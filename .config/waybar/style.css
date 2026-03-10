@@ -24,8 +24,8 @@ window#waybar {
 window#waybar > box {
   background: @blur_background;
   margin-top: 4.5px;
-  margin-left: 200.0px;
-  margin-right: 200.0px;
+  margin-left: 4.5px;
+  margin-right: 4.5px;
   margin-bottom: 0.0px;
   border-radius: 20.0px;
   padding: 4.0px;
@@ -133,7 +133,7 @@ tooltip label {
 */
 
 #custom-cava-left {
-  color: @primary_container;
+  color: transparent;
   background: transparent;
   border-radius: 30px;
   margin-left: 0px;
@@ -218,7 +218,7 @@ tooltip label {
 */
 
 #custom-cava-right {
-  color: @primary_container;
+  color: transparent;
   background: transparent;
   border-radius: 30px;
   margin-left: 0px;
