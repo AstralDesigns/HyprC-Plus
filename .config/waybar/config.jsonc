@@ -227,7 +227,7 @@
   "custom/distro": {
     "format": "{icon}",
     "format-icons": {
-      "default": "󱇐",
+      "default": "",
     },
     "tooltip": true,
     "tooltip-format": "Click: Candy-Settings\nRight-click: Hyprland-Settings",
