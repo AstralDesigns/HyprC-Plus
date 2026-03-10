@@ -112,7 +112,7 @@ var Daemon = class {
     
     // Load pinned apps efficiently
     loadPinnedApps() {
-        const pinnedFile = `${GLib.getenv('HOME')}/.hyprcandy/GJS/hyprcandydock/pinned`;
+        const pinnedFile = `${GLib.getenv('HOME')}/.config/pinned`;
         const file = Gio.File.new_for_path(pinnedFile);
         
         if (file.query_exists(null)) {
@@ -436,7 +436,7 @@ var Daemon = class {
     
     // Save pinned apps
     savePinnedApps() {
-        const pinnedFile = `${GLib.getenv('HOME')}/.hyprcandy/GJS/hyprcandydock/pinned`;
+        const pinnedFile = `${GLib.getenv('HOME')}/.config/pinned`;
         const file = Gio.File.new_for_path(pinnedFile);
         // replace_contents requires a Uint8Array, not a string
         const content = new TextEncoder().encode(Array.from(this.pinnedApps).join('\n') + '\n');
