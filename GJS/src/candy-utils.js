@@ -474,26 +474,26 @@ function createWaybarPanel() {
     });
     mkRow(panel, 'Bottom', botE);
 
-    // Start Icon — targets distro "default" icon on line 222 of config.jsonc
+    // Start Icon — targets distro "default" icon on line 230 of config.jsonc
     const distroE = mkEntry(5);
     function loadDistroIcon() {
         try {
             let [ok, c] = GLib.file_get_contents(WAYBAR_CONF);
             if (ok && c) {
                 let lines = imports.byteArray.toString(c).split('\n');
-                if (lines.length >= 222) {
-                    let m = lines[221].match(/"default":\s*"([^"]*)"/);
+                if (lines.length >= 230) {
+                    let m = lines[229].match(/"default":\s*"([^"]*)"/);
                     if (m) return m[1].trim();
                 }
             }
-        } catch (e) {}
+        } catch (e) { }
         return ' ';
     }
     distroE.set_text(loadDistroIcon());
     distroE.connect('activate', () => {
         const icon = distroE.get_text();
         if (icon) {
-            GLib.spawn_command_line_async(`sed -i '222s/"default": "[^"]*"/"default": "${icon}"/' '${WAYBAR_CONF}'`);
+            GLib.spawn_command_line_async(`sed -i '230s/"default": "[^"]*"/"default": "${icon}"/' '${WAYBAR_CONF}'`);
             GLib.spawn_command_line_async("bash -c 'sleep 0.3 && systemctl --user restart waybar.service &'");
         }
     });
