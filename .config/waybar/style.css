@@ -1,0 +1,588 @@
+@import "colors.css";
+@import "theme.css";
+/* @import "animation.css"; */
+
+/* ───────────────────────────────────────────────────────────────┤ global ├───
+*/
+* {
+  min-height: 0;
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ──────────────────────────────────────────────────────────┤ drop shadow ├───
+*/
+window#waybar {
+  background: none;
+  /*border: 0px solid @on_primary_fixed_variant; @primary_fixed_dim;*/
+  border-radius: 8.0px;
+}
+
+/* ───────────────────────────────────────────────────────────┤ background ├───
+*/
+window#waybar > box {
+  background: @blur_background;
+  margin-top: 4.5px;
+  margin-left: 200.0px;
+  margin-right: 200.0px;
+  margin-bottom: 0.0px;
+  border-radius: 20.0px;
+  padding: 4.0px;
+  border: 2px solid @on_primary_fixed_variant;
+}
+
+/* ─────────────────────────────────────────────────────────────┤ tooltips ├───
+*/
+tooltip {
+  background: @on_primary;
+  border: 2px solid @inverse_primary;
+  border-radius: 4px;
+}
+
+tooltip label {
+  color: @primary;
+  margin: 0.0px;
+}
+
+/* ───────────────────────────────────────────────────────────┤ workspaces ├───
+*/
+
+#workspaces {
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  padding-left: 2px;
+  padding-right: 2px;
+  border-radius: 20px;
+}
+
+#workspaces button {
+  color: @secondary_container;
+  transition: none;
+  margin-right: 2px;
+  margin-left: 2px;
+}
+
+#workspaces button:hover {
+  color: @primary;
+  color: @primary;
+  background: transparent;
+  text-shadow: none;
+}
+
+#workspaces button.active {
+  /*color: @on_primary;
+  background: @primary_fixed_dim;*/
+  color: @primary;
+  background: transparent;
+}
+
+#workspaces button.active:hover {
+  color: @primary;
+  color: @primary_container;
+}
+
+/* Occupied workspace (persistent with windows but not focused) */
+#workspaces button.persistent:not(.active):not(.empty) {
+  color: @primary;
+  background: transparent;
+}
+
+#workspaces button.persistent:not(.active):not(.empty):hover {
+  color: @primary;
+  color: @primary_container;
+}
+
+/* Urgent workspace (has urgent/notification windows) */
+#workspaces button.urgent {
+  color: @critical;
+}
+
+/* ──────────────────────────────────────────────────────────┤ overview ├───
+*/
+#custom-overview {
+  color: @secondary_container;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 6px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#custom-overview:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ───────────────────────────────────────────────────────────┤ media info ├───
+*/
+#mpris {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 0px;
+  padding-left: 8px;
+  padding-right: 4px;
+  border-radius: 30px;
+}
+
+#mpris:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ──────────────────────────────────────────────────────────────┤ cava-left ├───
+*/
+
+#custom-cava-left {
+  color: @primary_container;
+  background: transparent;
+  border-radius: 30px;
+  margin-left: 0px;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-weight: normal;
+  transition: all 0.3s ease;
+}
+
+/* When cava is hidden (no media playing) */
+#custom-cava-left.cava-hidden {
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+/* When cava is active (media playing) */
+#custom-cava-left.cava-active {
+  opacity: 1;
+}
+
+#custom-cava-left.cava-silent {
+    opacity: 0.6;
+}
+
+/* ─────────────────────────────────────────────────────────────────┤ date ├───
+*/
+
+#clock.date {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 2px;
+  margin-right: 0px;
+  border-radius: 30px;
+  padding-left: 7px;
+  padding-right: 6px;
+}
+
+#clock.date:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ──────────────────────────────────────────────────────────┤ distro icon ├───
+*/
+
+#custom-distro {
+  font-size: 14px;
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+  margin-left: 6px;
+  margin-right: 6px;
+}
+
+#custom-distro:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ─────────────────────────────────────────────────────────────────┤ time ├───
+*/
+
+#clock.time {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 0px;
+  margin-right: 0px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+#clock.time:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ──────────────────────────────────────────────────────────────┤ cava-right ├───
+*/
+
+#custom-cava-right {
+  color: @primary_container;
+  background: transparent;
+  border-radius: 30px;
+  margin-left: 0px;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-weight: normal;
+  transition: all 0.3s ease;
+}
+
+/* When cava is hidden (no media playing) */
+#custom-cava-right.cava-hidden {
+  padding: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+/* When cava is active (media playing) */
+#custom-cava-right.cava-active {
+  opacity: 1;
+}
+
+#custom-cava-right.cava-silent {
+    opacity: 0.6;
+}
+
+/* ──────────────────────────────────────────────────────────┤ rofi ├───
+*/
+#custom-rofi {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-right: 1px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#custom-rofi:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ─────────────────────────────────────────────────────────┤ weather ├───
+*/
+
+#custom-weather {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 6px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+#custom-weather:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ──────────────────────────────────────────────────────────────────┤ media ├───
+*/
+
+#custom-player {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 6px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 2px;
+}
+
+#custom-player:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ───────────────────────────────────────────────────────┤ idle_inhibitor ├───
+*/
+#idle_inhibitor {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-right: 1px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 1px;
+}
+
+#idle_inhibitor:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ────────────────────────────────────────────────────────────────┤ wi-fi ├───
+*/
+#custom-wifi {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-right: 1px;
+  border-radius: 30px;
+  padding-left: 5px;
+  padding-right: 9px;
+}
+
+#custom-wifi:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ────────────────────────────────────────────────────────────┤ bluetooth ├───
+*/
+#bluetooth {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 1px;
+  border-radius: 30px;
+  padding-left: 7px;
+  padding-right: 7px;
+}
+
+#bluetooth:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ────────────────────────────────────────────────────────┤ system update ├───
+*/
+#custom-update {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-right: 1px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#custom-update:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ────────────────────────────────────────────────────────────┤ window ├───
+*/
+#window {
+  border-radius: 20px;
+  margin-right: 6px;
+}
+
+/* ───────────────────────────────────────────────────────────┤ tray ├───
+*/
+#tray {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-right: 6px;
+  border-radius: 30px;
+  padding-left: 4px;
+  padding-right: 4px;
+  padding-top: 3px;
+  padding-bottom: 3px;
+}
+
+#tray:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ──────────────────────────────────────────────────────────┤ tray popovers ├───
+*/
+
+/* Tray popover windows */
+#tray popover,
+window.popup {
+  color: @primary;
+  background: @on_primary;
+  border-radius: 12px;
+  font-size: 11px;
+  padding: 10px;
+  margin-top: 8px;
+  font-family: "JetBrainsMono Nerd Font";
+  font-weight: normal;
+}
+
+/* Tray popover labels */
+#tray popover,
+window.popup label {
+  color: @primary;
+  font-size: 11px;
+  padding: 4px 4px;
+  min-height: 10px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* Tray popover menu items */
+#tray popover,
+window.popup menuitem {
+  color: @primary;
+  border-radius: 8px;
+}
+
+/* ───────────────────────────────────────────────────────┤ SywaNC ├───
+*/
+
+#custom-notification {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#custom-notification:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ─────────────────────────────────────────────────┤ power-profiles ├───
+*/
+#power-profiles-daemon {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-right: 0px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#power-profiles-daemon:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ────────────────────────────────────────────────────────┤ output device ├───
+*/
+
+#pulseaudio {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 6px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+#pulseaudio:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ───────────────────────────────────────────────────────────┤ brightness ├───
+*/
+
+#backlight {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 4px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+#backlight:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ──────────────────────────────────────────────────────────────┤ battery ├───
+*/
+
+#battery {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 6px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+#battery.warning {
+  color: @warning;
+}
+
+#battery.critical {
+  color: @critical;
+}
+
+#battery.charging {
+  color: @charging;
+}
+
+#battery:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ─────────────────────────────────────────────────────────┤ power button ├───
+*/
+
+#custom-power {
+  color: @secondary_container;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 6px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#custom-power:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim);
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+/* ────────────────────────────────────────────────┤ media-player ├───
+*/
+#custom-media-player {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 1px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#custom-media-player:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
+/* ──────────────────────────────────────────┤ toggles island ├───
+*/
+#toggles {
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  border-radius: 30px;
+}
+
+/* ──────────────────────────────────────────┤ media island ├───
+*/
+#media {
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 6px;
+  border-radius: 30px;
+}
+
+/* ───────────────────────────────────────────────────────────┤ font sizes ├───
+*/
+/*
+  NOTE: Be careful when changing font sizes, as they can affect alignment.
+
+  Try adjusting whole numbers first, then refine with decimals.
+
+  If you increase or decrease a value, make the same change to all properties
+  in this section to keep the layout consistent.
+*/
+
+* {
+  font-family: "JetBrainsMono Nerd Font";
+  font-size: 11px;
+  font-weight: bold;
+}
+
+tooltip label,
+#window label,
+#mpris {
+  font-weight: normal;
+  font-size: 10px;
+}

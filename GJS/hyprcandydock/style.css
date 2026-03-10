@@ -1,0 +1,224 @@
+/* HyprCandy Dock Theme - Matugen Colors */
+
+/* Main dock window */
+window.background {
+    background-color: @blur_background;
+    border-radius: 20px;    /* config: borderRadius */
+    border-style: solid;
+    border-width: 2px;      /* config: borderWidth  */
+    border-color: @on_primary_fixed_variant;
+}
+
+/* Dock box container */
+#box {
+    padding: 4px;           /* config: innerPadding */
+    background-color: transparent;
+}
+
+#active {
+    border-bottom: none;
+}
+
+/* Active indicator glyphs — font-size is injected at runtime from
+   INDICATOR_FONT_SIZE = round(ICON_SIZE * indicatorSizeFraction).
+   The rule here is a safe default; the JS-injected rule overrides it. */
+#active-indicator {
+    color: @primary;
+    font-size: 4px;
+    padding: 0px;
+    margin: 0px;
+}
+
+/* Start and trash icons — font-size matches ICON_SIZE.
+   JS injects an override rule so this stays in sync automatically. */
+#start-icon, #trash-icon {
+    color: @primary;
+    font-size: 22px;        /* overridden at runtime from ICON_SIZE */
+    padding: 0px;
+    margin: 0px;
+}
+
+/* Fallback icon — shown when an app has no icon in the theme.
+   Uses the Hyprland NF glyph (\u{F30F}).
+   font-size is overridden at runtime from ICON_SIZE. */
+.fallback-icon {
+    color: @primary;
+    font-size: 22px;        /* overridden at runtime from ICON_SIZE */
+    padding: 0px;
+    margin: 0px;
+}
+
+/* ── Button resets ─────────────────────────────────────────────────────
+   CRITICAL: do NOT use "all:unset" on button * — it strips the GTK4
+   'clicked' signal dispatch and breaks all click handlers inside popovers.
+   Use targeted property resets only. */
+button.app-button, button.dock-button {
+    background: none;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 2px;
+    margin: 0px;
+    min-width: 0;
+    min-height: 0;
+    outline: none;
+}
+
+button.app-button:hover, button.dock-button:hover {
+    background: none;
+    background-color: transparent;
+}
+
+button.app-button:focus, button.dock-button:focus {
+    background: none;
+    background-color: transparent;
+    outline: none;
+}
+
+button.app-button:active, button.dock-button:active {
+    background: none;
+    background-color: transparent;
+}
+
+/* Icon images inside app buttons */
+button.app-button image, button.dock-button image {
+    background: none;
+    background-color: transparent;
+    padding: 2px;
+    margin: 0px;
+}
+
+/* App containers — vertical (or horizontal for side docks) box */
+.app-container {
+    background: none;
+    background-color: transparent;
+    padding: 0px;
+    margin: 0px;
+}
+
+/* Indicator overlay — Gtk.Label placed directly on Gtk.Overlay with
+   valign=END so dots sit at the dock-facing edge of the button. */
+#indicator-overlay {
+    background: none;
+    background-color: transparent;
+    padding: 0px;
+    margin-bottom: 0px;
+}
+
+/* ── Dock separators (GNOME-style floating dividers) ───────────────────
+   dock-sep-v: vertical line in a horizontal dock (bottom / top)
+   dock-sep-h: horizontal line in a vertical dock (left / right)
+   Short, centered, @primary tinted — purely decorative. */
+separator.dock-sep-v {
+    background-color: @primary;
+    opacity: 0.85;
+    min-width:  1px;
+    max-width:  1px;
+    /* min-height / max-height injected at runtime = btnSize */
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+separator.dock-sep-h {
+    background-color: @primary;
+    opacity: 0.85;
+    min-height: 1px;
+    max-height: 1px;
+    /* min-width / max-width injected at runtime = btnSize */
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+/* ── Context menu popovers ─────────────────────────────────────────────
+   dock-popover class applied in JS for full specificity over GTK theme. */
+popover.dock-popover {
+    background-color: transparent;
+    border: none;
+    border-radius: 12px;
+    padding: 0px;
+    min-width: 200px;
+    box-shadow: none;
+    color: @primary;
+}
+
+popover.dock-popover > contents {
+    background-color: @on_secondary;
+    border: 1px solid alpha(@secondary, 0.5);
+    border-radius: 12px;
+    padding: 0px;
+    min-width: 200px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    color: @primary;
+}
+
+popover.dock-popover > arrow {
+    background-color: @on_secondary;
+}
+
+popover.dock-popover > contents separator,
+popover.dock-popover contents separator {
+    background-color: @secondary;
+    min-height: 1px;
+}
+
+popover.dock-popover menuitem,
+popover.dock-popover .popover-item {
+    background: none;
+    background-color: transparent;
+    color: @primary;
+    padding: 6px 12px;
+    min-width: 180px;
+    border-radius: 6px;
+}
+
+popover.dock-popover menuitem:hover,
+popover.dock-popover .popover-item:hover {
+    background-color: alpha(@primary, 0.12);
+}
+
+popover.dock-popover .popover-action {
+    font-size: 12px;
+    padding: 4px 8px;
+}
+
+/* Plain sub-label (e.g. chevron labels) */
+popover.dock-popover .popover-sublabel {
+    font-size: 11px;
+    font-weight: bold;
+    color: @primary;
+    margin-top: 6px;
+    margin-bottom: 2px;
+    padding: 0px 12px;
+}
+
+/* Section headers: GPU / Move-to-Workspace — centred, @inverse_primary */
+popover.dock-popover .popover-section-header {
+    font-size: 11px;
+    font-weight: bold;
+    color: @inverse_primary;
+    margin-top: 4px;
+    margin-bottom: 2px;
+    padding: 0px 12px;
+}
+
+popover.dock-popover .popover-toggle {
+    font-size: 10px;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 2px 6px;
+}
+
+/* Buttons inside popovers — targeted reset only (NO all:unset) */
+popover.dock-popover button {
+    background: none;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    min-width: 0;
+    min-height: 0;
+    padding: 0px;
+    margin: 0px;
+    outline: none;
+}
+
