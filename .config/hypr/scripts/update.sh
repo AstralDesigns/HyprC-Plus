@@ -8,7 +8,7 @@ kitty --class="floating-installer" \
       --override=initial_window_height=600 \
       -e bash -c "
 rm -rf ~/candyinstall
-git clone --depth 1 https://github.com/AstralDesigns/HyprC-Plus.git && 
+git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git && 
 cd candyinstall && 
 chmod +x Candy_Update.sh &&
 bash Candy_Update.sh
