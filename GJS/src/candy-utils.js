@@ -477,6 +477,16 @@ function createWaybarPanel() {
     // Start Icon — targets distro "default" icon on line 230 of config.jsonc
     const distroE = mkEntry(5);
     function loadDistroIcon() {
+        // Prefer state file (written by candy-utils, read by waybar-distro-icon.sh)
+        try {
+            const stateFile = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'waybar-start-icon.txt']);
+            let [ok, c] = GLib.file_get_contents(stateFile);
+            if (ok && c) {
+                const icon = imports.byteArray.toString(c).trim();
+                if (icon) return icon;
+            }
+        } catch (e) {}
+        // Fall back to reading config.jsonc line 230 (initial / legacy)
         try {
             let [ok, c] = GLib.file_get_contents(WAYBAR_CONF);
             if (ok && c) {
@@ -486,16 +496,20 @@ function createWaybarPanel() {
                     if (m) return m[1].trim();
                 }
             }
-        } catch (e) { }
+        } catch (e) {}
         return ' ';
     }
     distroE.set_text(loadDistroIcon());
     distroE.connect('activate', () => {
         const icon = distroE.get_text();
-        if (icon) {
-            GLib.spawn_command_line_async(`sed -i '230s/"default": "[^"]*"/"default": "${icon}"/' '${WAYBAR_CONF}'`);
-            GLib.spawn_command_line_async("bash -c 'sleep 0.3 && systemctl --user restart waybar.service &'");
-        }
+        if (!icon) return;
+        // Write state file — waybar-distro-icon.sh polls this and re-emits on SIGRTMIN+9
+        const stateDir = GLib.build_filenamev([HOME, '.config', 'hyprcandy']);
+        GLib.mkdir_with_parents(stateDir, 0o755);
+        const stateFile = GLib.build_filenamev([stateDir, 'waybar-start-icon.txt']);
+        GLib.file_set_contents(stateFile, icon);
+        // Signal waybar to re-run the exec script — no restart needed
+        GLib.spawn_command_line_async('pkill -SIGRTMIN+9 waybar');
     });
     mkRow(panel, 'Start Icon', distroE);
 
@@ -526,7 +540,8 @@ function createWaybarPanel() {
                 );
             }
         }
-        GLib.spawn_command_line_async("bash -c 'sleep 0.3 && systemctl --user restart waybar.service &'");
+        // Reload waybar config without restarting the service — no flicker
+        GLib.spawn_command_line_async('killall -SIGUSR2 waybar');
     }
 
     const wsIcons = [

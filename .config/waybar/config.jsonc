@@ -225,13 +225,15 @@
   // ──────────────────────────────────────────────────────────────┤ distro ├───
 
   "custom/distro": {
-    "format": "{icon}",
-    "format-icons": {
-      "default": "",
-    },
+    "exec": "~/.config/waybar/scripts/waybar-distro-icon.sh",
+    "return-type": "json",
+    "format": "{}",
+    "interval": "once",
+    "signal": 9,
     "tooltip": true,
-    "tooltip-format": "Click: Candy-Settings\nRight-click: Hyprland-Settings",
     "on-click": "~/.hyprcandy/GJS/toggle-control-center.sh",
+    "min-length": 1,
+    "max-length": 1
     //"on-click-right": "DRI_PRIME=1 ~/.hyprcandy/GJS/toggle-hyprland-settings.sh",
   },
 
