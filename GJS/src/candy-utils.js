@@ -497,7 +497,7 @@ function createWaybarPanel() {
                 }
             }
         } catch (e) {}
-        return ' ';
+        return '';
     }
     distroE.set_text(loadDistroIcon());
     distroE.connect('activate', () => {
@@ -1077,8 +1077,8 @@ function createControlCenterContent() {
 
     // Menu items
     const menuDefs = [
-        ['󰔎  Themes',    'themes'],
         ['  Hyprland',  'hyprland'],
+        ['󰔎  Themes',    'themes'],
         ['󱟛  Bar',    'waybar'],
         ['󰞒  Dock',      'dock'],
         ['  SwayNC',    'swaync'],
