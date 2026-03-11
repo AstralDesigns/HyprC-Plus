@@ -204,16 +204,74 @@ var Daemon = class {
         return iconName;
     }
 
-    // Launch a pinned-but-not-running app via its desktop entry.
-    launchApp(className) {
+    // Spawn a child process with LD_PRELOAD cleared.
+    // The dock is launched with LD_PRELOAD=libgtk4-layer-shell.so — if we don't
+    // unset it every child process inherits it, which breaks GTK3, Electron,
+    // Firefox-based apps and anything launched transitively (e.g. apps from rofi).
+    _spawnClean(argv, extraEnv) {
+        let envp = GLib.get_environ();
+        envp = GLib.environ_unsetenv(envp, 'LD_PRELOAD');
+        if (extraEnv) {
+            for (const [k, v] of Object.entries(extraEnv))
+                envp = GLib.environ_setenv(envp, k, v, true);
+        }
+        GLib.spawn_async(
+            GLib.get_home_dir(),
+            argv,
+            envp,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null, null
+        );
+    }
+
+    // Resolve the best exec command for a class name.
+    // Strategy (in order):
+    //   1. Desktop entry via _findAppInfo (covers XDG, Flatpak, Snap)
+    //   2. Scan all desktop files matching Exec= or Name= basename
+    //   3. which — covers plain binaries and scripts with no .desktop
+    _resolveExec(className) {
         const info = this._findAppInfo(className);
         if (info) {
-            try { info.launch([], null); return; } catch (e) {
-                console.warn(`⚠️ launch() failed for ${className}:`, e.message);
-            }
+            const cmd = info.get_commandline && info.get_commandline();
+            if (cmd) return cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
         }
-        const cmd = this.getExecFromDesktop(className);
-        GLib.spawn_command_line_async(cmd || className.toLowerCase());
+        const needle = this._normalizeClass(className).toLowerCase();
+        try {
+            for (const appInfo of Gio.AppInfo.get_all()) {
+                const cmd = appInfo.get_commandline && appInfo.get_commandline();
+                if (!cmd) continue;
+                const execBase = cmd.split(/\s+/)[0].split('/').pop().toLowerCase();
+                const name = (appInfo.get_name && appInfo.get_name() || '').toLowerCase();
+                if (execBase === needle || name === needle ||
+                        name.includes(needle) || execBase.includes(needle)) {
+                    return cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
+                }
+            }
+        } catch (_) {}
+        try {
+            const bin = GLib.find_program_in_path(className) ||
+                        GLib.find_program_in_path(className.toLowerCase()) ||
+                        GLib.find_program_in_path(this._normalizeClass(className));
+            if (bin) return bin;
+        } catch (_) {}
+        return null;
+    }
+
+    // Launch a pinned-but-not-running app.
+    launchApp(className) {
+        const raw = this._resolveExec(className);
+        if (!raw) {
+            console.warn(`⚠️ launchApp: could not resolve exec for "${className}"`);
+            return;
+        }
+        console.log(`🚀 Launching ${className} → ${raw}`);
+        try {
+            const [, argv] = GLib.shell_parse_argv(raw);
+            this._spawnClean(argv);
+            console.log(`✅ Launched ${className}`);
+        } catch (e) {
+            console.error(`❌ Launch failed for ${className}:`, e.message);
+        }
     }
     
     // Get initial client list
@@ -575,13 +633,13 @@ var Daemon = class {
         }
 
         try {
-            GLib.spawn_async(null, argv, envp,
-                GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-                null, null);
+            // _spawnClean handles LD_PRELOAD removal; extraEnv overlays GPU vars on top
+            const extraEnv = envp ? Object.fromEntries(
+                envp.map(e => e.split('=')).filter(p => p.length === 2).map(([k,v]) => [k,v])
+            ) : {};
+            this._spawnClean(argv, extraEnv);
         } catch (e) {
-            console.error('❌ launchWithGPU spawn_async failed:', e.message);
-            // Fallback to plain launch
-            try { GLib.spawn_command_line_async(clean); } catch (_) {}
+            console.error('❌ launchWithGPU failed:', e.message);
         }
     }
 
