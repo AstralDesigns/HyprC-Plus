@@ -126,8 +126,8 @@ separator.dock-sep-h {
     min-height: 1px;
     max-height: 1px;
     /* min-width / max-width injected at runtime = btnSize */
-    margin-top: 8px;
-    margin-bottom: 8px;
+    margin-left: 8px;
+    margin-right: 8px;
 }
 
 /* ── Context menu popovers ─────────────────────────────────────────────
