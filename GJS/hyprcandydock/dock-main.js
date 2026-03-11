@@ -37,6 +37,25 @@ const DockConfig = imports.config.DockConfig;
 })();
 
 const IS_VERTICAL = (DockConfig.position === 'left' || DockConfig.position === 'right');
+// Spawn a child with LD_PRELOAD cleared so libgtk4-layer-shell is not
+// inherited by apps launched from the dock (or transitively via rofi etc.)
+function _spawnCleanCmd(cmdStr) {
+    try {
+        const [, argv] = GLib.shell_parse_argv(cmdStr);
+        let envp = GLib.get_environ();
+        envp = GLib.environ_unsetenv(envp, 'LD_PRELOAD');
+        GLib.spawn_async(
+            GLib.get_home_dir(),
+            argv,
+            envp,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null, null
+        );
+    } catch (e) {
+        console.error('❌ _spawnCleanCmd failed:', e.message);
+    }
+}
+
 
 // --- Configuration (live from DockConfig) -----------------------------
 // Three independent size axes: app icons, glyph icons, indicators
@@ -616,7 +635,7 @@ const HyprCandyDock = GObject.registerClass({
 
         // Left click - launch rofi
         btn.connect('clicked', () => {
-            GLib.spawn_command_line_async('rofi -show drun');
+            _spawnCleanCmd('rofi -show drun');
         });
 
         // Right click - show settings menu
@@ -649,7 +668,7 @@ const HyprCandyDock = GObject.registerClass({
         btn.set_tooltip_text('Trash');
 
         btn.connect('clicked', () => {
-            GLib.spawn_command_line_async('nautilus trash:///');
+            _spawnCleanCmd('nautilus trash:///');
         });
 
         this.mainBox.append(btn);
@@ -1103,7 +1122,7 @@ const HyprCandyDock = GObject.registerClass({
             newWinBtn.set_halign(Gtk.Align.FILL);
             newWinBtn.connect('clicked', () => {
                 const execCmd = this.daemon.getExecFromDesktop(data.iconClass || data.className);
-                GLib.spawn_command_line_async(execCmd || (data.iconClass || data.className).toLowerCase());
+                _spawnCleanCmd(execCmd || (data.iconClass || data.className).toLowerCase());
                 mainPopover.popdown();
             });
             menuBox.append(newWinBtn);
@@ -1185,7 +1204,7 @@ const HyprCandyDock = GObject.registerClass({
         settingsBtn.add_css_class('popover-item');
         settingsBtn.set_halign(Gtk.Align.FILL);
         settingsBtn.connect('clicked', () => {
-            GLib.spawn_command_line_async('bash -c "$HOME/.hyprcandy/GJS/toggle-hyprland-settings.sh"');
+            _spawnCleanCmd('bash -c "$HOME/.hyprcandy/GJS/toggle-hyprland-settings.sh"');
             popover.popdown();
         });
         menuBox.append(settingsBtn);
