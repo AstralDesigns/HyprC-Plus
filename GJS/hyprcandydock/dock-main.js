@@ -37,23 +37,15 @@ const DockConfig = imports.config.DockConfig;
 })();
 
 const IS_VERTICAL = (DockConfig.position === 'left' || DockConfig.position === 'right');
-// Spawn a child with LD_PRELOAD cleared so libgtk4-layer-shell is not
-// inherited by apps launched from the dock (or transitively via rofi etc.)
 function _spawnCleanCmd(cmdStr) {
     try {
         const [, argv] = GLib.shell_parse_argv(cmdStr);
         let envp = GLib.get_environ();
         envp = GLib.environ_unsetenv(envp, 'LD_PRELOAD');
-        GLib.spawn_async(
-            GLib.get_home_dir(),
-            argv,
-            envp,
+        GLib.spawn_async(GLib.get_home_dir(), argv, envp,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-            null, null
-        );
-    } catch (e) {
-        console.error('❌ _spawnCleanCmd failed:', e.message);
-    }
+            null, null);
+    } catch (e) { console.error('_spawnCleanCmd failed:', e.message); }
 }
 
 
@@ -364,98 +356,124 @@ function teardownColorMonitor() {
 }
 
 // --- Drag and Drop Manager --------------------------------------------
+//
+// Same-process DnD: we never need to serialise data across a process boundary
+// so we skip the GTK4 content type system entirely.  The dragged className is
+// stored as an instance variable; the DropTarget fires 'drop' purely as a
+// positional signal and we read this.draggedClassName directly.
+//
+// The provider still needs to offer *something* so GTK starts the drag — we
+// use a plain empty string GVariant.  DropTarget accepts the same mime type
+// ('text/plain;charset=utf-8' which is what TYPE_STRING maps to in GTK4).
+//
+// Drag icon: we snapshot the button widget into a Gtk.DragIcon paintable so
+// the user sees the actual app icon while dragging.
 var DragDropManager = class {
+    // Pattern from working GTK4 reorder example (GNOME Discourse #8422):
+    //  - Payload = plain integer (source index). set_gtypes([TYPE_INT]) matches exactly.
+    //  - DragSource on the Gtk.Button (events reach it before the overlay).
+    //  - DropTarget on each Gtk.Overlay (drop fires on the specific slot released over).
+    //  - No container-level drop target needed.
+    //  - isDragging blocks _updateFromDaemon from reverting order mid-drag.
     constructor(dock) {
-        this.dock = dock;
-        this.draggedWidget = null;
-        if (this.dock.mainBox) {
-            this.setupDragDrop();
+        this.dock         = dock;
+        this.isDragging   = false;
+        this.draggedClass = null;
+    }
+
+    _appEntries() {
+        return Array.from(this.dock.clientWidgets.entries());
+    }
+
+    _applyReorder(draggedClass, afterClass) {
+        const entries = this._appEntries();
+        const from    = entries.findIndex(([c]) => c === draggedClass);
+        if (from === -1) return;
+        const [entry] = entries.splice(from, 1);
+        const toIdx   = afterClass ? entries.findIndex(([c]) => c === afterClass) : -1;
+        entries.splice(toIdx === -1 ? 0 : toIdx + 1, 0, entry);
+
+        // Rebuild Map + reorder visual children.
+        // Anchor from _startSeparator so apps never land before the start button.
+        this.dock.clientWidgets.clear();
+        for (const [c, w] of entries) this.dock.clientWidgets.set(c, w);
+        let prev = this.dock._startSeparator || null;
+        for (const [, w] of entries) {
+            this.dock.mainBox.reorder_child_after(w, prev);
+            prev = w;
         }
     }
 
-    setupDragDrop() {
-        if (!this.dock.mainBox) return;
-        
-        // GTK4 DropTarget for the main box
-        const dropTarget = new Gtk.DropTarget({
-            actions: Gdk.DragAction.MOVE,
-            // Use proper GTK4 content format
-            formats: Gdk.ContentFormats.new_for_gtype(Gtk.Widget),
+    setupDragSource(btn, overlay, className) {
+        // ── DragSource on the button ──────────────────────────────────────
+        const dragSource = new Gtk.DragSource({ actions: Gdk.DragAction.MOVE });
+
+        dragSource.connect('prepare', () => {
+            const idx = this._appEntries().findIndex(([c]) => c === className);
+            return Gdk.ContentProvider.new_for_value(idx >= 0 ? idx : 0);
         });
 
-        dropTarget.connect('drop', (target, value, x, y) => {
-            this._onDrop(value, x, y);
-            return true;
-        });
-
-        dropTarget.connect('motion', (target, x, y) => {
-            return this._onDragMotion(x, y);
-        });
-
-        dropTarget.connect('leave', () => {
-            this._onDragLeave();
-        });
-
-        this.dock.mainBox.add_controller(dropTarget);
-    }
-
-    _onDrop(widget, x, y) {
-        if (!widget || widget === this.draggedWidget) return;
-
-        // Find drop position
-        let dropAfter = null;
-        let child = this.dock.mainBox.get_first_child();
-        
-        while (child) {
-            const alloc = child.get_allocation();
-            if (x > alloc.x + alloc.width / 2) {
-                dropAfter = child;
-            }
-            child = child.get_next_sibling();
-        }
-
-        // Reorder widget
-        if (dropAfter && dropAfter !== widget) {
-            this.dock.mainBox.reorder_child_after(widget, dropAfter);
-        } else if (!dropAfter && this.dock.mainBox.get_first_child() !== widget) {
-            this.dock.mainBox.reorder_child_after(widget, null);
-        }
-
-        this.draggedWidget = null;
-    }
-
-    _onDragMotion(x, y) {
-        // Visual feedback could be added here
-        return Gdk.DragAction.MOVE;
-    }
-
-    _onDragLeave() {
-        // Cleanup visual feedback
-    }
-
-    setupDragSource(widget) {
-        const dragSource = new Gtk.DragSource({
-            actions: Gdk.DragAction.MOVE,
-        });
-
-        dragSource.connect('prepare', (source, x, y) => {
-            this.draggedWidget = widget;
-            // Use GTK4 content provider correctly
-            const content = new Gdk.ContentProvider();
-            content.set_value(widget, Gtk.Widget.$gtype);
-            return content;
-        });
-
-        dragSource.connect('drag-begin', () => {
-            widget.set_opacity(0.5);
+        dragSource.connect('drag-begin', (source) => {
+            this.isDragging   = true;
+            this.draggedClass = className;
+            overlay.set_opacity(0.4);
+            try { source.set_icon(Gtk.WidgetPaintable.new(btn), 0, 0); } catch (_) {}
         });
 
         dragSource.connect('drag-end', () => {
-            widget.set_opacity(1.0);
-            this.draggedWidget = null;
+            overlay.set_opacity(1.0);
+            // Always clear — successful drop (deleteData=true) must also unlock updates
+            this.isDragging   = false;
+            this.draggedClass = null;
         });
 
-        widget.add_controller(dragSource);
+        btn.add_controller(dragSource);
+
+        // ── DropTarget on the overlay ─────────────────────────────────────
+        const dropTarget = new Gtk.DropTarget({ actions: Gdk.DragAction.MOVE });
+        dropTarget.set_gtypes([GObject.TYPE_INT]);
+
+        dropTarget.connect('motion', () => {
+            overlay.add_css_class('drag-target-hover');
+            return Gdk.DragAction.MOVE;
+        });
+        dropTarget.connect('leave', () => {
+            overlay.remove_css_class('drag-target-hover');
+        });
+
+        dropTarget.connect('drop', (_t, srcIdx, x, y) => {
+            overlay.remove_css_class('drag-target-hover');
+            const entries = this._appEntries();
+            if (srcIdx < 0 || srcIdx >= entries.length) return false;
+
+            const draggedClass = entries[srcIdx][0];
+            if (draggedClass === className) return false;
+
+            // Decide insert position from pointer location within this slot
+            const isVert = IS_VERTICAL;
+            const alloc  = overlay.get_allocation();
+            const half   = isVert ? alloc.height / 2 : alloc.width / 2;
+            const pos    = isVert ? y : x;
+
+            let afterClass;
+            if (pos >= half) {
+                // Drop in second half → insert after this slot
+                afterClass = className;
+            } else {
+                // Drop in first half → insert before this slot
+                const myIdx = entries.findIndex(([c]) => c === className);
+                afterClass  = myIdx > 0 ? entries[myIdx - 1][0] : null;
+            }
+
+            this._applyReorder(draggedClass, afterClass);
+            this.dock.daemon.reorderPinned(draggedClass, afterClass);
+
+            this.isDragging   = false;
+            this.draggedClass = null;
+            return true;
+        });
+
+        overlay.add_controller(dropTarget);
     }
 };
 
@@ -676,6 +694,9 @@ const HyprCandyDock = GObject.registerClass({
     }
 
     _updateFromDaemon(clientData) {
+        // Don't touch widget order while a drag is in flight
+        if (this.dragDropManager && this.dragDropManager.isDragging) return;
+
         const currentClasses = new Set(this.clientWidgets.keys());
         const newClasses = new Set(clientData.map(d => d.className));
 
@@ -700,17 +721,22 @@ const HyprCandyDock = GObject.registerClass({
             }
         }
 
-        // Reorder: sep-end → trash must always be the final two widgets
-        const lastApp = this._getLastAppWidget();
-        if (this._endSeparator) {
-            this.mainBox.reorder_child_after(this._endSeparator, lastApp);
-        }
-        if (this._trashButton) {
-            this.mainBox.reorder_child_after(
-                this._trashButton, this._endSeparator || lastApp);
+        // Sync visual order to clientData order (= pinnedApps order after a drag).
+        // Anchor from _startSeparator so apps never land before the start button.
+        let prev = this._startSeparator || null;
+        for (const data of clientData) {
+            const w = this.clientWidgets.get(data.className);
+            if (w) { this.mainBox.reorder_child_after(w, prev); prev = w; }
         }
 
-        // Surface width may have changed (app added/removed) — re-sync zone
+        // sep-end and trash always last
+        const lastApp = this._getLastAppWidget();
+        if (this._endSeparator)
+            this.mainBox.reorder_child_after(this._endSeparator, lastApp);
+        if (this._trashButton)
+            this.mainBox.reorder_child_after(
+                this._trashButton, this._endSeparator || lastApp);
+
         this._scheduleExclusiveZoneUpdate();
     }
 
@@ -821,11 +847,14 @@ const HyprCandyDock = GObject.registerClass({
         // Allow input events to pass through the transparent dots area to the button
         overlay.set_clip_overlay(dotsBox, true);
 
-        this.dragDropManager.setupDragSource(overlay);
+        this.dragDropManager.setupDragSource(btn, overlay, data.className);
 
-        if (this._endSeparator) {
-            const lastWidget = this._getLastAppWidget();
-            this.mainBox.insert_child_after(overlay, lastWidget);
+        // Always insert between the two separators.
+        // Anchor: last existing app widget, or _startSeparator if no apps yet.
+        // This prevents new widgets from appearing before the start button.
+        const anchor = this._getLastAppWidget() || this._startSeparator;
+        if (anchor) {
+            this.mainBox.insert_child_after(overlay, anchor);
         } else {
             this.mainBox.append(overlay);
         }

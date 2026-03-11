@@ -204,31 +204,17 @@ var Daemon = class {
         return iconName;
     }
 
-    // Spawn a child process with LD_PRELOAD cleared.
-    // The dock is launched with LD_PRELOAD=libgtk4-layer-shell.so — if we don't
-    // unset it every child process inherits it, which breaks GTK3, Electron,
-    // Firefox-based apps and anything launched transitively (e.g. apps from rofi).
     _spawnClean(argv, extraEnv) {
         let envp = GLib.get_environ();
         envp = GLib.environ_unsetenv(envp, 'LD_PRELOAD');
-        if (extraEnv) {
+        if (extraEnv)
             for (const [k, v] of Object.entries(extraEnv))
                 envp = GLib.environ_setenv(envp, k, v, true);
-        }
-        GLib.spawn_async(
-            GLib.get_home_dir(),
-            argv,
-            envp,
+        GLib.spawn_async(GLib.get_home_dir(), argv, envp,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-            null, null
-        );
+            null, null);
     }
 
-    // Resolve the best exec command for a class name.
-    // Strategy (in order):
-    //   1. Desktop entry via _findAppInfo (covers XDG, Flatpak, Snap)
-    //   2. Scan all desktop files matching Exec= or Name= basename
-    //   3. which — covers plain binaries and scripts with no .desktop
     _resolveExec(className) {
         const info = this._findAppInfo(className);
         if (info) {
@@ -240,12 +226,11 @@ var Daemon = class {
             for (const appInfo of Gio.AppInfo.get_all()) {
                 const cmd = appInfo.get_commandline && appInfo.get_commandline();
                 if (!cmd) continue;
-                const execBase = cmd.split(/\s+/)[0].split('/').pop().toLowerCase();
+                const execBase = cmd.split(' ')[0].split('/').pop().toLowerCase();
                 const name = (appInfo.get_name && appInfo.get_name() || '').toLowerCase();
                 if (execBase === needle || name === needle ||
-                        name.includes(needle) || execBase.includes(needle)) {
+                        name.includes(needle) || execBase.includes(needle))
                     return cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
-                }
             }
         } catch (_) {}
         try {
@@ -257,21 +242,34 @@ var Daemon = class {
         return null;
     }
 
-    // Launch a pinned-but-not-running app.
     launchApp(className) {
         const raw = this._resolveExec(className);
-        if (!raw) {
-            console.warn(`⚠️ launchApp: could not resolve exec for "${className}"`);
-            return;
-        }
-        console.log(`🚀 Launching ${className} → ${raw}`);
+        if (!raw) { console.warn('launchApp: no exec for ' + className); return; }
         try {
             const [, argv] = GLib.shell_parse_argv(raw);
             this._spawnClean(argv);
-            console.log(`✅ Launched ${className}`);
-        } catch (e) {
-            console.error(`❌ Launch failed for ${className}:`, e.message);
-        }
+        } catch (e) { console.error('Launch failed: ' + e.message); }
+    }
+
+    reorderPinned(draggedClass, afterClass) {
+        const findOrig = (n) => {
+            for (const orig of this.pinnedApps)
+                if (this._normalizeClass(orig) === n || orig === n) return orig;
+            return n;
+        };
+        const draggedOrig = findOrig(draggedClass);
+        const afterOrig   = afterClass ? findOrig(afterClass) : null;
+        if (!this.pinnedApps.has(draggedOrig)) return;
+        const order = Array.from(this.pinnedApps);
+        const from  = order.indexOf(draggedOrig);
+        if (from === -1) return;
+        order.splice(from, 1);
+        const to = afterOrig ? order.indexOf(afterOrig) : -1;
+        if (to === -1) order.unshift(draggedOrig);
+        else order.splice(to + 1, 0, draggedOrig);
+        this.pinnedApps = new Set(order);
+        this.savePinnedApps();
+        console.log('Reordered: ' + draggedOrig + ' after ' + (afterOrig || 'start'));
     }
     
     // Get initial client list
@@ -633,14 +631,11 @@ var Daemon = class {
         }
 
         try {
-            // _spawnClean handles LD_PRELOAD removal; extraEnv overlays GPU vars on top
-            const extraEnv = envp ? Object.fromEntries(
-                envp.map(e => e.split('=')).filter(p => p.length === 2).map(([k,v]) => [k,v])
-            ) : {};
-            this._spawnClean(argv, extraEnv);
-        } catch (e) {
-            console.error('❌ launchWithGPU failed:', e.message);
-        }
+            envp = GLib.environ_unsetenv(envp || GLib.get_environ(), 'LD_PRELOAD');
+            GLib.spawn_async(GLib.get_home_dir(), argv, envp,
+                GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                null, null);
+        } catch (e) { console.error('launchWithGPU failed:', e.message); }
     }
 
     // Get executable command from desktop file
