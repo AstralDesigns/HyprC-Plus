@@ -303,6 +303,10 @@ scrollbar trough * {
   margin-right: 0;
 }
 
+.widget-backlight > flowbox {
+  background: transparent;
+}
+
 * {
     font-size: medium;
 }

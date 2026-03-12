@@ -597,6 +597,18 @@ function createHyprlandPanel() {
     pickerBtn.connect('clicked', () => GLib.spawn_command_line_async('hyprpicker'));
     panel.append(pickerBtn);
 
+    // X-Ray toggle
+    let xrayOn = loadBool('xray.state', false);
+    const xrayBtn = mkToggle(xrayOn ? 'X-Ray On' : 'X-Ray Off', xrayOn);
+    xrayBtn.connect('clicked', () => {
+        xrayOn = !xrayOn;
+        GLib.spawn_command_line_async('bash -c "$HOME/.config/hypr/scripts/xray.sh"');
+        xrayBtn.set_label(xrayOn ? 'X-Ray On' : 'X-Ray Off');
+        if (xrayOn) xrayBtn.add_css_class('cc-active'); else xrayBtn.remove_css_class('cc-active');
+        saveBool('xray.state', xrayOn);
+    });
+    panel.append(xrayBtn);
+    
     // Opacity toggle
     let opacOn = loadBool('opacity.state', false);
     const opacBtn = mkToggle(opacOn ? 'Opacity On' : 'Opacity Off', opacOn);
