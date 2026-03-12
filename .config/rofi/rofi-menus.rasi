@@ -34,7 +34,7 @@ configuration {
 @theme "~/.config/rofi/colors.rasi"
 
 /* ---- Load wallpaper ---- */
-@import "~/.config/hyprcandy/cache/current_wallpaper_height.rasi"
+//@import "~/.config/hyprcandy/cache/current_wallpaper_height.rasi"//
 
 /* ---- Border color ---- */
 @import "~/.config/rofi/rofi.rasi"
@@ -81,7 +81,7 @@ mainbox {
     orientation:                 horizontal;
     children:                    [ "listbox" ];
     background-color:            transparent;
-    background-image:            @current-image;
+    //background-image:            @current-image;
 }
 
 /* ---- Imagebox ---- */

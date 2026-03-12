@@ -264,7 +264,7 @@ fi
     
     # Add header with dynamic categories
     {
-        echo "🎮 Hyprland Keybindings |  is the SUPER key"
+        echo " Hyprland Keybindings |  is the SUPER key"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo "Search for category or keybind specific keywords"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
