@@ -5,7 +5,7 @@
 # No waybar restart needed.
 
 STATE_FILE="$HOME/.config/hyprcandy/waybar-start-icon.txt"
-DEFAULT_ICON="󰫢"   # fallback if state file absent
+DEFAULT_ICON="󰫣"   # fallback if state file absent
 
 icon=$(cat "$STATE_FILE" 2>/dev/null | tr -d '\n')
 [ -z "$icon" ] && icon="$DEFAULT_ICON"
