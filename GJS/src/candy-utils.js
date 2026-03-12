@@ -902,8 +902,13 @@ function createSDDMPanel() {
             saveState('sddm_blur.state', n.toString());
         }
     });
-    mkRow(panel, 'Blur Radius', blurE);
-
+    mkRow(panel, 'Blur R', blurE);
+    
+    // Preview SDDM
+    const previewBtn = mkBtn('󰈈  Preview');
+    previewBtn.connect('clicked', () => GLib.spawn_command_line_async(`sddm-greeter --test-mode --theme /usr/share/sddm/themes/sugar-candy`));
+    panel.append(previewBtn);
+    
     return panel;
 }
 
