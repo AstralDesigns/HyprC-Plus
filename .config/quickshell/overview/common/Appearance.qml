@@ -32,6 +32,7 @@ Singleton {
         property color m3onPrimaryContainer: "#F9D8FF"
         property color m3secondary: "#D5C0D7"
         property color m3onSecondary: "#392C3D"
+        property color m3onSecondaryTransparent: Qt.rgba(0x39/255, 0x2C/255, 0x3D/255, 0.4)
         property color m3secondaryContainer: "#534457"
         property color m3onSecondaryContainer: "#F2DCF3"
         property color m3background: "#161217"
@@ -44,6 +45,7 @@ Singleton {
         property color m3onSurface: "#EAE0E7"
         property color m3surfaceVariant: "#4C444D"
         property color m3onSurfaceVariant: "#CFC3CD"
+        property color m3inversePrimary: "#7B3FA0"
         property color m3inverseSurface: "#EAE0E7"
         property color m3inverseOnSurface: "#342F34"
         property color m3outline: "#988E97"
@@ -70,10 +72,13 @@ Singleton {
         property color colSecondary: m3colors.m3secondary
         property color colSecondaryContainer: m3colors.m3secondaryContainer
         property color colOnSecondaryContainer: m3colors.m3onSecondaryContainer
-        property color colTooltip: m3colors.m3inverseSurface
-        property color colOnTooltip: m3colors.m3inverseOnSurface
+        property color colTooltip: m3colors.m3inversePrimary
+        property color colOnTooltip: m3colors.m3primary
         property color colShadow: ColorUtils.transparentize(m3colors.m3shadow, 0.7)
         property color colOutline: m3colors.m3outline
+        property color colOverviewBg: m3colors.m3onSecondaryTransparent ?? Qt.rgba(0x39/255, 0x2C/255, 0x3D/255, 0.4)
+        property color colOverviewRowBg: m3colors.m3inversePrimary ?? "#7B3FA0"
+        property color colOverviewText: m3colors.m3primary ?? "#E5B6F2"
     }
 
     rounding: QtObject {

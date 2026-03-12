@@ -13,11 +13,11 @@ Singleton {
         }
 
         property QtObject overview: QtObject {
-            property int rows: 2
-            property int columns: 5
-            property real scale: 0.16
             property bool enable: true
-            property bool hideEmptyRows: true  // Hide workspace rows with no windows
+            property int numWorkspaces: 10        // Number of workspace rows shown
+            property real workspaceLabelWidth: 52 // px width of the workspace number cell
+            property real windowStripSpacing: 6   // px spacing between window preview cells
+            property bool hideEmptyWorkspaces: false // Hide workspace rows with no windows (except active)
         }
         
         property QtObject hacks: QtObject {

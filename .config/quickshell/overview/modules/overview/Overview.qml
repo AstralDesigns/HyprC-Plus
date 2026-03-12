@@ -28,14 +28,14 @@ Scope {
             color: "transparent"
 
             mask: Region {
-                item: GlobalStates.overviewOpen ? keyHandler : null
+                item: columnLayout
             }
 
             anchors {
                 top: true
+                left: true
+                right: true
                 bottom: true
-                left: !(Config?.options.overview.enable ?? true) 
-                right: !(Config?.options.overview.enable ?? true) 
             }
 
             HyprlandFocusGrab {
@@ -53,6 +53,8 @@ Scope {
                 target: GlobalStates
                 function onOverviewOpenChanged() {
                     if (GlobalStates.overviewOpen) {
+                        GlobalStates.resetStripScroll();
+                        GlobalStates.resetWinFocus();
                         delayedGrabTimer.start();
                     }
                 }
@@ -79,64 +81,85 @@ Scope {
                 focus: GlobalStates.overviewOpen
 
                 Keys.onPressed: event => {
-                    // close: Escape or Enter
-                    if (event.key === Qt.Key_Escape || event.key === Qt.Key_Return) {
+                    const currentId = Hyprland.focusedMonitor?.activeWorkspace?.id ?? 1;
+                    const numWs = Config.options.overview.numWorkspaces;
+                    const widget = overviewLoader.item;
+                    const wins = widget ? widget.windowsForWorkspace(currentId) : [];
+                    const winCount = wins.length;
+
+                    // Enter: close overview first (releases keyboard/focus grab), then
+                    // dispatch focuswindow — same order as mouse click which works correctly.
+                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                        const idx = GlobalStates.focusedWinIndex;
+                        if (idx >= 0 && idx < winCount) {
+                            const addr = `0x${wins[idx].HyprlandToplevel.address}`;
+                            const wd = widget.windowByAddress[addr];
+                            if (wd) {
+                                const targetAddr = wd.address;
+                                // Close overview first so it releases Wayland focus/grab
+                                GlobalStates.overviewOpen = false;
+                                // Then dispatch focus after overview has closed
+                                Qt.callLater(() => {
+                                    Hyprland.dispatch(`focuswindow address:${targetAddr}`);
+                                });
+                            } else {
+                                GlobalStates.overviewOpen = false;
+                            }
+                        } else {
+                            GlobalStates.overviewOpen = false;
+                        }
+                        event.accepted = true;
+                        return;
+                    }
+
+                    // Escape: close
+                    if (event.key === Qt.Key_Escape) {
                         GlobalStates.overviewOpen = false;
                         event.accepted = true;
                         return;
                     }
 
-                    // Helper: compute current group bounds
-                    const workspacesPerGroup = Config.options.overview.rows * Config.options.overview.columns;
-                    const currentId = Hyprland.focusedMonitor?.activeWorkspace?.id ?? 1;
-                    const currentGroup = Math.floor((currentId - 1) / workspacesPerGroup);
-                    const minWorkspaceId = currentGroup * workspacesPerGroup + 1;
-                    const maxWorkspaceId = minWorkspaceId + workspacesPerGroup - 1;
-                    
-                    // When hideEmptyRows is enabled, constrain navigation to current row
-                    const currentRow = Math.floor((currentId - minWorkspaceId) / Config.options.overview.columns);
-                    const rowMinId = minWorkspaceId + currentRow * Config.options.overview.columns;
-                    const rowMaxId = rowMinId + Config.options.overview.columns - 1;
-
                     let targetId = null;
 
-                    // Arrow keys and vim-style hjkl
-                    if (event.key === Qt.Key_Left || event.key === Qt.Key_H) {
+                    // Up/K — previous workspace, reset win focus
+                    if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
                         targetId = currentId - 1;
-                        // Wrap within visible workspaces
-                        if (Config.options.overview.hideEmptyRows) {
-                            if (targetId < rowMinId) targetId = rowMaxId;
-                        } else {
-                            if (targetId < minWorkspaceId) targetId = maxWorkspaceId;
-                        }
-                    } else if (event.key === Qt.Key_Right || event.key === Qt.Key_L) {
-                        targetId = currentId + 1;
-                        // Wrap within visible workspaces
-                        if (Config.options.overview.hideEmptyRows) {
-                            if (targetId > rowMaxId) targetId = rowMinId;
-                        } else {
-                            if (targetId > maxWorkspaceId) targetId = minWorkspaceId;
-                        }
-                    } else if (event.key === Qt.Key_Up || event.key === Qt.Key_K) {
-                        targetId = currentId - Config.options.overview.columns;
-                        if (targetId < minWorkspaceId) targetId += workspacesPerGroup;
+                        if (targetId < 1) targetId = numWs;
+                        GlobalStates.resetStripScroll();
+                        GlobalStates.resetWinFocus();
+                    // Down/J — next workspace, reset win focus
                     } else if (event.key === Qt.Key_Down || event.key === Qt.Key_J) {
-                        targetId = currentId + Config.options.overview.columns;
-                        if (targetId > maxWorkspaceId) targetId -= workspacesPerGroup;
-                    }
-
-                    // Number keys: jump to workspace within the current group
-                    // 1-9 map to positions 1-9, 0 maps to position 10
-                    else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
-                        const position = event.key - Qt.Key_0; // 1-9
-                        if (position <= workspacesPerGroup) {
-                            targetId = minWorkspaceId + position - 1;
+                        targetId = currentId + 1;
+                        if (targetId > numWs) targetId = 1;
+                        GlobalStates.resetStripScroll();
+                        GlobalStates.resetWinFocus();
+                    // Left/H — cycle to previous window in active workspace
+                    } else if (event.key === Qt.Key_Left || event.key === Qt.Key_H) {
+                        if (winCount > 0) {
+                            const cur = GlobalStates.focusedWinIndex;
+                            GlobalStates.focusedWinIndex = cur <= 0 ? winCount - 1 : cur - 1;
                         }
+                        event.accepted = true;
+                        return;
+                    // Right/L — cycle to next window in active workspace
+                    } else if (event.key === Qt.Key_Right || event.key === Qt.Key_L) {
+                        if (winCount > 0) {
+                            const cur = GlobalStates.focusedWinIndex;
+                            GlobalStates.focusedWinIndex = cur < 0 ? 0 : (cur + 1) % winCount;
+                        }
+                        event.accepted = true;
+                        return;
+                    // Number keys 1-9 jump directly to workspace N
+                    } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
+                        targetId = event.key - Qt.Key_0;
+                        if (targetId > numWs) targetId = null;
+                        GlobalStates.resetStripScroll();
+                        GlobalStates.resetWinFocus();
+                    // 0 jumps to workspace 10
                     } else if (event.key === Qt.Key_0) {
-                        // 0 = 10th workspace in the group (if group has 10+ workspaces)
-                        if (workspacesPerGroup >= 10) {
-                            targetId = minWorkspaceId + 9; // 10th position = offset 9
-                        }
+                        if (numWs >= 10) targetId = 10;
+                        GlobalStates.resetStripScroll();
+                        GlobalStates.resetWinFocus();
                     }
 
                     if (targetId !== null) {
@@ -146,13 +169,33 @@ Scope {
                 }
             }
 
+            // Mouse wheel anywhere on panel navigates workspaces
+            WheelHandler {
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                onWheel: event => {
+                    const currentId = Hyprland.focusedMonitor?.activeWorkspace?.id ?? 1;
+                    const numWs = Config.options.overview.numWorkspaces;
+                    let targetId;
+                    if (event.angleDelta.y > 0) {
+                        targetId = currentId - 1;
+                        if (targetId < 1) targetId = numWs;
+                    } else {
+                        targetId = currentId + 1;
+                        if (targetId > numWs) targetId = 1;
+                    }
+                    GlobalStates.resetWinFocus();
+                    GlobalStates.resetStripScroll();
+                    Hyprland.dispatch("workspace " + targetId);
+                }
+            }
+
             ColumnLayout {
                 id: columnLayout
                 visible: GlobalStates.overviewOpen
                 anchors {
                     horizontalCenter: parent.horizontalCenter
                     top: parent.top
-                    topMargin: 100
+                    topMargin: 40
                 }
 
                 Loader {
