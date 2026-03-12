@@ -597,17 +597,19 @@ function createHyprlandPanel() {
     pickerBtn.connect('clicked', () => GLib.spawn_command_line_async('hyprpicker'));
     panel.append(pickerBtn);
 
-    // X-Ray toggle
-    let xrayOn = loadBool('xray.state', false);
-    const xrayBtn = mkToggle(xrayOn ? 'X-Ray On' : 'X-Ray Off', xrayOn);
-    xrayBtn.connect('clicked', () => {
-        xrayOn = !xrayOn;
-        GLib.spawn_command_line_async('bash -c "$HOME/.config/hypr/scripts/xray.sh"');
-        xrayBtn.set_label(xrayOn ? 'X-Ray On' : 'X-Ray Off');
-        if (xrayOn) xrayBtn.add_css_class('cc-active'); else xrayBtn.remove_css_class('cc-active');
-        saveBool('xray.state', xrayOn);
-    });
-    panel.append(xrayBtn);
+    // X-Ray toggle — sentinel file is the single source of truth, matching xray.sh
+const XRAY_SENTINEL = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'settings', 'xray-on']);
+let xrayOn = GLib.file_test(XRAY_SENTINEL, GLib.FileTest.EXISTS);
+const xrayBtn = mkToggle(xrayOn ? 'X-Ray  On' : 'X-Ray  Off', xrayOn);
+xrayBtn.connect('clicked', () => {
+    GLib.spawn_command_line_async(`bash ${HOME}/.config/hypr/scripts/xray.sh`);
+    // Re-read sentinel after script runs — file exists = on
+    xrayOn = !xrayOn;
+    xrayBtn.set_label(xrayOn ? 'X-Ray  On' : 'X-Ray  Off');
+    if (xrayOn) xrayBtn.add_css_class('cc-active');
+    else xrayBtn.remove_css_class('cc-active');
+});
+panel.append(xrayBtn);
     
     // Opacity toggle
     let opacOn = loadBool('opacity.state', false);
