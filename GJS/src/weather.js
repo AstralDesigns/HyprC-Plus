@@ -118,7 +118,7 @@ function createWeatherBox() {
             .weather-desc { font-size: 1.25em; font-weight: 600; color: @primary; }
             .weather-loc { font-size: 1.0em; font-weight: 500; color: @primary; opacity: 0.7; }
             .weather-detail { font-size: 0.95em; color: @primary; opacity: 0.8; }
-            .weather-forecast { border: 2px solid @inverse_primary; border-radius: 10px; padding: 12px 8px 6px 8px !important; min-height: 110px; margin-bottom: 0 !important; }
+            .weather-forecast { border: 2px solid @inverse_primary; border-radius: 10px; padding: 12px 12px 12px 12px !important; min-height: 110px; margin-bottom: 0 !important; }
             .fc-day { font-size: 1.05em; font-weight: 600; color: @primary; opacity: 0.7; margin-bottom: 3px; }
             .fc-icon { font-size: 1.9em; color: @primary; margin-bottom: 3px; }
             .fc-hi { font-size: 1.1em; font-weight: 600; color: @primary; margin-bottom: 2px; }

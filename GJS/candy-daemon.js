@@ -49,7 +49,7 @@ const WIDGET_POSITIONS = {
     utils: { centered: true },
     system: { width: 280, height: 320 },
     media: { width: 520, height: 140 },
-    weather: { width: 420, height: 340 }
+    weather: { width: 420, height: 380 }
 };
 
 /**
@@ -214,7 +214,7 @@ function toggleWeather() {
     if (!widgets.weather) {
         widgets.weather = new Gtk.ApplicationWindow({
             application: app,
-            default_width: 300, default_height: 240,
+            default_width: 305, default_height: 245,
             resizable: false, decorated: false,
             title: 'candy.weather',
         });
