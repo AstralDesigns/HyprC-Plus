@@ -28,6 +28,7 @@ const ROFI_RADIUS   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'setti
 const WAYPAPER_INT  = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hooks', 'waypaper_integration.sh']);
 const DOCK_CONFIG   = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'config.js']);
 const DOCK_CYCLE    = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'cycle.sh']);
+const SDDM_THEME    = '/usr/share/sddm/themes/sugar-candy/theme.conf';
 
 try { GLib.mkdir_with_parents(CONFIG_DIR, 0o755); } catch (e) {}
 
@@ -840,6 +841,72 @@ function createRofiPanel() {
     return panel;
 }
 
+// ─── SDDM Panel ────────────────────────────────────────────────────────────
+function createSDDMPanel() {
+    const panel = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 4,
+        margin_start: 6, margin_end: 6, margin_top: 6, margin_bottom: 6 });
+    mkHeading(panel, '󰍂 SDDM');
+
+    // Helper: read a Key=value line from theme.conf
+    function readSDDMVal(key, fallback) {
+        try {
+            let [ok, c] = GLib.file_get_contents(SDDM_THEME);
+            if (ok && c) {
+                let m = imports.byteArray.toString(c).match(new RegExp('^' + key + '=(.*)$', 'm'));
+                if (m) return m[1].replace(/^"|"$/g, '').trim();
+            }
+        } catch (e) {}
+        return fallback;
+    }
+
+    // Helper: write a Key=value line in theme.conf via sudo sed (root-owned file)
+    function writeSDDMVal(key, val) {
+        GLib.spawn_command_line_async(
+            `sudo sed -i 's|^${key}=.*|${key}=${val}|' '${SDDM_THEME}'`
+        );
+    }
+
+    // ── Header Text ─────────────────────────────────────────────────────────
+    // Any string/glyph shown at the top of the SDDM login form.
+    const headerE = mkEntry(12);
+    headerE.set_max_width_chars(20);
+    headerE.set_text(loadState('sddm_header.state', '') || readSDDMVal('HeaderText', ''));
+    headerE.connect('activate', () => {
+        const v = headerE.get_text();          // preserve spaces + glyphs as-is
+        writeSDDMVal('HeaderText', v);
+        saveState('sddm_header.state', v);
+    });
+    mkRow(panel, 'Header', headerE);
+    
+    // ── Form Psition ─────────────────────────────────────────────────────────
+    // Form position: left, center, right
+    const formposE = mkEntry(8);
+    formposE.set_max_width_chars(8);
+    formposE.set_text(loadState('sddm_form.state', '') || readSDDMVal('FormPosition', ''));
+    formposE.connect('activate', () => {
+        const v = formposE.get_text();          // preserve spaces + glyphs as-is
+        writeSDDMVal('FormPosition', v);
+        saveState('sddm_form.state', v);
+    });
+    mkRow(panel, 'Form Pos', formposE);
+
+    // ── Blur Radius ──────────────────────────────────────────────────────────
+    // Controls background blur strength (0 = no blur, 100 = max).
+    // PartialBlur or FullBlur must be enabled in theme.conf for this to apply.
+    const blurE = mkEntry(3);
+    blurE.set_text(loadState('sddm_blur.state', '') || readSDDMVal('BlurRadius', '75'));
+    blurE.connect('activate', () => {
+        const n = parseInt(blurE.get_text());
+        if (!isNaN(n) && n >= 0 && n <= 100) {
+            writeSDDMVal('BlurRadius', n.toString());
+            saveState('sddm_blur.state', n.toString());
+        }
+    });
+    mkRow(panel, 'Blur Radius', blurE);
+
+    return panel;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // CSS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1083,6 +1150,7 @@ function createControlCenterContent() {
         ['󰞒  Dock',      'dock'],
         ['  SwayNC',    'swaync'],
         ['󰮫  Menus',      'rofi'],
+        ['󰍂  SDDM',      'sddm'],
     ];
 
     const panels = {};
@@ -1111,6 +1179,7 @@ function createControlCenterContent() {
         dock: createDockPanel,
         swaync: createSwayncPanel,
         rofi: createRofiPanel,
+        sddm: createSDDMPanel,
     };
 
     function showPanel(id) {
