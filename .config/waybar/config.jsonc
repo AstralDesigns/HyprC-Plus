@@ -160,7 +160,7 @@
     "format": "󱙪",
     "tooltip": true,
     "tooltip-format": "Utilities",
-    "on-click": "DRI_PRIME=1 ~/.config/hypr/scripts/rofi-menus.sh",
+    "on-click": "~/.config/hypr/scripts/rofi-menus.sh",
     "min-length": 1,
     "max-length": 7
   },
@@ -234,7 +234,7 @@
     "on-click": "~/.hyprcandy/GJS/toggle-control-center.sh",
     "min-length": 1,
     "max-length": 1
-    //"on-click-right": "DRI_PRIME=1 ~/.hyprcandy/GJS/toggle-hyprland-settings.sh",
+    //"on-click-right": "~/.hyprcandy/GJS/toggle-hyprland-settings.sh",
   },
 
   // ─────────────────────────────────────────────────────┤ idle inhibitor ├───
