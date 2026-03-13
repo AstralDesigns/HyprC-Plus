@@ -72,7 +72,7 @@ Singleton {
         property color colSecondary: m3colors.m3secondary
         property color colSecondaryContainer: m3colors.m3secondaryContainer
         property color colOnSecondaryContainer: m3colors.m3onSecondaryContainer
-        property color colTooltip: m3colors.m3inversePrimary
+        property color colTooltip: m3colors.m3onSecondary
         property color colOnTooltip: m3colors.m3primary
         property color colShadow: ColorUtils.transparentize(m3colors.m3shadow, 0.7)
         property color colOutline: m3colors.m3outline
