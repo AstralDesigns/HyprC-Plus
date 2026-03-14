@@ -28,8 +28,8 @@
 button {
     border: 2px solid @primary;
     border-radius: 8px;
-    min-width: 4px;
-    min-height: 6px;
+    min-width: 2px;
+    min-height: 2px;
     background: linear-gradient(180deg, @inverse_primary, @on_secondary);
     color: @primary;
     transition: color 300ms ease-in-out,
@@ -310,5 +310,5 @@ scrollbar trough * {
 }
 
 * {
-    font-size: medium;
+    font-size: small;
 }
