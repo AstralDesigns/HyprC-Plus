@@ -1163,7 +1163,7 @@ function createControlCenterContent() {
     const menuDefs = [
         [' Hyprland',  'hyprland'],
         ['󰔎 Themes',    'themes'],
-        ['󱟛 Bar || 󰎟 Center',    'waybar'],
+        ['󱟛 Bar  󰂚 Center',    'waybar'],
         ['󰞒  Dock',      'dock'],
         //['  SwayNC',    'swaync'],
         ['󰮫 Menus',      'rofi'],
