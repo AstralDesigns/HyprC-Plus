@@ -41,8 +41,8 @@
           "power-profiles-daemon",
           "idle_inhibitor",
           "custom/rofi",
-          "custom/notification",
-          "custom/system-monitor"
+          "custom/system-monitor",
+          "custom/notification"
       ]
   },
   // ──────────────────────────────────────────────────────────┤ media group ├───

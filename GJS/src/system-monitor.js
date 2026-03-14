@@ -288,6 +288,31 @@ function getNetworkInfo() {
 
 function getSystemUptime() { try { let [ok,c]=GLib.file_get_contents('/proc/uptime'); if(ok) return parseFloat(imports.byteArray.toString(c).split(' ')[0]); } catch(e){} return 0; }
 function getLoadAverage() { try { let [ok,c]=GLib.file_get_contents('/proc/loadavg'); if(ok){let p=imports.byteArray.toString(c).split(' '); return [parseFloat(p[0])||0,parseFloat(p[1])||0,parseFloat(p[2])||0];} } catch(e){} return [0,0,0]; }
+function getBatteryInfo() {
+    try {
+        const psDir = '/sys/class/power_supply';
+        const [ok, stdout] = GLib.spawn_command_line_sync('ls ' + psDir);
+        if (!ok) return null;
+        const entries = imports.byteArray.toString(stdout).trim().split('\n');
+        for (const entry of entries) {
+            const name = entry.trim();
+            if (!name.match(/^BAT/i)) continue;
+            const base = psDir + '/' + name;
+            const readFile = (f) => {
+                try {
+                    let [fok, c] = GLib.file_get_contents(base + '/' + f);
+                    return fok ? imports.byteArray.toString(c).trim() : null;
+                } catch(e) { return null; }
+            };
+            const cap    = parseInt(readFile('capacity') || '0');
+            const status = readFile('status') || 'Unknown';  // Charging / Discharging / Full
+            const icon   = status === 'Charging' ? '󰂄' : cap > 80 ? '󰁹' : cap > 60 ? '󰂀' : cap > 40 ? '󰁾' : cap > 20 ? '󰁼' : '󰁺';
+            return { capacity: cap, status, icon, name };
+        }
+    } catch(e) {}
+    return null;  // No battery — desktop PC
+}
+
 function formatBytes(b) { if(b===0) return '0 B'; const k=1024,s=['B','KB','MB','GB','TB'],i=Math.floor(Math.log(b)/Math.log(k)); return parseFloat((b/Math.pow(k,i)).toFixed(1))+' '+s[i]; }
 function formatUptime(sec) { const d=Math.floor(sec/86400),h=Math.floor((sec%86400)/3600),m=Math.floor((sec%3600)/60); return d>0?`${d}d ${h}h ${m}m`:h>0?`${h}h ${m}m`:`${m}m`; }
 function formatRate(bps) { if(bps<1024) return `${Math.round(bps)} B/s`; if(bps<1048576) return `${(bps/1024).toFixed(1)} KB/s`; return `${(bps/1048576).toFixed(1)} MB/s`; }
@@ -393,6 +418,11 @@ function createSystemMonitorBox() {
     const cpuG=createGauge('󰻠','CPU'), ramG=createGauge('󰍛','RAM'), tmpG=createGauge('󰔏','Temp'), swpG=createGauge('󰾴','Swap');
     flow.append(cpuG.widget); flow.append(ramG.widget); flow.append(tmpG.widget); flow.append(swpG.widget);
 
+    // Battery: auto-detect once at startup — only appended on laptops/tablets
+    const _batProbe = getBatteryInfo();
+    const batG = _batProbe ? createGauge(_batProbe.icon, 'Battery') : null;
+    if (batG) flow.append(batG.widget);
+
     let gpuGs=[], diskGs=[], _lgc=0, _ldc=0;
 
     const netLbl = new Gtk.Label({label:'↓ --  ↑ --',halign:Gtk.Align.CENTER}); netLbl.add_css_class('sysmon-info');
@@ -423,6 +453,14 @@ function createSystemMonitorBox() {
         }
         for (let i=0;i<disks.length&&i<diskGs.length;i++) diskGs[i].update(disks[i].percentage/100, `${disks[i].percentage}%`, `${disks[i].used}/${disks[i].size}`);
 
+        if (batG) {
+            const bat = getBatteryInfo();
+            if (bat) {
+                batG.setLabel(bat.status === 'Full' ? 'Battery ✓' : 'Battery');
+                batG.update(bat.capacity / 100, `${bat.capacity}%`, bat.status);
+            }
+        }
+
         netLbl.set_label(`↓ ${formatRate(net.rxRate)}  ↑ ${formatRate(net.txRate)}`);
         upLbl.set_label(`Up: ${formatUptime(upt)}  Load: ${load[0].toFixed(2)}`);
     }
@@ -443,6 +481,7 @@ function createSystemMonitorBox() {
                 swpG.da.queue_draw();
                 for (let g of gpuGs) g.da.queue_draw();
                 for (let g of diskGs) g.da.queue_draw();
+                if (batG) batG.da.queue_draw();
                 imports.system.gc();
             }
             return GLib.SOURCE_CONTINUE;
