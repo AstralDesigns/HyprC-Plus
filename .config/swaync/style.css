@@ -28,8 +28,8 @@
 button {
     border: 2px solid @primary;
     border-radius: 8px;
-    min-width: 8px;
-    min-height: 8px;
+    min-width: 4px;
+    min-height: 6px;
     background: linear-gradient(180deg, @inverse_primary, @border-color);
     color: @primary;
     transition: color 300ms ease-in-out,

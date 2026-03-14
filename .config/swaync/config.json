@@ -58,11 +58,11 @@
         "buttons-grid": {
             "actions": [
                 {
-                    "label": "",
+                    "label": "\u2009",
                     "command": "bash -c $HOME/.config/hypr/scripts/screenshot.sh"
                 },
                 {
-                    "label": "",
+                    "label": "\u2009",
                     "command": "bash -c $HOME/.config/swaync/recorder.sh"
                 },
                 {
@@ -70,9 +70,8 @@
                     "command": "bash $HOME/.config/waybar/scripts/volume-control.sh -o m"
                 },
                 {
-                    "label": "",
+                    "label": "\u2009",
                     "command": "kitty ~"
-                }
             ]
         }
     }
