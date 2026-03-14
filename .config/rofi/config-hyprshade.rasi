@@ -48,7 +48,7 @@ configuration {
 
 /* ---- Map colors ---- */
 * {
-    color11: @primary-fixed-dim;
+    color11: @primary;
     color5: @on-primary-fixed;
     foreground: @on-surface;
 }
