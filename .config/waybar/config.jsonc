@@ -108,9 +108,9 @@
     "format-paused": "{status_icon} {title} - {artist}",
 
     "player-icons": {
-      "default": "󰝚 ",
-      "spotify": "<span foreground='#a6da95'>󰓇 </span>",
-      "firefox": "<span foreground='#ed8796'>󰗃 </span>"
+      "default": "",
+      "spotify": "<span foreground='#a6da95'>󰓇</span>",
+      "firefox": "<span foreground='#ed8796'>󰗃</span>"
     },
     "status-icons": {
       "paused": "<span color='#b7bdf8'>\u200A\u200A󰏤\u2009\u2009</span>"

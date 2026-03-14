@@ -23,6 +23,7 @@ const HYPR_CONF     = GLib.build_filenamev([HOME, '.config', 'hypr', 'hyprviz.co
 const WAYBAR_STYLE  = GLib.build_filenamev([HOME, '.config', 'waybar', 'style.css']);
 const WAYBAR_CONF   = GLib.build_filenamev([HOME, '.config', 'waybar', 'config.jsonc']);
 const SWAYNC_STYLE  = GLib.build_filenamev([HOME, '.config', 'swaync', 'style.css']);
+const SWAYNC_CONF   = GLib.build_filenamev([HOME, '.config', 'swaync', 'config.json']);
 const ROFI_BORDER   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'settings', 'rofi-border.rasi']);
 const ROFI_RADIUS   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'settings', 'rofi-border-radius.rasi']);
 const WAYPAPER_INT  = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hooks', 'waypaper_integration.sh']);
@@ -384,23 +385,26 @@ function createWaybarPanel() {
     panel.append(toggleRow);
 
     // Border
-    const borderE = mkEntry(3);
-    borderE.set_text(loadState('waybar_border_size.state', '2'));
-    borderE.connect('activate', () => {
-        const n = parseInt(borderE.get_text());
-        if (!isNaN(n) && n >= 0 && n <= 10) {
-            try {
-                let [ok, c] = GLib.file_get_contents(WAYBAR_STYLE);
-                if (ok && c) {
-                    let txt = imports.byteArray.toString(c);
-                    let m = txt.match(/border:\s*([0-9]+)px\s*solid\s*@on_primary_fixed_variant;/);
-                    if (m) GLib.spawn_command_line_async(`sed -i '32s/border: ${m[1]}px solid @on_primary_fixed_variant;/border: ${n}px solid @on_primary_fixed_variant;/' '${WAYBAR_STYLE}'`);
-                }
-            } catch (e) {}
-            saveState('waybar_border_size.state', n.toString());
-        }
-    });
-    mkRow(panel, 'Border', borderE);
+const borderE = mkEntry(3);
+borderE.set_text(loadState('waybar_border_size.state', '2'));
+borderE.connect('activate', () => {
+    const n = parseInt(borderE.get_text());
+    if (!isNaN(n) && n >= 0 && n <= 10) {
+        // Unconditional pattern match — no read needed, never silently skips
+        GLib.spawn_command_line_async(`sed -i 's/border: [0-9]*px solid @on_primary_fixed_variant;/border: ${n}px solid @on_primary_fixed_variant;/g' '${WAYBAR_STYLE}'`);
+        // Mirror to SwayNC
+        try {
+            let [ok2, c2] = GLib.file_get_contents(SWAYNC_STYLE);
+            if (ok2 && c2) {
+                let m2 = imports.byteArray.toString(c2).match(/border:\s*([0-9]+)px\s*solid\s*@bordercolor;/);
+                if (m2) GLib.spawn_command_line_async(`sed -i 's/border: ${m2[1]}px solid @bordercolor;/border: ${n}px solid @bordercolor;/g' '${SWAYNC_STYLE}'`);
+            }
+        } catch (e) {}
+        GLib.spawn_command_line_async("bash -c 'swaync-client -rs'");
+        saveState('waybar_border_size.state', n.toString());
+    }
+});
+mkRow(panel, 'Border', borderE);
 
     // Padding
     const padE = mkEntry(3);
@@ -430,6 +434,9 @@ function createWaybarPanel() {
             const vs = v.toFixed(1);
             GLib.spawn_command_line_async(`sed -i '30s/border-radius: [0-9.]*px;/border-radius: ${vs}px;/' '${WAYBAR_STYLE}'`);
             GLib.spawn_command_line_async(`sed -i '19s/border-radius: [0-9.]*px;/border-radius: ${vs}px;/' '${WAYBAR_STYLE}'`);
+            // Mirror radius to SwayNC style.css
+            GLib.spawn_command_line_async(`sed -i '18s/border-radius: [0-9.]*px;/border-radius: ${vs}px;/' '${SWAYNC_STYLE}'`);
+            GLib.spawn_command_line_async("bash -c 'swaync-client -rs'");
             saveState('waybar_outer_radius.state', vs);
         }
     });
@@ -444,6 +451,10 @@ function createWaybarPanel() {
             const vs = v.toFixed(1);
             GLib.spawn_command_line_async(`sed -i '27s/margin-left: [0-9.]*px;/margin-left: ${vs}px;/' '${WAYBAR_STYLE}'`);
             GLib.spawn_command_line_async(`sed -i '28s/margin-right: [0-9.]*px;/margin-right: ${vs}px;/' '${WAYBAR_STYLE}'`);
+            // Mirror right margin to SwayNC config.json — floor only, no decimals
+            const vSnc = Math.floor(v).toString();
+            GLib.spawn_command_line_async(`sed -i '11s/"control-center-margin-right": [0-9]*,/"control-center-margin-right": ${vSnc},/' '${SWAYNC_CONF}'`);
+            GLib.spawn_command_line_async('pkill -f swaync');
             saveState('waybar_side_margin.state', vs);
         }
     });
@@ -556,6 +567,43 @@ function createWaybarPanel() {
         e.connect('activate', () => { if (e.get_text() !== null) writeWsIcon(key, e.get_text()); });
         mkRow(panel, label, e);
     });
+    
+    // Numbered ↔ Icon workspace toggle
+    // Comments/uncomments lines 82-89 (the format-icons block: "6"–"persistent").
+    // Numbered mode: lines commented → waybar shows 1-10 as plain numbers.
+    // Icon mode:     lines active   → waybar uses the icon entries.
+    let wsIconsOn = loadBool('ws_icons_mode.state', true);
+    const wsModeBtn = mkToggle(wsIconsOn ? 'WS: Icons' : 'WS: Numbers', wsIconsOn);
+    wsModeBtn.connect('clicked', () => {
+        wsIconsOn = !wsIconsOn;
+        if (wsIconsOn) {
+            // Uncomment lines 82-89
+            GLib.spawn_async(null, ['sed', '-i', 's|//"6"|"6"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|//"7"|"7"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|//"8"|"8"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|//"9"|"9"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|//"10"|"10"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|//"active"|"active"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|//"empty"|"empty"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|//"persistent"|"persistent"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+        } else {
+            // Comment lines 82-89
+            GLib.spawn_async(null, ['sed', '-i', 's|"6"|//"6"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|"7"|//"7"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|"8"|//"8"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|"9"|//"9"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|"10"|//"10"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|"active"|//"active"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|"empty"|//"empty"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', 's|"persistent"|//"persistent"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+        }
+        GLib.spawn_command_line_async('killall -SIGUSR2 waybar');
+        wsModeBtn.set_label(wsIconsOn ? 'WS: Icons' : 'WS: Numbers');
+        if (wsIconsOn) wsModeBtn.add_css_class('cc-active');
+        else wsModeBtn.remove_css_class('cc-active');
+        saveBool('ws_icons_mode.state', wsIconsOn);
+    });
+    panel.append(wsModeBtn);
 
     return panel;
 }
@@ -747,56 +795,6 @@ function createDockPanel() {
 }
 
 // ─── Swaync Panel ────────────────────────────────────────────────────────────
-function createSwayncPanel() {
-    const panel = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 4,
-        margin_start: 6, margin_end: 6, margin_top: 6, margin_bottom: 6 });
-    mkHeading(panel, ' SwayNC');
-
-    // Border
-    const bE = mkEntry(3);
-    function loadSwayncBorder() {
-        let v = loadState('swaync_border_size.state', '');
-        if (v) return v;
-        try {
-            let [ok, c] = GLib.file_get_contents(SWAYNC_STYLE);
-            if (ok && c) { let m = imports.byteArray.toString(c).match(/border:\s*([0-9]+)px\s*solid\s*@bordercolor;/); if (m) return m[1]; }
-        } catch (e) {}
-        return '2';
-    }
-    bE.set_text(loadSwayncBorder());
-    bE.connect('activate', () => {
-        const n = parseInt(bE.get_text());
-        if (!isNaN(n) && n >= 0 && n <= 10) {
-            try {
-                let [ok, c] = GLib.file_get_contents(SWAYNC_STYLE);
-                if (ok && c) {
-                    let m = imports.byteArray.toString(c).match(/border:\s*([0-9]+)px\s*solid\s*@bordercolor;/);
-                    if (m) GLib.spawn_command_line_async(`sed -i '17s/border: ${m[1]}px solid @bordercolor;/border: ${n}px solid @bordercolor;/' '${SWAYNC_STYLE}'`);
-                }
-            } catch (e) {}
-            saveState('swaync_border_size.state', n.toString());
-            GLib.spawn_command_line_async("bash -c 'swaync-client -rs'");
-        }
-    });
-    mkRow(panel, 'Border', bE);
-
-    // Radius
-    const rE = mkEntry(3);
-    rE.set_text(loadState('swaync_outer_radius.state', '10.0'));
-    rE.connect('activate', () => {
-        const v = parseFloat(rE.get_text());
-        if (!isNaN(v) && v >= 0 && v <= 20) {
-            const vs = v.toFixed(1);
-            GLib.spawn_command_line_async(`sed -i '18s/border-radius: [0-9.]*px;/border-radius: ${vs}px;/' '${SWAYNC_STYLE}'`);
-            saveState('swaync_outer_radius.state', vs);
-            GLib.spawn_command_line_async("bash -c 'swaync-client -rs'");
-        }
-    });
-    mkRow(panel, 'Radius', rE);
-
-    return panel;
-}
-
 // ─── Rofi Panel ──────────────────────────────────────────────────────────────
 function createRofiPanel() {
     const panel = new Gtk.Box({ orientation: Gtk.Orientation.VERTICAL, spacing: 4,
@@ -882,7 +880,7 @@ function createSDDMPanel() {
 
     // ── Header Text ─────────────────────────────────────────────────────────
     // Any string/glyph shown at the top of the SDDM login form.
-    const headerE = mkEntry(12);
+    const headerE = mkEntry(11);
     headerE.set_max_width_chars(20);
     headerE.set_text(loadState('sddm_header.state', '') || readSDDMVal('HeaderText', ''));
     headerE.connect('activate', () => {
@@ -919,7 +917,7 @@ function createSDDMPanel() {
     mkRow(panel, 'Blur R', blurE);
     
     // Preview SDDM
-    const previewBtn = mkBtn('󰈈  Preview');
+    const previewBtn = mkBtn('󰈈 Preview');
     previewBtn.connect('clicked', () => GLib.spawn_command_line_async(`sddm-greeter --test-mode --theme /usr/share/sddm/themes/sugar-candy`));
     panel.append(previewBtn);
     
@@ -1163,13 +1161,13 @@ function createControlCenterContent() {
 
     // Menu items
     const menuDefs = [
-        ['  Hyprland',  'hyprland'],
-        ['󰔎  Themes',    'themes'],
-        ['󱟛  Bar',    'waybar'],
+        [' Hyprland',  'hyprland'],
+        ['󰔎 Themes',    'themes'],
+        ['󱟛 Bar / 󰎟 Center',    'waybar'],
         ['󰞒  Dock',      'dock'],
-        ['  SwayNC',    'swaync'],
-        ['󰮫  Menus',      'rofi'],
-        ['󰍂  SDDM',      'sddm'],
+        //['  SwayNC',    'swaync'],
+        ['󰮫 Menus',      'rofi'],
+        ['󰍂 SDDM',      'sddm'],
     ];
 
     const panels = {};
@@ -1196,7 +1194,7 @@ function createControlCenterContent() {
         waybar: createWaybarPanel,
         hyprland: createHyprlandPanel,
         dock: createDockPanel,
-        swaync: createSwayncPanel,
+        //swaync: createSwayncPanel,
         rofi: createRofiPanel,
         sddm: createSDDMPanel,
     };

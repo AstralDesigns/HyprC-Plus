@@ -15,7 +15,7 @@
 /* Control Center - Default (unfocused) state */
 .control-center {
     border: 2px solid @bordercolor;
-    border-radius: 10.0px;
+    border-radius: 20.0px;
     background: @background; /* Your current unfocused color */
     padding: 0;
 }
@@ -58,7 +58,7 @@ button:hover {
 .notification {
     color: @bordercolor;
     background: @background;
-    border: 3px solid @bordercolor;
+    border: 2px solid @bordercolor;
     border-radius: 10px;
     padding:10px;
 }

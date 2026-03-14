@@ -15,8 +15,8 @@
 */
 window#waybar {
   background: none;
-  /*border: 0px solid @on_primary_fixed_variant; @primary_fixed_dim;*/
-  border-radius: 8.0px;
+  /*border: 2px solid @on_primary_fixed_variant; @primary_fixed_dim;*/
+  border-radius: 20.0px;
 }
 
 /* ───────────────────────────────────────────────────────────┤ background ├───
@@ -24,8 +24,8 @@ window#waybar {
 window#waybar > box {
   background: @blur_background;
   margin-top: 4.5px;
-  margin-left: 4.5px;
-  margin-right: 4.5px;
+  margin-left: 12.0px;
+  margin-right: 12.0px;
   margin-bottom: 0.0px;
   border-radius: 20.0px;
   padding: 4.0px;
@@ -119,7 +119,7 @@ tooltip label {
   color: @primary;
   background: linear-gradient(180deg, @inverse_primary, @scrim);
   margin-left: 0px;
-  padding-left: 8px;
+  padding-left: 1px;
   padding-right: 4px;
   border-radius: 30px;
 }
@@ -133,7 +133,7 @@ tooltip label {
 */
 
 #custom-cava-left {
-  color: transparent;
+  color: @primary_container;
   background: transparent;
   border-radius: 30px;
   margin-left: 0px;
@@ -218,7 +218,7 @@ tooltip label {
 */
 
 #custom-cava-right {
-  color: transparent;
+  color: @primary_container;
   background: transparent;
   border-radius: 30px;
   margin-left: 0px;
@@ -381,7 +381,7 @@ tooltip label {
 
 #tray:hover {
   color: @primary;
-  background: linear-gradient(0deg, @inverse_primary, @scrim)
+  background: linear-gradient(180deg, @inverse_primary, @scrim)
 }
 
 /* ──────────────────────────────────────────────────────────┤ tray popovers ├───
@@ -537,7 +537,7 @@ window.popup menuitem {
 #custom-media-player {
   color: @primary;
   background: linear-gradient(180deg, @inverse_primary, @scrim);
-  margin-left: 1px;
+  margin-left: 0px;
   border-radius: 30px;
   padding-left: 6px;
   padding-right: 8px;
@@ -585,4 +585,33 @@ tooltip label,
 #mpris {
   font-weight: normal;
   font-size: 10px;
+}
+
+/* ─────────────────────────────────────────────────────┤ hover transitions ├───
+   Smooth colour + gradient transitions on all interactive waybar elements.
+   Placed at end to avoid interfering with sed line-targeted rules above.
+   transition: color + background animate together over 300ms ease-in-out,
+   giving a clockwise/anticlockwise feel as the gradient direction reverses.
+*/
+#custom-overview,
+#custom-distro,
+#custom-rofi,
+#custom-weather,
+#custom-player,
+#custom-wifi,
+#custom-update,
+#custom-notification,
+#idle_inhibitor,
+#bluetooth,
+#tray,
+#power-profiles-daemon,
+#clock.date,
+#clock.time,
+#mpris,
+#battery,
+#custom-media-player,
+#custom-power {
+  transition: color 300ms ease-in-out,
+              background 300ms ease-in-out,
+              background-color 300ms ease-in-out;
 }
