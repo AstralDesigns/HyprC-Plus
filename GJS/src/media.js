@@ -205,13 +205,13 @@ function createMediaBox() {
         .media-controls-center button:hover {
             background-color: @inverse_primary;
             border-color: @inverse_primary;
-            box-shadow: 0 0 12px 2px @background, 0 0 0 2px @background inset;
-            color: @background;
+            box-shadow: 0 0 1px 2px @primary, 0 0 0 2px @primary inset;
+            color: @primary;
         }
         .media-controls-center button:active {
             background-color: @inverse_primary;
             transform: scale(0.95);
-            color: @background;
+            color: @primary;
         }
         .media-controls-center button.shuffle-active {
             background-color: @inverse_primary;
