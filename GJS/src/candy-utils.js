@@ -447,7 +447,7 @@ mkRow(panel, 'Border', borderE);
     sideE.set_text(loadState('waybar_side_margin.state', '4.5'));
     sideE.connect('activate', () => {
         const v = parseFloat(sideE.get_text());
-        if (!isNaN(v) && v >= 0 && v <= 200) {
+        if (!isNaN(v) && v >= 0 && v <= 1000) {
             const vs = v.toFixed(1);
             GLib.spawn_command_line_async(`sed -i '27s/margin-left: [0-9.]*px;/margin-left: ${vs}px;/' '${WAYBAR_STYLE}'`);
             GLib.spawn_command_line_async(`sed -i '28s/margin-right: [0-9.]*px;/margin-right: ${vs}px;/' '${WAYBAR_STYLE}'`);
@@ -604,6 +604,26 @@ mkRow(panel, 'Border', borderE);
         saveBool('ws_icons_mode.state', wsIconsOn);
     });
     panel.append(wsModeBtn);
+    
+    // Battery module addition/removal
+    let btModuleOn = loadBool('bt_module_mode.state', true);
+    const btModeBtn = mkToggle(btModuleOn ? 'Battery-Module: 󰄬' : 'Battery-Module: x', btModuleOn);
+    btModeBtn.connect('clicked', () => {
+        btModuleOn = !btModuleOn;
+        if (btModuleOn) {
+            // Uncomment lines 82-89
+            GLib.spawn_async(null, ['sed', '-i', '31s|//"battery",|"battery"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+        } else {
+            // Comment lines 82-89
+            GLib.spawn_async(null, ['sed', '-i', '31s|"battery"|//"battery",|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+        }
+        GLib.spawn_command_line_async('killall -SIGUSR2 waybar');
+        btModeBtn.set_label(btModuleOn ? 'Battery-Module: 󰄬' : 'Battery-Module: x');
+        if (btModuleOn) btModeBtn.add_css_class('cc-active');
+        else btModeBtn.remove_css_class('cc-active');
+        saveBool('bt_module_mode.state', btModuleOn);
+    });
+    panel.append(btModeBtn);
 
     return panel;
 }
