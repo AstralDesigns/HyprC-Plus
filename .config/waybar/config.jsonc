@@ -41,10 +41,10 @@
           "power-profiles-daemon",
           "idle_inhibitor",
           "custom/rofi",
-          "custom/notification"
+          "custom/notification",
+          "custom/system-monitor"
       ]
   },
-  
   // ──────────────────────────────────────────────────────────┤ media group ├───
   "group/media": {
       "orientation": "horizontal",
@@ -425,6 +425,18 @@
     "min-length": 6,
     "max-length": 6
   },
+  
+  // ─────────────────────────────────────────────────────┤ system-monitor ├───
+
+  "custom/system-monitor": {
+    "format": " ",
+    "tooltip": true,
+    "tooltip-format": "Left-click: System-Monitor-Widget\nRight-click: System-Monitor-App",
+    "on-click-right": "gnome-system-monitor",
+    "on-click": "~/.hyprcandy/GJS/toggle-system-monitor.sh",
+    "min-length": 1,
+    "max-length": 7
+  },
 
   // ────────────────────────────────────────────────────────────┤ battery ├───
 
@@ -437,14 +449,11 @@
     "format": "{icon} {capacity}%",
     "format-icons": ["󰂎", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
     "format-charging": " {capacity}%",
-
-    "tooltip-format": "Discharging: {time}\n\nLeft-click: System-Monitor-App\nRight-click: System-Monitor-Widget",
-    "tooltip-format-charging": "Charging: {time}\n\nLeft-click: System-Monitor-App\nRight-click: System-Monitor-App",
+    "tooltip-format": "Discharging: {time}",
+    "tooltip-format-charging": "Charging: {time}",
     "interval": 1,
     "min-length": 6,
-    "max-length": 6,
-    "on-click-right": "gnome-system-monitor",
-    "on-click": "~/.hyprcandy/GJS/toggle-system-monitor.sh"
+    "max-length": 6
   },
 
   // ───────────────────────────────────────────────────────┤ power button ├───
