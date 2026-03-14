@@ -26,24 +26,24 @@
 }
 
 button {
-    border: 0px;
+    border: 2px solid @primary;
     border-radius: 8px;
     min-width: 8px;
     min-height: 8px;
-    background: @bordercolor;
-    color: @buttoncolor;
-    box-shadow: 0 0 0 2px @primary_fixed_dim inset;
-    transition: all 0.2s ease;
-    opacity: 1;
-    padding-left: 16px;
-    padding-right: 16px;
-    transition: all 0.2s ease;
+    background: linear-gradient(180deg, @inverse_primary, @border-color);
+    color: @primary;
+    transition: color 300ms ease-in-out,
+              background 300ms ease-in-out,
+              background-color 300ms ease-in-out;
+    padding-left: 14px;
+    padding-right: 14px;
 }
+
 button:hover {
-    background: @buttoncolor;
+    background: linear-gradient(0deg, @inverse_primary, @primary);
     color: @on_secondary;
-    box-shadow: 0 0 0 2px @on_secondary inset;
 }
+
 .notification-group-header {
     font-size: 14px;
 }
@@ -84,6 +84,7 @@ button:hover {
 
 .close-button {
     background: @on_secondary;
+    color: @primary;
     text-shadow: none;
     box-shadow: none;
     padding: 0;
@@ -96,6 +97,7 @@ button:hover {
 
 .close-button:hover {
     background: @primary;
+    color: @on_secondary;
     text-shadow: none;
     box-shadow: none;
     padding: 0;
