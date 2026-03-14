@@ -30,7 +30,7 @@ button {
     border-radius: 8px;
     min-width: 4px;
     min-height: 6px;
-    background: linear-gradient(180deg, @inverse_primary, @border-color);
+    background: linear-gradient(180deg, @inverse_primary, @on_secondary);
     color: @primary;
     transition: color 300ms ease-in-out,
               background 300ms ease-in-out,
@@ -40,7 +40,7 @@ button {
 }
 
 button:hover {
-    background: linear-gradient(0deg, @inverse_primary, @primary);
+    background: linear-gradient(0deg, @primary, @inverse_primary);
     color: @on_secondary;
 }
 
