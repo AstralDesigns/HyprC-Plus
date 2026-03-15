@@ -174,8 +174,8 @@ element {
 }
 
 element selected.normal {
-    background-color:            @primary-fixed-dim;
-    text-color:                  @color5;
+    background-color:            @on-primary-fixed-variant;
+    text-color:                  @color11;
     border-radius:               @border-radius;
 }
 
