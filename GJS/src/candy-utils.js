@@ -634,7 +634,7 @@ mkRow(panel, 'Border', borderE);
     panel.append(btModeBtn);
     
     // Notification center direction
-    let ntPos = loadBool('nt_pos.state', true);
+    let ntPos = loadBool('nt_pos.state', false);
     const ntPosBtn = mkToggle(ntPos ? '󰂚 Center: 󰁍' : '󰂚 Center: 󰁔', ntPos);
     ntPosBtn.connect('clicked', () => {
         ntPos = !ntPos;
