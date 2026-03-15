@@ -35,6 +35,10 @@ for FILE in "$KDEGLOBALS" "$UC_COLORS"; do
     echo "✅ $(basename $FILE) icon theme → $ICON_THEME"
 done
 
+killall qs -c overview
+sleep 1
+qs -c overview &
+
 dbus-send --session --type=signal /kdeglobals \
     org.kde.kconfig.notify.ConfigChanged \
     'array:dict:string,variant:{"Icons":{"Theme":"'"$ICON_THEME"'"}}' 2>/dev/null || true

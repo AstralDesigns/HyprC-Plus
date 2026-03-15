@@ -9,7 +9,7 @@ post_hook = 'hyprctl reload'
 [templates.swaync]
 input_path = '~/.config/matugen/templates/swaync.css'
 output_path = '~/.config/swaync/colors.css'
-post_hook = 'bash -c "swaync &" && bash -c "sleep 1 && swaync-client -rs & >/dev/null 2>&1"'
+post_hook = 'bash -c "swaync-client -rs & >/dev/null 2>&1"'
 
 [templates.waybar]
 input_path = '~/.config/matugen/templates/waybar.css'
