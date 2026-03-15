@@ -7,7 +7,7 @@
 @define-color bordercolor @on_primary_fixed_variant;
 @define-color fontcolor @on_surface;
 @define-color text-color @primary;
-
+@define-color slider @on_secondary;
 * {
     font-family: "C059 Bold";
 }
@@ -141,7 +141,7 @@ button:hover {
 
 /* Volume widget slider styling */
 .widget-volume scale slider {
-    background: @buttoncolor;
+    background: @primary;
     box-shadow: 0 0 4px 4px @bordercolor, 0 0 0 2px @on_secondary;
     border-radius: 4px;
     padding: 0;
@@ -152,7 +152,7 @@ button:hover {
 
 .widget-volume scale highlight {
     border-radius: 16px;
-    background: linear-gradient(45deg, @primary_fixed_dim 0%, @inverse_primary 100%, #9558e1 0%, #16121a 100%);
+    background: linear-gradient(45deg, @inverse_primary 0%, @slider 100%, #9558e1 0%, #16121a 100%);
     box-shadow: 0 0 2px 2px @bordercolor, 0 0 0 2px @on_secondary inset;
 }
 
@@ -167,7 +167,7 @@ button:hover {
 
 /* Backlight widget slider styling */
 .widget-backlight scale slider {
-    background: @buttoncolor;
+    background: @primary;
     box-shadow: 0 0 4px 4px @bordercolor, 0 0 0 2px @on_secondary;
     border-radius: 4px;
     padding: 0;
@@ -178,7 +178,7 @@ button:hover {
 
 .widget-backlight scale highlight {
     border-radius: 16px;
-    background: linear-gradient(45deg, @primary_fixed_dim 0%, @inverse_primary 100%, #9558e1 0%, #16121a 100%);
+    background: linear-gradient(45deg, @inverse_primary 0%, @slider 100%, #9558e1 0%, #16121a 100%);
     box-shadow: 0 0 2px 2px @bordercolor, 0 0 0 2px @on_secondary inset;
 }
 
@@ -216,26 +216,26 @@ button:hover {
 }
 
 .widget-dnd > switch:hover {
-  background: rgba(255,255,255,0.3);;
+  background: rgba(255,255,255,0.3);
   border-radius: 16px;
   box-shadow: 0 0 0 2px @on_secondary inset;
 }
 
 .widget-dnd > switch:checked {
-  background: linear-gradient(45deg, @primary_fixed_dim 0%, @inverse_primary 100%, #9558e1 0%, #16121a 100%);
+  background: linear-gradient(45deg, @inverse_primary 0%, @slider 100%, #9558e1 0%, #16121a 100%);
   box-shadow: 0 0 0 2px @on_secondary inset;
   color: @buttoncolor;
   border-radius: 16px;
 }
 
 .widget-dnd > switch:checked:hover {
-  background: @background;
+  background: rgba(255,255,255,0.3);
   border-radius: 16px;
   box-shadow: 0 0 0 2px @on_secondary inset;
 }
 
 .widget-dnd > switch slider {
-  background: @buttoncolor;
+  background: @primary;
   box-shadow: 0 0 4px 4px @bordercolor, 0 0 0 2px @on_secondary;
   border-radius: 4px;
 }
@@ -246,7 +246,7 @@ button:hover {
 }
 
 .widget-dnd > switch:checked slider {
-  background: @buttoncolor;
+  background: @primary;
   box-shadow: 0 0 4px 4px @bordercolor, 0 0 0 2px @on_secondary;
   border-radius: 4px;
 }

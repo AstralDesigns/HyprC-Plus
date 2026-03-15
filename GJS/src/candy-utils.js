@@ -281,6 +281,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i 's/@inverse_primary, @scrim/@inverse_primary, @primary_fixed_dim/g' '${waybarFile}'`);
             GLib.spawn_command_line_async(`sed -i '8s/@primary_fixed_dim;/@inverse_primary;/g' '${dockFile}'`);
             GLib.spawn_command_line_async(`sed -i '60s/@background;/@buttoncolor;/g; 68s/@bordercolor;/@background;/g' '${swayncFile}'`);
+            GLib.spawn_command_line_async(`sed -i 's/@inverse_primary 0%, @slider 100%,/@primary_fixed_dim 0%, @inverse_primary 100%,/g' '${swayncFile}'`);
             GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @primary_fixed_dim;/g; 103s/color: .*;/color: @primary_fixed_dim;/g; 519s/color: .*;/color: @primary_fixed_dim;/g;' '${waybarFile}'`);
         } else if (name === 'Dark') {
             GLib.spawn_command_line_async(`sed -i 's/-m light/-m dark/g' '${WAYPAPER_INT}'`);
@@ -296,6 +297,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i 's/@inverse_primary, @primary_fixed_dim/@inverse_primary, @scrim/g' '${waybarFile}'`);
             GLib.spawn_command_line_async(`sed -i '8s/@primary_fixed_dim;/@inverse_primary;/g' '${dockFile}'`);
             GLib.spawn_command_line_async(`sed -i '60s/@buttoncolor;/@background;/g; 68s/@background;/@bordercolor;/g' '${swayncFile}'`);
+            GLib.spawn_command_line_async(`sed -i 's/@primary_fixed_dim 0%, @inverse_primary 100%,/@inverse_primary 0%, @slider 100%,/g' '${swayncFile}'`);
             GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @secondary_container;/g; 103s/color: .*;/color: @secondary_container;/g; 519s/color: .*;/color: @secondary_container;/g;' '${waybarFile}'`);
         } else {
             // All other dark-mode schemes share the same sed logic
@@ -311,6 +313,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i 's/@inverse_primary, @primary_fixed_dim/@inverse_primary, @scrim/g' '${waybarFile}'`);
             GLib.spawn_command_line_async(`sed -i '8s/@primary_fixed_dim;/@inverse_primary;/g' '${dockFile}'`);
             GLib.spawn_command_line_async(`sed -i '60s/@buttoncolor;/@background;/g; 68s/@background;/@bordercolor;/g' '${swayncFile}'`);
+            GLib.spawn_command_line_async(`sed -i 's/@primary_fixed_dim 0%, @inverse_primary 100%,/@inverse_primary 0%, @slider 100%,/g' '${swayncFile}'`);
             GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @secondary_container;/g; 103s/color: .*;/color: @secondary_container;/g; 519s/color: .*;/color: @secondary_container;/g;' '${waybarFile}'`);
         }
 
