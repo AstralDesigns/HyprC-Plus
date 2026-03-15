@@ -368,14 +368,16 @@ function createWaybarPanel() {
         const rofi3 = GLib.build_filenamev([HOME, '.config', 'rofi', 'wifi-menu.rasi']);
         if (bottom) {
             GLib.spawn_command_line_async(`sed -i '5s/"position": "top",/"position": "bottom",/' '${WAYBAR_CONF}'`);
+            GLib.spawn_command_line_async(`sed -i 's/"positionY": "top",/"positionY": "bottom",/' '${SWAYNC_CONF}'`);
             [rofi1, rofi2, rofi3].forEach(f => GLib.spawn_command_line_async(`sed -i 's/location:                 north;/location:                 south;/' '${f}'`));
             posBtn.set_label('Pos: 󰅀'); posBtn.add_css_class('cc-active');
         } else {
             GLib.spawn_command_line_async(`sed -i '5s/"position": "bottom",/"position": "top",/' '${WAYBAR_CONF}'`);
+            GLib.spawn_command_line_async(`sed -i 's/"positionY": "bottom",/"positionY": "top",/' '${SWAYNC_CONF}'`);
             [rofi1, rofi2, rofi3].forEach(f => GLib.spawn_command_line_async(`sed -i 's/location:                 south;/location:                 north;/' '${f}'`));
             posBtn.set_label('Pos: 󰅃'); posBtn.remove_css_class('cc-active');
         }
-        GLib.spawn_command_line_async('systemctl --user restart waybar.service');
+        GLib.spawn_command_line_async('systemctl --user restart waybar.service && killall swaync');
         saveState('waybar-position.txt', bottom ? 'bottom' : 'top');
     });
 
@@ -454,7 +456,8 @@ mkRow(panel, 'Border', borderE);
             // Mirror right margin to SwayNC config.json — floor only, no decimals
             const vSnc = Math.floor(v).toString();
             GLib.spawn_command_line_async(`sed -i '11s/"control-center-margin-right": [0-9]*,/"control-center-margin-right": ${vSnc},/' '${SWAYNC_CONF}'`);
-            GLib.spawn_command_line_async('pkill -f swaync');
+            GLib.spawn_command_line_async(`sed -i '12s/"control-center-margin-left": [0-9]*,/"control-center-margin-left": ${vSnc},/' '${SWAYNC_CONF}'`);
+            GLib.spawn_command_line_async('killall swaync');
             saveState('waybar_side_margin.state', vs);
         }
     });
@@ -624,6 +627,24 @@ mkRow(panel, 'Border', borderE);
         saveBool('bt_module_mode.state', btModuleOn);
     });
     panel.append(btModeBtn);
+    
+    // Notification center direction
+    let ntPos = loadBool('nt_pos.state', true);
+    const ntPosBtn = mkToggle(ntPos ? '󰂚 Center: 󰁍' : '󰂚 Center: 󰁔', ntPos);
+    ntPosBtn.connect('clicked', () => {
+        ntPos = !ntPos;
+        if (ntPos) {
+            GLib.spawn_command_line_async(`sed -i 's/"positionX": "right",/"positionX": "left",/' '${SWAYNC_CONF}'`);
+        } else {
+            GLib.spawn_command_line_async(`sed -i 's/"positionX": "left",/"positionX": "right",/' '${SWAYNC_CONF}'`);
+        }
+        GLib.spawn_command_line_async('killall swaync');
+        ntPosBtn.set_label(ntPos ? '󰂚 Center: 󰁍' : '󰂚 Center: 󰁔');
+        if (ntPos) ntPosBtn.add_css_class('cc-active');
+        else ntPosBtn.remove_css_class('cc-active');
+        saveBool('nt_pos.state', ntPos);
+    });
+    panel.append(ntPosBtn);
 
     return panel;
 }
