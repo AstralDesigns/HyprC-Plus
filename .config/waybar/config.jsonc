@@ -41,7 +41,7 @@
           "power-profiles-daemon",
           "idle_inhibitor",
           "custom/rofi",
-          "custom/system-monitor",
+          //"custom/system-monitor",
           "custom/notification"
       ]
   },
@@ -432,8 +432,8 @@
     "format": " ",
     "tooltip": true,
     "tooltip-format": "Left-click: System-Monitor-Widget\nRight-click: System-Monitor-App",
-    "on-click-right": "gnome-system-monitor",
     "on-click": "~/.hyprcandy/GJS/toggle-system-monitor.sh",
+    "on-click-right": "gnome-system-monitor",
     "min-length": 1,
     "max-length": 7
   },
@@ -449,8 +449,10 @@
     "format": "{icon} {capacity}%",
     "format-icons": ["󰂎", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
     "format-charging": " {capacity}%",
-    "tooltip-format": "Discharging: {time}",
-    "tooltip-format-charging": "Charging: {time}",
+    "tooltip-format": "Discharging: {time}\n\nLeft-click: System-Monitor-Widget\nRight-click: System-Monitor-App",
+    "tooltip-format-charging": "Charging: {time}\n\nLeft-click: System-Monitor-Widget\nRight-click: System-Monitor-App",
+    "on-click": "~/.hyprcandy/GJS/toggle-system-monitor.sh",
+    "on-click-right": "gnome-system-monitor",
     "interval": 1,
     "min-length": 6,
     "max-length": 6
