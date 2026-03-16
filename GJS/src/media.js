@@ -12,12 +12,20 @@ imports.searchPath.unshift(scriptDir);
 // NOTE: gtk-video-player and media-detector no longer imported —
 // video logic removed to eliminate memory leak from Gtk.Video + GStreamer.
 // Art is handled entirely in-process with GdkPixbuf + Cairo.
+// For video files, a single first-frame thumbnail is extracted via ffmpeg
+// at startup — no periodic refresh, no GStreamer involved.
 
 const BUS_NAME_PREFIX = 'org.mpris.MediaPlayer2.';
 const MPRIS_PATH = '/org/mpris/MediaPlayer2';
 
 // ── Placeholder glyph for audio with no art (Nerd Font: 󰎈 = double-note) ─
-const PLACEHOLDER_GLYPH = '󰎈';
+const PLACEHOLDER_GLYPH = '󰎆';
+
+// ── Source dot glyphs (Nerd Font mdi icons) ──────────────────────────────
+// mdi:play-circle  󰐊  mdi:pause-circle  󰏤  mdi:stop-circle  󰓛
+const SRC_PLAYING = '󰐊';
+const SRC_PAUSED  = '󰏤';
+const SRC_STOPPED = '󰓛';
 
 function getMprisPlayersAsync(callback) {
     Gio.DBus.session.call(
@@ -28,7 +36,12 @@ function getMprisPlayersAsync(callback) {
             try {
                 const result = source.call_finish(res);
                 const names = result.deep_unpack()[0];
-                callback(names.filter(n => n.startsWith(BUS_NAME_PREFIX)));
+                // Exclude playerctld — it's a proxy daemon that mirrors whichever
+                // player is currently active, so it always appears as a duplicate.
+                callback(names.filter(n =>
+                    n.startsWith(BUS_NAME_PREFIX) &&
+                    !n.toLowerCase().includes('playerctld')
+                ));
             } catch (e) { callback([]); }
         }
     );
@@ -67,15 +80,14 @@ function getActivePipeWireSinkInfo() {
     return null;
 }
 
-// ── Try to extract first-frame thumbnail from a local video file via ffmpeg ─
-// Returns a GdkPixbuf on success, null otherwise. Writes to a fixed temp path
-// so we never accumulate files.
+// ── Extract first-frame thumbnail from a local video file via ffmpeg ─────
+// Always seeks to 3s in (avoids black frames at start on most content).
+// Writes to a fixed temp path — never accumulates files.
 const THUMB_TMP = GLib.build_filenamev([GLib.get_tmp_dir(), 'candy-media-thumb.jpg']);
 
 function extractVideoThumbnail(fileUri) {
     try {
         const path = fileUri.replace('file://', '');
-        // -ss 3 = 3s in, -vframes 1 = one frame, -y = overwrite, quiet
         const cmd = `ffmpeg -y -loglevel error -ss 3 -i "${path}" -vframes 1 -vf "scale=220:-1" "${THUMB_TMP}"`;
         const [ok, , , status] = GLib.spawn_command_line_sync(cmd);
         if (!ok || status !== 0) return null;
@@ -99,7 +111,6 @@ function createMediaBox() {
             try { Gtk.StyleContext.remove_provider_for_display(display, _userColorProvider); } catch (e) {}
         }
         _userColorProvider = new Gtk.CssProvider();
-        // Prefer gtk-4.0, fall back to gtk-3.0
         const path = GLib.file_test(_gtk4ColorsPath, GLib.FileTest.EXISTS) ? _gtk4ColorsPath : _gtk3ColorsPath;
         try {
             _userColorProvider.load_from_path(path);
@@ -108,7 +119,6 @@ function createMediaBox() {
     }
     _reloadColorCSS();
 
-    // Watch for color file changes and re-resolve within ~300ms
     const _watchPath = GLib.file_test(_gtk4ColorsPath, GLib.FileTest.EXISTS) ? _gtk4ColorsPath : _gtk3ColorsPath;
     try {
         const colFile = Gio.File.new_for_path(_watchPath);
@@ -232,26 +242,84 @@ function createMediaBox() {
             color: @background;
         }
         .rotating-thumbnail { border-radius: 9999px; margin: 6px; }
+
+        /* ── Source selector sidebar (left strip) ─────────────────── */
+        .media-sources-bar {
+            padding: 6px 2px;
+            border-radius: 14px;
+            background-color: rgba(0,0,0,0.18);
+            margin-right: 5px;
+        }
+        .media-source-btn {
+            min-width: 22px;
+            min-height: 22px;
+            padding: 3px 2px;
+            border-radius: 999px;
+            background: transparent;
+            border: none;
+            box-shadow: none;
+            color: @primary;
+            opacity: 0.45;
+            font-size: 10px;
+            transition: all 0.15s ease;
+        }
+        .media-source-btn:hover {
+            opacity: 0.8;
+            background-color: rgba(255,255,255,0.08);
+        }
+        .media-source-btn.source-active {
+            opacity: 1.0;
+            color: @primary;
+            text-shadow: 0 0 8px @primary;
+        }
+        .media-source-btn.source-playing {
+            opacity: 0.85;
+        }
+
+        /* ── Volume slider (right strip) ──────────────────────────── */
+        .media-volume-bar {
+            margin-left: 5px;
+            padding: 6px 0px;
+        }
+        .media-volume-bar trough {
+            min-width: 4px;
+            border-radius: 4px;
+            background-color: rgba(255,255,255,0.15);
+        }
+        .media-volume-bar highlight {
+            min-width: 4px;
+            border-radius: 4px;
+            background-color: @primary;
+            box-shadow: 0 0 6px rgba(0,255,255,0.5);
+        }
+        .media-volume-bar slider {
+            min-width: 14px;
+            min-height: 14px;
+            border-radius: 999px;
+            background-color: @primary;
+            border: none;
+            box-shadow: 0 0 6px @primary;
+        }
+        .media-volume-bar slider:hover {
+            box-shadow: 0 0 10px @primary, 0 0 0 2px rgba(255,255,255,0.2);
+        }
     `, -1);
     Gtk.StyleContext.add_provider_for_display(
         Gdk.Display.get_default(), staticCss,
         Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
     );
 
-    // ── JS-driven liquid-metal background (Cairo — zero CSS parsing) ────────
-    // Previously this used CssProvider.load_from_data() 10x/sec which leaked
-    // GTK CSS engine nodes (~hundreds of MB). Now rendered via Cairo DrawingArea.
+    // ── JS-driven liquid-metal background (Cairo) ───────────────────────────
     let phase = 0;
-    const BG_FPS = 10;  // 10fps for smooth slow-moving blobs
+    const BG_FPS = 10;
     const BG_INTERVAL_MS = Math.round(1000 / BG_FPS);
-    const PHASE_STEP = (2 * Math.PI) / (BG_FPS * 50); // full cycle in 50s
+    const PHASE_STEP = (2 * Math.PI) / (BG_FPS * 50);
 
     function lx(p, f, o) { return (Math.sin(p * f + o) * 0.5 + 0.5); }
     function ly(p, f, o) { return (Math.cos(p * f + o) * 0.5 + 0.5); }
     function bs(p, f, o, lo, hi) { return lo + (Math.sin(p * f + o) * 0.5 + 0.5) * (hi - lo); }
 
-    // Resolve @color references from the user's GTK theme for Cairo painting
-    let _bgColors = null;  // resolved once, refreshed on CSS reload
+    let _bgColors = null;
     function _resolveBgColors(widget) {
         try {
             const sc = widget.get_style_context();
@@ -269,7 +337,6 @@ function createMediaBox() {
         } catch (e) { }
     }
 
-    // Cairo DrawingArea for background — replaces dynamicBgProvider entirely
     const bgDrawingArea = new Gtk.DrawingArea();
     bgDrawingArea.set_hexpand(true);
     bgDrawingArea.set_vexpand(true);
@@ -281,8 +348,6 @@ function createMediaBox() {
         const p = phase;
         const φ = 1.6180339887, r2 = 1.4142135623, r3 = 1.7320508075;
         const inv = _bgColors.inv, bg = _bgColors.bg, blur = _bgColors.blur;
-
-        // Clip to rounded rectangle (matches .media-player-frame border-radius: 22px)
         const rad = 22;
         cr.newSubPath();
         cr.arc(w - rad, rad, rad, -Math.PI / 2, 0);
@@ -291,14 +356,9 @@ function createMediaBox() {
         cr.arc(rad, rad, rad, Math.PI, 3 * Math.PI / 2);
         cr.closePath();
         cr.clip();
-
-        // Base fill
         cr.setSourceRGBA(bg.r, bg.g, bg.b, 1);
         cr.rectangle(0, 0, w, h);
         cr.fill();
-
-        // Six radial blobs — same Lissajous orbits as original CSS
-        // Each blob: [cxFrac, cyFrac, wFrac, hFrac, color, fadeStop]
         const blobs = [
             [lx(p,φ*0.7,0),    ly(p,φ*0.5,0.5),  bs(p,0.41,0,0.55,0.75), bs(p,0.53,1.1,0.4,0.65), inv,  bs(p,0.67,0.3,0.55,0.8)],
             [lx(p,r2*0.6,1.2),  ly(p,r2*0.8,2.1), bs(p,0.37,2.3,0.45,0.7), bs(p,0.61,0.7,0.5,0.72), bg,   bs(p,0.53,1.7,0.5,0.75)],
@@ -321,14 +381,42 @@ function createMediaBox() {
         }
     });
 
-    // GC counter — trigger GC every ~10s to reclaim Cairo/Pango/GVariant garbage
     let _gcCounter = 0;
 
     // ── Loop state ─────────────────────────────────────────────────────────
     let loopMode = 0;
-    let lastRenderedLoopMode = -1;  // track what's currently shown to avoid re-creating labels
+    let lastRenderedLoopMode = -1;
     const loopModes = ['None', 'Track', 'Playlist'];
     const loopLabels = ['No Loop', 'Looping Track', 'Looping Playlist'];
+
+    // ── Source sidebar ─────────────────────────────────────────────────────
+    // Vertical strip on the far left — one dot button per detected MPRIS source.
+    // Clicking a dot manually selects that source.
+    // Scroll on the sidebar cycles sources.
+    const sourcesBar = new Gtk.Box({
+        orientation: Gtk.Orientation.VERTICAL,
+        spacing: 4,
+        valign: Gtk.Align.CENTER,
+        halign: Gtk.Align.CENTER,
+    });
+    sourcesBar.add_css_class('media-sources-bar');
+
+    // ── Volume slider ──────────────────────────────────────────────────────
+    // Smooth vertical GtkScale on the far right. Reads/writes MPRIS Volume.
+    const _volAdj = new Gtk.Adjustment({
+        value: 1.0, lower: 0.0, upper: 1.0,
+        step_increment: 0.05, page_increment: 0.1, page_size: 0,
+    });
+    const volumeScale = new Gtk.Scale({
+        orientation: Gtk.Orientation.VERTICAL,
+        adjustment: _volAdj,
+        inverted: true,      // top of slider = max volume
+        draw_value: false,
+    });
+    volumeScale.set_size_request(28, 100);
+    volumeScale.set_valign(Gtk.Align.CENTER);
+    volumeScale.add_css_class('media-volume-bar');
+    volumeScale.set_tooltip_text('Volume');
 
     // ── Widget tree ────────────────────────────────────────────────────────
     const mediaPlayerBox = new Gtk.Box({
@@ -336,7 +424,8 @@ function createMediaBox() {
         halign: Gtk.Align.CENTER, valign: Gtk.Align.CENTER,
         hexpand: true, vexpand: true,
     });
-    mediaPlayerBox.set_size_request(500, 118);
+    // Slightly wider than original to accommodate sidebar + volume strip
+    mediaPlayerBox.set_size_request(560, 118);
     mediaPlayerBox.set_margin_top(12);
     mediaPlayerBox.set_margin_bottom(12);
     mediaPlayerBox.set_margin_start(12);
@@ -356,7 +445,6 @@ function createMediaBox() {
     titleLabel.add_css_class('media-title-label');
 
     // ── Rotating thumbnail (Cairo DrawingArea) ─────────────────────────────
-    // Fully self-contained: no external widget deps, no GStreamer, no leaks.
     const THUMB_SIZE = 110;
     const thumbDa = new Gtk.DrawingArea();
     thumbDa.set_size_request(THUMB_SIZE, THUMB_SIZE);
@@ -369,21 +457,17 @@ function createMediaBox() {
     thumbDa.set_margin_start(4);
     thumbDa.set_margin_end(0);
 
-    // Thumb state — kept in a plain object, not on the widget, for clarity
     const thumb = {
-        pixbuf: null,   // GdkPixbuf | null
-        angle: 0,      // degrees
-        speed: 0.10,   // °/frame
+        pixbuf: null,
+        angle: 0,
+        speed: 0.10,
         timerId: 0,
         playing: false,
-        isPlaceholder: true,  // true = show glyph instead of rotating image
+        isPlaceholder: true,
     };
 
-    // ── Cached Pango objects for placeholder glyph (avoid per-frame alloc) ──
     let _cachedPangoLayout = null;
     let _cachedPangoFd = null;
-
-    // ── Cached Cairo gradient dimensions to avoid per-frame re-creation ──
     let _cachedGlossGradient = null;
     let _cachedGlossR = -1;
     let _cachedGlossCx = -1;
@@ -392,31 +476,23 @@ function createMediaBox() {
     thumbDa.set_draw_func((_w, cr, w, h) => {
         const cx = w / 2, cy = h / 2;
         const r = Math.min(w, h) / 2 - 1;
-
-        // Clip to circle
         cr.save();
         cr.arc(cx, cy, r, 0, 2 * Math.PI);
         cr.clip();
-
         if (thumb.pixbuf && !thumb.isPlaceholder) {
-            // Rotate image
             cr.translate(cx, cy);
             cr.rotate(thumb.angle * Math.PI / 180);
             cr.translate(-cx, -cy);
             const pw = thumb.pixbuf.get_width(), ph = thumb.pixbuf.get_height();
             const sc = (2 * r) / Math.min(pw, ph);
             cr.scale(sc, sc);
-            Gdk.cairo_set_source_pixbuf(cr, thumb.pixbuf,
-                (w / sc - pw) / 2, (h / sc - ph) / 2);
+            Gdk.cairo_set_source_pixbuf(cr, thumb.pixbuf, (w / sc - pw) / 2, (h / sc - ph) / 2);
             cr.paint();
         } else {
-            // Transparent placeholder — parent gradient shows through
             cr.setSourceRGBA(0, 0, 0, 0);
             cr.paint();
         }
         cr.restore();
-
-        // Gloss (cached gradient — only recreated when dimensions change)
         cr.save();
         cr.arc(cx, cy, r, 0, 2 * Math.PI);
         cr.clip();
@@ -427,17 +503,13 @@ function createMediaBox() {
                 _cachedGlossGradient.addColorStopRGBA(0, 1, 1, 1, 0.15);
                 _cachedGlossGradient.addColorStopRGBA(0.4, 1, 1, 1, 0.0);
                 _cachedGlossGradient.addColorStopRGBA(1, 0, 0, 0, 0.22);
-                _cachedGlossR = r;
-                _cachedGlossCx = cx;
-                _cachedGlossCy = cy;
+                _cachedGlossR = r; _cachedGlossCx = cx; _cachedGlossCy = cy;
             }
             cr.setSource(_cachedGlossGradient);
             cr.arc(cx, cy, r, 0, 2 * Math.PI);
             cr.fill();
         } catch (e) { }
         cr.restore();
-
-        // Spindle dot only when real art is showing
         if (thumb.pixbuf && !thumb.isPlaceholder) {
             cr.save();
             cr.arc(cx, cy, 5, 0, 2 * Math.PI);
@@ -448,9 +520,6 @@ function createMediaBox() {
             cr.fill();
             cr.restore();
         }
-
-        // Placeholder glyph — drawn via Pango so it renders correctly
-        // FontDescription cached; layout re-bound to current cr each frame (required by PangoCairo)
         if (thumb.isPlaceholder) {
             try {
                 const Pango = imports.gi.Pango;
@@ -460,7 +529,6 @@ function createMediaBox() {
                     _cachedPangoFd.set_family('monospace');
                     _cachedPangoFd.set_absolute_size(36 * Pango.SCALE);
                 }
-                // Layout must be created per-cr context, but FontDescription is reused
                 const layout = PangoCairo.create_layout(cr);
                 layout.set_text(PLACEHOLDER_GLYPH, -1);
                 layout.set_font_description(_cachedPangoFd);
@@ -485,7 +553,6 @@ function createMediaBox() {
         });
     }
     function thumbStopRotation() { thumb.playing = false; }
-
     function thumbSetPixbuf(pixbuf, isPlaceholder) {
         thumb.pixbuf = pixbuf;
         thumb.isPlaceholder = isPlaceholder;
@@ -565,22 +632,25 @@ function createMediaBox() {
     infoBox.add_css_class('media-info-center');
     infoBox.append(mediaInfoContainer);
 
-    // Background is the Cairo DrawingArea (no CSS parsing)
     const playerFrame = new Gtk.Overlay({
         halign: Gtk.Align.CENTER, valign: Gtk.Align.CENTER,
         hexpand: false, vexpand: false,
     });
     playerFrame.set_size_request(500, 140);
     playerFrame.add_css_class('media-player-frame');
-    playerFrame.set_child(bgDrawingArea);    // background at bottom
-    playerFrame.add_overlay(infoBox);        // content on top
-    playerFrame.set_measure_overlay(infoBox, true);  // size bg to match content
+    playerFrame.set_child(bgDrawingArea);
+    playerFrame.add_overlay(infoBox);
+    playerFrame.set_measure_overlay(infoBox, true);
+
+    // ── Assemble: [sourcesBar] [playerFrame] [volumeScale] ────────────────
+    mediaPlayerBox.append(sourcesBar);
     mediaPlayerBox.append(playerFrame);
+    mediaPlayerBox.append(volumeScale);
 
     // ── Runtime state ──────────────────────────────────────────────────────
     let player = null;
     let busName = null;
-    let lastArtUrl = null;   // null = never loaded; '' = loaded but empty
+    let lastArtUrl = null;
     let isSeeking = false;
     let seekTarget = 0;
     let lastPosition = 0;
@@ -588,38 +658,52 @@ function createMediaBox() {
     let frozenPosition = 0;
     let isPositionFrozen = false;
 
-    // Single reusable Soup session — never recreated
+    // ── Multi-source tracking ──────────────────────────────────────────────
+    // allPlayers: [{bus, shortName, proxy, status}] for all detected MPRIS sources.
+    // userSelectedBus: bus the user manually picked — null = auto-select.
+    // proxyCache: reuse existing proxies to avoid recreating on every poll.
+    let allPlayers = [];
+    let userSelectedBus = null;
+    let lastPlayerListKey = '';
+    const proxyCache = {};   // busName → proxy
+
     const session = new Soup.Session();
-    session.set_timeout(8);   // 8s timeout; prevents hanging requests
+    session.set_timeout(8);
 
     // ── Art loading ────────────────────────────────────────────────────────
     // Rules:
-    //  1. artUrl unchanged → skip entirely (no re-decode, no re-draw)
-    //  2. artUrl empty/missing → placeholder glyph, rotate if playing
-    //  3. artUrl = local file:// image → GdkPixbuf from file
-    //  4. artUrl = local file:// video  → ffmpeg first-frame thumb, else glyph
-    //  5. artUrl = http(s)://           → Soup async download → GdkPixbuf
-    //  Memory: only one pixbuf held at a time; old one replaced then GC'd
-
+    //  1. artUrl unchanged → skip (no re-decode, no re-draw)
+    //  2. artUrl empty/missing AND mediaUrl is a video → extract first frame via ffmpeg
+    //  3. artUrl empty/missing, not a video (or ffmpeg unavailable) → placeholder glyph
+    //  4. artUrl = local file:// image → GdkPixbuf from file
+    //  5. artUrl = local file:// video → extract first frame via ffmpeg, else glyph
+    //  6. artUrl = http(s):// → Soup async download → GdkPixbuf
+    // No periodic video refresh — one static first-frame thumbnail per track.
     const VIDEO_EXTS = ['.mkv', '.mp4', '.avi', '.webm', '.mov', '.flv', '.wmv', '.m4v', '.ts'];
 
-    function applyArt(artUrl, playbackState) {
+    function applyArt(artUrl, playbackState, mediaUrl = '') {
         const isPlaying = playbackState === 'Playing';
 
-        // ── Guard: skip if nothing changed ───────────────────────────────
+        // Guard: skip if nothing changed (rotation state may still need updating)
         if (artUrl === lastArtUrl) {
-            // Just update rotation state if playback changed
-            if (isPlaying) thumbStartRotation();
-            else thumbStopRotation();
+            if (isPlaying) thumbStartRotation(); else thumbStopRotation();
             return;
         }
         lastArtUrl = artUrl;
 
         // ── No art ───────────────────────────────────────────────────────
         if (!artUrl || artUrl.length === 0) {
-            thumbSetPixbuf(null, true);          // show glyph
-            if (isPlaying) thumbStartRotation();
-            else thumbStopRotation();
+            // Check if the real media file (xesam:url) is a video — if so try ffmpeg
+            const lMedia = (mediaUrl || '').toLowerCase().replace('file://', '');
+            const mediaIsVideo = VIDEO_EXTS.some(ext => lMedia.endsWith(ext));
+            if (mediaIsVideo && mediaUrl) {
+                const normUri = mediaUrl.startsWith('file://') ? mediaUrl : `file://${mediaUrl}`;
+                const pb = extractVideoThumbnail(normUri);
+                thumbSetPixbuf(pb || null, !pb);
+            } else {
+                thumbSetPixbuf(null, true);
+            }
+            if (isPlaying) thumbStartRotation(); else thumbStopRotation();
             return;
         }
 
@@ -627,79 +711,248 @@ function createMediaBox() {
         if (artUrl.startsWith('file://') || artUrl.startsWith('/')) {
             const path = artUrl.replace('file://', '');
             const lp = path.toLowerCase();
+            const normUri = artUrl.startsWith('/') ? `file://${artUrl}` : artUrl;
 
             if (VIDEO_EXTS.some(ext => lp.endsWith(ext))) {
-                // Local video without embedded art → extract first frame
-                const pb = extractVideoThumbnail(artUrl.startsWith('/') ? `file://${artUrl}` : artUrl);
-                if (pb) {
-                    thumbSetPixbuf(pb, false);
-                } else {
-                    thumbSetPixbuf(null, true);  // ffmpeg not available → glyph
-                }
+                // artUrl is the video file itself — extract first frame
+                const pb = extractVideoThumbnail(normUri);
+                thumbSetPixbuf(pb || null, !pb);
             } else {
-                // Image file (jpg/png/etc)
+                // Static image (album art, embedded thumbnail, etc.)
                 try {
                     const pb = GdkPixbuf.Pixbuf.new_from_file(path);
                     thumbSetPixbuf(pb, false);
-                } catch (e) {
-                    thumbSetPixbuf(null, true);
-                }
+                } catch (e) { thumbSetPixbuf(null, true); }
             }
-            if (isPlaying) thumbStartRotation();
-            else thumbStopRotation();
+            if (isPlaying) thumbStartRotation(); else thumbStopRotation();
             return;
         }
 
         // ── Remote URL ───────────────────────────────────────────────────
         if (artUrl.startsWith('http://') || artUrl.startsWith('https://')) {
-            // Show glyph immediately while downloading; replace when done
             thumbSetPixbuf(null, true);
-            if (isPlaying) thumbStartRotation();
-            else thumbStopRotation();
-
+            if (isPlaying) thumbStartRotation(); else thumbStopRotation();
             const msg = Soup.Message.new('GET', artUrl);
             session.send_and_read_async(msg, GLib.PRIORITY_LOW, null, (sess, sres) => {
-                // Bail if art changed while we were downloading
                 if (artUrl !== lastArtUrl) return;
                 try {
                     const bytes = sess.send_and_read_finish(sres);
                     const stream = Gio.MemoryInputStream.new_from_bytes(bytes);
                     const pb = GdkPixbuf.Pixbuf.new_from_stream(stream, null);
-                    stream.close(null);  // explicitly free native stream resources
+                    stream.close(null);
                     if (artUrl === lastArtUrl) thumbSetPixbuf(pb, false);
-                } catch (e) { /* keep glyph */ }
+                } catch (e) { }
             });
             return;
         }
 
-        // Fallback for unrecognised URL schemes
+        // Fallback for unrecognised schemes
         thumbSetPixbuf(null, true);
-        if (isPlaying) thumbStartRotation();
-        else thumbStopRotation();
+        if (isPlaying) thumbStartRotation(); else thumbStopRotation();
     }
 
-    // ── MPRIS player selection ─────────────────────────────────────────────
+    // ── Source sidebar helpers ─────────────────────────────────────────────
+    // Short display name from bus string: strip prefix and common suffixes.
+    function _sourceName(bus) {
+        let name = bus.replace(BUS_NAME_PREFIX, '');
+        // Strip instance suffixes like .instance12345 or trailing dots
+        name = name.replace(/\.\d+$/, '').replace(/\.$/, '');
+        // Capitalise first char
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    }
+
+    // Rebuild sidebar buttons from scratch when the player list changes.
+    function _buildSourceDots() {
+        let child;
+        while ((child = sourcesBar.get_first_child())) sourcesBar.remove(child);
+
+        for (const p of allPlayers) {
+            const isActive = p.bus === busName;
+            const isPlaying = p.status === 'Playing';
+            const glyph = isPlaying ? SRC_PLAYING : (p.status === 'Paused' ? SRC_PAUSED : SRC_STOPPED);
+
+            const btn = new Gtk.Button();
+            // Tiny label — just the glyph
+            const lbl = new Gtk.Label({ label: glyph, halign: Gtk.Align.CENTER });
+            btn.set_child(lbl);
+            btn.set_tooltip_text(`${p.shortName}${isPlaying ? ' 󰐊' : p.status === 'Paused' ? ' 󰏤' : ''}`);
+            btn.add_css_class('media-source-btn');
+            if (isActive)  btn.add_css_class('source-active');
+            if (isPlaying) btn.add_css_class('source-playing');
+
+            btn._srcBus = p.bus;
+            btn.connect('clicked', () => {
+                userSelectedBus = btn._srcBus;
+                _switchToSource(btn._srcBus);
+            });
+            sourcesBar.append(btn);
+        }
+    }
+
+    // Only update glyph + classes on existing buttons (no teardown/rebuild).
+    function _updateSourceDotStyles() {
+        let btn = sourcesBar.get_first_child();
+        for (const p of allPlayers) {
+            if (!btn) break;
+            const isActive  = p.bus === busName;
+            const isPlaying = p.status === 'Playing';
+            const glyph = isPlaying ? SRC_PLAYING : (p.status === 'Paused' ? SRC_PAUSED : SRC_STOPPED);
+            const lbl = btn.get_child();
+            if (lbl) lbl.set_label(glyph);
+            btn.set_tooltip_text(`${p.shortName}${isPlaying ? ' 󰐊' : p.status === 'Paused' ? ' 󰏤' : ''}`);
+            if (isActive)  btn.add_css_class('source-active');
+            else           btn.remove_css_class('source-active');
+            if (isPlaying) btn.add_css_class('source-playing');
+            else           btn.remove_css_class('source-playing');
+            btn = btn.get_next_sibling();
+        }
+    }
+
+    // Switch the active player to a specific bus.
+    function _switchToSource(targetBus) {
+        const found = allPlayers.find(p => p.bus === targetBus);
+        if (!found) return;
+        if (targetBus === busName) return;
+        busName = targetBus;
+        player = found.proxy;
+        lastArtUrl = null;  // force art reload for new source
+        _updateSourceDotStyles();
+        updateTrackInfoAsync();
+    }
+
+    // Scroll on the sources bar or main widget cycles through sources.
+    const _srcScrollCtrl = new Gtk.EventControllerScroll();
+    _srcScrollCtrl.set_flags(Gtk.EventControllerScrollFlags.VERTICAL);
+    _srcScrollCtrl.connect('scroll', (_ctrl, _dx, dy) => {
+        if (allPlayers.length < 2) return Gdk.EVENT_PROPAGATE;
+        const idx = allPlayers.findIndex(p => p.bus === busName);
+        const next = dy > 0
+            ? (idx + 1) % allPlayers.length
+            : (idx - 1 + allPlayers.length) % allPlayers.length;
+        userSelectedBus = allPlayers[next].bus;
+        _switchToSource(userSelectedBus);
+        return Gdk.EVENT_STOP;
+    });
+    sourcesBar.add_controller(_srcScrollCtrl);
+
+    // ── MPRIS player enumeration + auto-select ─────────────────────────────
     function updatePlayerAsync(callback) {
-        getMprisPlayersAsync(players => {
-            if (players.length > 0) {
-                const browsers = ['chromium', 'firefox', 'brave', 'vivaldi', 'chrome', 'opera'];
-                let selected = players[0];
-                for (const name of players) {
-                    if (browsers.some(b => name.toLowerCase().includes(b))) { selected = name; break; }
+        getMprisPlayersAsync(buses => {
+            // Track list change to know when to rebuild dots vs just re-style them
+            const listKey = buses.slice().sort().join(',');
+            const listChanged = listKey !== lastPlayerListKey;
+            lastPlayerListKey = listKey;
+
+            // Build allPlayers — reuse cached proxies
+            const newPlayers = [];
+            for (const bus of buses) {
+                if (!proxyCache[bus]) {
+                    try { proxyCache[bus] = createMprisProxy(bus); }
+                    catch (e) { proxyCache[bus] = null; }
                 }
-                // Only recreate proxy if player changed
-                if (selected !== busName) {
-                    busName = selected;
-                    try { player = createMprisProxy(busName); }
-                    catch (e) { player = null; }
+                const proxy = proxyCache[bus];
+                let status = 'Stopped';
+                if (proxy) {
+                    try {
+                        const sv = proxy.get_cached_property('PlaybackStatus');
+                        status = sv ? sv.deep_unpack() : 'Stopped';
+                    } catch (e) { }
                 }
-            } else {
-                player = null;
-                busName = null;
+                newPlayers.push({ bus, shortName: _sourceName(bus), proxy, status });
             }
+            // Clean up proxies for buses that have gone away
+            for (const b of Object.keys(proxyCache)) {
+                if (!buses.includes(b)) delete proxyCache[b];
+            }
+            allPlayers = newPlayers;
+
+            // ── Auto-select logic ──────────────────────────────────────────
+            // ── Auto-select logic ──────────────────────────────────────────
+            // Clear userSelectedBus only if that source has completely disappeared
+            if (userSelectedBus && !allPlayers.find(p => p.bus === userSelectedBus)) userSelectedBus = null;
+
+            const currentEntry = allPlayers.find(p => p.bus === busName);
+            const userEntry    = userSelectedBus ? allPlayers.find(p => p.bus === userSelectedBus) : null;
+
+            let targetBus = null;
+
+            if (userEntry) {
+                // User explicitly chose a source → always respect it, regardless of
+                // whether another source is playing. Auto-select only runs when no
+                // explicit selection has been made (userSelectedBus === null).
+                targetBus = userSelectedBus;
+            } else {
+                // Auto-select: prefer currently-playing, then any playing, then first
+                const anyPlaying = allPlayers.find(p => p.status === 'Playing');
+                if (currentEntry && currentEntry.status === 'Playing') {
+                    targetBus = busName;        // keep current — it's playing
+                } else if (anyPlaying) {
+                    targetBus = anyPlaying.bus; // something else started playing
+                } else if (allPlayers.length > 0) {
+                    targetBus = allPlayers[0].bus;
+                }
+            }
+
+            if (targetBus && targetBus !== busName) {
+                const entry = allPlayers.find(p => p.bus === targetBus);
+                busName = targetBus;
+                player = entry ? entry.proxy : null;
+                lastArtUrl = null;   // force art reload on source change
+            } else if (!targetBus) {
+                busName = null;
+                player = null;
+            }
+
+            // Rebuild dots only when the list actually changed; otherwise just restyle
+            if (listChanged) _buildSourceDots();
+            else             _updateSourceDotStyles();
+
             if (callback) callback();
         });
     }
+
+    // ── Volume sync helpers ────────────────────────────────────────────────
+    // Use wpctl (PipeWire) for volume read/write — more reliable than MPRIS
+    // Volume which many players either don't implement or ignore.
+    // Reads are cached for 2s so we don't spawn a process every 50ms poll.
+    let _volumeChanging = false;
+    let _volCache = { value: 1.0, ts: 0 };
+    const VOL_CACHE_TTL_MS = 2000;
+
+    function _readVolumeWpctl() {
+        const now = GLib.get_monotonic_time() / 1000;  // µs → ms
+        if (now - _volCache.ts < VOL_CACHE_TTL_MS) return _volCache.value;
+        try {
+            const [ok, stdout] = GLib.spawn_command_line_sync('wpctl get-volume @DEFAULT_AUDIO_SINK@');
+            if (!ok || !stdout) return _volCache.value;
+            const out = imports.byteArray.toString(stdout);
+            // Output format: "Volume: 0.75" or "Volume: 0.75 [MUTED]"
+            const m = out.match(/Volume:\s*([\d.]+)/);
+            const vol = m ? Math.max(0, Math.min(1, parseFloat(m[1]))) : _volCache.value;
+            _volCache = { value: vol, ts: now };
+            return vol;
+        } catch (e) { return _volCache.value; }
+    }
+
+    function _writeVolumeWpctl(val) {
+        // Optimistic cache update so the slider doesn't snap back on next read
+        _volCache = { value: val, ts: GLib.get_monotonic_time() / 1000 };
+        try {
+            GLib.spawn_command_line_async(`wpctl set-volume @DEFAULT_AUDIO_SINK@ ${val.toFixed(3)}`);
+        } catch (e) { }
+    }
+
+    function _readVolume() {
+        const vol = _readVolumeWpctl();
+        _volumeChanging = true;
+        _volAdj.set_value(vol);
+        _volumeChanging = false;
+    }
+
+    _volAdj.connect('value-changed', () => {
+        if (_volumeChanging) return;  // programmatic update — don't write back
+        _writeVolumeWpctl(_volAdj.get_value());
+    });
 
     // ── Track info update ──────────────────────────────────────────────────
     function updateTrackInfoAsync() {
@@ -713,7 +966,6 @@ function createMediaBox() {
             progress.set_text('--:-- / --:--');
             [shuffleBtn, prevBtn, playBtn, nextBtn, loopBtn].forEach(b => b.set_sensitive(false));
             thumbStopRotation();
-            // Reset art only if not already showing placeholder
             if (lastArtUrl !== '') {
                 lastArtUrl = '';
                 thumbSetPixbuf(null, true);
@@ -738,6 +990,9 @@ function createMediaBox() {
                     const artistArr = metadata['xesam:artist'] ? metadata['xesam:artist'].deep_unpack() : [];
                     const artist = artistArr.length > 0 ? artistArr[0] : '';
                     const artUrl = metadata['mpris:artUrl'] ? metadata['mpris:artUrl'].deep_unpack() : '';
+                    // xesam:url is the actual media file path — used for video frame refresh
+                    // even when artUrl points to a static embedded thumbnail image
+                    const mediaUrl = metadata['xesam:url'] ? metadata['xesam:url'].deep_unpack() : '';
                     const length = metadata['mpris:length'] ? metadata['mpris:length'].deep_unpack() : 0;
 
                     Gio.DBus.session.call(
@@ -761,7 +1016,6 @@ function createMediaBox() {
                             titleLabel.set_label(title);
                             artistLabel.set_label(artist);
 
-                            // Play button icon
                             if (playbackState === 'Playing') {
                                 playBtn.set_icon_name('media-playback-pause-symbolic');
                                 progress.remove_css_class('paused');
@@ -770,10 +1024,8 @@ function createMediaBox() {
                                 progress.add_css_class('paused');
                             }
 
-                            // Art (deduplicated internally)
-                            applyArt(artUrl, playbackState);
+                            applyArt(artUrl, playbackState, mediaUrl);
 
-                            // Progress
                             if (length > 0) {
                                 const prevState = lastPlaybackState;
                                 lastPlaybackState = playbackState;
@@ -794,18 +1046,18 @@ function createMediaBox() {
                                 progress.set_text('--:-- / --:--');
                             }
 
-                            // Shuffle
+                            // Read volume into slider (no-op if unchanged)
+                            _readVolume();
+
                             try {
                                 const sv = player.get_cached_property('Shuffle');
                                 shuffleBtn._setShuffleState(sv ? sv.deep_unpack() : false);
                             } catch (e) { }
 
-                            // Loop
                             try {
                                 const lv = player.get_cached_property('LoopStatus');
                                 loopMode = Math.max(0, loopModes.indexOf(lv ? lv.deep_unpack() : 'None'));
                             } catch (e) { }
-                            // Only update loop button UI when mode actually changed
                             if (loopMode !== lastRenderedLoopMode) {
                                 lastRenderedLoopMode = loopMode;
                                 loopBtn.remove_css_class('loop-none');
@@ -861,7 +1113,6 @@ function createMediaBox() {
         if (!player || !busName) return;
         try { const lv = player.get_cached_property('LoopStatus'); loopMode = Math.max(0, loopModes.indexOf(lv ? lv.deep_unpack() : 'None')); } catch (e) { }
         const newMode = (loopMode + 1) % 3;
-        // Try method first, fall back to property Set
         Gio.DBus.session.call(busName, '/org/mpris/MediaPlayer2',
             'org.mpris.MediaPlayer2.Player', 'SetLoopStatus',
             GLib.Variant.new_tuple([GLib.Variant.new_string(loopModes[newMode])]),
@@ -887,19 +1138,35 @@ function createMediaBox() {
             });
     });
 
-    // ── Seek gestures ──────────────────────────────────────────────────────
+    // ── Seek gestures (smooth) ─────────────────────────────────────────────
+    // Bug fix: GestureDrag.drag-update gives (offset_x, offset_y) from the
+    // drag START point, not an absolute coordinate. The original code passed
+    // offset_x directly to getPointerFraction() as if it were absolute, which
+    // caused the progress bar to jump to the wrong position on drag.
+    // Fix: track the absolute x at press time (_seekPressX) and add the
+    // running offset to it on every drag-update tick.
     function getPointerFraction(widget, x) {
         return Math.max(0, Math.min(1, x / widget.get_allocation().width));
     }
+
+    let _seekPressX = 0;
     const gesture = new Gtk.GestureClick();
     const dragGesture = new Gtk.GestureDrag();
 
     gesture.connect('pressed', (_g, _n, x) => {
         if (!player) return;
+        _seekPressX = x;
         isSeeking = true;
         progress.set_fraction(getPointerFraction(progress, x));
         progress.add_css_class('seeking');
     });
+
+    // drag-update: x here is offset from start — add _seekPressX for absolute pos
+    dragGesture.connect('drag-update', (_g, dx) => {
+        if (!player || !isSeeking) return;
+        progress.set_fraction(getPointerFraction(progress, _seekPressX + dx));
+    });
+
     gesture.connect('released', (_g, _n, x) => {
         if (!player || !isSeeking) return;
         isSeeking = false;
@@ -942,27 +1209,20 @@ function createMediaBox() {
                 }
             });
     });
-    dragGesture.connect('drag-update', (_g, x) => {
-        if (!player || !isSeeking) return;
-        progress.set_fraction(getPointerFraction(progress, x));
-    });
+
     progress.add_controller(gesture);
     progress.add_controller(dragGesture);
 
     // ── Timer lifecycle ────────────────────────────────────────────────────
-    // All periodic timers are tracked so they can be stopped when hidden and
-    // cleaned up on destroy, preventing leaked callbacks and GVariant allocs.
-    let _bgTimerId = 0;
+    let _bgTimerId   = 0;
     let _pollTimerId = 0;
 
     function _startTimers() {
-        // Resolve theme colors on (re-)show so Cairo background uses current palette
         _resolveBgColors(mediaPlayerBox);
         if (_bgTimerId === 0) {
             _bgTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, BG_INTERVAL_MS, () => {
                 phase += PHASE_STEP;
                 bgDrawingArea.queue_draw();
-                // Every ~2s: re-resolve theme colors (hot-reload support) + GC
                 if (++_gcCounter >= BG_FPS * 2) {
                     _gcCounter = 0;
                     _resolveBgColors(mediaPlayerBox);
@@ -981,7 +1241,7 @@ function createMediaBox() {
     }
 
     function _stopTimers() {
-        if (_bgTimerId) { GLib.source_remove(_bgTimerId); _bgTimerId = 0; }
+        if (_bgTimerId)   { GLib.source_remove(_bgTimerId);   _bgTimerId   = 0; }
         if (_pollTimerId) { GLib.source_remove(_pollTimerId); _pollTimerId = 0; }
         thumbStopRotation();
     }
@@ -991,20 +1251,16 @@ function createMediaBox() {
         if (thumb.timerId) { GLib.source_remove(thumb.timerId); thumb.timerId = 0; }
         if (_colorMonitor) { _colorMonitor.cancel(); _colorMonitor = null; }
         if (_colorDebounce) { GLib.source_remove(_colorDebounce); _colorDebounce = 0; }
-        // Release cached objects
         _cachedGlossGradient = null;
         _cachedPangoFd = null;
         _cachedPangoLayout = null;
         thumb.pixbuf = null;
     }
 
-    // ── Visibility tracking ───────────────────────────────────────────────
-    // Stop all timers when the widget's toplevel is hidden; restart on show.
-    mediaPlayerBox.connect('map', () => _startTimers());
-    mediaPlayerBox.connect('unmap', () => _stopTimers());
+    mediaPlayerBox.connect('map',     () => _startTimers());
+    mediaPlayerBox.connect('unmap',   () => _stopTimers());
     mediaPlayerBox.connect('destroy', () => _destroyTimers());
 
-    // ── Periodic refresh (initial — timers started properly on map) ──────
     updatePlayerAsync(() => updateTrackInfoAsync());
 
     return mediaPlayerBox;
