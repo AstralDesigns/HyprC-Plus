@@ -23,9 +23,10 @@ const PLACEHOLDER_GLYPH = '';
 
 // ── Source dot glyphs (Nerd Font mdi icons) ──────────────────────────────
 // mdi:play-circle  󰐊  mdi:pause-circle  󰏤  mdi:stop-circle  󰓛
-const SRC_PLAYING = '󰐊';
-const SRC_PAUSED  = '󰏤';
-const SRC_STOPPED = '󰓛';
+const SRC_PLAYING  = '󰐊';
+const SRC_PAUSED   = '󰏤';
+const SRC_STOPPED  = '󰓛';
+const SRC_NO_MEDIA = '󰎊';   // mdi:music-note-off — shown when no source detected
 
 function getMprisPlayersAsync(callback) {
     Gio.DBus.session.call(
@@ -296,6 +297,14 @@ function createMediaBox() {
         .media-source-btn.source-playing {
             opacity: 0.85;
         }
+        .media-source-btn.source-no-media {
+            opacity: 0.85;
+            cursor: default;
+        }
+        .media-source-btn.source-no-media:hover {
+            background-color: transparent;
+            opacity: 0.25;
+        }
 
         /* ── Volume slider (right strip) ──────────────────────────── */
         .media-volume-bar {
@@ -346,12 +355,16 @@ function createMediaBox() {
             const [ok1, c1] = sc.lookup_color('inverse_primary');
             const [ok2, c2] = sc.lookup_color('background');
             const [ok3, c3] = sc.lookup_color('blur_background');
+            const [ok4, c4] = sc.lookup_color('primary');
             if (ok1 && ok2) {
                 _bgColors = {
                     inv: { r: c1.red, g: c1.green, b: c1.blue, a: c1.alpha },
                     bg:  { r: c2.red, g: c2.green, b: c2.blue, a: c2.alpha },
                     blur: ok3 ? { r: c3.red, g: c3.green, b: c3.blue, a: c3.alpha }
                                : { r: c2.red, g: c2.green, b: c2.blue, a: 0.5 },
+                    // @primary — used for placeholder glyph colour
+                    pri: ok4 ? { r: c4.red, g: c4.green, b: c4.blue }
+                              : { r: 1, g: 1, b: 1 },  // fallback: white
                 };
             }
         } catch (e) { }
@@ -511,23 +524,28 @@ function createMediaBox() {
             cr.paint();
         }
         cr.restore();
-        cr.save();
-        cr.arc(cx, cy, r, 0, 2 * Math.PI);
-        cr.clip();
-        try {
-            const Cairo = imports.gi.cairo;
-            if (_cachedGlossR !== r || _cachedGlossCx !== cx || _cachedGlossCy !== cy) {
-                _cachedGlossGradient = new Cairo.RadialGradient(cx, cy - r * 0.25, r * 0.05, cx, cy, r);
-                _cachedGlossGradient.addColorStopRGBA(0, 1, 1, 1, 0.15);
-                _cachedGlossGradient.addColorStopRGBA(0.4, 1, 1, 1, 0.0);
-                _cachedGlossGradient.addColorStopRGBA(1, 0, 0, 0, 0.22);
-                _cachedGlossR = r; _cachedGlossCx = cx; _cachedGlossCy = cy;
-            }
-            cr.setSource(_cachedGlossGradient);
+        // Gloss + spindle are visual chrome for album-art rotation —
+        // skip entirely when showing the placeholder glyph so no
+        // semi-transparent circles appear behind it.
+        if (thumb.pixbuf && !thumb.isPlaceholder) {
+            cr.save();
             cr.arc(cx, cy, r, 0, 2 * Math.PI);
-            cr.fill();
-        } catch (e) { }
-        cr.restore();
+            cr.clip();
+            try {
+                const Cairo = imports.gi.cairo;
+                if (_cachedGlossR !== r || _cachedGlossCx !== cx || _cachedGlossCy !== cy) {
+                    _cachedGlossGradient = new Cairo.RadialGradient(cx, cy - r * 0.25, r * 0.05, cx, cy, r);
+                    _cachedGlossGradient.addColorStopRGBA(0, 1, 1, 1, 0.15);
+                    _cachedGlossGradient.addColorStopRGBA(0.4, 1, 1, 1, 0.0);
+                    _cachedGlossGradient.addColorStopRGBA(1, 0, 0, 0, 0.22);
+                    _cachedGlossR = r; _cachedGlossCx = cx; _cachedGlossCy = cy;
+                }
+                cr.setSource(_cachedGlossGradient);
+                cr.arc(cx, cy, r, 0, 2 * Math.PI);
+                cr.fill();
+            } catch (e) { }
+            cr.restore();
+        }
         if (thumb.pixbuf && !thumb.isPlaceholder) {
             cr.save();
             cr.arc(cx, cy, 5, 0, 2 * Math.PI);
@@ -558,7 +576,8 @@ function createMediaBox() {
                 }
                 const [pw2, ph2] = _cachedPangoLayout.get_pixel_size();
                 cr.save();
-                cr.setSourceRGBA(1, 1, 1, 0.55);
+                const _pri = _bgColors ? _bgColors.pri : { r: 1, g: 1, b: 1 };
+                cr.setSourceRGBA(_pri.r, _pri.g, _pri.b, 0.75);
                 cr.moveTo(cx - pw2 / 2, cy - ph2 / 2);
                 PangoCairo.show_layout(cr, _cachedPangoLayout);
                 cr.restore();
@@ -688,7 +707,7 @@ function createMediaBox() {
     // proxyCache: reuse existing proxies to avoid recreating on every poll.
     let allPlayers = [];
     let userSelectedBus = null;
-    let lastPlayerListKey = '';
+    let lastPlayerListKey = '__unset__';  // sentinel — forces _buildSourceDots on first poll
     const proxyCache = {};   // busName → proxy
 
     const session = new Soup.Session();
@@ -789,6 +808,20 @@ function createMediaBox() {
     function _buildSourceDots() {
         let child;
         while ((child = sourcesBar.get_first_child())) sourcesBar.remove(child);
+
+        if (allPlayers.length === 0) {
+            // No sources detected — show a static no-media indicator so the
+            // sidebar keeps its width and doesn't collapse/shift the layout.
+            const lbl = new Gtk.Label({ label: SRC_NO_MEDIA, halign: Gtk.Align.CENTER });
+            const btn = new Gtk.Button();
+            btn.set_child(lbl);
+            btn.set_tooltip_text('No media');
+            btn.add_css_class('media-source-btn');
+            btn.add_css_class('source-no-media');
+            btn.set_sensitive(false);
+            sourcesBar.append(btn);
+            return;
+        }
 
         for (const p of allPlayers) {
             const isActive = p.bus === busName;
