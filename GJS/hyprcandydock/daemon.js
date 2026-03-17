@@ -7,6 +7,50 @@ const {Gio, GLib} = imports.gi;
 const _decoder = new TextDecoder();
 const _encoder = new TextEncoder();
 
+// ── dGPU environment detection ────────────────────────────────────────────
+// Reads /sys/class/drm — instant kernel vfs, no process spawn.
+// Returns env-var object for dGPU routing, or null on iGPU/CPU-only systems.
+//   NVIDIA hybrid  → { CUDA_VISIBLE_DEVICES: '0' }
+//   AMD dGPU       → { DRI_PRIME: '1' }
+//   Intel iGPU only→ null
+// Cached permanently — hardware topology never changes at runtime.
+let _gpuEnvCache = undefined;  // undefined = not yet probed; null = no dGPU
+
+function _detectDgpuEnv() {
+    if (_gpuEnvCache !== undefined) return _gpuEnvCache;
+
+    let hasNvidia = false, hasAmd = false;
+    try {
+        const drm = Gio.File.new_for_path('/sys/class/drm');
+        let en = null;
+        try {
+            en = drm.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+            let fi;
+            while ((fi = en.next_file(null)) !== null) {
+                // Only card0, card1 … — skip renderD* nodes
+                if (!fi.get_name().match(/^card\d+$/)) continue;
+                try {
+                    const vendorPath = `/sys/class/drm/${fi.get_name()}/device/vendor`;
+                    const [, bytes] = Gio.File.new_for_path(vendorPath).load_contents(null);
+                    const vendor = _decoder.decode(bytes).trim();
+                    if      (vendor === '0x10de') hasNvidia = true;
+                    else if (vendor === '0x1002') hasAmd    = true;
+                } catch (_) {}
+            }
+        } finally {
+            if (en) try { en.close(null); } catch (_) {}
+        }
+    } catch (_) {}
+
+    _gpuEnvCache = hasNvidia ? { CUDA_VISIBLE_DEVICES: '0' }
+                 : hasAmd    ? { DRI_PRIME: '1' }
+                 : null;
+
+    console.log('[daemon] dGPU env for launched apps:',
+        _gpuEnvCache ? JSON.stringify(_gpuEnvCache) : '(none — iGPU/CPU default)');
+    return _gpuEnvCache;
+}
+
 var Daemon = class {
     // Normalize Hyprland class names: strip reverse-DNS prefixes.
     // "org.gnome.Nautilus" → "nautilus"  |  "firefox" → "firefox"
@@ -216,6 +260,15 @@ var Daemon = class {
     _spawnClean(argv, extraEnv) {
         let envp = GLib.get_environ();
         envp = GLib.environ_unsetenv(envp, 'LD_PRELOAD');
+        // Apply dGPU routing to all launched apps by default.
+        // override=false: respects DRI_PRIME/CUDA_VISIBLE_DEVICES already in the
+        // user's session, and lets the explicit extraEnv below overwrite it when
+        // the user picks a specific GPU from the context menu.
+        const gpuEnv = _detectDgpuEnv();
+        if (gpuEnv)
+            for (const [k, v] of Object.entries(gpuEnv))
+                envp = GLib.environ_setenv(envp, k, v, false);
+        // Explicit per-launch env (e.g. "Launch with dGPU / iGPU") always wins.
         if (extraEnv)
             for (const [k, v] of Object.entries(extraEnv))
                 envp = GLib.environ_setenv(envp, k, v, true);
