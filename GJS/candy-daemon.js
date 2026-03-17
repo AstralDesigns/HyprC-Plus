@@ -52,6 +52,41 @@ const WIDGET_POSITIONS = {
     weather: { width: 420, height: 380 }
 };
 
+// ── GPU environment detection (same logic as daemon.js) ──────────────────
+// Reads /sys/class/drm — instant, no process spawn, cached permanently.
+// Returns env vars for dGPU routing, or null for iGPU/CPU-only systems.
+let _gpuEnvDetected = undefined;
+function _detectDgpuEnv() {
+    if (_gpuEnvDetected !== undefined) return _gpuEnvDetected;
+    let hasNvidia = false, hasAmd = false;
+    try {
+        const drm = Gio.File.new_for_path('/sys/class/drm');
+        let en = null;
+        try {
+            en = drm.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+            let fi;
+            while ((fi = en.next_file(null)) !== null) {
+                const name = fi.get_name();
+                if (!name.match(/^card\d+$/)) continue;
+                try {
+                    const [, bytes] = Gio.File.new_for_path(
+                        `/sys/class/drm/${name}/device/vendor`).load_contents(null);
+                    const vendor = new TextDecoder().decode(bytes).trim();
+                    if      (vendor === '0x10de') hasNvidia = true;
+                    else if (vendor === '0x1002') hasAmd    = true;
+                } catch (_) {}
+            }
+        } finally {
+            if (en) try { en.close(null); } catch (_) {}
+        }
+    } catch (_) {}
+    _gpuEnvDetected = hasNvidia ? { CUDA_VISIBLE_DEVICES: '0' }
+                    : hasAmd    ? { DRI_PRIME: '1' }
+                    : null;
+    print('🎮 GPU env: ' + (_gpuEnvDetected ? JSON.stringify(_gpuEnvDetected) : '(iGPU/CPU default)'));
+    return _gpuEnvDetected;
+}
+
 /**
  * Setup Candy desktop entry and icons (optimized - only if missing)
  */
@@ -380,6 +415,14 @@ function onShutdown() {
 
 function main() {
     print('🍬 Candy Daemon starting...');
+
+    // Apply dGPU routing to this process and all children it spawns.
+    // GLib.setenv with override=false respects any env the user already set.
+    const gpuEnv = _detectDgpuEnv();
+    if (gpuEnv)
+        for (const [k, v] of Object.entries(gpuEnv))
+            GLib.setenv(k, v, false);
+
     setupCandyDesktop();
     PidUtils.writePid(DAEMON_NAME);
 
