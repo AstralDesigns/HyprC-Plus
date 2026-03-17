@@ -699,6 +699,7 @@ const HyprCandyDock = GObject.registerClass({
 
         const currentClasses = new Set(this.clientWidgets.keys());
         const newClasses = new Set(clientData.map(d => d.className));
+        let added = 0, removed = 0;
 
         // Remove deleted apps
         for (const className of currentClasses) {
@@ -707,6 +708,7 @@ const HyprCandyDock = GObject.registerClass({
                 if (widget) {
                     this.mainBox.remove(widget);
                     this.clientWidgets.delete(className);
+                    removed++;
                     log('[dock] Removed: ' + className);
                 }
             }
@@ -716,6 +718,7 @@ const HyprCandyDock = GObject.registerClass({
         for (const data of clientData) {
             if (!this.clientWidgets.has(data.className)) {
                 this._addClientButton(data);
+                added++;
             } else {
                 this._updateClientButton(data);
             }
@@ -723,21 +726,26 @@ const HyprCandyDock = GObject.registerClass({
 
         // Sync visual order to clientData order (= pinnedApps order after a drag).
         // Anchor from _startSeparator so apps never land before the start button.
+        // `prev` ends up pointing at the last app widget in clientData order —
+        // use it directly for sep/trash placement instead of _getLastAppWidget(),
+        // which iterates the Map in *insertion* order (diverges from clientData
+        // order whenever a new app is added mid-sequence, causing apps to appear
+        // after the trash icon).
         let prev = this._startSeparator || null;
+        let structuralChange = added > 0 || removed > 0;
         for (const data of clientData) {
             const w = this.clientWidgets.get(data.className);
             if (w) { this.mainBox.reorder_child_after(w, prev); prev = w; }
         }
 
-        // sep-end and trash always last
-        const lastApp = this._getLastAppWidget();
+        // sep-end and trash always last — anchored off `prev` (last app in clientData order)
         if (this._endSeparator)
-            this.mainBox.reorder_child_after(this._endSeparator, lastApp);
+            this.mainBox.reorder_child_after(this._endSeparator, prev);
         if (this._trashButton)
             this.mainBox.reorder_child_after(
-                this._trashButton, this._endSeparator || lastApp);
+                this._trashButton, this._endSeparator || prev);
 
-        this._scheduleExclusiveZoneUpdate();
+        if (structuralChange) this._scheduleExclusiveZoneUpdate();
     }
 
     _getLastAppWidget() {
@@ -834,6 +842,7 @@ const HyprCandyDock = GObject.registerClass({
         dotsBox.set_halign(dotsHalign);
         dotsBox.set_valign(dotsValign);
         dotsBox.set_name('indicator-dots');
+        dotsBox._dotCount = data.instances ? data.instances.length : 0;
         this._populateDots(dotsBox, data);
 
         // Wrap button + dots in an overlay — no size penalty vs a plain button
@@ -849,14 +858,21 @@ const HyprCandyDock = GObject.registerClass({
 
         this.dragDropManager.setupDragSource(btn, overlay, data.className);
 
-        // Always insert between the two separators.
-        // Anchor: last existing app widget, or _startSeparator if no apps yet.
-        // This prevents new widgets from appearing before the start button.
-        const anchor = this._getLastAppWidget() || this._startSeparator;
-        if (anchor) {
-            this.mainBox.insert_child_after(overlay, anchor);
+        // Insert position: immediately before the end separator if it already
+        // exists (correct at all times), otherwise after the last known app
+        // widget or the start separator (during initial load before sep-end exists).
+        // The full reorder in _updateFromDaemon corrects any transient position,
+        // but inserting here correctly avoids a visible flash after trash.
+        if (this._endSeparator) {
+            const beforeSep = this._endSeparator.get_prev_sibling();
+            this.mainBox.insert_child_after(overlay, beforeSep);
         } else {
-            this.mainBox.append(overlay);
+            const anchor = this._getLastAppWidget() || this._startSeparator;
+            if (anchor) {
+                this.mainBox.insert_child_after(overlay, anchor);
+            } else {
+                this.mainBox.append(overlay);
+            }
         }
 
         this.clientWidgets.set(data.className, overlay);
@@ -876,13 +892,18 @@ const HyprCandyDock = GObject.registerClass({
             btn.set_tooltip_text(tooltipText);
         }
 
-        // dotsBox is the first overlay child (added via add_overlay)
+        // Only rebuild dots when the instance count actually changed —
+        // avoids allocating/destroying Gtk.Label widgets on every poll tick.
         const dotsBox = this._findDotsBox(overlay);
         if (dotsBox) {
-            while (dotsBox.get_first_child()) {
-                dotsBox.remove(dotsBox.get_first_child());
+            const newCount = data.instances ? data.instances.length : 0;
+            if (dotsBox._dotCount !== newCount) {
+                dotsBox._dotCount = newCount;
+                while (dotsBox.get_first_child()) {
+                    dotsBox.remove(dotsBox.get_first_child());
+                }
+                this._populateDots(dotsBox, data);
             }
-            this._populateDots(dotsBox, data);
         }
     }
 

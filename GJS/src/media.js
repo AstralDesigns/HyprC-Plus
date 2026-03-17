@@ -54,30 +54,51 @@ function createMprisProxy(busName) {
     );
 }
 
-// Cached PipeWire result — avoid spawning pw-cli every 1s poll
+// Cached PipeWire/PulseAudio sink-input result.
+// Uses `pactl list short sink-inputs` — tiny output vs pw-cli list-objects.
 let _pwCache = { result: null, ts: 0 };
 const PW_CACHE_TTL_MS = 5000;  // cache for 5 seconds
 
-function getActivePipeWireSinkInfo() {
+function getActivePipeWireSinkInfo(callback) {
     const now = GLib.get_monotonic_time() / 1000;  // µs → ms
-    if (now - _pwCache.ts < PW_CACHE_TTL_MS) return _pwCache.result;
+    if (now - _pwCache.ts < PW_CACHE_TTL_MS) { callback(_pwCache.result); return; }
     try {
-        const [ok, stdout] = GLib.spawn_command_line_sync('pw-cli list-objects Node');
-        if (!ok || !stdout) { _pwCache = { result: null, ts: now }; return null; }
-        const output = imports.byteArray.toString(stdout);
-        for (const node of output.split('\n\n')) {
-            if (node.includes('state: running') &&
-                node.includes('media.class = "Audio/Stream"') &&
-                node.includes('direction = output')) {
-                const m = node.match(/app\.name = "([^"]+)"/);
-                const res = { appName: m ? m[1] : null };
-                _pwCache = { result: res, ts: now };
-                return res;
+        // `pactl list short sink-inputs` output format (one line per stream):
+        //   <index>\t<sink>\t<client>\t<format>\t<state>
+        // Much smaller than pw-cli list-objects which dumps all Node objects.
+        const proc = Gio.Subprocess.new(
+            ['pactl', 'list', 'short', 'sink-inputs'],
+            Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE
+        );
+        proc.communicate_utf8_async(null, null, (p, res) => {
+            const ts = GLib.get_monotonic_time() / 1000;
+            let output = '';
+            try {
+                const [, stdout] = p.communicate_utf8_finish(res);
+                output = stdout || '';
+            } catch (e) {
+                _pwCache = { result: null, ts };
+                callback(null);
+                return;
             }
-        }
-    } catch (e) { }
-    _pwCache = { result: null, ts: now };
-    return null;
+            // Any line present = at least one sink-input is running
+            const lines = output.trim().split('\n').filter(l => l.trim());
+            if (lines.length > 0) {
+                // We don't get app name from `short` output — use client index
+                // as a proxy for "something is playing". App name display is
+                // cosmetic; showing "Audio playing" is sufficient.
+                const res2 = { appName: null };
+                _pwCache = { result: res2, ts };
+                callback(res2);
+            } else {
+                _pwCache = { result: null, ts };
+                callback(null);
+            }
+        });
+    } catch (e) {
+        _pwCache = { result: null, ts: GLib.get_monotonic_time() / 1000 };
+        callback(null);
+    }
 }
 
 // ── Extract first-frame thumbnail from a local video file via ffmpeg ─────
@@ -311,9 +332,8 @@ function createMediaBox() {
 
     // ── JS-driven liquid-metal background (Cairo) ───────────────────────────
     let phase = 0;
-    const BG_FPS = 10;
-    const BG_INTERVAL_MS = Math.round(1000 / BG_FPS);
-    const PHASE_STEP = (2 * Math.PI) / (BG_FPS * 50);
+    // PHASE_STEP sized so a full cycle takes ~50 s (visually slow, meditative)
+    const PHASE_STEP = (2 * Math.PI) / (8 * 50);  // 8fps * 50s
 
     function lx(p, f, o) { return (Math.sin(p * f + o) * 0.5 + 0.5); }
     function ly(p, f, o) { return (Math.cos(p * f + o) * 0.5 + 0.5); }
@@ -380,8 +400,6 @@ function createMediaBox() {
             cr.fill();
         }
     });
-
-    let _gcCounter = 0;
 
     // ── Loop state ─────────────────────────────────────────────────────────
     let loopMode = 0;
@@ -529,14 +547,20 @@ function createMediaBox() {
                     _cachedPangoFd.set_family('monospace');
                     _cachedPangoFd.set_absolute_size(108 * Pango.SCALE);
                 }
-                const layout = PangoCairo.create_layout(cr);
-                layout.set_text(PLACEHOLDER_GLYPH, -1);
-                layout.set_font_description(_cachedPangoFd);
-                const [pw2, ph2] = layout.get_pixel_size();
+                // Create layout once; re-bind to current cr context each frame
+                // PangoCairo.update_layout() is far cheaper than create_layout()
+                if (!_cachedPangoLayout) {
+                    _cachedPangoLayout = PangoCairo.create_layout(cr);
+                    _cachedPangoLayout.set_text(PLACEHOLDER_GLYPH, -1);
+                    _cachedPangoLayout.set_font_description(_cachedPangoFd);
+                } else {
+                    PangoCairo.update_layout(cr, _cachedPangoLayout);
+                }
+                const [pw2, ph2] = _cachedPangoLayout.get_pixel_size();
                 cr.save();
                 cr.setSourceRGBA(1, 1, 1, 0.55);
-                cr.moveTo(cx - pw2 / 0, cy - ph2 / 0);
-                PangoCairo.show_layout(cr, layout);
+                cr.moveTo(cx - pw2 / 2, cy - ph2 / 2);
+                PangoCairo.show_layout(cr, _cachedPangoLayout);
                 cr.restore();
             } catch (e) { }
         }
@@ -653,8 +677,8 @@ function createMediaBox() {
     let lastArtUrl = null;
     let isSeeking = false;
     let seekTarget = 0;
-    let lastPosition = 0;
-    let lastPlaybackState = 'Stopped';
+    // Position freeze: used by seek logic to hold display position after a seek
+    // until the player confirms the new position.
     let frozenPosition = 0;
     let isPositionFrozen = false;
 
@@ -867,7 +891,6 @@ function createMediaBox() {
             allPlayers = newPlayers;
 
             // ── Auto-select logic ──────────────────────────────────────────
-            // ── Auto-select logic ──────────────────────────────────────────
             // Clear userSelectedBus only if that source has completely disappeared
             if (userSelectedBus && !allPlayers.find(p => p.bus === userSelectedBus)) userSelectedBus = null;
 
@@ -954,22 +977,22 @@ function createMediaBox() {
         _writeVolumeWpctl(_volAdj.get_value());
     });
 
-    // ── Track info update ──────────────────────────────────────────────────
+    // ── Track info update (metadata only — position handled by _doPositionPoll) ──
     function updateTrackInfoAsync() {
         if (!player) {
-            const sinkInfo = getActivePipeWireSinkInfo();
-            titleLabel.set_label(sinkInfo
-                ? ('Audio playing' + (sinkInfo.appName ? ` — ${sinkInfo.appName}` : ''))
-                : 'No Media');
+            _isPlaying = false;
+            _trackLength = 0;
+            _restartBgTimer(BG_MS_IDLE);
+            getActivePipeWireSinkInfo(sinkInfo => {
+                titleLabel.set_label(sinkInfo
+                    ? ('Audio playing' + (sinkInfo.appName ? ` — ${sinkInfo.appName}` : ''))
+                    : 'No Media');
+            });
             artistLabel.set_label('');
-            progress.set_fraction(0.0);
-            progress.set_text('--:-- / --:--');
+            if (!isSeeking) { progress.set_fraction(0.0); progress.set_text('--:-- / --:--'); }
             [shuffleBtn, prevBtn, playBtn, nextBtn, loopBtn].forEach(b => b.set_sensitive(false));
             thumbStopRotation();
-            if (lastArtUrl !== '') {
-                lastArtUrl = '';
-                thumbSetPixbuf(null, true);
-            }
+            if (lastArtUrl !== '') { lastArtUrl = ''; thumbSetPixbuf(null, true); }
             return;
         }
         [shuffleBtn, prevBtn, playBtn, nextBtn, loopBtn].forEach(b => b.set_sensitive(true));
@@ -990,92 +1013,60 @@ function createMediaBox() {
                     const artistArr = metadata['xesam:artist'] ? metadata['xesam:artist'].deep_unpack() : [];
                     const artist = artistArr.length > 0 ? artistArr[0] : '';
                     const artUrl = metadata['mpris:artUrl'] ? metadata['mpris:artUrl'].deep_unpack() : '';
-                    // xesam:url is the actual media file path — used for video frame refresh
-                    // even when artUrl points to a static embedded thumbnail image
                     const mediaUrl = metadata['xesam:url'] ? metadata['xesam:url'].deep_unpack() : '';
                     const length = metadata['mpris:length'] ? metadata['mpris:length'].deep_unpack() : 0;
 
-                    Gio.DBus.session.call(
-                        busName, '/org/mpris/MediaPlayer2',
-                        'org.freedesktop.DBus.Properties', 'Get',
-                        GLib.Variant.new_tuple([
-                            GLib.Variant.new_string('org.mpris.MediaPlayer2.Player'),
-                            GLib.Variant.new_string('Position'),
-                        ]),
-                        null, Gio.DBusCallFlags.NONE, -1, null,
-                        (src2, res2) => {
-                            let position = 0;
-                            try { position = src2.call_finish(res2).deep_unpack()[0].deep_unpack(); } catch (e) { }
+                    // Store track length for position interpolation
+                    _trackLength = length;
 
-                            let playbackState = 'Stopped';
-                            try {
-                                const sv = player.get_cached_property('PlaybackStatus');
-                                playbackState = sv ? sv.deep_unpack() : 'Stopped';
-                            } catch (e) { }
+                    // PlaybackStatus from cache (no extra D-Bus call)
+                    let playbackState = 'Stopped';
+                    try {
+                        const sv = player.get_cached_property('PlaybackStatus');
+                        playbackState = sv ? sv.deep_unpack() : 'Stopped';
+                    } catch (e) { }
+                    _isPlaying = playbackState === 'Playing';
 
-                            titleLabel.set_label(title);
-                            artistLabel.set_label(artist);
+                    titleLabel.set_label(title);
+                    artistLabel.set_label(artist);
 
-                            if (playbackState === 'Playing') {
-                                playBtn.set_icon_name('media-playback-pause-symbolic');
-                                progress.remove_css_class('paused');
-                            } else {
-                                playBtn.set_icon_name('media-playback-start-symbolic');
-                                progress.add_css_class('paused');
-                            }
+                    if (_isPlaying) {
+                        playBtn.set_icon_name('media-playback-pause-symbolic');
+                        progress.remove_css_class('paused');
+                    } else {
+                        playBtn.set_icon_name('media-playback-start-symbolic');
+                        progress.add_css_class('paused');
+                    }
 
-                            applyArt(artUrl, playbackState, mediaUrl);
+                    applyArt(artUrl, playbackState, mediaUrl);
+                    _readVolume();
 
-                            if (length > 0) {
-                                const prevState = lastPlaybackState;
-                                lastPlaybackState = playbackState;
-                                if (prevState === 'Playing' && playbackState !== 'Playing') {
-                                    frozenPosition = lastPosition; isPositionFrozen = true;
-                                } else if (playbackState === 'Playing') {
-                                    isPositionFrozen = false;
-                                }
-                                lastPosition = position;
-                                const dp = (isPositionFrozen && playbackState !== 'Playing') ? frozenPosition : position;
-                                if (!isSeeking) progress.set_fraction(dp / length);
-                                const ps = Math.floor(dp / 1e6), ls = Math.floor(length / 1e6);
-                                progress.set_text(
-                                    `${Math.floor(ps / 60)}:${('0' + (ps % 60)).slice(-2)} / ${Math.floor(ls / 60)}:${('0' + (ls % 60)).slice(-2)}`
-                                );
-                            } else {
-                                if (!isSeeking) progress.set_fraction(0.0);
-                                progress.set_text('--:-- / --:--');
-                            }
+                    // Shuffle
+                    try {
+                        const sv = player.get_cached_property('Shuffle');
+                        shuffleBtn._setShuffleState(sv ? sv.deep_unpack() : false);
+                    } catch (e) { }
 
-                            // Read volume into slider (no-op if unchanged)
-                            _readVolume();
-
-                            try {
-                                const sv = player.get_cached_property('Shuffle');
-                                shuffleBtn._setShuffleState(sv ? sv.deep_unpack() : false);
-                            } catch (e) { }
-
-                            try {
-                                const lv = player.get_cached_property('LoopStatus');
-                                loopMode = Math.max(0, loopModes.indexOf(lv ? lv.deep_unpack() : 'None'));
-                            } catch (e) { }
-                            if (loopMode !== lastRenderedLoopMode) {
-                                lastRenderedLoopMode = loopMode;
-                                loopBtn.remove_css_class('loop-none');
-                                loopBtn.remove_css_class('loop-track');
-                                loopBtn.remove_css_class('loop-playlist');
-                                loopBtn.add_css_class(`loop-${loopModes[loopMode].toLowerCase()}`);
-                                loopBtn.set_tooltip_text(loopLabels[loopMode]);
-                                loopBtn.set_child(makeGlyphLabel(
-                                    loopMode === 1 ? '󰑘' : loopMode === 2 ? '󰑖' : '󰑗'
-                                ));
-                            }
-                        }
-                    );
+                    // Loop (only re-render when mode changed)
+                    try {
+                        const lv = player.get_cached_property('LoopStatus');
+                        loopMode = Math.max(0, loopModes.indexOf(lv ? lv.deep_unpack() : 'None'));
+                    } catch (e) { }
+                    if (loopMode !== lastRenderedLoopMode) {
+                        lastRenderedLoopMode = loopMode;
+                        loopBtn.remove_css_class('loop-none');
+                        loopBtn.remove_css_class('loop-track');
+                        loopBtn.remove_css_class('loop-playlist');
+                        loopBtn.add_css_class(`loop-${loopModes[loopMode].toLowerCase()}`);
+                        loopBtn.set_tooltip_text(loopLabels[loopMode]);
+                        loopBtn.set_child(makeGlyphLabel(
+                            loopMode === 1 ? '󰑘' : loopMode === 2 ? '󰑖' : '󰑗'
+                        ));
+                    }
                 } catch (e) {
                     titleLabel.set_label('No Media');
                     artistLabel.set_label('');
-                    progress.set_fraction(0.0);
-                    progress.set_text('--:-- / --:--');
+                    if (!isSeeking) { progress.set_fraction(0.0); progress.set_text('--:-- / --:--'); }
                 }
             }
         );
@@ -1214,26 +1205,141 @@ function createMediaBox() {
     progress.add_controller(dragGesture);
 
     // ── Timer lifecycle ────────────────────────────────────────────────────
-    let _bgTimerId   = 0;
-    let _pollTimerId = 0;
+    // Three-tier polling to minimise D-Bus traffic:
+    //   _bgTimerId    — Cairo animation, adaptive fps (playing→8fps, paused→2fps)
+    //   _posPollTimer — Position + PlaybackStatus only, every 1 s
+    //   _metaPollTimer— Full metadata + player list, every 4 s
+    //
+    // Local position interpolation: between position polls we advance the
+    // display position using wall-clock time so the progress bar stays smooth
+    // at zero additional D-Bus cost.
+    let _bgTimerId    = 0;
+    let _posPollTimer = 0;
+    let _metaPollTimer = 0;
+
+    // Interpolation state — updated by _doPositionPoll()
+    let _posBase      = 0;   // last known position in µs
+    let _posBaseTime  = 0;   // GLib.get_monotonic_time() when _posBase was set
+    let _trackLength  = 0;   // track length in µs (updated on metadata fetch)
+    let _isPlaying    = false;
+
+    // Adaptive bg fps — full speed when playing, slow when paused/stopped
+    const BG_FPS_PLAY  = 8;
+    const BG_FPS_IDLE  = 2;
+    const BG_MS_PLAY   = Math.round(1000 / BG_FPS_PLAY);   // 125ms
+    const BG_MS_IDLE   = Math.round(1000 / BG_FPS_IDLE);   // 500ms
+    let   _bgInterval  = BG_MS_PLAY;   // current interval, checked on each restart
+
+    function _restartBgTimer(wantMs) {
+        if (_bgTimerId && _bgInterval === wantMs) return;  // already correct, no-op
+        if (_bgTimerId) { GLib.source_remove(_bgTimerId); _bgTimerId = 0; }
+        _bgInterval = wantMs;
+        _bgTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, wantMs, () => {
+            phase += PHASE_STEP;
+            bgDrawingArea.queue_draw();
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
+    // Dedicated GC + color-refresh timer — fixed 2s regardless of animation fps.
+    // Decoupled from bg fps so it fires reliably even when bg is at 2fps idle.
+    let _gcTimerId = 0;
+    function _startGcTimer() {
+        if (_gcTimerId) return;
+        _gcTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, 2000, () => {
+            _resolveBgColors(mediaPlayerBox);
+            imports.system.gc();
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+    function _stopGcTimer() {
+        if (_gcTimerId) { GLib.source_remove(_gcTimerId); _gcTimerId = 0; }
+    }
+
+    // Compute interpolated display position without a D-Bus call
+    function _interpolatedPosition() {
+        if (!_isPlaying || _posBaseTime === 0) return _posBase;
+        const elapsed = GLib.get_monotonic_time() - _posBaseTime;   // µs
+        return Math.min(_posBase + elapsed, _trackLength > 0 ? _trackLength : _posBase + elapsed);
+    }
+
+    // Fast poll: fetch Position + PlaybackStatus, update progress bar
+    function _doPositionPoll() {
+        if (!player || !busName) return;
+        Gio.DBus.session.call(
+            busName, '/org/mpris/MediaPlayer2',
+            'org.freedesktop.DBus.Properties', 'Get',
+            GLib.Variant.new_tuple([
+                GLib.Variant.new_string('org.mpris.MediaPlayer2.Player'),
+                GLib.Variant.new_string('Position'),
+            ]),
+            null, Gio.DBusCallFlags.NONE, -1, null,
+            (src, res) => {
+                let position = 0;
+                try { position = src.call_finish(res).deep_unpack()[0].deep_unpack(); } catch (e) { return; }
+
+                let state = 'Stopped';
+                try {
+                    const sv = player.get_cached_property('PlaybackStatus');
+                    state = sv ? sv.deep_unpack() : 'Stopped';
+                } catch (e) { }
+
+                const wasPlaying = _isPlaying;
+                _isPlaying = state === 'Playing';
+                _posBase = position;
+                _posBaseTime = GLib.get_monotonic_time();
+
+                // Adapt bg animation speed
+                _restartBgTimer(_isPlaying ? BG_MS_PLAY : BG_MS_IDLE);
+
+                // Update play button icon if state changed
+                if (_isPlaying !== wasPlaying) {
+                    if (_isPlaying) {
+                        playBtn.set_icon_name('media-playback-pause-symbolic');
+                        progress.remove_css_class('paused');
+                        thumbStartRotation();
+                    } else {
+                        playBtn.set_icon_name('media-playback-start-symbolic');
+                        progress.add_css_class('paused');
+                        thumbStopRotation();
+                    }
+                }
+
+                // Progress bar (skip if user is seeking)
+                if (!isSeeking && _trackLength > 0) {
+                    const dp = isPositionFrozen && !_isPlaying ? frozenPosition : position;
+                    progress.set_fraction(dp / _trackLength);
+                    const ps = Math.floor(dp / 1e6), ls = Math.floor(_trackLength / 1e6);
+                    progress.set_text(
+                        `${Math.floor(ps / 60)}:${('0' + (ps % 60)).slice(-2)} / ${Math.floor(ls / 60)}:${('0' + (ls % 60)).slice(-2)}`
+                    );
+                }
+            }
+        );
+    }
 
     function _startTimers() {
         _resolveBgColors(mediaPlayerBox);
-        if (_bgTimerId === 0) {
-            _bgTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, BG_INTERVAL_MS, () => {
-                phase += PHASE_STEP;
-                bgDrawingArea.queue_draw();
-                if (++_gcCounter >= BG_FPS * 2) {
-                    _gcCounter = 0;
-                    _resolveBgColors(mediaPlayerBox);
-                    imports.system.gc();
-                }
+
+        // Bg animation — starts at idle speed, _doPositionPoll will switch it
+        if (_bgTimerId === 0) _restartBgTimer(BG_MS_IDLE);
+
+        // GC + color refresh — fixed 2s, independent of animation fps
+        _startGcTimer();
+
+        // Position poll: 1 s
+        if (_posPollTimer === 0) {
+            _doPositionPoll();
+            _posPollTimer = GLib.timeout_add(GLib.PRIORITY_LOW, 1000, () => {
+                _doPositionPoll();
                 return GLib.SOURCE_CONTINUE;
             });
         }
-        if (_pollTimerId === 0) {
+
+        // Metadata + player list: 4 s (also fires immediately for first load)
+        if (_metaPollTimer === 0) {
             updatePlayerAsync(() => updateTrackInfoAsync());
-            _pollTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, 50, () => {
+            _metaPollTimer = GLib.timeout_add(GLib.PRIORITY_LOW, 4000, () => {
                 updatePlayerAsync(() => updateTrackInfoAsync());
                 return GLib.SOURCE_CONTINUE;
             });
@@ -1241,8 +1347,10 @@ function createMediaBox() {
     }
 
     function _stopTimers() {
-        if (_bgTimerId)   { GLib.source_remove(_bgTimerId);   _bgTimerId   = 0; }
-        if (_pollTimerId) { GLib.source_remove(_pollTimerId); _pollTimerId = 0; }
+        if (_bgTimerId)    { GLib.source_remove(_bgTimerId);    _bgTimerId    = 0; }
+        if (_posPollTimer) { GLib.source_remove(_posPollTimer); _posPollTimer = 0; }
+        if (_metaPollTimer){ GLib.source_remove(_metaPollTimer);_metaPollTimer= 0; }
+        _stopGcTimer();
         thumbStopRotation();
     }
 

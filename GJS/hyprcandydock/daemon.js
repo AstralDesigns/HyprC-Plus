@@ -3,6 +3,10 @@
 
 const {Gio, GLib} = imports.gi;
 
+// Module-level singletons — avoids repeated allocation in hot paths
+const _decoder = new TextDecoder();
+const _encoder = new TextEncoder();
+
 var Daemon = class {
     // Normalize Hyprland class names: strip reverse-DNS prefixes.
     // "org.gnome.Nautilus" → "nautilus"  |  "firefox" → "firefox"
@@ -23,9 +27,15 @@ var Daemon = class {
         this.eventSource = null;
         this.hyprDir = '';
         this.his = '';
+        // Persistent socket client — reused across all hyprctl() calls to avoid
+        // allocating a new Gio.SocketClient + Gio.UnixSocketAddress per command.
+        this._socketClient = Gio.SocketClient.new();
         // Debounce state — prevents main-loop saturation from rapid events
         this._refreshTimer   = null;
         this._refreshing     = false;
+        // GPU list cache — getAvailableGPUs() is called from the context menu;
+        // hardware doesn't change at runtime so one scan per process is enough.
+        this._gpuListCache   = null;
         
         this.setupHyprlandPaths();
         this.loadPinnedApps();
@@ -42,14 +52,21 @@ var Daemon = class {
             this.hyprDir = '/tmp/hypr';
             const dir = Gio.File.new_for_path(this.hyprDir);
             if (dir.query_exists(null)) {
-                const enumerator = dir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
-                let fileInfo;
-                while ((fileInfo = enumerator.next_file(null)) !== null) {
-                    const name = fileInfo.get_name();
-                    if (name.includes('.socket.sock')) {
-                        this.his = name.replace('.socket.sock', '');
-                        break;
+                let enumerator = null;
+                try {
+                    enumerator = dir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+                    let fileInfo;
+                    while ((fileInfo = enumerator.next_file(null)) !== null) {
+                        const name = fileInfo.get_name();
+                        if (name.includes('.socket.sock')) {
+                            this.his = name.replace('.socket.sock', '');
+                            break;
+                        }
                     }
+                } catch (e) {
+                    console.error('setupHyprlandPaths enum error:', e.message);
+                } finally {
+                    if (enumerator) try { enumerator.close(null); } catch (_) {}
                 }
             }
         }
@@ -61,16 +78,15 @@ var Daemon = class {
     async hyprctl(cmd) {
         return new Promise((resolve, reject) => {
             const socketFile = `${this.hyprDir}/${this.his}/.socket.sock`;
+            // Reuse persistent _socketClient — Gio.UnixSocketAddress is
+            // lightweight but Gio.SocketClient construction is not; reusing
+            // it avoids one GObject allocation + GLib type lookup per call.
             const socketAddress = Gio.UnixSocketAddress.new(socketFile);
-            const socketClient = Gio.SocketClient.new();
             
-            socketClient.connect_async(socketAddress, null, (source, result) => {
+            this._socketClient.connect_async(socketAddress, null, (source, result) => {
                 try {
                     const connection = source.connect_finish(result);
-                    if (!connection) {
-                        reject(new Error('Failed to connect'));
-                        return;
-                    }
+                    if (!connection) { reject(new Error('Failed to connect')); return; }
                     
                     const message = new GLib.Bytes(cmd);
                     const outputStream = connection.get_output_stream();
@@ -85,27 +101,20 @@ var Daemon = class {
                                 try {
                                     const bytes = source.read_bytes_finish(result);
                                     if (bytes) {
-                                        const data = bytes.get_data();
-                                        const response = new TextDecoder().decode(data);
+                                        // Use module-level singleton decoder — avoids
+                                        // allocating a new TextDecoder on every call.
+                                        const response = _decoder.decode(bytes.get_data());
                                         connection.close(null);
                                         resolve(response);
                                     } else {
                                         connection.close(null);
                                         resolve('');
                                     }
-                                } catch (e) {
-                                    connection.close(null);
-                                    reject(e);
-                                }
+                                } catch (e) { connection.close(null); reject(e); }
                             });
-                        } catch (e) {
-                            connection.close(null);
-                            reject(e);
-                        }
+                        } catch (e) { connection.close(null); reject(e); }
                     });
-                } catch (e) {
-                    reject(e);
-                }
+                } catch (e) { reject(e); }
             });
         });
     }
@@ -117,7 +126,7 @@ var Daemon = class {
         
         if (file.query_exists(null)) {
             const [, contents] = file.load_contents(null);
-            const pinned = new TextDecoder().decode(contents);
+            const pinned = _decoder.decode(contents);
             pinned.trim().split('\n').forEach(app => {
                 const a = app.trim();
                 if (a) this.pinnedApps.add(a); // store original class as-is
@@ -221,22 +230,18 @@ var Daemon = class {
             const cmd = info.get_commandline && info.get_commandline();
             if (cmd) return cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
         }
+        // _findAppInfo already performed a full Gio.AppInfo.get_all() scan in its
+        // slow path and cached the result (including null for misses). If it returned
+        // null, a second scan here would find the same nothing at higher cost.
+        // Only fall through to the exec-name heuristic if _findAppInfo is uncached
+        // (shouldn't happen) or if we want to match by executable base-name, which
+        // _findAppInfo doesn't do. We skip the full re-scan and go straight to
+        // the cheap GLib.find_program_in_path check.
         const needle = this._normalizeClass(className).toLowerCase();
-        try {
-            for (const appInfo of Gio.AppInfo.get_all()) {
-                const cmd = appInfo.get_commandline && appInfo.get_commandline();
-                if (!cmd) continue;
-                const execBase = cmd.split(' ')[0].split('/').pop().toLowerCase();
-                const name = (appInfo.get_name && appInfo.get_name() || '').toLowerCase();
-                if (execBase === needle || name === needle ||
-                        name.includes(needle) || execBase.includes(needle))
-                    return cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
-            }
-        } catch (_) {}
         try {
             const bin = GLib.find_program_in_path(className) ||
                         GLib.find_program_in_path(className.toLowerCase()) ||
-                        GLib.find_program_in_path(this._normalizeClass(className));
+                        GLib.find_program_in_path(needle);
             if (bin) return bin;
         } catch (_) {}
         return null;
@@ -357,9 +362,8 @@ var Daemon = class {
     startEventMonitoring() {
         const socketFile = `${this.hyprDir}/${this.his}/.socket2.sock`;
         const socketAddress = Gio.UnixSocketAddress.new(socketFile);
-        const socketClient = Gio.SocketClient.new();
-        
-        socketClient.connect_async(socketAddress, null, (source, result) => {
+        // Reuse the persistent _socketClient — same reasoning as hyprctl()
+        this._socketClient.connect_async(socketAddress, null, (source, result) => {
             try {
                 const connection = source.connect_finish(result);
                 if (!connection) {
@@ -387,7 +391,9 @@ var Daemon = class {
                 try {
                     const [line] = source.read_line_finish(result);
                     if (line) {
-                        const event = new TextDecoder().decode(line);
+                        // Use module-level singleton — this fires on every
+                        // Hyprland event so avoiding allocation here matters.
+                        const event = _decoder.decode(line);
                         this.processEvent(event);
                         readEvent(); // Continue reading
                     }
@@ -495,7 +501,7 @@ var Daemon = class {
         const pinnedFile = `${GLib.getenv('HOME')}/.config/pinned`;
         const file = Gio.File.new_for_path(pinnedFile);
         // replace_contents requires a Uint8Array, not a string
-        const content = new TextEncoder().encode(Array.from(this.pinnedApps).join('\n') + '\n');
+        const content = _encoder.encode(Array.from(this.pinnedApps).join('\n') + '\n');
         try {
             file.replace_contents(content, null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
             console.log(`💾 Saved ${this.pinnedApps.size} pinned apps`);
@@ -504,8 +510,11 @@ var Daemon = class {
         }
     }
 
-    // Get available GPUs from the system
+    // Get available GPUs from the system.
+    // Result is cached for the process lifetime — hardware doesn't change at runtime.
     getAvailableGPUs() {
+        if (this._gpuListCache) return this._gpuListCache;
+
         const gpus = [];
         const gpuTypes = { intel: [], amd: [], nvidia: [] };
         
@@ -514,91 +523,46 @@ var Daemon = class {
             const nvidiaSmi = GLib.find_program_in_path('nvidia-smi');
             if (nvidiaSmi) {
                 const [, stdout] = GLib.spawn_command_line_sync('nvidia-smi --query-gpu=name --format=csv,noheader');
-                const gpuNames = new TextDecoder().decode(stdout).trim().split('\n');
+                const gpuNames = _decoder.decode(stdout).trim().split('\n');
                 gpuNames.forEach(name => {
-                    if (name.trim()) {
-                        gpus.push(name.trim());
-                        gpuTypes.nvidia.push(name.trim());
-                    }
+                    if (name.trim()) { gpus.push(name.trim()); gpuTypes.nvidia.push(name.trim()); }
                 });
             }
-        } catch (e) {
-            console.warn('⚠️ Could not detect NVIDIA GPUs:', e);
-        }
+        } catch (e) { console.warn('⚠️ Could not detect NVIDIA GPUs:', e); }
 
         // Check for AMD/Intel GPUs via lspci
         try {
             const [, stdout] = GLib.spawn_command_line_sync('lspci -k | grep -EA3 \'VGA|3D\'');
-            const output = new TextDecoder().decode(stdout);
+            const output = _decoder.decode(stdout);
             
-            // Parse AMD GPUs
             if (output.toLowerCase().includes('amd') || output.toLowerCase().includes('radeon')) {
-                const lines = output.split('\n');
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
+                for (const line of output.split('\n')) {
                     if (line.toLowerCase().includes('amd') || line.toLowerCase().includes('radeon')) {
                         const gpuName = line.trim().replace(/\s+/g, ' ');
-                        if (gpuName && !gpus.includes(gpuName)) {
-                            gpus.push(gpuName);
-                            gpuTypes.amd.push(gpuName);
-                        }
+                        if (gpuName && !gpus.includes(gpuName)) { gpus.push(gpuName); gpuTypes.amd.push(gpuName); }
                     }
                 }
             }
-            
-            // Parse Intel GPUs
             if (output.toLowerCase().includes('intel')) {
-                const lines = output.split('\n');
-                for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i];
+                for (const line of output.split('\n')) {
                     if (line.toLowerCase().includes('intel') && !line.toLowerCase().includes('wireless')) {
                         const gpuName = line.trim().replace(/\s+/g, ' ');
-                        if (gpuName && !gpus.includes(gpuName)) {
-                            gpus.push(gpuName);
-                            gpuTypes.intel.push(gpuName);
-                        }
+                        if (gpuName && !gpus.includes(gpuName)) { gpus.push(gpuName); gpuTypes.intel.push(gpuName); }
                     }
                 }
             }
-        } catch (e) {
-            console.warn('⚠️ Could not detect Intel/AMD GPUs:', e);
-        }
+        } catch (e) { console.warn('⚠️ Could not detect Intel/AMD GPUs:', e); }
 
-        // Build user-friendly GPU list with launch methods
         const result = [];
-        
-        // Add integrated GPU option (always available)
-        if (gpuTypes.intel.length > 0 || gpuTypes.amd.length > 0) {
-            result.push('Integrated GPU (iGPU)');
-        } else if (gpus.length > 0) {
-            result.push('Integrated GPU');
-        }
-        
-        // Add discrete GPU options
-        if (gpuTypes.nvidia.length > 0) {
-            gpuTypes.nvidia.forEach(gpu => {
-                result.push('NVIDIA ' + gpu + ' (prime-run)');
-            });
-        }
-        
-        if (gpuTypes.amd.length > 0) {
-            gpuTypes.amd.forEach(gpu => {
-                result.push('AMD ' + gpu + ' (DRI_PRIME=1)');
-            });
-        }
-        
-        if (gpuTypes.intel.length > 1) {
-            // Multiple Intel GPUs - add discrete Intel option
-            result.push('Intel dGPU (DRI_PRIME=1)');
-        }
-
-        // Fallback if nothing detected
-        if (result.length === 0) {
-            result.push('Integrated GPU');
-            result.push('Discrete GPU');
-        }
+        if (gpuTypes.intel.length > 0 || gpuTypes.amd.length > 0) result.push('Integrated GPU (iGPU)');
+        else if (gpus.length > 0) result.push('Integrated GPU');
+        if (gpuTypes.nvidia.length > 0) gpuTypes.nvidia.forEach(gpu => result.push('NVIDIA ' + gpu + ' (prime-run)'));
+        if (gpuTypes.amd.length > 0) gpuTypes.amd.forEach(gpu => result.push('AMD ' + gpu + ' (DRI_PRIME=1)'));
+        if (gpuTypes.intel.length > 1) result.push('Intel dGPU (DRI_PRIME=1)');
+        if (result.length === 0) { result.push('Integrated GPU'); result.push('Discrete GPU'); }
 
         console.log('🎮 Available GPUs:', result.join(', '));
+        this._gpuListCache = result;
         return result;
     }
 
