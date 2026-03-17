@@ -40,9 +40,6 @@ const PidUtils = imports['pid-utils'];
 let widgets = {};
 let cssWatcher = null;
 let fileMonitor = null;
-let idleCheckId = null;
-let idleStartTime = 0;
-const IDLE_TIMEOUT_MS = 60000; // Exit after 60 seconds with no widgets open
 
 // Widget positioning (via Hyprland window rules - see candy-hyprland.conf)
 const WIDGET_POSITIONS = {
@@ -372,39 +369,10 @@ function onActivate() {
 
     // File interface for toggle scripts
     setupFileInterface();
-
-    // Start idle cleanup checker (every 5 seconds)
-    idleCheckId = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 5000, checkIdleAndCleanup);
-}
-
-/**
- * Check if daemon should exit (no widgets open for too long)
- */
-function checkIdleAndCleanup() {
-    const anyOpen = Object.values(widgets).some(w => w?.get_visible());
-    
-    if (!anyOpen) {
-        if (idleStartTime === 0) {
-            idleStartTime = Date.now();
-            print('⏱️ Idle timeout started');
-        } else if (Date.now() - idleStartTime > IDLE_TIMEOUT_MS) {
-            print('⏱️ Idle timeout reached, exiting...');
-            app.quit();
-            return false;
-        }
-    } else {
-        idleStartTime = 0; // Reset when widgets open
-    }
-    
-    return true; // Keep checking
 }
 
 function onShutdown() {
     print('🧹 Cleaning up...');
-    if (idleCheckId) {
-        GLib.source_remove(idleCheckId);
-        idleCheckId = null;
-    }
     // Remove ready sentinel so toggle scripts don't see a stale file
     try { Gio.File.new_for_path(READY_FILE).delete(null); } catch(e) {}
     for (let k in widgets) if (widgets[k]) widgets[k].hide();
