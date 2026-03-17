@@ -18,8 +18,8 @@ imports.searchPath.unshift(scriptDir);
 const BUS_NAME_PREFIX = 'org.mpris.MediaPlayer2.';
 const MPRIS_PATH = '/org/mpris/MediaPlayer2';
 
-// ── Placeholder glyph for audio with no art (Nerd Font: 󰎈 = double-note) ─
-const PLACEHOLDER_GLYPH = '󰎆';
+// ── Placeholder glyph for audio with no art (Nerd Font:  = double-note) ─
+const PLACEHOLDER_GLYPH = '';
 
 // ── Source dot glyphs (Nerd Font mdi icons) ──────────────────────────────
 // mdi:play-circle  󰐊  mdi:pause-circle  󰏤  mdi:stop-circle  󰓛
@@ -527,7 +527,7 @@ function createMediaBox() {
                 if (!_cachedPangoFd) {
                     _cachedPangoFd = new Pango.FontDescription();
                     _cachedPangoFd.set_family('monospace');
-                    _cachedPangoFd.set_absolute_size(36 * Pango.SCALE);
+                    _cachedPangoFd.set_absolute_size(108 * Pango.SCALE);
                 }
                 const layout = PangoCairo.create_layout(cr);
                 layout.set_text(PLACEHOLDER_GLYPH, -1);
@@ -535,7 +535,7 @@ function createMediaBox() {
                 const [pw2, ph2] = layout.get_pixel_size();
                 cr.save();
                 cr.setSourceRGBA(1, 1, 1, 0.55);
-                cr.moveTo(cx - pw2 / 2, cy - ph2 / 2);
+                cr.moveTo(cx - pw2 / 0, cy - ph2 / 0);
                 PangoCairo.show_layout(cr, layout);
                 cr.restore();
             } catch (e) { }
