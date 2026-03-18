@@ -7,19 +7,105 @@ const {Gio, GLib} = imports.gi;
 const _decoder = new TextDecoder();
 const _encoder = new TextEncoder();
 
-// ── dGPU environment detection ────────────────────────────────────────────
-// Reads /sys/class/drm — instant kernel vfs, no process spawn.
-// Returns env-var object for dGPU routing, or null on iGPU/CPU-only systems.
-//   NVIDIA hybrid  → { CUDA_VISIBLE_DEVICES: '0' }
-//   AMD dGPU       → { DRI_PRIME: '1' }
-//   Intel iGPU only→ null
-// Cached permanently — hardware topology never changes at runtime.
-let _gpuEnvCache = undefined;  // undefined = not yet probed; null = no dGPU
+// ── GPU detection via switcheroo-control ─────────────────────────────────
+// switcheroo-control (net.hadess.SwitcherooControl) is the standard D-Bus
+// service for GPU switching on hybrid-graphics Linux systems.  It is used by
+// GNOME itself and correctly handles all topologies: iGPU-only, dGPU-only,
+// hybrid Intel+NVIDIA, hybrid Intel+AMD, AMD APU+dGPU, etc.
+//
+// Each GPU entry has:
+//   name      — human-readable GPU name
+//   isDefault — true for the iGPU / default rendering GPU
+//   envVars   — {KEY: VALUE} dict of env vars to route rendering to that GPU
+//               (e.g. {DRI_PRIME: 'pci-0000:01:00.0'} or empty {} for default)
+//
+// Falls back to /sys/class/drm vendor ID probing if switcheroo is unavailable.
+// Results are cached permanently — hardware topology never changes at runtime.
 
-function _detectDgpuEnv() {
-    if (_gpuEnvCache !== undefined) return _gpuEnvCache;
+let _switcherooCache = undefined;  // undefined = not yet queried; null = unavailable
 
-    let hasNvidia = false, hasAmd = false;
+function _querySwitcheroo() {
+    // Only cache success — never permanently cache null (would happen if called
+    // before the D-Bus system bus connection is ready, e.g. at dock startup).
+    if (_switcherooCache !== undefined && _switcherooCache !== null)
+        return _switcherooCache;
+
+    console.log('[switcheroo] querying...');
+    try {
+        const result = Gio.DBus.system.call_sync(
+            'net.hadess.SwitcherooControl',
+            '/net/hadess/SwitcherooControl',
+            'org.freedesktop.DBus.Properties',
+            'Get',
+            new GLib.Variant('(ss)', ['net.hadess.SwitcherooControl', 'GPUs']),
+            null,
+            Gio.DBusCallFlags.NONE,
+            -1,
+            null
+        );
+
+        // Properties.Get returns (v). deep_unpack() on GLib.Variant is FULLY
+        // recursive — all nested variants are unpacked to plain JS types in one call.
+        // result.deep_unpack() → [aa{sv_already_unpacked}]
+        // Do NOT call .deep_unpack() on the individual field values — they are
+        // already plain JS strings/booleans/arrays at this point.
+        // Properties.Get returns (v) — result.deep_unpack() unpacks the tuple
+        // leaving raw[0] as a GLib.Variant (the inner v wrapping aa{sv}).
+        // We must call deep_unpack() on it a second time to reach the GPU list.
+        // That second unpack in GJS gives a plain object with integer-string keys
+        // {"0":{...},"1":{...}} — Object.values() normalises it to a real array.
+        const raw = result.deep_unpack();
+        console.log('[switcheroo] raw length:', raw ? raw.length : 'null');
+
+        const inner = raw[0];
+        const unpacked = (inner && typeof inner.deep_unpack === 'function')
+            ? inner.deep_unpack()
+            : inner;
+        const gpuList = unpacked ? Object.values(unpacked) : [];
+        console.log('[switcheroo] gpuList length after double-unpack:', gpuList.length);
+
+        if (gpuList.length === 0) {
+            console.log('[switcheroo] empty — no GPUs reported');
+            return null;
+        }
+
+        console.log('[switcheroo] first entry keys:', Object.keys(gpuList[0]).join(', '));
+
+        _switcherooCache = gpuList.map(gpuDict => {
+            const name       = gpuDict['Name']        || 'Unknown GPU';
+            const isDefault  = gpuDict['Default']     || false;
+            const isDiscrete = gpuDict['Discrete']    || false;
+            // Each dict value may still be a GLib.Variant — unpack if needed
+            const _u = v => (v && typeof v.deep_unpack === 'function') ? v.deep_unpack() : v;
+            const evArr = _u(gpuDict['Environment']);
+            const envVars = {};
+            const arr = Array.isArray(evArr) ? evArr : (evArr ? Object.values(evArr) : []);
+            for (let i = 0; i + 1 < arr.length; i += 2)
+                envVars[arr[i]] = arr[i + 1];
+            console.log('[switcheroo]', name, 'default=' + _u(gpuDict['Default']),
+                'discrete=' + _u(gpuDict['Discrete']), 'env=' + JSON.stringify(envVars));
+            return { name: _u(gpuDict['Name']) || 'Unknown GPU',
+                     isDefault: !!_u(gpuDict['Default']),
+                     isDiscrete: !!_u(gpuDict['Discrete']),
+                     envVars };
+        });
+
+        console.log('[switcheroo] parsed GPUs:',
+            _switcherooCache.map(g => `${g.name} default=${g.isDefault} discrete=${g.isDiscrete} env=${JSON.stringify(g.envVars)}`).join(' | '));
+
+    } catch (e) {
+        console.log('[switcheroo] query exception:', e.message);
+        console.log('[switcheroo] stack:', e.stack || '(no stack)');
+        return null;  // NOT stored — allow retry next time
+    }
+    return _switcherooCache;
+}
+
+// ── /sys/class/drm fallback ───────────────────────────────────────────────
+// Only used when switcheroo-control is not available.
+// Returns {KEY: VALUE} env vars for the dGPU, or null on single-GPU systems.
+function _sysDetectDgpuEnv() {
+    let cards = [];
     try {
         const drm = Gio.File.new_for_path('/sys/class/drm');
         let en = null;
@@ -27,29 +113,56 @@ function _detectDgpuEnv() {
             en = drm.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
             let fi;
             while ((fi = en.next_file(null)) !== null) {
-                // Only card0, card1 … — skip renderD* nodes
-                if (!fi.get_name().match(/^card\d+$/)) continue;
+                const name = fi.get_name();
+                if (!name.match(/^card\d+$/)) continue;
                 try {
-                    const vendorPath = `/sys/class/drm/${fi.get_name()}/device/vendor`;
-                    const [, bytes] = Gio.File.new_for_path(vendorPath).load_contents(null);
-                    const vendor = _decoder.decode(bytes).trim();
-                    if      (vendor === '0x10de') hasNvidia = true;
-                    else if (vendor === '0x1002') hasAmd    = true;
+                    const [, vb] = Gio.File.new_for_path(
+                        `/sys/class/drm/${name}/device/vendor`).load_contents(null);
+                    cards.push(_decoder.decode(vb).trim());
                 } catch (_) {}
             }
         } finally {
             if (en) try { en.close(null); } catch (_) {}
         }
     } catch (_) {}
+    if (cards.length <= 1) return null;   // single GPU — no routing needed
+    const hasNvidia = cards.some(v => v === '0x10de');
+    const hasAmd    = cards.some(v => v === '0x1002');
+    return hasNvidia ? { CUDA_VISIBLE_DEVICES: '0' }
+         : hasAmd    ? { DRI_PRIME: '1' }
+         : null;
+}
 
-    _gpuEnvCache = hasNvidia ? { CUDA_VISIBLE_DEVICES: '0' }
-                 : hasAmd    ? { DRI_PRIME: '1' }
-                 : null;
+// ── detectDgpuEnv (exported) ──────────────────────────────────────────────
+// Used by _spawnClean() and dock-main.js to auto-route ALL launched apps to
+// the dGPU without user interaction.  Returns {KEY:VALUE} or null.
+let _gpuEnvCache = undefined;
 
-    console.log('[daemon] dGPU env for launched apps:',
-        _gpuEnvCache ? JSON.stringify(_gpuEnvCache) : '(none — iGPU/CPU default)');
+function _detectDgpuEnv() {
+    if (_gpuEnvCache !== undefined) return _gpuEnvCache;
+    // Use /sys directly — called at startup before main loop is running,
+    // so switcheroo D-Bus may not be available yet. Keeps _switcherooCache clean.
+    _gpuEnvCache = _sysDetectDgpuEnv();
+    console.log('[daemon] startup dGPU env (via /sys):',
+        _gpuEnvCache ? JSON.stringify(_gpuEnvCache) : '(none)');
     return _gpuEnvCache;
 }
+
+var detectDgpuEnv = _detectDgpuEnv;
+
+// ── GPU name abbreviation ─────────────────────────────────────────────────
+// Strips verbose vendor prefixes and truncates to 32 chars for the popover.
+function _abbreviateGpuName(name) {
+    if (!name) return 'Unknown GPU';
+    let s = name
+        .replace(/^Advanced Micro Devices,\s*Inc\.\s*\[AMD\/ATI\]\s*/i, '')
+        .replace(/^NVIDIA\s+Corporation\s*/i, '')
+        .replace(/^Intel\s+Corporation\s*/i, '')
+        .replace(/^Intel\(R\)\s*/i, 'Intel® ')
+        .trim();
+    return s.length > 32 ? s.slice(0, 31) + '…' : s;
+}
+var abbreviateGpuName = _abbreviateGpuName;
 
 var Daemon = class {
     // Normalize Hyprland class names: strip reverse-DNS prefixes.
@@ -563,92 +676,60 @@ var Daemon = class {
         }
     }
 
-    // Get available GPUs from the system.
-    // Result is cached for the process lifetime — hardware doesn't change at runtime.
+
+    // Get non-default (discrete) GPUs for the context-menu popover.
+    // Uses switcheroo-control — returns [{name, envVars}] for each dGPU,
+    // or [] when switcheroo is unavailable or only one GPU exists.
+    // "New Window" (plain launch) is always shown by dock-main; these entries
+    // appear as additional "Launch on <name>" options.
     getAvailableGPUs() {
-        if (this._gpuListCache) return this._gpuListCache;
+        if (this._gpuListCache !== null && this._gpuListCache !== undefined)
+            return this._gpuListCache;
 
-        const gpus = [];
-        const gpuTypes = { intel: [], amd: [], nvidia: [] };
-        
-        // Check for NVIDIA GPUs
-        try {
-            const nvidiaSmi = GLib.find_program_in_path('nvidia-smi');
-            if (nvidiaSmi) {
-                const [, stdout] = GLib.spawn_command_line_sync('nvidia-smi --query-gpu=name --format=csv,noheader');
-                const gpuNames = _decoder.decode(stdout).trim().split('\n');
-                gpuNames.forEach(name => {
-                    if (name.trim()) { gpus.push(name.trim()); gpuTypes.nvidia.push(name.trim()); }
-                });
-            }
-        } catch (e) { console.warn('⚠️ Could not detect NVIDIA GPUs:', e); }
+        const sw = _querySwitcheroo();
+        if (!sw || sw.length <= 1) {
+            // switcheroo unavailable or single-GPU system — no extra options
+            this._gpuListCache = [];
+            console.log('🎮 GPU options: (none — single GPU or switcheroo unavailable)');
+            return [];
+        }
 
-        // Check for AMD/Intel GPUs via lspci
-        try {
-            const [, stdout] = GLib.spawn_command_line_sync('lspci -k | grep -EA3 \'VGA|3D\'');
-            const output = _decoder.decode(stdout);
-            
-            if (output.toLowerCase().includes('amd') || output.toLowerCase().includes('radeon')) {
-                for (const line of output.split('\n')) {
-                    if (line.toLowerCase().includes('amd') || line.toLowerCase().includes('radeon')) {
-                        const gpuName = line.trim().replace(/\s+/g, ' ');
-                        if (gpuName && !gpus.includes(gpuName)) { gpus.push(gpuName); gpuTypes.amd.push(gpuName); }
-                    }
-                }
-            }
-            if (output.toLowerCase().includes('intel')) {
-                for (const line of output.split('\n')) {
-                    if (line.toLowerCase().includes('intel') && !line.toLowerCase().includes('wireless')) {
-                        const gpuName = line.trim().replace(/\s+/g, ' ');
-                        if (gpuName && !gpus.includes(gpuName)) { gpus.push(gpuName); gpuTypes.intel.push(gpuName); }
-                    }
-                }
-            }
-        } catch (e) { console.warn('⚠️ Could not detect Intel/AMD GPUs:', e); }
+        // Return only non-default GPUs (the default is covered by "New Window")
+        this._gpuListCache = sw
+            .filter(g => g.isDiscrete)
+            .map(g => ({ name: g.name, envVars: g.envVars }));
 
-        const result = [];
-        if (gpuTypes.intel.length > 0 || gpuTypes.amd.length > 0) result.push('Integrated GPU (iGPU)');
-        else if (gpus.length > 0) result.push('Integrated GPU');
-        if (gpuTypes.nvidia.length > 0) gpuTypes.nvidia.forEach(gpu => result.push('NVIDIA ' + gpu + ' (prime-run)'));
-        if (gpuTypes.amd.length > 0) gpuTypes.amd.forEach(gpu => result.push('AMD ' + gpu + ' (DRI_PRIME=1)'));
-        if (gpuTypes.intel.length > 1) result.push('Intel dGPU (DRI_PRIME=1)');
-        if (result.length === 0) { result.push('Integrated GPU'); result.push('Discrete GPU'); }
-
-        console.log('🎮 Available GPUs:', result.join(', '));
-        this._gpuListCache = result;
-        return result;
+        console.log('🎮 dGPU options:', this._gpuListCache.map(g => g.name).join(', '));
+        return this._gpuListCache;
     }
 
-    // Launch application with specific GPU
-    launchWithGPU(className, gpuLabel) {
+    // Launch application on a specific GPU.
+    // gpuObj: {name, envVars} as returned by getAvailableGPUs().
+    // envVars is a {KEY: VALUE} dict from switcheroo — typically
+    //   {DRI_PRIME: 'pci-0000:01:00.0'} for AMD/Intel dGPU
+    //   {} for the default GPU (same as plain launch)
+    launchWithGPU(className, gpuObj) {
         const execCmd = this.getExecFromDesktop(className);
-        
         if (!execCmd) {
-            console.warn('⚠️ Could not find exec command for:', className);
+            console.warn('⚠️ No exec for:', className);
             try { GLib.spawn_command_line_async(className.toLowerCase()); } catch(e) {}
             return;
         }
 
-        // Strip desktop field codes (%U etc.) and split into argv
         const clean = execCmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
         const argv  = clean.split(/\s+/).filter(Boolean);
-        let envp    = null; // null = inherit current environment
 
-        if (gpuLabel.includes('prime-run')) {
-            // NVIDIA: prepend prime-run wrapper to argv
-            argv.unshift('prime-run');
-            console.log('🚀 NVIDIA (prime-run):', argv.join(' '));
-        } else if (gpuLabel.includes('DRI_PRIME=1')) {
-            // AMD/Intel dGPU: set env var — spawn_command_line_async does NOT parse env prefixes
-            envp = GLib.environ_setenv(GLib.get_environ(), 'DRI_PRIME', '1', true);
-            console.log('🚀 dGPU (DRI_PRIME=1):', argv.join(' '));
-        } else {
-            // iGPU / default: plain launch, no env changes
-            console.log('🚀 iGPU (default):', argv.join(' '));
-        }
+        // Build env from current environment, remove LD_PRELOAD, apply GPU vars
+        let envp = GLib.environ_unsetenv(GLib.get_environ(), 'LD_PRELOAD');
+
+        const envVars = (gpuObj && gpuObj.envVars) ? gpuObj.envVars : {};
+        for (const [k, v] of Object.entries(envVars))
+            envp = GLib.environ_setenv(envp, k, v, true);
+
+        console.log('🚀 Launch on', (gpuObj && gpuObj.name) || 'default GPU',
+            Object.keys(envVars).length ? JSON.stringify(envVars) : '(no env override)');
 
         try {
-            envp = GLib.environ_unsetenv(envp || GLib.get_environ(), 'LD_PRELOAD');
             GLib.spawn_async(GLib.get_home_dir(), argv, envp,
                 GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
                 null, null);

@@ -12,7 +12,10 @@ const GLibUnix = imports.gi.GLibUnix;
 const Gtk4LayerShell = imports.gi.Gtk4LayerShell;
 
 // Import daemon + config
-imports.searchPath.unshift('.');
+// Use the script's own directory — '.' is the working directory which breaks
+// when the dock is launched from outside its own folder (e.g. exec-once in hyprland.conf).
+const _dockDir = GLib.path_get_dirname(imports.system.programInvocationName);
+imports.searchPath.unshift(_dockDir);
 const Daemon     = imports.daemon.Daemon;
 const DockConfig = imports.config.DockConfig;
 
@@ -981,6 +984,16 @@ const HyprCandyDock = GObject.registerClass({
         mainPopover.set_position(mainPopPos);
         mainPopover.add_css_class('dock-popover');
         mainPopover.set_offset(mainOffX, mainOffY);
+        // Defer unparent via idle_add — calling unparent() synchronously inside
+        // 'closed' interrupts GTK4's Wayland grab-release sequence, corrupting
+        // event routing so all future right-clicks route to the first button that
+        // ever showed a popover.  idle_add lets GTK finish cleanup first.
+        mainPopover.connect('closed', () => {
+            GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                try { mainPopover.unparent(); } catch(_) {}
+                return GLib.SOURCE_REMOVE;
+            });
+        });
         
         // Apply inline styling for transparency fix
         const mainStyleContext = mainPopover.get_style_context();
@@ -1044,6 +1057,12 @@ const HyprCandyDock = GObject.registerClass({
                 sidePopover.set_position(sidePopPos);
                 sidePopover.add_css_class('dock-popover');
                 sidePopover.set_offset(sideOffX, sideOffY);
+                sidePopover.connect('closed', () => {
+                    GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                        try { sidePopover.unparent(); } catch(_) {}
+                        return GLib.SOURCE_REMOVE;
+                    });
+                });
                 
                 // Apply inline styling for transparency fix
                 const sideStyleContext = sidePopover.get_style_context();
@@ -1139,19 +1158,36 @@ const HyprCandyDock = GObject.registerClass({
             });
         }
 
-        // --- GPU to Launch New Window (shown for ALL apps, running or not) ---
+        // --- "New Window" always shown; dGPU options appended if switcheroo reports any ---
+        // getAvailableGPUs() returns [{name, envVars}] for non-default GPUs via
+        // switcheroo-control, or [] if unavailable / single GPU.
         const gpus = this.daemon.getAvailableGPUs();
-        if (gpus.length > 0) {
-            // Single separator between instances and GPU section
-            if (data.instances.length > 0) {
-                const gpuSepTop = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
-                gpuSepTop.set_margin_top(4);
-                gpuSepTop.set_margin_bottom(4);
-                menuBox.append(gpuSepTop);
-            }
 
-            // Section header — centred, @inverse_primary colour via CSS class
-            const gpuHeader = Gtk.Label.new('GPU to Launch New Window');
+        // Always: separator + "New Window" (plain launch on default GPU)
+        if (data.instances.length > 0 || gpus.length > 0) {
+            const newWinSepTop = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            newWinSepTop.set_margin_top(4);
+            newWinSepTop.set_margin_bottom(4);
+            menuBox.append(newWinSepTop);
+        }
+        const newWinBtn = Gtk.Button.new_with_label('New Window');
+        newWinBtn.add_css_class('popover-item');
+        newWinBtn.set_halign(Gtk.Align.FILL);
+        newWinBtn.connect('clicked', () => {
+            const execCmd = this.daemon.getExecFromDesktop(data.iconClass || data.className);
+            _spawnCleanCmd(execCmd || (data.iconClass || data.className).toLowerCase());
+            mainPopover.popdown();
+        });
+        menuBox.append(newWinBtn);
+
+        // dGPU options — only if switcheroo-control reports non-default GPUs
+        if (gpus.length > 0) {
+            const gpuSepTop = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            gpuSepTop.set_margin_top(4);
+            gpuSepTop.set_margin_bottom(4);
+            menuBox.append(gpuSepTop);
+
+            const gpuHeader = Gtk.Label.new('Launch on GPU');
             gpuHeader.set_halign(Gtk.Align.CENTER);
             gpuHeader.add_css_class('popover-section-header');
             menuBox.append(gpuHeader);
@@ -1162,7 +1198,9 @@ const HyprCandyDock = GObject.registerClass({
             menuBox.append(gpuSepBottom);
 
             for (const gpu of gpus) {
-                const gpuBtn = Gtk.Button.new_with_label(gpu);
+                const _abbrev = imports.daemon.abbreviateGpuName
+                    ? imports.daemon.abbreviateGpuName(gpu.name) : gpu.name;
+                const gpuBtn = Gtk.Button.new_with_label(_abbrev);
                 gpuBtn.add_css_class('popover-item');
                 gpuBtn.add_css_class('popover-action');
                 gpuBtn.set_halign(Gtk.Align.FILL);
@@ -1172,29 +1210,12 @@ const HyprCandyDock = GObject.registerClass({
                 });
                 menuBox.append(gpuBtn);
             }
-            // Separator after GPU section
-            const gpuSepAfter = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
-            gpuSepAfter.set_margin_top(4);
-            gpuSepAfter.set_margin_bottom(4);
-            menuBox.append(gpuSepAfter);
-        } else {
-            // No GPU detection — plain "New Window" fallback
-            const newWinBtn = Gtk.Button.new_with_label('New Window');
-            newWinBtn.add_css_class('popover-item');
-            newWinBtn.set_halign(Gtk.Align.FILL);
-            newWinBtn.connect('clicked', () => {
-                const execCmd = this.daemon.getExecFromDesktop(data.iconClass || data.className);
-                _spawnCleanCmd(execCmd || (data.iconClass || data.className).toLowerCase());
-                mainPopover.popdown();
-            });
-            menuBox.append(newWinBtn);
-            // Separator after New Window button
-            const newWinSep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
-            newWinSep.set_margin_top(4);
-            newWinSep.set_margin_bottom(4);
-            menuBox.append(newWinSep);
         }
 
+        const afterLaunchSep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        afterLaunchSep.set_margin_top(4);
+        afterLaunchSep.set_margin_bottom(4);
+        menuBox.append(afterLaunchSep);
         // Close all windows (only when multiple instances running)
         if (data.instances.length > 1) {
             const closeAllBtn = Gtk.Button.new_with_label('Close All Windows');
@@ -1250,6 +1271,12 @@ const HyprCandyDock = GObject.registerClass({
         popover.set_position(mainPopPos);
         popover.add_css_class('dock-popover');
         popover.set_offset(mainOffX, mainOffY);
+        popover.connect('closed', () => {
+            GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                try { popover.unparent(); } catch(_) {}
+                return GLib.SOURCE_REMOVE;
+            });
+        });
         
         // Apply styling
         const styleContext = popover.get_style_context();
