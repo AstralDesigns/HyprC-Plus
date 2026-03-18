@@ -1045,12 +1045,15 @@ const HyprCandyDock = GObject.registerClass({
                 sidePopover.set_position(sidePopPos);
                 sidePopover.add_css_class('dock-popover');
                 sidePopover.set_offset(sideOffX, sideOffY);
-                sidePopover.connect('closed', () => {
-                    GLib.idle_add(GLib.PRIORITY_LOW, () => {
-                        try { sidePopover.unparent(); } catch(_) {}
-                        return GLib.SOURCE_REMOVE;
-                    });
-                });
+                // NOTE: no 'closed' → unparent() here.
+                // sidePopover is parented to focusBtn which lives inside
+                // mainPopover's content tree. Calling unparent() on it after
+                // it closes causes a crash when the mouse re-enters focusBtn:
+                // hoverCtrl 'enter' calls sidePopover.popup() on the now-
+                // parentless widget, triggering a GTK assertion.
+                // mainPopover.unparent() (deferred via idle_add on its own
+                // 'closed' signal) cleans up the entire tree including all
+                // side popovers when the main menu is dismissed.
                 
                 // Apply inline styling for transparency fix
                 const sideStyleContext = sidePopover.get_style_context();
