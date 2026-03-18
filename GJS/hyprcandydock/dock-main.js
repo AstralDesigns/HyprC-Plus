@@ -19,18 +19,6 @@ imports.searchPath.unshift(_dockDir);
 const Daemon     = imports.daemon.Daemon;
 const DockConfig = imports.config.DockConfig;
 
-// ── Apply dGPU routing to this process and all child spawns ───────────────
-// detectDgpuEnv() reads /sys — instant, cached, no spawn.
-// GLib.setenv with override=false means we respect an existing DRI_PRIME/
-// CUDA_VISIBLE_DEVICES the user may have set in their session already.
-// This affects: the dock's own GTK rendering + every _spawnCleanCmd call.
-(function applyDgpuEnvToProcess() {
-    const gpuEnv = imports.daemon.detectDgpuEnv ? imports.daemon.detectDgpuEnv() : null;
-    if (gpuEnv)
-        for (const [k, v] of Object.entries(gpuEnv))
-            GLib.setenv(k, v, false);
-})();
-
 // --- Parse position flag from ARGV ------------------------------------
 // Usage: gjs dock-main.js [-b|-t|-l|-r]
 (function parsePositionFlag() {

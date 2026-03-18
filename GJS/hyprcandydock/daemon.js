@@ -134,8 +134,8 @@ function _sysDetectDgpuEnv() {
 }
 
 // ── detectDgpuEnv (exported) ──────────────────────────────────────────────
-// Used by _spawnClean() and dock-main.js to auto-route ALL launched apps to
-// the dGPU without user interaction.  Returns {KEY:VALUE} or null.
+// Available for external callers that need /sys-based GPU env detection.
+// No longer applied automatically — dGPU routing is explicit-only via the popover.
 let _gpuEnvCache = undefined;
 
 function _detectDgpuEnv() {
@@ -373,15 +373,9 @@ var Daemon = class {
     _spawnClean(argv, extraEnv) {
         let envp = GLib.get_environ();
         envp = GLib.environ_unsetenv(envp, 'LD_PRELOAD');
-        // Apply dGPU routing to all launched apps by default.
-        // override=false: respects DRI_PRIME/CUDA_VISIBLE_DEVICES already in the
-        // user's session, and lets the explicit extraEnv below overwrite it when
-        // the user picks a specific GPU from the context menu.
-        const gpuEnv = _detectDgpuEnv();
-        if (gpuEnv)
-            for (const [k, v] of Object.entries(gpuEnv))
-                envp = GLib.environ_setenv(envp, k, v, false);
-        // Explicit per-launch env (e.g. "Launch with dGPU / iGPU") always wins.
+        // Only apply GPU env when the user explicitly requested it via the
+        // context menu ("Launch on GPU"). Blanket-applying DRI_PRIME to all
+        // launches breaks apps like Steam that manage their own GPU routing.
         if (extraEnv)
             for (const [k, v] of Object.entries(extraEnv))
                 envp = GLib.environ_setenv(envp, k, v, true);
