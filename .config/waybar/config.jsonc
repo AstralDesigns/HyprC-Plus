@@ -283,7 +283,7 @@
     "format": "{}",
     "on-click": "~/.config/waybar/scripts/wifi-menu.sh",
     "on-click-right": "kitty --title '󰤨  Network Manager TUI' bash -c nmtui",
-    "interval": 300,
+    "interval": 5,
     "min-length": 1,
     "max-length": 1
   },
