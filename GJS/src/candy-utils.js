@@ -633,21 +633,29 @@ mkRow(panel, 'Border', borderE);
     });
     panel.append(btModeBtn);
     
-    // Notification center direction
-    let ntPos = loadBool('nt_pos.state', false);
-    const ntPosBtn = mkToggle(ntPos ? '󰂚 Center: 󰁍' : '󰂚 Center: 󰁔', ntPos);
+    // Notification center direction — cycles right → left → center → right
+    const NT_POSITIONS = ['right', 'left', 'center'];
+    const NT_GLYPHS    = { right: '󰁔', left: '󰁍', center: '󰘞' };
+
+    let ntPos = loadState('nt_pos.state', 'right');
+    // Sanitise legacy bool values ('enabled'/'disabled') from the old two-state toggle
+    if (!NT_POSITIONS.includes(ntPos)) ntPos = 'right';
+
+    const _ntLabel = () => `󰂚 Center: ${NT_GLYPHS[ntPos]}`;
+    const ntPosBtn = mkToggle(_ntLabel(), ntPos !== 'right');
+
     ntPosBtn.connect('clicked', () => {
-        ntPos = !ntPos;
-        if (ntPos) {
-            GLib.spawn_command_line_async(`sed -i 's/"positionX": "right",/"positionX": "left",/' '${SWAYNC_CONF}'`);
-        } else {
-            GLib.spawn_command_line_async(`sed -i 's/"positionX": "left",/"positionX": "right",/' '${SWAYNC_CONF}'`);
-        }
+        const prev = ntPos;
+        ntPos = NT_POSITIONS[(NT_POSITIONS.indexOf(ntPos) + 1) % NT_POSITIONS.length];
+        // Replace whatever positionX value was there with the new one
+        GLib.spawn_command_line_async(
+            `sed -i 's/"positionX": "${prev}",/"positionX": "${ntPos}",/' '${SWAYNC_CONF}'`
+        );
         GLib.spawn_command_line_async('killall swaync');
-        ntPosBtn.set_label(ntPos ? '󰂚 Center: 󰁍' : '󰂚 Center: 󰁔');
-        if (ntPos) ntPosBtn.add_css_class('cc-active');
-        else ntPosBtn.remove_css_class('cc-active');
-        saveBool('nt_pos.state', ntPos);
+        ntPosBtn.set_label(_ntLabel());
+        if (ntPos !== 'right') ntPosBtn.add_css_class('cc-active');
+        else                   ntPosBtn.remove_css_class('cc-active');
+        saveState('nt_pos.state', ntPos);
     });
     panel.append(ntPosBtn);
 
