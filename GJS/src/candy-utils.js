@@ -634,8 +634,8 @@ mkRow(panel, 'Border', borderE);
     panel.append(btModeBtn);
     
     // Notification center direction — cycles right → left → center → right
-    const NT_POSITIONS = ['right', 'left', 'center'];
-    const NT_GLYPHS    = { right: '󰁔', left: '󰁍', center: '󰘞' };
+    const NT_POSITIONS = ['right', 'center', 'left'];
+    const NT_GLYPHS    = { right: '󰁔', center: '󰘞', left: '󰁍' };
 
     let ntPos = loadState('nt_pos.state', 'right');
     // Sanitise legacy bool values ('enabled'/'disabled') from the old two-state toggle
