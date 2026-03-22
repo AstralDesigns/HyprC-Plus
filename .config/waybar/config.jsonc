@@ -18,9 +18,9 @@
 
   "modules-center": [
     "custom/cava-left",           // cava visualizer
-    "clock#date",           // date
-    "custom/distro",        // distro icon
     "clock#time",           // time
+    "custom/distro",        // distro icon
+    "clock#date",           // date
     "custom/cava-right"           // cava visualizer
   ],
 
