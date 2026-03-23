@@ -54,7 +54,7 @@ configuration {
 
 // Main //
 window {
-    height:                      30.5em;
+    height:                      32.5em;
     width:                       60em;
     transparency:                "real";
     fullscreen:                  false;
@@ -75,7 +75,6 @@ mainbox {
     orientation:                 vertical;
     children:                    [ "inputbar" , "listbox" ];
     background-color:            transparent;
-    background-image:            @current-image;
 }
 
 
@@ -84,7 +83,7 @@ inputbar {
     enabled:                     true;
     spacing:                     0em;
     padding:                     1em;
-    children:                    [ "entry" ];
+    children:                    [ "space-1", "entry", "space-2" ];
     background-color:            transparent;
     background-image:            url("~/.config/hyprcandy/cache/current_wallpaper", width);
 }
@@ -100,6 +99,11 @@ textbox-prompt-colon {
     background-image:            url("~/.config/hyprcandy/cache/current_wallpaper", width);
 }
 
+space-1 {
+    spacing:  			10em;
+    background-color:  		transparent;
+}
+
 entry {
     enabled:                     true;
     border-radius:               2em;
@@ -108,8 +112,13 @@ entry {
     background-color:            @background;
     text-color:                  @color11;
     cursor:                      text;
-    placeholder:                 "Search ";
+    placeholder:                 "            Search  ";
     placeholder-color:           inherit;
+}
+
+space-2 {
+    spacing:  			10em;
+    background-color:  		transparent;
 }
 
 // Lists //
@@ -118,8 +127,9 @@ listbox {
     spacing:                     0em;
     border-radius:               1em;
     orientation:                 horizontal;
-    children:                    [ "listview" , "mode-switcher" ];
+    children:                    [ "mode-switcher", "listview" ];
     background-color:            @background;
+    background-image:            @current-image;
 }
 
 listview {
@@ -127,7 +137,7 @@ listview {
     spacing:                     0.5em;
     enabled:                     true;
     columns:                     5;
-    lines:                       5;
+    lines:                       10;
     cycle:                       true;
     dynamic:                     true;
     scrollbar:                   false;
@@ -138,17 +148,19 @@ listview {
     cursor:                      "default";
     background-color:            transparent;
     text-color:                  @foreground;
+    border-radius:               0em;
 }
 
 
 // Modes //
 mode-switcher {
     orientation:                 vertical;
-    width:                       7em;
+    width:                       6.5em;
     enabled:                     true;
-    padding:                     2.25em;
-    spacing:                     3em;
-    background-color:            transparent;
+    padding:                     2em;
+    spacing:                     4em;
+    background-color:            @background;
+    border-radius:               0em;
 }
 
 button {
@@ -156,7 +168,7 @@ button {
     cursor:                      pointer;
     border-radius:               2em;
     background-color:            @color11;
-    text-color:                  @background;
+    text-color:                  @on-primary-fixed-variant;
 }
 
 button selected {
@@ -222,7 +234,7 @@ element alternate.active {
 }
 
 element-icon {
-    size:                        3em;
+    size:                        2.0em;
     cursor:                      inherit;
     background-color:            transparent;
     text-color:                  inherit;

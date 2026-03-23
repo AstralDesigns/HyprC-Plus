@@ -26,6 +26,7 @@ const SWAYNC_STYLE  = GLib.build_filenamev([HOME, '.config', 'swaync', 'style.cs
 const SWAYNC_CONF   = GLib.build_filenamev([HOME, '.config', 'swaync', 'config.json']);
 const ROFI_BORDER   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'settings', 'rofi-border.rasi']);
 const ROFI_RADIUS   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'settings', 'rofi-border-radius.rasi']);
+const ROFI_CONF     = GLib.build_filenamev([HOME, '.config', 'rofi', 'config.rasi']);
 const WAYPAPER_INT  = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hooks', 'waypaper_integration.sh']);
 const DOCK_CONFIG   = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'config.js']);
 const DOCK_CYCLE    = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'cycle.sh']);
@@ -903,6 +904,46 @@ function createRofiPanel() {
         }
     });
     mkRow(panel, 'Radius', rE);
+
+    // Icon Size +/− (edits element-icon { size: Xem; } in ~/.config/rofi/config.rasi)
+    const [icDec, icInc] = mkPM();
+    function loadRofiIconSize() {
+        try {
+            let [ok, c] = GLib.file_get_contents(ROFI_CONF);
+            if (ok && c) {
+                let txt = imports.byteArray.toString(c);
+                // Match the element-icon block then pull the size value
+                let blk = txt.match(/element-icon\s*\{[^}]*\}/);
+                if (blk) {
+                    let m = blk[0].match(/\bsize\s*:\s*([0-9.]+)em/);
+                    if (m) return parseFloat(m[1]);
+                }
+            }
+        } catch (e) {}
+        return 2.0;
+    }
+    function updateRofiIconSize(delta) {
+        try {
+            let [ok, c] = GLib.file_get_contents(ROFI_CONF);
+            if (ok && c) {
+                let txt = imports.byteArray.toString(c);
+                let blk = txt.match(/element-icon\s*\{[^}]*\}/);
+                if (blk) {
+                    let m = blk[0].match(/\bsize\s*:\s*([0-9.]+)em/);
+                    if (m) {
+                        let cur = parseFloat(m[1]);
+                        let nv = Math.max(0.5, (cur + delta)).toFixed(1);
+                        GLib.spawn_command_line_async(
+                            `sed -i '/element-icon/,/}/{s/\\bsize:[[:space:]]*${m[1]}em/size:                        ${nv}em/}' '${ROFI_CONF}'`
+                        );
+                    }
+                }
+            }
+        } catch (e) {}
+    }
+    icDec.connect('clicked', () => updateRofiIconSize(-0.5));
+    icInc.connect('clicked', () => updateRofiIconSize(0.5));
+    mkRow(panel, 'Icon Size', icDec, icInc);
 
     return panel;
 }
