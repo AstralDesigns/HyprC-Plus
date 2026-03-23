@@ -1,5 +1,5 @@
 * {
-    background: rgba(19, 13, 6, 0.4);
+    background: rgba(19, 13, 6, 0.3);
     primary: #e5b67b;
     primary-fixed: #fad9b2;
     primary-fixed-dim: #e5b67b;
