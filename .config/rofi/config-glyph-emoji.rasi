@@ -113,16 +113,26 @@ textbox-prompt-colon {
     background-image:            url("~/.config/hyprcandy/cache/current_wallpaper", width);
 }
 
+space-1 {
+    spacing:  			1em;
+    background-color:  		transparent;
+}
+
 entry {
     enabled:                     true;
     border-radius:               2em;
-    spacing:                     1em;
+    spacing:                     0.5em;
     padding:                     1em;
     background-color:            @background;
     text-color:                  @color11;
     cursor:                      text;
-    placeholder:                 "Search ";
+    placeholder:                 "      Search  ";
     placeholder-color:           inherit;
+}
+
+space-2 {
+    spacing:  			1em;
+    background-color:  		transparent;
 }
 
 // Lists //

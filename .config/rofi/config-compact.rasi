@@ -103,7 +103,6 @@ inputbar {
 }
 
 textbox-prompt-colon {
-    font:                       "JetBrainsMono Nerd Font Propo 12";
     enabled:                     true;
     expand:                      false;
     str:                         " ";
@@ -114,16 +113,28 @@ textbox-prompt-colon {
     background-image:            url("~/.config/hyprcandy/cache/current_wallpaper", width);
 }
 
+space-1 {
+    width:                      2em;
+    spacing:  			3em;
+    background-color:  		transparent;
+}
+
 entry {
     enabled:                     true;
     border-radius:               2em;
-    spacing:                     1em;
+    spacing:                     0.5em;
     padding:                     1em;
     background-color:            @background;
     text-color:                  @color11;
     cursor:                      text;
-    placeholder:                 "Search ";
+    placeholder:                 "                          Search  ";
     placeholder-color:           inherit;
+}
+
+space-2 {
+    width:                      2em;
+    spacing:  			3em;
+    background-color:  		transparent;
 }
 
 // Lists //
