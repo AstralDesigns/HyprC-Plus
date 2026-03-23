@@ -115,10 +115,10 @@ textbox-prompt-colon {
 
 entry {
     enabled:                     true;
-    border-radius:               2em 2em 2em 2em;
+    border-radius:               2em;
     spacing:                     1em;
     padding:                     1em;
-    background-color:            @color5;
+    background-color:            @background;
     text-color:                  @foreground;
     cursor:                      text;
     placeholder:                 "Search ";

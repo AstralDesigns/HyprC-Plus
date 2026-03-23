@@ -54,7 +54,7 @@ configuration {
 
 // Main //
 window {
-    height:                      34.5em;
+    height:                      30em;
     width:                       60em;
     transparency:                "real";
     fullscreen:                  false;
@@ -71,7 +71,7 @@ window {
 mainbox {
     enabled:                     true;
     spacing:                     0em;
-    padding:                     0em;
+    padding:                     0.5em;
     orientation:                 vertical;
     children:                    [ "inputbar" , "listbox" ];
     background-color:            transparent;
@@ -83,7 +83,7 @@ mainbox {
 inputbar {
     enabled:                     true;
     spacing:                     0em;
-    padding:                     5em;
+    padding:                     1em;
     children:                    [ "entry" ];
     background-color:            transparent;
     background-image:            url("~/.config/hyprcandy/cache/current_wallpaper", width);
@@ -102,10 +102,10 @@ textbox-prompt-colon {
 
 entry {
     enabled:                     true;
-    border-radius:               2em 2em 2em 2em;
-    spacing:                     1em;
+    border-radius:               2em;
+    spacing:                     0.5em;
     padding:                     1em;
-    background-color:            @on-primary-fixed-variant;
+    background-color:            @background;
     text-color:                  @color11;
     cursor:                      text;
     placeholder:                 "Search ";
@@ -116,18 +116,18 @@ entry {
 listbox {
     padding:                     0em;
     spacing:                     0em;
-    border-radius:               0em;
+    border-radius:               1em;
     orientation:                 horizontal;
     children:                    [ "listview" , "mode-switcher" ];
     background-color:            @background;
 }
 
 listview {
-    padding:                     1.5em;
+    padding:                     1em;
     spacing:                     0.5em;
     enabled:                     true;
     columns:                     5;
-    lines:                       4;
+    lines:                       5;
     cycle:                       true;
     dynamic:                     true;
     scrollbar:                   false;
@@ -144,10 +144,10 @@ listview {
 // Modes //
 mode-switcher {
     orientation:                 vertical;
-    width:                       7.5em;
+    width:                       7em;
     enabled:                     true;
-    padding:                     2.5em;
-    spacing:                     2em;
+    padding:                     2.25em;
+    spacing:                     3em;
     background-color:            transparent;
 }
 
@@ -178,7 +178,7 @@ element {
 element selected.normal {
     background-color:            @on-primary-fixed-variant;
     text-color:                  @color11;
-    border-radius:               @border-radius;
+    border-radius:               0.8em;
 }
 
 element normal.normal {
