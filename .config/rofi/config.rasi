@@ -14,10 +14,10 @@ configuration {
     font:                       "JetBrainsMono Nerd Font Propo 11";
     show-icons:                 true;
     icon-theme:                 "Tela circle black";
-    display-drun:               " ";
-    display-run:                " ";
-    display-filebrowser:        " ";
-    display-window:             " ";
+    display-drun:               "";
+    display-run:                "";
+    display-filebrowser:        "";
+    display-window:             "";
     drun-display-format:        "{name}";
     hover-select:               false;
     scroll-method:              1;
@@ -54,8 +54,8 @@ configuration {
 
 // Main //
 window {
-    height:                      35em;
-    width:                       62em;
+    height:                      34.5em;
+    width:                       60em;
     transparency:                "real";
     fullscreen:                  false;
     enabled:                     true;
@@ -84,7 +84,7 @@ inputbar {
     enabled:                     true;
     spacing:                     0em;
     padding:                     5em;
-    children:                    [ "textbox-prompt-colon", "entry" ];
+    children:                    [ "entry" ];
     background-color:            transparent;
     background-image:            url("~/.config/hyprcandy/cache/current_wallpaper", width);
 }
@@ -102,13 +102,13 @@ textbox-prompt-colon {
 
 entry {
     enabled:                     true;
-    border-radius:               0em 2em 2em 0em;
+    border-radius:               2em 2em 2em 2em;
     spacing:                     1em;
     padding:                     1em;
     background-color:            @on-primary-fixed-variant;
     text-color:                  @color11;
     cursor:                      text;
-    placeholder:                 "Search";
+    placeholder:                 "Search ";
     placeholder-color:           inherit;
 }
 
@@ -116,6 +116,7 @@ entry {
 listbox {
     padding:                     0em;
     spacing:                     0em;
+    border-radius:               0em;
     orientation:                 horizontal;
     children:                    [ "listview" , "mode-switcher" ];
     background-color:            @background;
@@ -143,14 +144,15 @@ listview {
 // Modes //
 mode-switcher {
     orientation:                 vertical;
-    width:                       6.6em;
+    width:                       7.5em;
     enabled:                     true;
-    padding:                     1.5em;
-    spacing:                     1.5em;
+    padding:                     2.5em;
+    spacing:                     2em;
     background-color:            transparent;
 }
 
 button {
+    font:                       "JetBrainsMono Nerd Font Propo 11.5";
     cursor:                      pointer;
     border-radius:               2em;
     background-color:            @color11;

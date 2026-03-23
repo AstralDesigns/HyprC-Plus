@@ -96,12 +96,13 @@ inputbar {
     enabled:                     true;
     spacing:                     0em;
     padding:                     1em;
-    children:                    [ "textbox-prompt-colon", "entry" ];
+    children:                    [ "entry" ];
     background-color:            transparent;
     background-image:            url("~/.config/hyprcandy/cache/current_wallpaper", width);
 }
 
 textbox-prompt-colon {
+    font:                       "JetBrainsMono Nerd Font Propo 12";
     enabled:                     true;
     expand:                      false;
     str:                         " ";
@@ -114,13 +115,13 @@ textbox-prompt-colon {
 
 entry {
     enabled:                     true;
-    border-radius:               0em 2em 2em 0em;
+    border-radius:               2em 2em 2em 2em;
     spacing:                     1em;
     padding:                     1em;
     background-color:            @on-primary-fixed-variant;
     text-color:                  @color11;
     cursor:                      text;
-    placeholder:                 "Search";
+    placeholder:                 "Search ";
     placeholder-color:           inherit;
 }
 
