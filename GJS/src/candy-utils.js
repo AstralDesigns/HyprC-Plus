@@ -449,7 +449,7 @@ mkRow(panel, 'Border', borderE);
 
     // Side Margins
     const sideE = mkEntry(3);
-    sideE.set_text(loadState('waybar_side_margin.state', '4.5'));
+    sideE.set_text(loadState('waybar_side_margin.state', '12.0'));
     sideE.connect('activate', () => {
         const v = parseFloat(sideE.get_text());
         if (!isNaN(v) && v >= 0 && v <= 1000) {
