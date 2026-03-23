@@ -56,8 +56,8 @@ configuration {
 window {
     width:                        11em;
     height:                       31em;
-    x-offset:                     -1em;
-    y-offset:                     2em;
+    x-offset:                     -0.5em;
+    y-offset:                     0.5em;
     spacing:                      0px;
     padding:                      0px;
     margin:                       0px; 

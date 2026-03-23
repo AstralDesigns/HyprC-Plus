@@ -57,7 +57,7 @@ window {
     width:                        35em;
     height:                       36em;
     x-offset:                     0em;
-    y-offset:                     2em;
+    y-offset:                     0.5em;
     spacing:                      0em;
     padding:                      0em;
     margin:                       0em; 
