@@ -16,6 +16,10 @@ reload_colors() {
     gsettings set org.gnome.desktop.interface color-scheme "prefer-dark"
     
     sudo dconf update
+    sleep 0.5
+    systemctl --user restart xdg-desktop-portal.service
+    sleep 0.5
+    systemctl --user restart xdg-desktop-portal-gtk.service
 }
 
 update_hypr_group_text() {
