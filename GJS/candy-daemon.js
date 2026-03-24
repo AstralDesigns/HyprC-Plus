@@ -202,7 +202,7 @@ function toggleSystem() {
     if (!widgets.system) {
         widgets.system = new Gtk.ApplicationWindow({
             application: app,
-            default_width: 400, default_height: 420,
+            default_width: 480, default_height: 420,
             resizable: false, decorated: true,
             title: 'candy.systemmonitor',
         });
@@ -246,7 +246,7 @@ function toggleWeather() {
     if (!widgets.weather) {
         widgets.weather = new Gtk.ApplicationWindow({
             application: app,
-            default_width: 305, default_height: 245,
+            default_width: 360, default_height: 275,
             resizable: false, decorated: false,
             title: 'candy.weather',
         });

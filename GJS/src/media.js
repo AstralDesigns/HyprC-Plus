@@ -268,9 +268,10 @@ function createMediaBox() {
         /* ── Source selector sidebar (left strip) ─────────────────── */
         .media-sources-bar {
             padding: 6px 2px;
-            border-radius: 14px;
+            border-radius: 16px;
             background-color: rgba(0,0,0,0.18);
-            margin-right: 5px;
+            margin-right: 2px;
+            margin-left: 2px;
         }
         .media-source-btn {
             min-width: 22px;
@@ -308,8 +309,9 @@ function createMediaBox() {
 
         /* ── Volume slider (right strip) ──────────────────────────── */
         .media-volume-bar {
-            margin-left: 5px;
-            padding: 6px 0px;
+            margin-right: 6px;
+            margin-left: 6px;
+            padding: 6px 2px;
         }
         .media-volume-bar trough {
             min-width: 4px;
