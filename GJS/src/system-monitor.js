@@ -83,6 +83,27 @@ function getDiskInfo() {
     return [];
 }
 
+// Collapse multiple mount points that share the same block device into one gauge.
+// Preference order: '/' first, then shortest mountpoint path (most "canonical").
+function deduplicateDisks(disks) {
+    const byDevice = new Map();
+    for (let d of disks) {
+        if (!byDevice.has(d.device)) {
+            byDevice.set(d.device, d);
+        } else {
+            const existing = byDevice.get(d.device);
+            // Always prefer the root mountpoint as the representative
+            if (d.mountpoint === '/') {
+                byDevice.set(d.device, d);
+            } else if (existing.mountpoint !== '/' && d.mountpoint.length < existing.mountpoint.length) {
+                // Among non-root mounts, prefer the shortest (most top-level) path
+                byDevice.set(d.device, d);
+            }
+        }
+    }
+    return Array.from(byDevice.values());
+}
+
 function getGPUInfo() {
     let gpus = [];
     let detectedIntelGPUs = new Set();
@@ -431,7 +452,7 @@ function createSystemMonitorBox() {
     infoBox.append(netLbl); infoBox.append(upLbl); mainBox.append(infoBox);
 
     function updateAll() {
-        let cpu=getCPUInfo(), mem=getMemoryInfo(), temp=getTemperatureInfo(), disks=getDiskInfo(), gpus=getGPUInfo(), net=getNetworkInfo(), upt=getSystemUptime(), load=getLoadAverage();
+        let cpu=getCPUInfo(), mem=getMemoryInfo(), temp=getTemperatureInfo(), disks=deduplicateDisks(getDiskInfo()), gpus=getGPUInfo(), net=getNetworkInfo(), upt=getSystemUptime(), load=getLoadAverage();
         cpuG.update(cpu.usage/100, `${cpu.usage}%`, '');
         let mp = mem.total>0 ? Math.round((mem.used/mem.total)*100) : 0;
         ramG.update(mp/100, `${mp}%`, formatBytes(mem.used));
