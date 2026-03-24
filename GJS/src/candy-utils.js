@@ -224,8 +224,35 @@ function createUserProfile() {
         dlg.connect('response', (d, r) => {
             if (r === Gtk.ResponseType.ACCEPT) {
                 const p = d.get_file().get_path();
-                GLib.spawn_command_line_async(`magick "${p}" -resize 128x128^ -gravity center -extent 128x128 "${userIconPath}"`);
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 600, () => { loadIcon(); avatarDa.queue_draw(); return false; });
+                // spawn_async + child_watch_add: reload the icon exactly when magick
+                // exits — avoids the race where a fixed timeout fires before the
+                // process has finished writing the output file.
+                try {
+                    const [ok, pid] = GLib.spawn_async(
+                        null,
+                        ['magick', p,
+                         '-resize', '128x128^', '-gravity', 'center',
+                         '-extent', '128x128', userIconPath],
+                        null,
+                        GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+                        null
+                    );
+                    if (ok) {
+                        GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, () => {
+                            GLib.spawn_close_pid(pid);
+                            loadIcon();
+                            avatarDa.queue_draw();
+                        });
+                    }
+                } catch (e) {
+                    // Fallback for environments where spawn_async is unavailable
+                    GLib.spawn_command_line_async(
+                        `magick "${p}" -resize 128x128^ -gravity center -extent 128x128 "${userIconPath}"`
+                    );
+                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
+                        loadIcon(); avatarDa.queue_draw(); return false;
+                    });
+                }
             }
         });
         dlg.show();

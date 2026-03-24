@@ -66,9 +66,10 @@ const INDICATOR_SPACING = DockConfig.indicatorSpacing;
 const ICON_SIZE = APP_ICON_SIZE;
 
 // Glyph icons — Nerd Font Unicode codepoints (NF font required)
-const GLYPH_START     = '󱗼';   //  Linux / start
-const GLYPH_INDICATOR = '\u{F09DF}';  //  active-window dot
-const GLYPH_TRASH     = '\udb82\ude7a';   //  trash
+const GLYPH_START      = '󱗼';   //  Linux / start
+const GLYPH_INDICATOR  = '\u{F09DF}';  //  active-window dot
+const GLYPH_TRASH_EMPTY = '󰩺';   //  nf-md-trash_can_outline — no files in trash
+const GLYPH_TRASH_FULL  = '󰩹';   //  nf-md-trash_can         — files present in trash
 // Hyprland logo glyph (nf-linux-hyprland, NerdFonts >= 3.2)
 const GLYPH_FALLBACK  = '󱙝';   //  shown when app has no icon
 
@@ -673,7 +674,14 @@ const HyprCandyDock = GObject.registerClass({
     }
 
     _addTrashButton() {
-        // Trash button has no indicator — same as start, no container/overlay needed.
+        const TRASH_FILES_DIR = GLib.build_filenamev(
+            [GLib.get_home_dir(), '.local', 'share', 'Trash', 'files']
+        );
+
+        // Ensure the Trash/files directory exists (it may not on a fresh install
+        // where the user has never trashed anything yet).
+        try { GLib.mkdir_with_parents(TRASH_FILES_DIR, 0o755); } catch (_) {}
+
         const btn = Gtk.Button.new();
         btn.add_css_class('app-button');
         btn.add_css_class('dock-button');
@@ -681,12 +689,46 @@ const HyprCandyDock = GObject.registerClass({
         btn.set_halign(Gtk.Align.CENTER);
         btn.set_valign(Gtk.Align.CENTER);
 
-        const label = Gtk.Label.new(GLYPH_TRASH);
+        // Start with the empty glyph; _updateTrashIcon() will correct it immediately.
+        const label = Gtk.Label.new(GLYPH_TRASH_EMPTY);
         label.set_name('trash-icon');
         label.set_halign(Gtk.Align.CENTER);
         label.set_valign(Gtk.Align.CENTER);
         btn.set_child(label);
         btn.set_tooltip_text('Trash');
+
+        // Returns true if Trash/files contains at least one entry.
+        function _trashHasFiles() {
+            try {
+                const dir = Gio.File.new_for_path(TRASH_FILES_DIR);
+                const en  = dir.enumerate_children(
+                    'standard::name', Gio.FileQueryInfoFlags.NONE, null
+                );
+                const hasEntry = en.next_file(null) !== null;
+                try { en.close(null); } catch (_) {}
+                return hasEntry;
+            } catch (_) { return false; }
+        }
+
+        function _updateTrashIcon() {
+            label.set_text(_trashHasFiles() ? GLYPH_TRASH_FULL : GLYPH_TRASH_EMPTY);
+        }
+
+        // Set correct initial state before the monitor is even ready.
+        _updateTrashIcon();
+
+        // Watch Trash/files for additions and deletions — zero-polling.
+        // WATCH_MOVES catches rename-into-trash (the most common write path).
+        try {
+            const trashDir = Gio.File.new_for_path(TRASH_FILES_DIR);
+            this._trashMonitor = trashDir.monitor_directory(
+                Gio.FileMonitorFlags.WATCH_MOVES, null
+            );
+            this._trashMonitor.connect('changed', () => _updateTrashIcon());
+            log('[dock] Trash monitor active on: ' + TRASH_FILES_DIR);
+        } catch (e) {
+            log('[dock] Trash monitor setup failed: ' + e.message);
+        }
 
         btn.connect('clicked', () => {
             _spawnCleanCmd('nautilus trash:///');
@@ -694,6 +736,7 @@ const HyprCandyDock = GObject.registerClass({
 
         this.mainBox.append(btn);
         this._trashButton = btn;
+        this._trashLabel  = label;
     }
 
     _updateFromDaemon(clientData) {
@@ -1355,6 +1398,10 @@ const HyprCandyDock = GObject.registerClass({
     }
 
     vfunc_close_request() {
+        if (this._trashMonitor) {
+            this._trashMonitor.cancel();
+            this._trashMonitor = null;
+        }
         teardownColorMonitor();
         this.daemon.shutdown();
         return false;
