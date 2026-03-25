@@ -19,7 +19,7 @@ const BUS_NAME_PREFIX = 'org.mpris.MediaPlayer2.';
 const MPRIS_PATH = '/org/mpris/MediaPlayer2';
 
 // ── Placeholder glyph for audio with no art (Nerd Font:  = double-note) ─
-const PLACEHOLDER_GLYPH = '';
+const PLACEHOLDER_GLYPH = '󰽲';
 
 // ── Source dot glyphs (Nerd Font mdi icons) ──────────────────────────────
 // mdi:play-circle  󰐊  mdi:pause-circle  󰏤  mdi:stop-circle  󰓛
@@ -493,7 +493,7 @@ function createMediaBox() {
     thumbDa.set_halign(Gtk.Align.CENTER);
     thumbDa.set_margin_top(4);
     thumbDa.set_margin_bottom(4);
-    thumbDa.set_margin_start(4);
+    thumbDa.set_margin_start(0);
     thumbDa.set_margin_end(0);
 
     const thumb = {
@@ -692,7 +692,7 @@ function createMediaBox() {
                 if (!_cachedPangoFd) {
                     _cachedPangoFd = new Pango.FontDescription();
                     _cachedPangoFd.set_family('monospace');
-                    _cachedPangoFd.set_absolute_size(108 * Pango.SCALE);
+                    _cachedPangoFd.set_absolute_size(128 * Pango.SCALE);
                 }
                 // Create layout once; re-bind to current cr context each frame
                 // PangoCairo.update_layout() is far cheaper than create_layout()
@@ -703,13 +703,15 @@ function createMediaBox() {
                 } else {
                     PangoCairo.update_layout(cr, _cachedPangoLayout);
                 }
-                const [pw2, ph2] = _cachedPangoLayout.get_pixel_size();
-                cr.save();
-                const _pri = _bgColors ? _bgColors.pri : { r: 1, g: 1, b: 1 };
-                cr.setSourceRGBA(_pri.r, _pri.g, _pri.b, 0.75);
-                cr.moveTo(cx - pw2 / 2, cy - ph2 / 2);
-                PangoCairo.show_layout(cr, _cachedPangoLayout);
-                cr.restore();
+                // Get actual glyph dimensions for proper centering
+        	const [pw2, ph2] = _cachedPangoLayout.get_pixel_size();
+        	cr.save();
+        	const _pri = _bgColors ? _bgColors.pri : { r: 1, g: 1, b: 1 };
+        	cr.setSourceRGBA(_pri.r, _pri.g, _pri.b, 0.75);
+        	// Center based on actual glyph size, not container size
+        	cr.moveTo(cx - pw2 / 2, cy - ph2 / 2);
+        	PangoCairo.show_layout(cr, _cachedPangoLayout);
+        	cr.restore();
             } catch (e) { }
         }
     });
