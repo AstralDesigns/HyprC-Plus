@@ -273,11 +273,11 @@ function createMediaBox() {
 
         /* ── Source selector sidebar (left strip) ─────────────────── */
         .media-sources-bar {
-            padding: 6px 2px;
+            padding: 2px 2px;
             border-radius: 16px;
             background-color: rgba(0,0,0,0.18);
             margin-right: 2px;
-            margin-left: 2px;
+            margin-left: 1px;
         }
         .media-source-btn {
             min-width: 22px;
@@ -678,12 +678,13 @@ function createMediaBox() {
         }
         if (thumb.pixbuf && !thumb.isPlaceholder) {
             cr.save();
+            const _bg = _bgColors ? _bgColors.bg : { r: 1, g: 1, b: 1 };
             const _pri = _bgColors ? _bgColors.pri : { r: 1, g: 1, b: 1 };
             cr.arc(cx, cy, 5, 0, 2 * Math.PI);
-            cr.setSourceRGBA(_pri.r, _pri.g, _pri.b, 0.85);
+            cr.setSourceRGBA(_bg.r, _bg.g, _bg.b, 0.85);
             cr.fill();
             cr.arc(cx, cy, 2.5, 0, 2 * Math.PI);
-            cr.setSourceRGBA(0.08, 0.06, 0.12, 0.9);
+            cr.setSourceRGBA(_pri.r, _pri.g, _pri.b, 0.85);
             cr.fill();
             cr.restore();
         }
