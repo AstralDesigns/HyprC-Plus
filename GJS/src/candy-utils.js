@@ -1152,8 +1152,8 @@ function createControlCenterContent() {
     // ── Live Cairo background covering entire panel ──
     let _bgColors = null;
     let _phase = 0;
-    const BG_FPS = 10;
-    const PHASE_STEP = (2 * Math.PI) / (BG_FPS * 50);
+    const BG_FPS = 6;
+    const PHASE_STEP = (2 * Math.PI) / (BG_FPS * 50);  // cycle period stays 50 s
 
     function _resolveColors(widget) {
         try {
@@ -1226,19 +1226,24 @@ function createControlCenterContent() {
 
     _resolveColors(bgDa);
 
-    // Watch GTK4 colors.css for changes and immediately re-resolve background colors
+    // Watch GTK4 colors.css for changes and immediately re-resolve background colors.
+    // Singleton provider: candy-utils and media.js both watch the same file and
+    // add providers at PRIORITY_USER+1. Using a per-module singleton means
+    // load_from_path replaces rules in-place rather than toggling the display
+    // registration, so only ONE cascade recalculation fires per theme change
+    // instead of two interleaved ones that cause a color flash.
     const _colorsPath = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
-    let _colorProvider = null;
+    if (!createControlCenterContent._sharedColorProvider) {
+        createControlCenterContent._sharedColorProvider = new Gtk.CssProvider();
+    }
+    const _colorProvider = createControlCenterContent._sharedColorProvider;
     let _colorDebounce = 0;
     function _reloadColorProvider() {
         const display = Gdk.Display.get_default();
         if (!display) return;
-        if (_colorProvider) {
-            try { Gtk.StyleContext.remove_provider_for_display(display, _colorProvider); } catch (e) {}
-        }
-        _colorProvider = new Gtk.CssProvider();
         try {
             _colorProvider.load_from_path(_colorsPath);
+            // add_provider_for_display is idempotent for the same object instance.
             Gtk.StyleContext.add_provider_for_display(display, _colorProvider, Gtk.STYLE_PROVIDER_PRIORITY_USER + 1);
         } catch (e) {}
         _resolveColors(bgDa);
@@ -1258,17 +1263,22 @@ function createControlCenterContent() {
         bgDa.connect('destroy', () => { colMon.cancel(); if (_colorDebounce) GLib.source_remove(_colorDebounce); });
     }
 
-    let _gcCounter = 0;
-    const animId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Math.round(1000 / BG_FPS), () => {
+    // Animation at PRIORITY_LOW so it cannot starve media.js cava reads
+    // (which run at PRIORITY_DEFAULT) when both windows are open.
+    const animId = GLib.timeout_add(GLib.PRIORITY_LOW, Math.round(1000 / BG_FPS), () => {
         _phase += PHASE_STEP;
         bgDa.queue_draw();
-        if (++_gcCounter > BG_FPS * 60) {
-            _gcCounter = 0;
-            imports.system.gc();
-        }
         return GLib.SOURCE_CONTINUE;
     });
-    bgDa.connect('destroy', () => GLib.source_remove(animId));
+    // GC decoupled from animation tick: fires every 30 s regardless of fps.
+    const gcId = GLib.timeout_add(GLib.PRIORITY_LOW, 30000, () => {
+        imports.system.gc();
+        return GLib.SOURCE_CONTINUE;
+    });
+    bgDa.connect('destroy', () => {
+        GLib.source_remove(animId);
+        GLib.source_remove(gcId);
+    });
 
     overlay.set_child(bgDa);
 

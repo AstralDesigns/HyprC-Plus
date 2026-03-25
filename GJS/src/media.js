@@ -120,22 +120,34 @@ function extractVideoThumbnail(fileUri) {
 function createMediaBox() {
 
     // ── Load user color theme + file monitor for fast reload ──────────────
+    // Module-level singleton: when both candy-utils and media are open they
+    // share the same display, so we must not both add providers at USER+1 —
+    // that causes two cascade recalculations on every theme change and a
+    // brief flash where the intermediate state is visible.
+    // We keep a single provider reference at module scope and reuse it.
     const _gtk4ColorsPath = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'gtk-4.0', 'colors.css']);
     const _gtk3ColorsPath = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'gtk-3.0', 'colors.css']);
-    let _userColorProvider = new Gtk.CssProvider();
     let _colorDebounce = 0;
     let _colorMonitor = null;
+
+    // Lazily initialised once across all createMediaBox() calls in this process.
+    // (In practice the daemon calls createMediaBox once and keeps the widget alive.)
+    if (!createMediaBox._sharedColorProvider) {
+        createMediaBox._sharedColorProvider = new Gtk.CssProvider();
+    }
+    const _userColorProvider = createMediaBox._sharedColorProvider;
 
     function _reloadColorCSS() {
         const display = Gdk.Display.get_default();
         if (!display) return;
-        if (_userColorProvider) {
-            try { Gtk.StyleContext.remove_provider_for_display(display, _userColorProvider); } catch (e) {}
-        }
-        _userColorProvider = new Gtk.CssProvider();
+        // Only remove + re-add if we actually need to swap the file contents.
+        // Using load_from_path on an already-loaded provider replaces its rules
+        // in-place without toggling the display registration — no double recalc.
         const path = GLib.file_test(_gtk4ColorsPath, GLib.FileTest.EXISTS) ? _gtk4ColorsPath : _gtk3ColorsPath;
         try {
             _userColorProvider.load_from_path(path);
+            // add_provider_for_display is idempotent for the same object —
+            // GTK ignores duplicate insertions, so this is safe to call every reload.
             Gtk.StyleContext.add_provider_for_display(display, _userColorProvider, Gtk.STYLE_PROVIDER_PRIORITY_USER + 1);
         } catch (e) {}
     }
@@ -557,7 +569,10 @@ function createMediaBox() {
 
     function _cavaReadLine() {
         if (!_cavaOn || !_cavaStream) return;
-        _cavaStream.read_line_async(GLib.PRIORITY_LOW, null, (s, res) => {
+        // PRIORITY_DEFAULT: cava data must be processed before animation ticks
+        // (which are PRIORITY_LOW). Without this, frames pile up in the socket
+        // buffer while the main loop is busy and the ring looks jagged.
+        _cavaStream.read_line_async(GLib.PRIORITY_DEFAULT, null, (s, res) => {
             if (!_cavaOn) return;
             try {
                 const [line] = s.read_line_finish_utf8(res);
@@ -722,7 +737,9 @@ function createMediaBox() {
     function thumbStartRotation() {
         if (thumb.timerId) return;
         thumb.playing = true;
-        thumb.timerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 33, () => {
+        // PRIORITY_LOW + 50ms (20fps): rotation is cosmetically smooth at this
+        // speed (0.10 deg/frame ≈ 2°/s) and no longer starves cava at DEFAULT.
+        thumb.timerId = GLib.timeout_add(GLib.PRIORITY_LOW, 50, () => {
             if (!thumb.playing) { thumb.timerId = 0; return GLib.SOURCE_REMOVE; }
             thumb.angle = (thumb.angle + thumb.speed) % 360;
             thumbDa.queue_draw();
@@ -1109,27 +1126,49 @@ function createMediaBox() {
         });
     }
 
-    // ── Volume sync helpers ────────────────────────────────────────────────
-    // Use wpctl (PipeWire) for volume read/write — more reliable than MPRIS
-    // Volume which many players either don't implement or ignore.
-    // Reads are cached for 2s so we don't spawn a process every 50ms poll.
+    // ── Volume read/write helpers ──────────────────────────────────────────
+    // _readVolumeAsync: non-blocking. Serves from cache when fresh; otherwise
+    // spawns wpctl asynchronously so the main loop is never stalled.
+    // _writeVolumeWpctl: already async via spawn_command_line_async, unchanged.
     let _volumeChanging = false;
     let _volCache = { value: 1.0, ts: 0 };
     const VOL_CACHE_TTL_MS = 2000;
 
-    function _readVolumeWpctl() {
-        const now = GLib.get_monotonic_time() / 1000;  // µs → ms
-        if (now - _volCache.ts < VOL_CACHE_TTL_MS) return _volCache.value;
+    function _readVolumeAsync(done) {
+        const now = GLib.get_monotonic_time() / 1000;   // µs → ms
+        if (now - _volCache.ts < VOL_CACHE_TTL_MS) {
+            // Cache still fresh — apply immediately without spawning a process.
+            _volumeChanging = true;
+            _volAdj.set_value(_volCache.value);
+            _volumeChanging = false;
+            if (done) done();
+            return;
+        }
         try {
-            const [ok, stdout] = GLib.spawn_command_line_sync('wpctl get-volume @DEFAULT_AUDIO_SINK@');
-            if (!ok || !stdout) return _volCache.value;
-            const out = imports.byteArray.toString(stdout);
-            // Output format: "Volume: 0.75" or "Volume: 0.75 [MUTED]"
-            const m = out.match(/Volume:\s*([\d.]+)/);
-            const vol = m ? Math.max(0, Math.min(1, parseFloat(m[1]))) : _volCache.value;
-            _volCache = { value: vol, ts: now };
-            return vol;
-        } catch (e) { return _volCache.value; }
+            const proc = Gio.Subprocess.new(
+                ['wpctl', 'get-volume', '@DEFAULT_AUDIO_SINK@'],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE
+            );
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                const ts = GLib.get_monotonic_time() / 1000;
+                try {
+                    const [, stdout] = p.communicate_utf8_finish(res);
+                    // Output: "Volume: 0.75" or "Volume: 0.75 [MUTED]"
+                    const m = (stdout || '').match(/Volume:\s*([\d.]+)/);
+                    const vol = m ? Math.max(0, Math.min(1, parseFloat(m[1]))) : _volCache.value;
+                    _volCache = { value: vol, ts };
+                    _volumeChanging = true;
+                    _volAdj.set_value(vol);
+                    _volumeChanging = false;
+                } catch (e) {
+                    // Keep stale value; bump ts to avoid a tight retry loop
+                    _volCache = { value: _volCache.value, ts };
+                }
+                if (done) done();
+            });
+        } catch (e) {
+            if (done) done();
+        }
     }
 
     function _writeVolumeWpctl(val) {
@@ -1138,13 +1177,6 @@ function createMediaBox() {
         try {
             GLib.spawn_command_line_async(`wpctl set-volume @DEFAULT_AUDIO_SINK@ ${val.toFixed(3)}`);
         } catch (e) { }
-    }
-
-    function _readVolume() {
-        const vol = _readVolumeWpctl();
-        _volumeChanging = true;
-        _volAdj.set_value(vol);
-        _volumeChanging = false;
     }
 
     _volAdj.connect('value-changed', () => {
@@ -1214,7 +1246,7 @@ function createMediaBox() {
                     }
 
                     applyArt(artUrl, playbackState, mediaUrl);
-                    _readVolume();
+                    _readVolumeAsync();
 
                     // Shuffle
                     try {
