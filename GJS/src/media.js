@@ -677,8 +677,9 @@ function createMediaBox() {
         }
         if (thumb.pixbuf && !thumb.isPlaceholder) {
             cr.save();
+            const _pri = _bgColors ? _bgColors.pri : { r: 1, g: 1, b: 1 };
             cr.arc(cx, cy, 5, 0, 2 * Math.PI);
-            cr.setSourceRGBA(1, 1, 1, 0.55);
+            cr.setSourceRGBA(_pri.r, _pri.g, _pri.b, 0.85);
             cr.fill();
             cr.arc(cx, cy, 2.5, 0, 2 * Math.PI);
             cr.setSourceRGBA(0.08, 0.06, 0.12, 0.9);
