@@ -5,6 +5,7 @@ QT6CT_CONF="$HOME/.config/qt6ct/qt6ct.conf"
 QT5CT_CONF="$HOME/.config/qt5ct/qt5ct.conf"
 KDEGLOBALS="$HOME/.config/kdeglobals"
 UC_COLORS="$HOME/.local/share/color-schemes/HyprCandy.colors"
+ROFI_MENU="$HOME/.config/rofi/config.rasi"
 
 ICON_THEME=$(grep "^gtk-icon-theme-name=" "$GTK_FILE" | cut -d'=' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
@@ -35,9 +36,12 @@ for FILE in "$KDEGLOBALS" "$UC_COLORS"; do
     echo "✅ $(basename $FILE) icon theme → $ICON_THEME"
 done
 
-killall qs -c overview
-sleep 1
-qs -c overview &
+if [ -f "$ROFI_MENU" ]; then
+    sed -i "16s|^.*|    icon-theme:                 \"$ICON_THEME\";|" "$ROFI_MENU"
+    echo "✅ $(basename $ROFI_MENU) icon theme → $ICON_THEME"
+fi
+
+killall -9 qs c- overview
 
 dbus-send --session --type=signal /kdeglobals \
     org.kde.kconfig.notify.ConfigChanged \

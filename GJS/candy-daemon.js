@@ -202,7 +202,7 @@ function toggleSystem() {
     if (!widgets.system) {
         widgets.system = new Gtk.ApplicationWindow({
             application: app,
-            default_width: 480, default_height: 420,
+            default_width: 450, default_height: 420,
             resizable: false, decorated: true,
             title: 'candy.systemmonitor',
         });
