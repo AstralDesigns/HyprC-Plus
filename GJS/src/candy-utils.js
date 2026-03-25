@@ -1078,6 +1078,14 @@ function injectCSS() {
             font-size: 14px; font-weight: 700; color: @primary;
             letter-spacing: 0.5px;
         }
+        .media-volume-bar slider {
+            min-width: 14px;
+            min-height: 14px;
+            border: 1px solid @primary;
+            border-radius: 4px;
+            background-color: @inverse_primary;
+            box-shadow: none;
+        }
 
         .cc-label { font-size: 12px; color: @primary; }
 

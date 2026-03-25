@@ -321,8 +321,9 @@ function createMediaBox() {
         }
         .media-volume-bar trough {
             min-width: 4px;
+            border: none;
             border-radius: 4px;
-            background-color: rgba(255,255,255,0.15);
+            background-color: background-color: rgba(0,0,0,0.18);
         }
         .media-volume-bar highlight {
             min-width: 4px;
@@ -333,13 +334,13 @@ function createMediaBox() {
         .media-volume-bar slider {
             min-width: 14px;
             min-height: 14px;
-            border-radius: 999px;
-            background-color: @primary;
-            border: none;
-            box-shadow: 0 0 6px @primary;
+            border: 1px solid @primary;
+            border-radius: 4px;
+            background-color: @inverse_primary;
+            box-shadow: none;
         }
         .media-volume-bar slider:hover {
-            box-shadow: 0 0 10px @primary, 0 0 0 2px rgba(255,255,255,0.2);
+            box-shadow: 0 0 2px @primary, 0 0 0 2px rgba(255,255,255,0.2);
         }
     `, -1);
     Gtk.StyleContext.add_provider_for_display(
