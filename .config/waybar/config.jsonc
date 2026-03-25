@@ -125,7 +125,7 @@
   // ──────────────────────────────────────────────────────────────┤ cava ├───
 
   "custom/cava-left": {
-    "exec": "python3 ~/.config/waybar/scripts/cava.py waybar --json --left --transparent-when-inactive",
+    "exec": "python3 ~/.config/waybar/scripts/cava.py waybar --json --left --width 10 --bar '⣀⣄⣤⣦⣶⣷⣿' --transparent-when-inactive",
     "return-type": "json",
     "format": "{}",
     "restart-interval": 0,
@@ -137,7 +137,7 @@
   // ──────────────────────────────────────────────────────────────┤ cava ├───
 
   "custom/cava-right": {
-    "exec": "python3 ~/.config/waybar/scripts/cava.py waybar --json --right --transparent-when-inactive",
+    "exec": "python3 ~/.config/waybar/scripts/cava.py waybar --json --right --width 10 --bar '⣀⣄⣤⣦⣶⣷⣿' --transparent-when-inactive",
     "return-type": "json",
     "format": "{}",
     "restart-interval": 0,
@@ -232,8 +232,8 @@
     "signal": 9,
     "tooltip": true,
     "on-click": "~/.hyprcandy/GJS/toggle-control-center.sh",
-    "min-length": 1,
-    "max-length": 1
+    "min-length": 0,
+    "max-length": 0
     //"on-click-right": "~/.hyprcandy/GJS/toggle-hyprland-settings.sh",
   },
 

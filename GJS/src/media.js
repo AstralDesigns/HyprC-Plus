@@ -152,6 +152,12 @@ function createMediaBox() {
                 _reloadColorCSS();
                 _resolveBgColors(bgDrawingArea);
                 bgDrawingArea.queue_draw();
+                cavaRingDa.queue_draw();
+                // Reconnect cava ring if manager restarted during theme change
+                _startCava();
+                // Toggle CSS class to force sub-node re-resolve on volume slider
+                volumeScale.remove_css_class('media-volume-bar');
+                volumeScale.add_css_class('media-volume-bar');
                 return GLib.SOURCE_REMOVE;
             });
         });
@@ -499,6 +505,127 @@ function createMediaBox() {
         isPlaceholder: true,
     };
 
+    // ── Cava ring (slim radial bars outside the disc) ──────────────────────
+    const CAVA_SCRIPT    = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'waybar', 'scripts', 'cava.py']);
+    const CAVA_SOCK      = GLib.build_filenamev([GLib.get_user_runtime_dir(), 'hyprcandy', 'cava.sock']);
+    const CAVA_RANGE     = 15;    // must match manager --range
+    const CAVA_N_MAX     = 64;    // buffer ceiling; actual count comes from socket
+    const CAVA_GAP       = 4;     // px between disc edge and bar base
+    const CAVA_BAR_MAX   = 27;    // max bar length outward at full amplitude (×1.5)
+    const CAVA_BAR_W     = 1.5;   // stroke width — slim
+    // Ring canvas sized to fully contain bars within its own allocation.
+    // No clip_children override needed — bars never exceed this boundary.
+    const CAVA_RING_SIZE = THUMB_SIZE + 2 * (CAVA_GAP + CAVA_BAR_MAX + 2);
+
+    const _cavaBars  = new Float32Array(CAVA_N_MAX);
+    let   _cavaN     = 32;
+    let   _cavaOn    = false;
+    let   _cavaConn  = null;
+    let   _cavaStream= null;
+
+    const cavaRingDa = new Gtk.DrawingArea();
+    cavaRingDa.set_size_request(CAVA_RING_SIZE, CAVA_RING_SIZE);
+    cavaRingDa.set_content_width(CAVA_RING_SIZE);
+    cavaRingDa.set_content_height(CAVA_RING_SIZE);
+    cavaRingDa.set_valign(Gtk.Align.CENTER);
+    cavaRingDa.set_halign(Gtk.Align.CENTER);
+    cavaRingDa.set_can_target(false);
+
+    cavaRingDa.set_draw_func((_w, cr, w, h) => {
+        if (!_cavaOn) return;
+        const cx = w / 2, cy = h / 2;
+        const rInner = THUMB_SIZE / 2 + CAVA_GAP;
+        const _cp = _bgColors ? _bgColors.pri : { r: 0.6, g: 0.85, b: 1.0 };
+        const N  = _cavaN;
+        const dA = (2 * Math.PI) / N;
+        const s0 = -Math.PI / 2;
+        cr.setLineWidth(CAVA_BAR_W);
+        cr.setLineCap(1);
+        for (let i = 0; i < N; i++) {
+            const amp = _cavaBars[i];
+            if (amp < 0.01) continue;
+            const a = s0 + (i + 0.5) * dA;
+            const len = amp * CAVA_BAR_MAX;
+            const cos = Math.cos(a), sin = Math.sin(a);
+            cr.setSourceRGBA(_cp.r, _cp.g, _cp.b, 0.20 + amp * 0.80);
+            cr.moveTo(cx + rInner * cos,         cy + rInner * sin);
+            cr.lineTo(cx + (rInner + len) * cos, cy + (rInner + len) * sin);
+            cr.stroke();
+        }
+    });
+
+    function _cavaReadLine() {
+        if (!_cavaOn || !_cavaStream) return;
+        _cavaStream.read_line_async(GLib.PRIORITY_LOW, null, (s, res) => {
+            if (!_cavaOn) return;
+            try {
+                const [line] = s.read_line_finish_utf8(res);
+                if (line === null) {
+                    // EOF — manager shut down (e.g. waybar restarted during theme change).
+                    // Clear state and schedule a reconnect attempt.
+                    _cavaOn = false; _cavaConn = null; _cavaStream = null;
+                    GLib.timeout_add(GLib.PRIORITY_LOW, 3000, () => { _startCava(); return GLib.SOURCE_REMOVE; });
+                    return;
+                }
+                const parts = line.trim().split(';').filter(v => /^\d+$/.test(v));
+                if (parts.length > 1) {
+                    _cavaN = Math.min(parts.length, CAVA_N_MAX);
+                    for (let i = 0; i < _cavaN; i++) {
+                        const raw = Math.min(parseInt(parts[i]), CAVA_RANGE) / CAVA_RANGE;
+                        _cavaBars[i] = raw > _cavaBars[i]
+                            ? _cavaBars[i] * 0.25 + raw * 0.75
+                            : _cavaBars[i] * 0.55 + raw * 0.45;
+                    }
+                    cavaRingDa.queue_draw();
+                }
+                _cavaReadLine();
+            } catch (e) {
+                // Connection error — same reconnect path as EOF.
+                _cavaOn = false; _cavaConn = null; _cavaStream = null;
+                GLib.timeout_add(GLib.PRIORITY_LOW, 3000, () => { _startCava(); return GLib.SOURCE_REMOVE; });
+            }
+        });
+    }
+
+    function _cavaConnect() {
+        if (_cavaOn) return;
+        if (!GLib.file_test(CAVA_SOCK, GLib.FileTest.EXISTS)) return;
+        try {
+            const client = new Gio.SocketClient();
+            client.connect_async(Gio.UnixSocketAddress.new(CAVA_SOCK), null, (sc, res) => {
+                try {
+                    _cavaConn    = sc.connect_finish(res);
+                    _cavaStream  = new Gio.DataInputStream({ base_stream: _cavaConn.get_input_stream() });
+                    _cavaOn      = true;
+                    _cavaReadLine();
+                } catch (e) { _cavaConn = null; _cavaStream = null; }
+            });
+        } catch (e) {}
+    }
+
+    function _startCava() {
+        if (_cavaOn) return;
+        if (GLib.file_test(CAVA_SOCK, GLib.FileTest.EXISTS)) {
+            _cavaConnect();
+        } else {
+            if (GLib.file_test(CAVA_SCRIPT, GLib.FileTest.EXISTS) && GLib.find_program_in_path('python3')) {
+                try {
+                    Gio.Subprocess.new(['python3', CAVA_SCRIPT, 'manager'],
+                        Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
+                } catch (e) {}
+            }
+            GLib.timeout_add(GLib.PRIORITY_LOW, 2500, () => { _cavaConnect(); return GLib.SOURCE_REMOVE; });
+        }
+    }
+
+    function _stopCava() {
+        _cavaOn = false;
+        if (_cavaConn) { try { _cavaConn.close(null); } catch (e) {} _cavaConn = null; }
+        _cavaStream = null;
+        _cavaBars.fill(0);
+        cavaRingDa.queue_draw();
+    }
+
     let _cachedPangoLayout = null;
     let _cachedPangoFd = null;
     let _cachedGlossGradient = null;
@@ -666,7 +793,15 @@ function createMediaBox() {
     });
     mediaInfoContainer.add_css_class('media-info-container');
     mediaInfoContainer.append(leftColumn);
-    mediaInfoContainer.append(thumbDa);
+    // cavaRingDa is the base child (sets the container footprint to CAVA_RING_SIZE).
+    // thumbDa is centered on top as an overlay. No set_clip_children needed —
+    // bars are drawn within cavaRingDa's own allocation.
+    const thumbOverlay = new Gtk.Overlay();
+    thumbOverlay.set_valign(Gtk.Align.CENTER);
+    thumbOverlay.set_halign(Gtk.Align.CENTER);
+    thumbOverlay.set_child(cavaRingDa);
+    thumbOverlay.add_overlay(thumbDa);
+    mediaInfoContainer.append(thumbOverlay);
 
     const infoBox = new Gtk.Box({
         orientation: Gtk.Orientation.VERTICAL, spacing: 4,
@@ -1355,6 +1490,7 @@ function createMediaBox() {
 
     function _startTimers() {
         _resolveBgColors(mediaPlayerBox);
+        _startCava();
 
         // Bg animation — starts at idle speed, _doPositionPoll will switch it
         if (_bgTimerId === 0) _restartBgTimer(BG_MS_IDLE);
@@ -1386,6 +1522,7 @@ function createMediaBox() {
         if (_posPollTimer) { GLib.source_remove(_posPollTimer); _posPollTimer = 0; }
         if (_metaPollTimer){ GLib.source_remove(_metaPollTimer);_metaPollTimer= 0; }
         _stopGcTimer();
+        _stopCava();
         thumbStopRotation();
     }
 
@@ -1398,6 +1535,7 @@ function createMediaBox() {
         _cachedPangoFd = null;
         _cachedPangoLayout = null;
         thumb.pixbuf = null;
+        _stopCava();
     }
 
     mediaPlayerBox.connect('map',     () => _startTimers());

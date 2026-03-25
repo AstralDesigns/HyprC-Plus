@@ -408,7 +408,7 @@ function createWaybarPanel() {
             [rofi1, rofi2, rofi3].forEach(f => GLib.spawn_command_line_async(`sed -i 's/location:                 south;/location:                 north;/' '${f}'`));
             posBtn.set_label('Pos: 󰅃'); posBtn.remove_css_class('cc-active');
         }
-        GLib.spawn_command_line_async('killall -SIGUSR2 waybar && killall swaync');
+        GLib.spawn_command_line_async('systemctl --user restart waybar.service && killall swaync');
         saveState('waybar-position.txt', bottom ? 'bottom' : 'top');
     });
 
