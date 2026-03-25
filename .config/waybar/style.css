@@ -23,7 +23,7 @@ window#waybar {
 */
 window#waybar > box {
   background: @blur_background;
-  margin-top: 4.5px;
+  margin-top: 0.0px;
   margin-left: 12.0px;
   margin-right: 12.0px;
   margin-bottom: 0.0px;
@@ -136,7 +136,7 @@ tooltip label {
   color: transparent;
   background: transparent;
   border-radius: 30px;
-  margin-left: 0px;
+  margin-right: 0px;
   padding-left: 8px;
   padding-right: 8px;
   font-weight: normal;
@@ -183,7 +183,7 @@ tooltip label {
 #custom-distro {
   font-size: 14px;
   color: @primary;
-  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  /*background: linear-gradient(180deg, @inverse_primary, @scrim);*/
   border-radius: 30px;
   padding-left: 5.5px;
   padding-right: 8.5px;
@@ -193,7 +193,7 @@ tooltip label {
 
 #custom-distro:hover {
   color: @primary;
-  background: linear-gradient(0deg, @inverse_primary, @scrim)
+  /*background: linear-gradient(0deg, @inverse_primary, @scrim)*/
 }
 
 /* ─────────────────────────────────────────────────────────────────┤ time ├───
@@ -361,7 +361,7 @@ tooltip label {
 /* ────────────────────────────────────────────────────────────┤ window ├───
 */
 #window {
-  border-radius: 20px;
+  border-radius: 30px;
   margin-right: 6px;
   margin-left: 0px;
 }
