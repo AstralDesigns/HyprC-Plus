@@ -31,12 +31,12 @@
     "battery",
     "custom/power"
   ],
+  
   // ────────────────────────────────────────────────────────┤ toggles group ├───
   "group/toggles": {
       "orientation": "horizontal",
       "modules": [
           "custom/update",
-          "custom/wifi",
           "power-profiles-daemon",
           "idle_inhibitor",
           //"custom/system-monitor",
@@ -479,11 +479,11 @@
   "custom/power": {
     "format": "{icon}",
     "format-icons": {
-      "default": "",
+      "default": "",
     },
     "tooltip": true,
-    "tooltip-format": "Left-click: rofi-logout\nRight-click: wlogout",
-    "on-click": "~/.config/waybar/scripts/power-menu.sh",
+    "tooltip-format": "Left-click: start-menu\nRight-click: wlogout",
+    "on-click": "~/.config/hyprcandy/scripts/startmenu.sh",
     "on-click-right": "~/.config/waybar/scripts/wlogout.sh"
   },
 }

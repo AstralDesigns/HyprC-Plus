@@ -21,7 +21,7 @@ var DockConfig = {
     // Paste any glyph directly (use rofi glyph menu or any NerdFont codepoint).
     // null = fall back to the GLYPH_START const in dock-main.js.
     // candy-utils sed pattern:  sed -i "s/startIcon: '[^']*'/startIcon: 'GLYPH'/" config.js
-    startIcon: '󰫢',               // @HCD:startIcon
+    startIcon: '',               // @HCD:startIcon
 
     // ── Button spacing (gap between every button in the dock) ─────────────
     // Controls GtkBox spacing — applies uniformly between start↔first-app,

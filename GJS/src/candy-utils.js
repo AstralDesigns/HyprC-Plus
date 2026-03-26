@@ -310,7 +310,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i '8s/@primary_fixed_dim;/@inverse_primary;/g' '${dockFile}'`);
             GLib.spawn_command_line_async(`sed -i '60s/@background;/@buttoncolor;/g; 68s/@bordercolor;/@background;/g' '${swayncFile}'`);
             GLib.spawn_command_line_async(`sed -i 's/@inverse_primary 0%, @slider 100%,/@primary_fixed_dim 0%, @inverse_primary 100%,/g' '${swayncFile}'`);
-            GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @primary_fixed_dim;/g; 103s/color: .*;/color: @primary_fixed_dim;/g; 519s/color: .*;/color: @primary_fixed_dim;/g;' '${waybarFile}'`);
+            GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @primary_fixed_dim;/g;' '${waybarFile}'`);
         } else if (name === 'Dark') {
             GLib.spawn_command_line_async(`sed -i 's/-m light/-m dark/g' '${WALLPAPER_INT}'`);
             GLib.file_set_contents('/tmp/hyprcandy-gtk.sh',
@@ -326,7 +326,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i '8s/@primary_fixed_dim;/@inverse_primary;/g' '${dockFile}'`);
             GLib.spawn_command_line_async(`sed -i '60s/@buttoncolor;/@background;/g; 68s/@background;/@bordercolor;/g' '${swayncFile}'`);
             GLib.spawn_command_line_async(`sed -i 's/@primary_fixed_dim 0%, @inverse_primary 100%,/@inverse_primary 0%, @slider 100%,/g' '${swayncFile}'`);
-            GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @secondary_container;/g; 103s/color: .*;/color: @secondary_container;/g; 519s/color: .*;/color: @secondary_container;/g;' '${waybarFile}'`);
+            GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @secondary_container;/g;' '${waybarFile}'`);
         } else {
             // All other dark-mode schemes share the same sed logic
             GLib.spawn_command_line_async(`sed -i 's/-m light/-m dark/g' '${WALLPAPER_INT}'`);
@@ -342,7 +342,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i '8s/@primary_fixed_dim;/@inverse_primary;/g' '${dockFile}'`);
             GLib.spawn_command_line_async(`sed -i '60s/@buttoncolor;/@background;/g; 68s/@background;/@bordercolor;/g' '${swayncFile}'`);
             GLib.spawn_command_line_async(`sed -i 's/@primary_fixed_dim 0%, @inverse_primary 100%,/@inverse_primary 0%, @slider 100%,/g' '${swayncFile}'`);
-            GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @secondary_container;/g; 103s/color: .*;/color: @secondary_container;/g; 519s/color: .*;/color: @secondary_container;/g;' '${waybarFile}'`);
+            GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @secondary_container;/g;' '${waybarFile}'`);
         }
 
         GLib.spawn_command_line_async("bash -c '$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh'");
@@ -647,11 +647,11 @@ mkRow(panel, 'Border', borderE);
         if (btModuleOn) {
             // Uncomment lines 82-89
             GLib.spawn_async(null, ['sed', '-i', '31s|//"battery"|"battery"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
-            GLib.spawn_async(null, ['sed', '-i', '44s|"custom/system-monitor"|//"custom/system-monitor"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', '42s|"custom/system-monitor"|//"custom/system-monitor"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
         } else {
             // Comment lines 82-89
             GLib.spawn_async(null, ['sed', '-i', '31s|"battery"|//"battery"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
-            GLib.spawn_async(null, ['sed', '-i', '44s|//"custom/system-monitor"|"custom/system-monitor"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', '42s|//"custom/system-monitor"|"custom/system-monitor"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
         }
         GLib.spawn_command_line_async('killall -SIGUSR2 waybar');
         btModeBtn.set_label(btModuleOn ? 'Battery-Module: 󰄬' : 'Battery-Module: x');
