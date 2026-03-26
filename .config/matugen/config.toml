@@ -37,9 +37,13 @@ input_path = '~/.config/matugen/templates/kitty-colors.conf'
 output_path = '~/.config/kitty/colors.conf'
 post_hook = 'pkill -SIGUSR1 kitty'
 
-[templates.quickshell]
+[templates.overview]
 input_path = '~/.config/matugen/templates/Appearance.colors.qml'
-output_path = '~/.config/quickshell/overview/common/Appearance.colors.qml'
+output_path = '~/.cache/quickshell/overview/Appearance.colors.qml'
+
+[templates.wallpaper]
+input_path = '~/.config/matugen/templates/Appearance.colors.qml'
+output_path = '~/.cache/quickshell/wallpaper/MatugenColors.qml'
 
 [templates.rofi]
 input_path = '~/.config/matugen/templates/rofi-colors.rasi'

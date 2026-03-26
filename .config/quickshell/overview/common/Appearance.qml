@@ -3,26 +3,121 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import "functions"
 import "." as Common
 
 Singleton {
     id: root
-    property QtObject m3colors: Common.Config.options.appearance.useMatugenColors && matugenLoader.item 
-                                 ? matugenLoader.item 
+    property QtObject m3colors: Common.Config.options.appearance.useMatugenColors
+                                 ? matugenColors
                                  : defaultColors
+
+    // ── Matugen color strings (updated live by FileView below) ────────────────
+    property string _m3primary:                  "#E5B6F2"
+    property string _m3onPrimary:                "#452152"
+    property string _m3primaryContainer:         "#5D386A"
+    property string _m3onPrimaryContainer:       "#F9D8FF"
+    property string _m3secondary:                "#D5C0D7"
+    property string _m3onSecondary:              "#392C3D"
+    property string _m3secondaryContainer:       "#534457"
+    property string _m3onSecondaryContainer:     "#F2DCF3"
+    property string _m3background:               "#161217"
+    property string _m3onBackground:             "#EAE0E7"
+    property string _m3surface:                  "#161217"
+    property string _m3surfaceContainerLow:      "#1F1A1F"
+    property string _m3surfaceContainer:         "#231E23"
+    property string _m3surfaceContainerHigh:     "#2D282E"
+    property string _m3surfaceContainerHighest:  "#383339"
+    property string _m3onSurface:                "#EAE0E7"
+    property string _m3surfaceVariant:           "#4C444D"
+    property string _m3onSurfaceVariant:         "#CFC3CD"
+    property string _m3inversePrimary:           "#7B3FA0"
+    property string _m3inverseSurface:           "#EAE0E7"
+    property string _m3inverseOnSurface:         "#342F34"
+    property string _m3outline:                  "#988E97"
+    property string _m3outlineVariant:           "#4C444D"
+    property string _m3shadow:                   "#000000"
+
+    function parseColors(text) {
+        const re = /property color (\w+): "(#[0-9a-fA-F]+)"/g
+        let m
+        while ((m = re.exec(text)) !== null) {
+            const key = m[1], val = m[2]
+            switch (key) {
+                case "m3primary":                root._m3primary = val; break
+                case "m3onPrimary":              root._m3onPrimary = val; break
+                case "m3primaryContainer":       root._m3primaryContainer = val; break
+                case "m3onPrimaryContainer":     root._m3onPrimaryContainer = val; break
+                case "m3secondary":              root._m3secondary = val; break
+                case "m3onSecondary":            root._m3onSecondary = val; break
+                case "m3secondaryContainer":     root._m3secondaryContainer = val; break
+                case "m3onSecondaryContainer":   root._m3onSecondaryContainer = val; break
+                case "m3background":             root._m3background = val; break
+                case "m3onBackground":           root._m3onBackground = val; break
+                case "m3surface":                root._m3surface = val; break
+                case "m3surfaceContainerLow":    root._m3surfaceContainerLow = val; break
+                case "m3surfaceContainer":       root._m3surfaceContainer = val; break
+                case "m3surfaceContainerHigh":   root._m3surfaceContainerHigh = val; break
+                case "m3surfaceContainerHighest":root._m3surfaceContainerHighest = val; break
+                case "m3onSurface":              root._m3onSurface = val; break
+                case "m3surfaceVariant":         root._m3surfaceVariant = val; break
+                case "m3onSurfaceVariant":       root._m3onSurfaceVariant = val; break
+                case "m3inversePrimary":         root._m3inversePrimary = val; break
+                case "m3inverseSurface":         root._m3inverseSurface = val; break
+                case "m3inverseOnSurface":       root._m3inverseOnSurface = val; break
+                case "m3outline":                root._m3outline = val; break
+                case "m3outlineVariant":         root._m3outlineVariant = val; break
+                case "m3shadow":                 root._m3shadow = val; break
+            }
+        }
+    }
+
+    FileView {
+        path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) +
+              "/quickshell/overview/Appearance.colors.qml"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseColors(text())
+    }
+
+    property QtObject matugenColors: QtObject {
+        property bool darkmode: true
+        property color m3primary:                Qt.color(root._m3primary)
+        property color m3onPrimary:              Qt.color(root._m3onPrimary)
+        property color m3primaryContainer:       Qt.color(root._m3primaryContainer)
+        property color m3onPrimaryContainer:     Qt.color(root._m3onPrimaryContainer)
+        property color m3secondary:              Qt.color(root._m3secondary)
+        property color m3onSecondary:            Qt.color(root._m3onSecondary)
+        property color m3onSecondaryTransparent: Qt.rgba(
+            Qt.color(root._m3onSecondary).r,
+            Qt.color(root._m3onSecondary).g,
+            Qt.color(root._m3onSecondary).b, 0.4)
+        property color m3secondaryContainer:     Qt.color(root._m3secondaryContainer)
+        property color m3onSecondaryContainer:   Qt.color(root._m3onSecondaryContainer)
+        property color m3background:             Qt.color(root._m3background)
+        property color m3onBackground:           Qt.color(root._m3onBackground)
+        property color m3surface:                Qt.color(root._m3surface)
+        property color m3surfaceContainerLow:    Qt.color(root._m3surfaceContainerLow)
+        property color m3surfaceContainer:       Qt.color(root._m3surfaceContainer)
+        property color m3surfaceContainerHigh:   Qt.color(root._m3surfaceContainerHigh)
+        property color m3surfaceContainerHighest:Qt.color(root._m3surfaceContainerHighest)
+        property color m3onSurface:              Qt.color(root._m3onSurface)
+        property color m3surfaceVariant:         Qt.color(root._m3surfaceVariant)
+        property color m3onSurfaceVariant:       Qt.color(root._m3onSurfaceVariant)
+        property color m3inversePrimary:         Qt.color(root._m3inversePrimary)
+        property color m3inverseSurface:         Qt.color(root._m3inverseSurface)
+        property color m3inverseOnSurface:       Qt.color(root._m3inverseOnSurface)
+        property color m3outline:                Qt.color(root._m3outline)
+        property color m3outlineVariant:         Qt.color(root._m3outlineVariant)
+        property color m3shadow:                 Qt.color(root._m3shadow)
+    }
     property QtObject animation
     property QtObject animationCurves
     property QtObject colors
     property QtObject rounding
     property QtObject font
     property QtObject sizes
-
-    Loader {
-        id: matugenLoader
-        active: Common.Config.options.appearance.useMatugenColors
-        source: "Appearance.colors.qml"
-    }
 
     property QtObject defaultColors: QtObject {
         property bool darkmode: true

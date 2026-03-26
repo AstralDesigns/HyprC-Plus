@@ -27,7 +27,7 @@ const SWAYNC_CONF   = GLib.build_filenamev([HOME, '.config', 'swaync', 'config.j
 const ROFI_BORDER   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'settings', 'rofi-border.rasi']);
 const ROFI_RADIUS   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'settings', 'rofi-border-radius.rasi']);
 const ROFI_CONF     = GLib.build_filenamev([HOME, '.config', 'rofi', 'config.rasi']);
-const WAYPAPER_INT  = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hooks', 'waypaper_integration.sh']);
+const WALLPAPER_INT  = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hooks', 'wallpaper_integration.sh']);
 const DOCK_CONFIG   = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'config.js']);
 const DOCK_CYCLE    = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'cycle.sh']);
 const SDDM_THEME    = '/usr/share/sddm/themes/sugar-candy/theme.conf';
@@ -295,10 +295,10 @@ function createThemesPanel() {
 
     function apply(name) {
         const scheme = schemeMap[name]; if (!scheme) return;
-        GLib.spawn_command_line_async(`sed -i 's/--type scheme-[^ ]*/--type ${scheme}/' '${WAYPAPER_INT}'`);
+        GLib.spawn_command_line_async(`sed -i 's/--type scheme-[^ ]*/--type ${scheme}/' '${WALLPAPER_INT}'`);
 
         if (name === 'Light') {
-            GLib.spawn_command_line_async(`sed -i 's/-m dark/-m light/g' '${WAYPAPER_INT}'`);
+            GLib.spawn_command_line_async(`sed -i 's/-m dark/-m light/g' '${WALLPAPER_INT}'`);
             GLib.file_set_contents('/tmp/hyprcandy-gtk.sh',
                 `#!/bin/sh\nsed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @primary_fixed_dim;/' '${gtk3File}'\n` +
                 `sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @inverse_primary;/' '${gtk3File}'\n` +
@@ -312,7 +312,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i 's/@inverse_primary 0%, @slider 100%,/@primary_fixed_dim 0%, @inverse_primary 100%,/g' '${swayncFile}'`);
             GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @primary_fixed_dim;/g; 103s/color: .*;/color: @primary_fixed_dim;/g; 519s/color: .*;/color: @primary_fixed_dim;/g;' '${waybarFile}'`);
         } else if (name === 'Dark') {
-            GLib.spawn_command_line_async(`sed -i 's/-m light/-m dark/g' '${WAYPAPER_INT}'`);
+            GLib.spawn_command_line_async(`sed -i 's/-m light/-m dark/g' '${WALLPAPER_INT}'`);
             GLib.file_set_contents('/tmp/hyprcandy-gtk.sh',
                 `#!/bin/sh\nsed -i 's/@on_secondary/@on_primary_fixed_variant/g' '${gtk3File}'\n` +
                 `sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @on_primary_fixed_variant;/' '${gtk3File}'\n` +
@@ -329,7 +329,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @secondary_container;/g; 103s/color: .*;/color: @secondary_container;/g; 519s/color: .*;/color: @secondary_container;/g;' '${waybarFile}'`);
         } else {
             // All other dark-mode schemes share the same sed logic
-            GLib.spawn_command_line_async(`sed -i 's/-m light/-m dark/g' '${WAYPAPER_INT}'`);
+            GLib.spawn_command_line_async(`sed -i 's/-m light/-m dark/g' '${WALLPAPER_INT}'`);
             GLib.file_set_contents('/tmp/hyprcandy-gtk.sh',
                 `#!/bin/sh\nsed -i 's/@on_primary_fixed_variant/@on_secondary/g' '${gtk3File}'\n` +
                 `sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @on_secondary;/' '${gtk3File}'\n` +
@@ -345,7 +345,7 @@ function createThemesPanel() {
             GLib.spawn_command_line_async(`sed -i '59s/color: .*;/color: @secondary_container;/g; 103s/color: .*;/color: @secondary_container;/g; 519s/color: .*;/color: @secondary_container;/g;' '${waybarFile}'`);
         }
 
-        GLib.spawn_command_line_async("bash -c '$HOME/.config/hyprcandy/hooks/waypaper_integration.sh'");
+        GLib.spawn_command_line_async("bash -c '$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh'");
         saveState('matugen-state', scheme);
         current = scheme;
         btns.forEach((b, i) => {

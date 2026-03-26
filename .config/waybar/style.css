@@ -100,9 +100,9 @@ tooltip label {
 */
 
 #custom-overview {
-  color: @secondary_container;
+  color: @primary;
   background: linear-gradient(180deg, @inverse_primary, @scrim);
-  margin-left: 6px;
+  margin-right: 1px;
   border-radius: 30px;
   padding-left: 6px;
   padding-right: 8px;
@@ -133,7 +133,7 @@ tooltip label {
 */
 
 #custom-cava-left {
-  color: transparent;
+  color: @primary;
   background: transparent;
   border-radius: 30px;
   margin-right: 0px;
@@ -218,7 +218,7 @@ tooltip label {
 */
 
 #custom-cava-right {
-  color: transparent;
+  color: @primary;
   background: transparent;
   border-radius: 30px;
   margin-left: 0px;
@@ -564,10 +564,35 @@ window.popup menuitem {
   background: linear-gradient(0deg, @inverse_primary, @scrim)
 }
 
+/* ──────────────────────────────────────────────────────────┤ wallpaper ├───
+*/
+
+#custom-wallpaper {
+  color: @primary;
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-right: 1px;
+  border-radius: 30px;
+  padding-left: 6px;
+  padding-right: 8px;
+}
+
+#custom-wallpaper:hover {
+  color: @primary;
+  background: linear-gradient(0deg, @inverse_primary, @scrim)
+}
+
 /* ──────────────────────────────────────────┤ toggles island ├───
 */
 #toggles {
   background: linear-gradient(180deg, @inverse_primary, @scrim);
+  border-radius: 30px;
+}
+
+/* ──────────────────────────────────────────┤ switch island ├───
+*/
+#switch {
+  background: linear-gradient(180deg, @inverse_primary, @scrim);
+  margin-left: 6px;
   border-radius: 30px;
 }
 
@@ -610,6 +635,7 @@ tooltip label,
    giving a clockwise/anticlockwise feel as the gradient direction reverses.
 */
 #custom-overview,
+#custom-wallpaper,
 #custom-distro,
 #custom-rofi,
 #custom-weather,

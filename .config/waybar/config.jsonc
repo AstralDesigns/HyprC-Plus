@@ -11,8 +11,7 @@
 
   "modules-left": [
     "hyprland/workspaces",  // workspaces
-    "custom/overview",
-    "custom/weather",
+    "group/switch",
     "group/media"      // ← singular island containing all 5
   ],
 
@@ -27,11 +26,11 @@
   "modules-right": [
     "hyprland/window",
     "tray",
-    "group/toggles",      // ← singular island containing all 5
+    "group/toggles",
+    "custom/weather",
     "battery",
     "custom/power"
   ],
-
   // ────────────────────────────────────────────────────────┤ toggles group ├───
   "group/toggles": {
       "orientation": "horizontal",
@@ -40,7 +39,6 @@
           "custom/wifi",
           "power-profiles-daemon",
           "idle_inhibitor",
-          "custom/rofi",
           //"custom/system-monitor",
           "custom/notification"
       ]
@@ -53,7 +51,15 @@
     	  "mpris"               // media info
       ]
   },
-  
+  // ──────────────────────────────────────────────────────────┤ switch group ├───
+  "group/switch": {
+      "orientation": "horizontal",
+      "modules": [
+          "custom/rofi",
+          "custom/wallpaper",
+          "custom/overview"
+      ]
+  },
   // ─────────────────────────────────────────────────────┤ theme switcher ├───
 
   "custom/theme": {
@@ -118,8 +124,8 @@
 
     "tooltip-format": "Playing: {title} - {artist}\n\nLeft-click: Play/Pause\nRight-click: Next",
     "tooltip-format-paused": "Paused: {title} - {artist}",
-    "min-length": 8,
-    "max-length": 25
+    "min-length": 7,
+    "max-length": 24
   },
   
   // ──────────────────────────────────────────────────────────────┤ cava ├───
@@ -181,7 +187,7 @@
     "on-scroll-up": "~/.config/waybar/scripts/toggle-weather-format.sh -c",
     "on-scroll-down": "~/.config/waybar/scripts/toggle-weather-format.sh -f",
     "min-length": 7,
-    "max-length": 30
+    "max-length": 7
   },
 
   // ────────────────────────────────────────────────────────┤ player ├───
@@ -424,6 +430,16 @@
     "on-scroll-down": "~/.config/waybar/scripts/brightness-control.sh -o d",
     "min-length": 6,
     "max-length": 6
+  },
+  
+  // ─────────────────────────────────────────────────────────┤ wallpapers ├───
+  
+  "custom/wallpaper": {
+    "format": "󰋯",
+    "tooltip": true,
+    "tooltip-format": "Left-click: Launch Wallpaper Picker\nRight-click: Cycle Wallpapers",
+    "on-click": "~/.config/hyprcandy/scripts/wallpaper.sh",
+    "on-click-right": "~/.config/quickshell/wallpaper/wallpaper-cycle.sh",
   },
   
   // ─────────────────────────────────────────────────────┤ system-monitor ├───

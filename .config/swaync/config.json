@@ -1,6 +1,6 @@
 {
     "$schema": "/etc/xdg/swaync/configSchema.json",
-    "positionX": "right",
+    "positionX": "left",
     "positionY": "top",
     "layer": "top",
     "control-center-layer": "top",
@@ -77,9 +77,3 @@
         }
     }
 }
-/*
-		{
-                    "label": "",
-                    "command": "DRI_PRIME=1 equibop"
-                },
-*/
