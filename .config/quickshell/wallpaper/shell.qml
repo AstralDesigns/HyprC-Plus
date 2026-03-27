@@ -175,6 +175,10 @@ ShellRoot {
             : allWallpapers.slice()
         if (focusedIdx >= filtered.length)
             focusedIdx = Math.max(0, filtered.length - 1)
+        // After any filter update (scan, search, sort) ensure the thumb pipeline
+        // is draining. GridView may recycle existing delegates rather than
+        // recreating them, so Component.onCompleted doesn't always re-fire.
+        Qt.callLater(root._thumbDrain)
     }
 
     Process {
@@ -979,6 +983,13 @@ ShellRoot {
                                     const i = root._thumbQueue.indexOf(path)
                                     if (i >= 0) root._thumbQueue.splice(i, 1)
                                 }
+                                // When GridView recycles a delegate for a new path (e.g. after
+                                // re-scan or sort), reset thumbSrc and re-request the thumbnail.
+                                // Without this, recycled delegates keep the previous thumbnail.
+                                onPathChanged: {
+                                    thumbSrc = ""
+                                    if (path) root.thumbRequest(path)
+                                }
 
                                 // thumbCard — background card; radius 30 matches magick output
                                 Rectangle {
@@ -1030,7 +1041,7 @@ ShellRoot {
                                             right:  parent.right
                                         }
                                         height: thumb.isFocused ? 28 : 0
-                                        color: Qt.rgba(0, 0, 0, 0.72)
+                                        color: root.cScrim
                                         clip: true
                                         Behavior on height {
                                             NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
@@ -1039,7 +1050,7 @@ ShellRoot {
                                             anchors.fill: parent
                                             anchors.leftMargin: 8; anchors.rightMargin: 8
                                             text: thumb.path.split('/').pop()
-                                            color: "#ffffff"; font.pixelSize: 11
+                                            color: "#ffffff"; font.pixelSize: 12
                                             elide: Text.ElideRight
                                             verticalAlignment: Text.AlignVCenter
                                         }

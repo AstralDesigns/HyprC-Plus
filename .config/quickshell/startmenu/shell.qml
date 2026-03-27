@@ -152,14 +152,21 @@ ShellRoot {
         }}
         onRunningChanged: if(running) { root._netBuf=[] } else { root.networkList=root._netBuf.slice() }
     }
-    Process { id: netConnProc; property string _cmd:""; command:["bash","-c",netConnProc._cmd]
-        onRunningChanged: if(!running){ root.netConnecting_=false; if(!netStatusProc.running) netStatusProc.running=true }
+    Process { id: netConnProc; property string _cmd:""; property string _lastSSID:"";
+        command:["bash","-c",netConnProc._cmd]
+        onExited: function(code) {
+            root.netConnecting_=false
+            if (code === 0) { root.netConnectedSSID = netConnProc._lastSSID; netConnFeedbackTimer.restart() }
+            if(!netStatusProc.running) netStatusProc.running=true
+        }
     }
+    Timer { id: netConnFeedbackTimer; interval: 2500; repeat: false
+        onTriggered: root.netConnectedSSID = "" }
     function connectNetwork(ssid, password){
         const esc=ssid.replace(/'/g,"'\\''")
         if(password) netConnProc._cmd="nmcli device wifi connect '"+esc+"' password '"+password.replace(/'/g,"'\\''")+"'"
         else netConnProc._cmd="nmcli connection up '"+esc+"' 2>/dev/null || nmcli device wifi connect '"+esc+"'"
-        root.netConnecting_=true; root.netConnectTarget=ssid
+        root.netConnecting_=true; root.netConnectTarget=ssid; netConnProc._lastSSID=ssid
         if(!netConnProc.running) netConnProc.running=true
     }
 
@@ -173,6 +180,8 @@ ShellRoot {
     property string btConnecting:  ""     // MAC currently being connected/disconnected
     property string btExpandedMac: ""     // MAC whose options panel is open
     property var    btActiveProfile: ({}) // mac → active PulseAudio profile string
+    property string btConnectedMac: ""   // MAC that just succeeded — shows ✓ briefly
+    property string netConnectedSSID: "" // SSID that just succeeded — shows ✓ briefly
 
     // ── Status poll: power state + paired/connected device list ──────────────
     Process { id: btStatusProc
@@ -180,10 +189,13 @@ ShellRoot {
         command: ["bash", "-c",
             "POWERED=$(bluetoothctl show 2>/dev/null | grep 'Powered:' | awk '{print $2}'); " +
             "echo \"POWERED:$POWERED\"; " +
-            "PAIRED=$(bluetoothctl devices Paired 2>/dev/null); " +
+            "ALL=$(bluetoothctl devices 2>/dev/null); " +
             "CONN=$(bluetoothctl devices Connected 2>/dev/null); " +
-            "echo \"$PAIRED\" | while IFS=' ' read -r _ mac name; do " +
+            "echo \"$ALL\" | while read -r line; do " +
+            "  mac=$(echo \"$line\" | awk '{print $2}'); " +
             "  [ -z \"$mac\" ] && continue; " +
+            "  name=$(echo \"$line\" | cut -d' ' -f3-); " +
+            "  [ -z \"$name\" ] && name=$mac; " +
             "  if echo \"$CONN\" | grep -q \"$mac\"; then c=1; else c=0; fi; " +
             "  echo \"DEV:$mac|$name|$c\"; " +
             "done"
@@ -214,42 +226,52 @@ ShellRoot {
         if (!btPowerProc.running) btPowerProc.running = true
     }
 
-    // ── Discovery scan (10-second timeout, then auto-refresh) ────────────────
+    // ── Discovery scan (20-second timeout, live refresh every 3s while scanning)
     Process { id: btScanProc
         command: ["bash", "-c",
-            "bluetoothctl --timeout 10 scan on 2>/dev/null; " +
+            "bluetoothctl --timeout 20 scan on 2>/dev/null; " +
             "bluetoothctl scan off 2>/dev/null"
         ]
         onExited: {
             root.btScanning = false
+            btScanLiveTimer.stop()
             if (!btStatusProc.running) btStatusProc.running = true
         }
     }
-    Timer { id: btScanRefreshTimer; interval: 5000; repeat: false
+    // Fires every 3s during an active scan to pull newly discovered devices into the list
+    Timer { id: btScanLiveTimer; interval: 3000; repeat: true
         onTriggered: if (!btStatusProc.running) btStatusProc.running = true }
     function toggleBtScan() {
         if (root.btScanning) {
             root.btScanning = false
+            btScanLiveTimer.stop()
             if (btScanProc.running) btScanProc.running = false
+            if (!btStatusProc.running) btStatusProc.running = true
         } else {
             root.btScanning = true
             if (!btScanProc.running) btScanProc.running = true
-            btScanRefreshTimer.restart()
+            btScanLiveTimer.restart()
         }
     }
 
     // ── Connect / disconnect / forget ─────────────────────────────────────────
-    Process { id: btConnProc; property string _cmd: ""
+    Process { id: btConnProc; property string _cmd: ""; property string _lastMac: ""
         command: ["bash", "-c", btConnProc._cmd]
-        onExited: { root.btConnecting = ""; if (!btStatusProc.running) btStatusProc.running = true }
+        onExited: function(code) {
+            root.btConnecting = ""
+            if (code === 0) { root.btConnectedMac = btConnProc._lastMac; btConnFeedbackTimer.restart() }
+            if (!btStatusProc.running) btStatusProc.running = true
+        }
     }
+    Timer { id: btConnFeedbackTimer; interval: 2500; repeat: false
+        onTriggered: root.btConnectedMac = "" }
     function btConnect(mac) {
-        root.btConnecting = mac
+        root.btConnecting = mac; btConnProc._lastMac = mac
         btConnProc._cmd = "bluetoothctl connect " + mac
         if (!btConnProc.running) btConnProc.running = true
     }
     function btDisconnect(mac) {
-        root.btConnecting = mac
+        root.btConnecting = mac; btConnProc._lastMac = mac
         btConnProc._cmd = "bluetoothctl disconnect " + mac
         if (!btConnProc.running) btConnProc.running = true
     }
@@ -257,6 +279,8 @@ ShellRoot {
         if (root.btExpandedMac === mac) root.btExpandedMac = ""
         btConnProc._cmd = "bluetoothctl remove " + mac
         if (!btConnProc.running) btConnProc.running = true
+        // Auto-scan so the forgotten device can be rediscovered immediately
+        if (!root.btScanning) root.toggleBtScan()
     }
 
     // ── Audio profile query (pactl) ───────────────────────────────────────────
@@ -563,6 +587,11 @@ ShellRoot {
                                         Text { Layout.fillWidth:true; text:netDelegate.modelData.ssid; color:root.cOnSurf; font.pixelSize:11; elide:Text.ElideRight }
                                         Text { text:"󰒃"; font.pixelSize:10; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar; opacity:0.5; visible:netDelegate.modelData.secure }
                                         Text { text:root.netConnecting_&&root.netConnectTarget===netDelegate.modelData.ssid?"󰒖":""; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary; RotationAnimator on rotation{from:0;to:360;duration:800;loops:Animation.Infinite;running:root.netConnecting_&&root.netConnectTarget===netDelegate.modelData.ssid} }
+                                        // Success checkmark
+                                        Text { text:"󰄬"; font.pixelSize:12; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary
+                                            visible: root.netConnectedSSID===netDelegate.modelData.ssid
+                                            opacity: root.netConnectedSSID===netDelegate.modelData.ssid ? 1.0 : 0.0
+                                            Behavior on opacity { NumberAnimation { duration: 400 } } }
                                     }
                                     MouseArea{id:nh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:{
                                         if(netDelegate.modelData.active) return
@@ -686,6 +715,12 @@ ShellRoot {
                                             visible: root.btConnecting===btDelegate.modelData.mac
                                             RotationAnimator on rotation{from:0;to:360;duration:800;loops:Animation.Infinite;running:root.btConnecting===btDelegate.modelData.mac} }
 
+                                        // Success checkmark
+                                        Text { text:"󰄬"; font.pixelSize:12; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary
+                                            visible: root.btConnectedMac===btDelegate.modelData.mac
+                                            opacity: root.btConnectedMac===btDelegate.modelData.mac ? 1.0 : 0.0
+                                            Behavior on opacity { NumberAnimation { duration: 400 } } }
+
                                         // Options expand arrow
                                         Text {
                                             text: root.btExpandedMac===btDelegate.modelData.mac ? "󰅀" : "󰅂"
@@ -704,7 +739,7 @@ ShellRoot {
                                             }
                                         }
                                     }
-                                    MouseArea{id:bth;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor
+                                    MouseArea{id:bth;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;z:-1
                                         onClicked: {
                                             if(root.btConnecting!==""){return}
                                             if(btDelegate.modelData.connected) root.btDisconnect(btDelegate.modelData.mac)
@@ -729,36 +764,16 @@ ShellRoot {
                                         spacing: 6
 
                                         // Profile selector row
+                                        // FIX: pragma ComponentBehavior:Bound forbids inner
+                                        // Repeater delegates from accessing outer Repeater IDs
+                                        // (btDelegate). Replace inner Repeater with three direct
+                                        // ProfilePill instances — no nested component boundary.
                                         RowLayout {
                                             width: parent.width; spacing: 4
                                             Text { text:"Profile:"; font.pixelSize:10; color:root.cOnSurfVar; Layout.preferredWidth:40 }
-                                            Repeater {
-                                                model: [
-                                                    {label:"A2DP",    profile:"a2dp-sink"},
-                                                    {label:"HSP/HFP", profile:"headset-head-unit"},
-                                                    {label:"Off",     profile:"off"}
-                                                ]
-                                                delegate: Rectangle {
-                                                    required property var modelData
-                                                    height:22; radius:6
-                                                    width: prfLbl.implicitWidth + 12
-                                                    property bool isActive: {
-                                                        const ap = root.btActiveProfile[btDelegate.modelData.mac] || ""
-                                                        return ap.indexOf(modelData.profile) >= 0
-                                                    }
-                                                    color: isActive
-                                                        ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.25)
-                                                        : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
-                                                    border.width:1; border.color:isActive
-                                                        ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.7)
-                                                        : Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.4)
-                                                    Behavior on color{ColorAnimation{duration:100}}
-                                                    Text { id:prfLbl; anchors.centerIn:parent; text:modelData.label
-                                                        font.pixelSize:10; color:parent.isActive?root.cPrimary:root.cOnSurfVar }
-                                                    MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor
-                                                        onClicked: root.btSetProfile(btDelegate.modelData.mac, modelData.profile) }
-                                                }
-                                            }
+                                            ProfilePill { pLabel:"A2DP";    pProfile:"a2dp-sink";         pMac:btDelegate.modelData.mac }
+                                            ProfilePill { pLabel:"HSP/HFP"; pProfile:"headset-head-unit"; pMac:btDelegate.modelData.mac }
+                                            ProfilePill { pLabel:"Off";     pProfile:"off";               pMac:btDelegate.modelData.mac }
                                             Item { Layout.fillWidth:true }
                                         }
 
@@ -809,9 +824,9 @@ ShellRoot {
                             color: root.cOnSurfVar; font.pixelSize:10; font.italic:true
                             leftPadding:4
                         }
-                        // Status loading indicator
+                        // Status loading indicator — only on first load (no devices yet)
                         Text {
-                            visible: btStatusProc.running
+                            visible: btStatusProc.running && root.btDevices.length === 0
                             text: "Loading…"; color:root.cOnSurfVar; font.pixelSize:10; font.italic:true
                             leftPadding:4
                         }
@@ -859,6 +874,35 @@ ShellRoot {
 
                 Item { height:4 }
             }
+        }
+    }
+
+    // ── ProfilePill: BT audio profile selector button ─────────────────────────
+    // Defined at root level so it is accessible from both outside and inside
+    // Repeater delegates without crossing pragma ComponentBehavior:Bound scopes.
+    component ProfilePill: Rectangle {
+        id: pill
+        required property string pLabel
+        required property string pProfile
+        required property string pMac
+        property bool isActive: (root.btActiveProfile[pMac] || "").indexOf(pProfile) >= 0
+        height: 24; radius: 6
+        width: pillLbl.implicitWidth + 20
+        color: isActive
+            ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.25)
+            : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
+        border.width: 1
+        border.color: isActive
+            ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.7)
+            : Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.4)
+        Behavior on color { ColorAnimation { duration: 100 } }
+        Text {
+            id: pillLbl; anchors.centerIn: parent; text: pill.pLabel
+            font.pixelSize: 10; color: pill.isActive ? root.cPrimary : root.cOnSurfVar
+        }
+        MouseArea {
+            anchors.fill: parent; anchors.margins: -1; cursorShape: Qt.PointingHandCursor
+            onClicked: root.btSetProfile(pill.pMac, pill.pProfile)
         }
     }
 
