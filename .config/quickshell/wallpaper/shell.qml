@@ -300,6 +300,96 @@ ShellRoot {
     // ── Visibility toggle (persisted — toggled via IPC, never quits) ──────────
     property bool pickerVisible: false
 
+    // Cleanup when hidden: stop background scans and flush pending thumb queue
+    onPickerVisibleChanged: {
+        if (!pickerVisible) {
+            if (scanProc.running)    scanProc.running = false
+            if (sidebarProc.running) sidebarProc.running = false
+            root._thumbQueue = []   // discard pending work; in-flight magick finishes naturally
+        }
+    }
+
+    // ── Rounded-thumbnail pipeline (ImageMagick → 160×100 rounded-rect PNG) ──
+    // Each wallpaper is processed once and cached in /tmp/qs_wp_thumbs/<hash>.png.
+    // A single sequential Process avoids spawning hundreds of magick instances.
+    // Delegates request via thumbRequest(); they receive the result via thumbReady().
+
+    signal thumbReady(string origPath, string thumbSrc)
+
+    property var  _thumbQueue:   []
+    property bool _thumbRunning: false
+
+    // djb2 hash of path → deterministic 8-hex cache filename, no shell escaping needed
+    function _pathHash(p) {
+        let h = 5381
+        for (let i = 0; i < p.length; i++)
+            h = ((h << 5) + h + p.charCodeAt(i)) >>> 0
+        return ('00000000' + h.toString(16)).slice(-8)
+    }
+
+    function thumbRequest(path) {
+        if (!path) return
+        if (root._thumbQueue.indexOf(path) < 0) root._thumbQueue.push(path)
+        _thumbDrain()
+    }
+
+    function _thumbDrain() {
+        if (root._thumbRunning || root._thumbQueue.length === 0) return
+        const path  = root._thumbQueue.shift()
+        const hash  = root._pathHash(path)
+        const dst   = "/tmp/qs_wp_thumbs/" + hash + ".png"
+        // Single-quote-escape both paths for bash
+        const safe  = path.replace(/'/g, "'\\''")
+        const safed = dst.replace(/'/g, "'\\''")
+        // For animated GIFs append [0] so magick only decodes the first frame —
+        // processing all frames is ~10–100× slower and returns no rounded result.
+        const isGif  = path.toLowerCase().endsWith(".gif")
+        const srcArg = isGif ? ("'" + safe + "'[0]") : ("'" + safe + "'")
+        root._thumbRunning = true
+        thumbProc._origPath = path
+        thumbProc._dst      = dst
+        // If cached file exists, just echo and exit — fires thumbReady without re-processing
+        thumbProc._cmd =
+            "mkdir -p /tmp/qs_wp_thumbs; " +
+            "[ -f '" + safed + "' ] && { echo ok; exit 0; }; " +
+            "magick " + srcArg + " " +
+            "-resize 160x100^ -gravity center -extent 160x100 " +
+            "\\( +clone -alpha extract " +
+            "   -fill black -colorize 100 " +
+            "   -fill white -draw 'roundrectangle 0,0 159,99 30,30' \\) " +
+            "-alpha off -compose CopyOpacity -composite " +
+            "-strip '" + safed + "' 2>/dev/null && echo ok"
+        thumbProc.running = true
+    }
+
+    Process {
+        id: thumbProc
+        property string _origPath: ""
+        property string _dst:      ""
+        property string _cmd:      "true"
+        command: ["bash", "-c", thumbProc._cmd]
+        onExited: function(code) {
+            if (code === 0)
+                // Append timestamp so QML Image sees a new URL even if file was replaced
+                root.thumbReady(thumbProc._origPath,
+                                "file://" + thumbProc._dst + "?" + Date.now())
+            root._thumbRunning = false
+            root._thumbDrain()
+        }
+    }
+
+    // Hard-refresh: wipe the on-disk thumb cache then re-scan so every
+    // thumbnail is regenerated from scratch.  Triggered by the refresh button.
+    Process {
+        id: thumbCacheClearProc
+        command: ["bash", "-c", "rm -rf /tmp/qs_wp_thumbs"]
+        onExited: {
+            root._thumbQueue   = []
+            root._thumbRunning = false
+            root.scanDir()
+        }
+    }
+
     IpcHandler {
         target: "wallpaper"
         function toggle(): void { root.pickerVisible = !root.pickerVisible }
@@ -728,7 +818,10 @@ ShellRoot {
                                 MouseArea {
                                     id: refHov; anchors.fill: parent; hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: root.scanDir()
+                                    onClicked: {
+                                        if (!thumbCacheClearProc.running)
+                                            thumbCacheClearProc.running = true
+                                    }
                                 }
                             }
 
@@ -872,44 +965,83 @@ ShellRoot {
                                     NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
                                 }
 
-                                // thumbCard — layer.enabled renders this Rectangle
-                                // (including its rounded corners) into an offscreen
-                                // texture, clipping Image and Placeholder to the
-                                // rounded shape.  Badge lives OUTSIDE so it gets its
-                                // own clean anti-aliased radius.
+                                // Receives thumb path from the central pipeline
+                                property string thumbSrc: ""
+                                Connections {
+                                    target: root
+                                    function onThumbReady(origPath, src) {
+                                        if (origPath === thumb.path) thumb.thumbSrc = src
+                                    }
+                                }
+                                // Enqueue when delegate is created; dequeue on destroy (trim work)
+                                Component.onCompleted: root.thumbRequest(path)
+                                Component.onDestruction: {
+                                    const i = root._thumbQueue.indexOf(path)
+                                    if (i >= 0) root._thumbQueue.splice(i, 1)
+                                }
+
+                                // thumbCard — background card; radius 30 matches magick output
                                 Rectangle {
                                     id: thumbCard
                                     anchors.centerIn: parent
                                     width:  gridView.thumbW
                                     height: gridView.thumbH
-                                    radius: root.rSm
+                                    radius: 30
                                     color:  "#1a1a1a"
+                                    // layer clips the fallback placeholder text to rounded rect
                                     layer.enabled: true
                                     layer.smooth:  true
 
+                                    // ImageMagick-generated rounded PNG (transparent corners
+                                    // are naturally transparent over the card background)
                                     Image {
                                         id: wallImg
                                         anchors.fill: parent
-                                        source: thumb.path ? "file://" + thumb.path : ""
-                                        fillMode: Image.PreserveAspectCrop
+                                        // thumbSrc when ready; empty string while generating
+                                        source:      thumb.thumbSrc
+                                        fillMode:    Image.PreserveAspectCrop
                                         asynchronous: true
-                                        smooth: true
-                                        mipmap: true
-                                        cache:  true
-                                        visible: status === Image.Ready
+                                        smooth:  true
+                                        mipmap:  false   // avoid QSGPlainTexture warning on dynamic src
+                                        cache:   false   // prevent accumulation in Qt image cache
+                                        visible: status === Image.Ready && thumb.thumbSrc !== ""
                                     }
 
-                                    // Placeholder — shown while image loads or on error
+                                    // Placeholder — shown while magick generates the thumb
                                     Rectangle {
                                         anchors.fill: parent
                                         color: "#252525"
-                                        visible: wallImg.status !== Image.Ready
+                                        visible: !wallImg.visible
                                         Text {
                                             anchors.centerIn: parent
-                                            text: wallImg.status === Image.Error ? "󰋵" : "󰋩"
+                                            text: thumb.thumbSrc === "" ? "󰋩" : (wallImg.status === Image.Error ? "󰋵" : "󰋩")
                                             color: "#888888"
                                             font.pixelSize: 30
                                             font.family: "Symbols Nerd Font Mono"
+                                        }
+                                    }
+
+                                    // Filename bar — inside layer so the card's radius:30 clips
+                                    // the bottom corners automatically; no extra radius needed.
+                                    Rectangle {
+                                        anchors {
+                                            bottom: parent.bottom
+                                            left:   parent.left
+                                            right:  parent.right
+                                        }
+                                        height: thumb.isFocused ? 28 : 0
+                                        color: Qt.rgba(0, 0, 0, 0.72)
+                                        clip: true
+                                        Behavior on height {
+                                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                                        }
+                                        Text {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 8; anchors.rightMargin: 8
+                                            text: thumb.path.split('/').pop()
+                                            color: "#ffffff"; font.pixelSize: 11
+                                            elide: Text.ElideRight
+                                            verticalAlignment: Text.AlignVCenter
                                         }
                                     }
                                 }
@@ -930,30 +1062,6 @@ ShellRoot {
                                         anchors.centerIn: parent; text: "󰄬"
                                         color: root.cOnPrimary
                                         font.pixelSize: 11; font.family: "Symbols Nerd Font Mono"
-                                    }
-                                }
-
-                                // Filename bar overlaid on card bottom
-                                Rectangle {
-                                    anchors {
-                                        bottom: thumbCard.bottom
-                                        left:   thumbCard.left
-                                        right:  thumbCard.right
-                                    }
-                                    height: thumb.isFocused ? 28 : 0
-                                    color: Qt.rgba(0, 0, 0, 0.72)
-                                    clip: true
-                                    radius: 0
-                                    Behavior on height {
-                                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-                                    }
-                                    Text {
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 8; anchors.rightMargin: 8
-                                        text: thumb.path.split('/').pop()
-                                        color: "#ffffff"; font.pixelSize: 11
-                                        elide: Text.ElideRight
-                                        verticalAlignment: Text.AlignVCenter
                                     }
                                 }
 

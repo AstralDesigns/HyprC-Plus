@@ -535,7 +535,7 @@ ShellRoot {
 
                                             Rectangle {
                                                 anchors.fill:parent; radius:22
-                                                color:Qt.rgba(root.cBg.r,root.cBg.g,root.cBg.b,0.45)
+                                                color:Qt.rgba(root.cBg.r,root.cBg.g,root.cBg.b,0.75)
                                                 border.width:2
                                                 border.color: root.authFailed ? root.cErr
                                                     : (root.authChecking

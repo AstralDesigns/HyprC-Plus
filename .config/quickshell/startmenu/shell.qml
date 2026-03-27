@@ -163,6 +163,168 @@ ShellRoot {
         if(!netConnProc.running) netConnProc.running=true
     }
 
+    // ── Bluetooth ─────────────────────────────────────────────────────────────
+    // All pairing/connection state is persisted by BlueZ in /var/lib/bluetooth.
+    // "Forget" = bluetoothctl remove <MAC>, which is the only way to un-remember.
+    property bool   btExpanded:    false
+    property bool   btPowered:     false
+    property bool   btScanning:    false
+    property var    btDevices:     []      // [{mac, name, connected}]
+    property string btConnecting:  ""     // MAC currently being connected/disconnected
+    property string btExpandedMac: ""     // MAC whose options panel is open
+    property var    btActiveProfile: ({}) // mac → active PulseAudio profile string
+
+    // ── Status poll: power state + paired/connected device list ──────────────
+    Process { id: btStatusProc
+        property var _buf: []
+        command: ["bash", "-c",
+            "POWERED=$(bluetoothctl show 2>/dev/null | grep 'Powered:' | awk '{print $2}'); " +
+            "echo \"POWERED:$POWERED\"; " +
+            "PAIRED=$(bluetoothctl devices Paired 2>/dev/null); " +
+            "CONN=$(bluetoothctl devices Connected 2>/dev/null); " +
+            "echo \"$PAIRED\" | while IFS=' ' read -r _ mac name; do " +
+            "  [ -z \"$mac\" ] && continue; " +
+            "  if echo \"$CONN\" | grep -q \"$mac\"; then c=1; else c=0; fi; " +
+            "  echo \"DEV:$mac|$name|$c\"; " +
+            "done"
+        ]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            if (l.startsWith("POWERED:"))
+                root.btPowered = l.slice(8).trim() === "yes"
+            else if (l.startsWith("DEV:")) {
+                const p = l.slice(4).split("|")
+                if (p.length >= 3)
+                    btStatusProc._buf.push({ mac: p[0], name: p[1] || p[0], connected: p[2] === "1" })
+            }
+        }}
+        onRunningChanged: if (running) _buf = []
+        onExited: root.btDevices = _buf.slice()
+        Component.onCompleted: running = true
+    }
+    Timer { interval: 8000; repeat: true; running: true;
+        onTriggered: if (!btStatusProc.running) btStatusProc.running = true }
+
+    // ── Power toggle ─────────────────────────────────────────────────────────
+    Process { id: btPowerProc; property string _cmd: ""
+        command: ["bash", "-c", btPowerProc._cmd]
+        onExited: { if (!btStatusProc.running) btStatusProc.running = true }
+    }
+    function toggleBtPower() {
+        btPowerProc._cmd = root.btPowered ? "bluetoothctl power off" : "bluetoothctl power on"
+        if (!btPowerProc.running) btPowerProc.running = true
+    }
+
+    // ── Discovery scan (10-second timeout, then auto-refresh) ────────────────
+    Process { id: btScanProc
+        command: ["bash", "-c",
+            "bluetoothctl --timeout 10 scan on 2>/dev/null; " +
+            "bluetoothctl scan off 2>/dev/null"
+        ]
+        onExited: {
+            root.btScanning = false
+            if (!btStatusProc.running) btStatusProc.running = true
+        }
+    }
+    Timer { id: btScanRefreshTimer; interval: 5000; repeat: false
+        onTriggered: if (!btStatusProc.running) btStatusProc.running = true }
+    function toggleBtScan() {
+        if (root.btScanning) {
+            root.btScanning = false
+            if (btScanProc.running) btScanProc.running = false
+        } else {
+            root.btScanning = true
+            if (!btScanProc.running) btScanProc.running = true
+            btScanRefreshTimer.restart()
+        }
+    }
+
+    // ── Connect / disconnect / forget ─────────────────────────────────────────
+    Process { id: btConnProc; property string _cmd: ""
+        command: ["bash", "-c", btConnProc._cmd]
+        onExited: { root.btConnecting = ""; if (!btStatusProc.running) btStatusProc.running = true }
+    }
+    function btConnect(mac) {
+        root.btConnecting = mac
+        btConnProc._cmd = "bluetoothctl connect " + mac
+        if (!btConnProc.running) btConnProc.running = true
+    }
+    function btDisconnect(mac) {
+        root.btConnecting = mac
+        btConnProc._cmd = "bluetoothctl disconnect " + mac
+        if (!btConnProc.running) btConnProc.running = true
+    }
+    function btForget(mac) {
+        if (root.btExpandedMac === mac) root.btExpandedMac = ""
+        btConnProc._cmd = "bluetoothctl remove " + mac
+        if (!btConnProc.running) btConnProc.running = true
+    }
+
+    // ── Audio profile query (pactl) ───────────────────────────────────────────
+    Process { id: btProfileQueryProc; property string _mac: ""; property var _lines: []
+        command: ["bash", "-c",
+            "CARD=\"bluez_card.$(echo '" + btProfileQueryProc._mac + "' | tr ':' '_')\"; " +
+            "pactl list cards 2>/dev/null | awk \"/Name: $CARD/{f=1} f&&/Active Profile:/{print; f=0}\""
+        ]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) { btProfileQueryProc._lines.push(l.trim()) }}
+        onRunningChanged: if (running) _lines = []
+        onExited: {
+            const line = _lines.find(function(x) { return x.startsWith("Active Profile:") })
+            if (line) {
+                const o = Object.assign({}, root.btActiveProfile)
+                o[btProfileQueryProc._mac] = line.replace("Active Profile:", "").trim()
+                root.btActiveProfile = o
+            }
+        }
+    }
+    function btQueryProfile(mac) {
+        btProfileQueryProc._mac = mac
+        if (!btProfileQueryProc.running) btProfileQueryProc.running = true
+    }
+
+    // ── Profile set (pactl set-card-profile) ─────────────────────────────────
+    Process { id: btSetProfileProc; property string _cmd: ""
+        command: ["bash", "-c", btSetProfileProc._cmd]
+        onExited: if (!btProfileQueryProc.running) btProfileQueryProc.running = true
+    }
+    function btSetProfile(mac, profile) {
+        const card = "bluez_card." + mac.replace(/:/g, "_")
+        btSetProfileProc._cmd = "pactl set-card-profile " + card + " " + profile
+        if (!btSetProfileProc.running) btSetProfileProc.running = true
+    }
+
+    // ── File send: zenity file picker → bluetooth-sendto ─────────────────────
+    Process { id: btSendProc; property string _cmd: ""
+        command: ["bash", "-c", btSendProc._cmd]
+    }
+    function btSendFile(mac) {
+        const esc = mac.replace(/'/g, "'\\''")
+        btSendProc._cmd =
+            "FILE=$(zenity --file-selection --title='Send via Bluetooth' 2>/dev/null) && " +
+            "[ -n \"$FILE\" ] && " +
+            "bluetooth-sendto --device='" + esc + "' \"$FILE\" &"
+        if (!btSendProc.running) btSendProc.running = true
+    }
+
+    // ── File receive: start/stop obexd auto-accept to ~/Downloads ─────────────
+    property bool btReceiving: false
+    Process { id: btObexProc; property string _cmd: ""
+        command: ["bash", "-c", btObexProc._cmd]
+        onExited: root.btReceiving = false
+    }
+    function toggleBtReceive() {
+        if (root.btReceiving) {
+            btObexProc._cmd = "pkill -f 'obexd.*auto-accept' 2>/dev/null; true"
+            root.btReceiving = false
+            if (!btObexProc.running) btObexProc.running = true
+        } else {
+            root.btReceiving = true
+            btObexProc._cmd =
+                "pkill -f 'obexd.*auto-accept' 2>/dev/null; " +
+                "/usr/lib/bluetooth/obexd --root \"${HOME}/Downloads\" --auto-accept &"
+            if (!btObexProc.running) btObexProc.running = true
+        }
+    }
+
     // ── Recorder ─────────────────────────────────────────────────────────────
     property bool isRecording: false
     Process { id: recCheckProc
@@ -325,15 +487,17 @@ ShellRoot {
 
                 Rectangle { Layout.fillWidth:true; height:1; color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.25) }
 
-                // ── Network ────────────────────────────────────────────────
+                // ── Network + Bluetooth ────────────────────────────────────
                 ColumnLayout { Layout.fillWidth:true; spacing:4
-                    RowLayout { Layout.fillWidth:true; spacing:10
+                    // ── Header row: wifi status | wifi expand | bt power | bt expand
+                    RowLayout { Layout.fillWidth:true; spacing:8
                         Text { text:"󰤨"; font.pixelSize:15; font.family:"Symbols Nerd Font Mono"
                             color:root.networkStatus==="connected"?root.cPrimary:root.cOnSurfVar }
                         ColumnLayout { Layout.fillWidth:true; spacing:0
                             Text { text:root.networkSSID||"Not connected"; color:root.cOnSurf; font.pixelSize:12; elide:Text.ElideRight }
                             Text { text:root.networkStatus; color:root.cOnSurfVar; font.pixelSize:10; opacity:0.7; visible:root.networkStatus!=="" }
                         }
+                        // Wifi expand button
                         Rectangle {
                             width:24;height:24;radius:6
                             color:nxh.containsMouse?Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.15):"transparent"
@@ -345,9 +509,35 @@ ShellRoot {
                                 if(root.networkExpanded&&!netScanProc.running) netScanProc.running=true
                             }}
                         }
+
+                        // Thin divider between wifi and BT controls
+                        Rectangle { width:1; height:20; color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.4) }
+
+                        // BT power icon — click toggles power
+                        Text {
+                            font.pixelSize:15; font.family:"Symbols Nerd Font Mono"
+                            text: root.btPowered ? "󰂱" : "󰂲"
+                            color: root.btPowered ? root.cPrimary : root.cOnSurfVar
+                            Behavior on color{ColorAnimation{duration:150}}
+                            MouseArea{anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:root.toggleBtPower()}
+                        }
+                        // BT expand button
+                        Rectangle {
+                            width:24;height:24;radius:6
+                            color:bxh.containsMouse?Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.15):"transparent"
+                            border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.55)
+                            Behavior on color{ColorAnimation{duration:100}}
+                            Text { anchors.centerIn:parent; text:root.btExpanded?"󰁆":"󰁄"; font.pixelSize:13; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary }
+                            MouseArea{id:bxh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:{
+                                root.btExpanded=!root.btExpanded
+                                if(root.btExpanded){
+                                    if(!btStatusProc.running) btStatusProc.running=true
+                                }
+                            }}
+                        }
                     }
 
-                    // Network list (expanded)
+                    // ── Wifi network list (expanded) ─────────────────────────
                     Column {
                         visible:root.networkExpanded
                         Layout.fillWidth:true
@@ -408,6 +598,224 @@ ShellRoot {
                             leftPadding:12
                         }
                     }
+
+                    // ── Bluetooth panel (expanded) ────────────────────────────
+                    Column {
+                        visible: root.btExpanded
+                        Layout.fillWidth: true
+                        width: parent.width
+                        spacing: 2
+
+                        // Toolbar: Scan toggle + Receive files toggle
+                        Row {
+                            width: parent.width; spacing: 6
+                            // Scan button
+                            Rectangle {
+                                height: 26; radius: 8
+                                width: 90
+                                color: root.btScanning
+                                    ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20)
+                                    : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.6)
+                                border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45)
+                                Behavior on color{ColorAnimation{duration:120}}
+                                RowLayout { anchors.centerIn:parent; spacing:4
+                                    Text {
+                                        text:"󰑪"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"
+                                        color: root.btScanning ? root.cPrimary : root.cOnSurfVar
+                                        RotationAnimator on rotation { from:0;to:360;duration:1000;loops:Animation.Infinite;running:root.btScanning }
+                                    }
+                                    Text { text: root.btScanning ? "Scanning…" : "Scan"; font.pixelSize:10; color:root.cOnSurfVar }
+                                }
+                                MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor
+                                    onClicked: root.btPowered ? root.toggleBtScan() : root.toggleBtPower() }
+                            }
+                            // Receive files toggle
+                            Rectangle {
+                                height: 26; radius: 8
+                                width: 110
+                                color: root.btReceiving
+                                    ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20)
+                                    : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.6)
+                                border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45)
+                                Behavior on color{ColorAnimation{duration:120}}
+                                RowLayout { anchors.centerIn:parent; spacing:4
+                                    Text { text:"󰶫"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.btReceiving?root.cPrimary:root.cOnSurfVar }
+                                    Text { text: root.btReceiving ? "Receiving…" : "Receive Files"; font.pixelSize:10; color:root.cOnSurfVar }
+                                }
+                                MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor; onClicked: root.toggleBtReceive() }
+                            }
+                        }
+
+                        // BT off notice
+                        Text {
+                            visible: !root.btPowered
+                            text: "Bluetooth is off"
+                            color: root.cOnSurfVar; font.pixelSize:11; font.italic:true
+                            leftPadding:4; topPadding:4
+                        }
+
+                        // Device list
+                        Repeater {
+                            model: root.btDevices
+                            delegate: Column {
+                                id: btDelegate
+                                required property var modelData
+                                required property int index
+                                width: parent.width
+                                spacing: 2
+
+                                // Main device row
+                                Rectangle {
+                                    id: btDevRow
+                                    width: parent.width; height: 34; radius: 8
+                                    color: bth.containsMouse
+                                        ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.10)
+                                        : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.5)
+                                    Behavior on color{ColorAnimation{duration:100}}
+                                    border.width: btDelegate.modelData.connected ? 1 : 0
+                                    border.color: Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.5)
+
+                                    RowLayout { anchors.fill:parent; anchors.leftMargin:8; anchors.rightMargin:8; spacing:6
+                                        // Device type icon (generic BT icon; could be refined)
+                                        Text { text:"󰂯"; font.pixelSize:13; font.family:"Symbols Nerd Font Mono"
+                                            color: btDelegate.modelData.connected ? root.cPrimary : root.cOnSurfVar }
+                                        Text { Layout.fillWidth:true; text:btDelegate.modelData.name; color:root.cOnSurf; font.pixelSize:11; elide:Text.ElideRight }
+
+                                        // Connecting spinner
+                                        Text { text:"󰒖"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary
+                                            visible: root.btConnecting===btDelegate.modelData.mac
+                                            RotationAnimator on rotation{from:0;to:360;duration:800;loops:Animation.Infinite;running:root.btConnecting===btDelegate.modelData.mac} }
+
+                                        // Options expand arrow
+                                        Text {
+                                            text: root.btExpandedMac===btDelegate.modelData.mac ? "󰅀" : "󰅂"
+                                            font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar
+                                            MouseArea { anchors.fill:parent; anchors.margins:-6; cursorShape:Qt.PointingHandCursor
+                                                onClicked: function(e) {
+                                                    e.accepted=true
+                                                    const m = btDelegate.modelData.mac
+                                                    if(root.btExpandedMac===m){
+                                                        root.btExpandedMac=""
+                                                    } else {
+                                                        root.btExpandedMac=m
+                                                        root.btQueryProfile(m)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    MouseArea{id:bth;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor
+                                        onClicked: {
+                                            if(root.btConnecting!==""){return}
+                                            if(btDelegate.modelData.connected) root.btDisconnect(btDelegate.modelData.mac)
+                                            else root.btConnect(btDelegate.modelData.mac)
+                                        }
+                                    }
+                                }
+
+                                // Options panel (expanded per device)
+                                Rectangle {
+                                    visible: root.btExpandedMac === btDelegate.modelData.mac
+                                    width: parent.width
+                                    height: visible ? optCol.implicitHeight + 12 : 0
+                                    radius: 8
+                                    color: Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.35)
+                                    border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.3)
+                                    clip: true
+
+                                    Column {
+                                        id: optCol
+                                        anchors { left:parent.left; right:parent.right; top:parent.top; margins:6 }
+                                        spacing: 6
+
+                                        // Profile selector row
+                                        RowLayout {
+                                            width: parent.width; spacing: 4
+                                            Text { text:"Profile:"; font.pixelSize:10; color:root.cOnSurfVar; Layout.preferredWidth:40 }
+                                            Repeater {
+                                                model: [
+                                                    {label:"A2DP",    profile:"a2dp-sink"},
+                                                    {label:"HSP/HFP", profile:"headset-head-unit"},
+                                                    {label:"Off",     profile:"off"}
+                                                ]
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    height:22; radius:6
+                                                    width: prfLbl.implicitWidth + 12
+                                                    property bool isActive: {
+                                                        const ap = root.btActiveProfile[btDelegate.modelData.mac] || ""
+                                                        return ap.indexOf(modelData.profile) >= 0
+                                                    }
+                                                    color: isActive
+                                                        ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.25)
+                                                        : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
+                                                    border.width:1; border.color:isActive
+                                                        ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.7)
+                                                        : Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.4)
+                                                    Behavior on color{ColorAnimation{duration:100}}
+                                                    Text { id:prfLbl; anchors.centerIn:parent; text:modelData.label
+                                                        font.pixelSize:10; color:parent.isActive?root.cPrimary:root.cOnSurfVar }
+                                                    MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor
+                                                        onClicked: root.btSetProfile(btDelegate.modelData.mac, modelData.profile) }
+                                                }
+                                            }
+                                            Item { Layout.fillWidth:true }
+                                        }
+
+                                        // Action buttons row: Send File + Forget
+                                        RowLayout {
+                                            width: parent.width; spacing: 4
+                                            // Send File
+                                            Rectangle {
+                                                height:22; radius:6; width:90
+                                                color:sfh.containsMouse
+                                                    ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20)
+                                                    : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
+                                                border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45)
+                                                Behavior on color{ColorAnimation{duration:100}}
+                                                RowLayout { anchors.centerIn:parent; spacing:4
+                                                    Text { text:"󰏢"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
+                                                    Text { text:"Send File"; font.pixelSize:10; color:root.cOnSurfVar }
+                                                }
+                                                MouseArea{id:sfh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor
+                                                    onClicked: root.btSendFile(btDelegate.modelData.mac) }
+                                            }
+                                            Item { Layout.fillWidth:true }
+                                            // Forget/Remove device
+                                            Rectangle {
+                                                height:22; radius:6; width:70
+                                                color:fgh.containsMouse
+                                                    ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.18)
+                                                    : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
+                                                border.width:1; border.color:Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.45)
+                                                Behavior on color{ColorAnimation{duration:100}}
+                                                RowLayout { anchors.centerIn:parent; spacing:4
+                                                    Text { text:"󰆴"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cErr; opacity:0.8 }
+                                                    Text { text:"Forget"; font.pixelSize:10; color:root.cErr; opacity:0.8 }
+                                                }
+                                                MouseArea{id:fgh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor
+                                                    onClicked: root.btForget(btDelegate.modelData.mac) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // No paired devices / BT off hint
+                        Text {
+                            visible: root.btPowered && root.btDevices.length === 0 && !btStatusProc.running
+                            text: "No paired devices — use Scan to discover"
+                            color: root.cOnSurfVar; font.pixelSize:10; font.italic:true
+                            leftPadding:4
+                        }
+                        // Status loading indicator
+                        Text {
+                            visible: btStatusProc.running
+                            text: "Loading…"; color:root.cOnSurfVar; font.pixelSize:10; font.italic:true
+                            leftPadding:4
+                        }
+                    }
                 }
 
                 Rectangle { Layout.fillWidth:true; height:1; color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.25) }
@@ -439,12 +847,12 @@ ShellRoot {
                 // Logout button (full width)
                 Rectangle {
                     Layout.fillWidth:true; height:36; radius:12
-                    color:logh.containsMouse?Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.18):Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.6)
+                    color:logh.containsMouse?Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.18):Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.6)
                     border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.40)
                     Behavior on color{ColorAnimation{duration:120}}
                     RowLayout { anchors.centerIn:parent; spacing:8
-                        Text { text:"󰗼"; font.pixelSize:16; font.family:"Symbols Nerd Font Mono"; color:logh.containsMouse?root.cErr:root.cOnSurfVar; Behavior on color{ColorAnimation{duration:120}} }
-                        Text { text:"Logout"; color:logh.containsMouse?root.cErr:root.cOnSurfVar; font.pixelSize:12; font.weight:Font.Medium; Behavior on color{ColorAnimation{duration:120}} }
+                        Text { text:"󰗼"; font.pixelSize:16; font.family:"Symbols Nerd Font Mono"; color:logh.containsMouse?root.cPrimary:root.cOnSurfVar; Behavior on color{ColorAnimation{duration:120}} }
+                        Text { text:"Logout"; color:logh.containsMouse?root.cPrimary:root.cOnSurfVar; font.pixelSize:12; font.weight:Font.Medium; Behavior on color{ColorAnimation{duration:120}} }
                     }
                     MouseArea{id:logh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:{ root.menuVisible=false; if(!logoutProc.running) logoutProc.running=true }}
                 }
