@@ -943,7 +943,7 @@ ShellRoot {
                                     height: thumb.isFocused ? 28 : 0
                                     color: Qt.rgba(0, 0, 0, 0.72)
                                     clip: true
-                                    radius: root.rSm
+                                    radius: 0
                                     Behavior on height {
                                         NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
                                     }
