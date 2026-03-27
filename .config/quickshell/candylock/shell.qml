@@ -42,7 +42,7 @@ ShellRoot {
     readonly property color cSecondaryFixedDim: Qt.color(_m3secondaryFixedDim)
     readonly property color cTertiaryFixedDim:  Qt.color(_m3tertiaryFixedDim)
 
-    // Outer panel tint — keep same opacity as working backup (0.62)
+    // Outer panel tint
     readonly property color cPanel: Qt.rgba(
         Qt.color(_m3inversePrimary).r, Qt.color(_m3inversePrimary).g,
         Qt.color(_m3inversePrimary).b, 0.62)
@@ -339,16 +339,45 @@ ShellRoot {
                 }
 
                 // ── UNIFIED BLUR PANEL ────────────────────────────────────────
+                // FIX: clip:true on Rectangle clips to the bounding RECTANGLE,
+                // not to the radius — blurred content bled to the four 90° corners.
+                //
+                // Correct approach:
+                //   1. centerPanel is a plain Item (no clip, no radius of its own).
+                //   2. layer.enabled:true renders ALL children to a single FBO.
+                //   3. layer.effect MultiEffect uses roundMask's layer alpha to crop
+                //      the FBO to the rounded shape before compositing to screen.
+                //   4. roundMask has opacity:0 so it is invisible in the scene, but
+                //      its layer (captured before opacity compositing) still provides
+                //      the white-filled rounded rect texture that MultiEffect reads.
                 Item {
                     id:centerPanel
                     anchors.centerIn:parent
                     width:660
-                    // Height driven by content + padding; clip keeps rounded corners clean
                     height:panelCol.implicitHeight+56
-                    clip:true
+                    // No clip:true — clipping is handled by the MultiEffect mask below.
 
-                    // BLUR: same proven pattern as backup — wallpaper slice offset-positioned,
-                    // blurred via layer+MultiEffect on the containing Item, panel clipped above.
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled:      true
+                        maskSource:       roundMask
+                        maskThresholdMin: 0.5
+                        maskSpreadAtMin:  1.0
+                    }
+
+                    // Mask shape — white rounded rect rendered to its own FBO.
+                    // opacity:0 hides it from the scene while still supplying the
+                    // layer texture (Qt captures the FBO before the opacity pass).
+                    Rectangle {
+                        id: roundMask
+                        anchors.fill: parent
+                        radius: 32
+                        color: "white"
+                        opacity: 0
+                        layer.enabled: true
+                    }
+
+                    // Blurred wallpaper slice
                     Item {
                         anchors.fill:parent
                         layer.enabled: wallImg.visible
@@ -356,21 +385,18 @@ ShellRoot {
                             blurEnabled:true; blur:1.0; blurMax:64
                         }
                         AnimatedImage {
-                            // Offset so this slice aligns with the panel's position on screen
-                            x: -centerPanel.x
-                            y: -centerPanel.y
-                            width:  mainRect.width
-                            height: mainRect.height
+                            x: -centerPanel.x; y: -centerPanel.y
+                            width: mainRect.width; height: mainRect.height
                             source: root.wallpaperPath?"file://"+root.wallpaperPath:""
                             fillMode:Image.PreserveAspectCrop; smooth:true; playing:true; cache:true
                             visible: root.wallpaperPath!==""
                         }
                     }
 
-                    // Panel tint + border (drawn over blur, inside clip region → rounded corners)
+                    // Panel tint + border — radius matches roundMask exactly (32)
                     Rectangle {
                         anchors.fill:parent; radius:32; color:root.cPanel
-                        border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.30)
+                        border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.1)
                     }
 
                     ColumnLayout {
@@ -606,7 +632,7 @@ ShellRoot {
                                         // Spindle removed; image itself rotates
                                         RotationAnimator on rotation {
                                             from:0; to:360
-                                            duration:16000
+                                            duration:100000
                                             loops:Animation.Infinite
                                             running:root.mediaStatus==="Playing"
                                         }
