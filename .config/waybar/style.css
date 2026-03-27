@@ -516,7 +516,7 @@ window.popup menuitem {
 /* ─────────────────────────────────────────────────────────┤ power button ├───
 */
 #custom-power {
-  color: @secondary_container;
+  color: @primary;
   background: linear-gradient(180deg, @inverse_primary, @scrim);
   margin-left: 6px;
   border-radius: 30px;

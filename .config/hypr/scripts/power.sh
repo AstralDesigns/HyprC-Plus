@@ -45,7 +45,7 @@ fi
 
 if [[ "$1" == "lock" ]]; then
   echo ":: Lock"
-  hyprlock
+  qs -c candylock
 fi
 
 if [[ "$1" == "reboot" ]]; then
@@ -64,7 +64,7 @@ fi
 
 if [[ "$1" == "suspend" ]]; then
   echo ":: Suspend"
-  hyprlock
+  qs -c candylock
   sleep 2
   loginctl suspend
 fi

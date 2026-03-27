@@ -401,10 +401,10 @@ ShellRoot {
                 GridLayout { Layout.fillWidth:true; columns:4; rowSpacing:6; columnSpacing:6
                     Repeater {
                         model:[
-                            {i:"",l:"Lock",    cmd:"loginctl lock-session",  logout:false},
-                            {i:"",l:"Reboot",  cmd:"systemctl reboot",        logout:false},
-                            {i:"󰤄",l:"Sleep",   cmd:"systemctl suspend",        logout:false},
-                            {i:"",l:"Shutdown",cmd:"systemctl poweroff",       logout:false},
+                            {i:"",l:"Lock",    cmd:"~/.config/hypr/scripts/power.sh lock",  logout:false},
+                            {i:"",l:"Reboot",  cmd:"~/.config/hypr/scripts/power.sh reboot",        logout:false},
+                            {i:"󰤄",l:"Sleep",   cmd:"~/.config/hypr/scripts/power.sh suspend",        logout:false},
+                            {i:"",l:"Shutdown",cmd:"~/.config/hypr/scripts/power.sh shutdown",       logout:false},
                         ]
                         delegate: Rectangle {
                             required property var modelData
