@@ -647,11 +647,11 @@ mkRow(panel, 'Border', borderE);
         if (btModuleOn) {
             // Uncomment lines 82-89
             GLib.spawn_async(null, ['sed', '-i', '31s|//"battery"|"battery"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
-            GLib.spawn_async(null, ['sed', '-i', '42s|"custom/system-monitor"|//"custom/system-monitor"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', '41s|"custom/system-monitor"|//"custom/system-monitor"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
         } else {
             // Comment lines 82-89
             GLib.spawn_async(null, ['sed', '-i', '31s|"battery"|//"battery"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
-            GLib.spawn_async(null, ['sed', '-i', '42s|//"custom/system-monitor"|"custom/system-monitor"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
+            GLib.spawn_async(null, ['sed', '-i', '41s|//"custom/system-monitor"|"custom/system-monitor"|g', WAYBAR_CONF], null, GLib.SpawnFlags.SEARCH_PATH, null, null);
         }
         GLib.spawn_command_line_async('killall -SIGUSR2 waybar');
         btModeBtn.set_label(btModuleOn ? 'Battery-Module: 󰄬' : 'Battery-Module: x');

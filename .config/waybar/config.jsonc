@@ -38,9 +38,9 @@
       "modules": [
           "custom/update",
           "power-profiles-daemon",
-          "idle_inhibitor",
           //"custom/system-monitor",
-          "custom/notification"
+          "custom/rofi",
+          "idle_inhibitor"
       ]
   },
   // ──────────────────────────────────────────────────────────┤ media group ├───
@@ -55,7 +55,7 @@
   "group/switch": {
       "orientation": "horizontal",
       "modules": [
-          "custom/rofi",
+          "custom/notifications",
           "custom/wallpaper",
           "custom/overview"
       ]
@@ -442,6 +442,15 @@
     "on-click-right": "~/.config/quickshell/wallpaper/wallpaper-cycle.sh",
   },
   
+  // ─────────────────────────────────────────────────────────┤ notifications ├───
+  
+  "custom/notifications": {
+    "format": "󰂜",
+    "tooltip": true,
+    "tooltip-format": "Notifcation Menu",
+    "on-click": "~/.config/hyprcandy/scripts/notifications.sh",
+  },
+  
   // ─────────────────────────────────────────────────────┤ system-monitor ├───
 
   "custom/system-monitor": {
@@ -482,8 +491,7 @@
       "default": "",
     },
     "tooltip": true,
-    "tooltip-format": "Left-click: start-menu\nRight-click: wlogout",
+    "tooltip-format": "Launch Start-Menu",
     "on-click": "~/.config/hyprcandy/scripts/startmenu.sh",
-    "on-click-right": "~/.config/waybar/scripts/wlogout.sh"
   },
 }

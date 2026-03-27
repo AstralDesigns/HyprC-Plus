@@ -91,7 +91,7 @@ tooltip label {
   color: @primary_container;
 }
 
-/* Urgent workspace (has urgent/notification windows) */
+/* Urgent workspace (has urgent/notifications windows) */
 #workspaces button.urgent {
   color: @critical;
 }
@@ -133,7 +133,7 @@ tooltip label {
 */
 
 #custom-cava-left {
-  color: @primary;
+  color: transparent;
   background: transparent;
   border-radius: 30px;
   margin-right: 0px;
@@ -218,7 +218,7 @@ tooltip label {
 */
 
 #custom-cava-right {
-  color: @primary;
+  color: transparent;
   background: transparent;
   border-radius: 30px;
   margin-left: 0px;
@@ -418,18 +418,18 @@ window.popup menuitem {
   border-radius: 8px;
 }
 
-/* ───────────────────────────────────────────────────────┤ SywaNC ├───
+/* ───────────────────────────────────────────────────────┤ N.Center ├───
 */
 
-#custom-notification {
+#custom-notifications {
   color: @primary;
   background: linear-gradient(180deg, @inverse_primary, @scrim);
   border-radius: 30px;
-  padding-left: 6px;
-  padding-right: 8px;
+  padding-left: 7px;
+  padding-right: 7px;
 }
 
-#custom-notification:hover {
+#custom-notifications:hover {
   color: @primary;
   background: linear-gradient(0deg, @inverse_primary, @scrim)
 }
@@ -642,7 +642,7 @@ tooltip label,
 #custom-player,
 #custom-wifi,
 #custom-update,
-#custom-notification,
+#custom-notifications,
 #idle_inhibitor,
 #bluetooth,
 #tray,
