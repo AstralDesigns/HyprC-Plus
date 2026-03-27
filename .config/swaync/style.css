@@ -197,13 +197,13 @@ button:hover {
 }
 
 .widget-title {
-  margin-right: 20px;
+  margin-right: 4px;
 }
 
 /* === Do Not Disturb === */
 
 .widget-dnd {
-  margin-right: 18px;
+  margin-right: 4px;
 }
 
 .widget-dnd > switch {

@@ -29,9 +29,6 @@
     "hide-on-action": true,
     "script-fail-notify": true,
     "widgets": [
-        "buttons-grid",
-        "volume",
-        "backlight",
         "dnd",
         "title",
         "notifications"
