@@ -198,6 +198,22 @@ ShellRoot {
     Process { id: logoutProc; command:["bash","-c","hyprctl dispatch exit"] }
     Process { id: powerProc; property string _cmd:""; command:["bash","-c",powerProc._cmd] }
 
+    // ── User icon — pre-process to circle via ImageMagick ─────────────────────
+    property string _userIconPath: ""
+    Process { id: smIconProc
+        property string _dst: "/tmp/qs_sm_user_circle.png"
+        property string _src: Quickshell.env("HOME")+"/.config/hyprcandy/user-icon.png"
+        command:["bash","-c",
+            "SRC='" + smIconProc._src + "'; DST='" + smIconProc._dst + "'; "+
+            "[ -f \"$SRC\" ] || exit 1; "+
+            "magick \"$SRC\" -resize 96x96^ -gravity center -extent 96x96 "+
+            "  \\( +clone -alpha extract -fill black -colorize 100 "+
+            "     -fill white -draw 'circle 48,48 48,0' \\) "+
+            "  -alpha off -compose CopyOpacity -composite -strip \"$DST\""]
+        onExited: function(code){ if(code===0) root._userIconPath = smIconProc._dst+"?"+Date.now() }
+        Component.onCompleted: running=true
+    }
+
     // ── Panel window ─────────────────────────────────────────────────────────
     PanelWindow {
         id: panel
@@ -243,11 +259,10 @@ ShellRoot {
 
                 // ── Row 1: user + power ────────────────────────────────────
                 RowLayout { Layout.fillWidth:true; spacing:8
-                    // User avatar — layer.enabled composites children through rounded mask
+                    // User avatar — circular PNG pre-rendered by ImageMagick
                     Rectangle { width:36;height:36;radius:18;color:root.cSurfHi
-                        layer.enabled:true
-                        Image { anchors.fill:parent; fillMode:Image.PreserveAspectCrop; source:"file://"+Quickshell.env("HOME")+"/.config/hyprcandy/user-icon.png"; smooth:true; visible:status===Image.Ready }
-                        Text { anchors.centerIn:parent; visible:parent.children[0].status!==Image.Ready; text:"󰀄"; font.pixelSize:20; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
+                        Image { id:smAvatar; anchors.fill:parent; fillMode:Image.PreserveAspectCrop; source:root._userIconPath?"file://"+root._userIconPath:""; smooth:true; mipmap:true; visible:root._userIconPath!=="" }
+                        Text { anchors.centerIn:parent; visible:!smAvatar.visible; text:"󰀄"; font.pixelSize:20; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
                     }
                     ColumnLayout { Layout.fillWidth:true; spacing:1
                         Text { text:Quickshell.env("USER"); color:root.cOnSurf; font.pixelSize:13; font.weight:Font.Medium }
