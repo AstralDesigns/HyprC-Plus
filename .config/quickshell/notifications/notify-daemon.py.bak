@@ -98,6 +98,7 @@ def main():
         sys.exit(1)
 
     svc = NotificationService(session_bus)
+    
 
     loop = GLib.MainLoop()
     try:

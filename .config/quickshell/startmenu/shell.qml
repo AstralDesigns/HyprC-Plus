@@ -60,6 +60,7 @@ ShellRoot {
     property bool menuVisible: false
     property bool waybarAtBottom: false
     property real waybarSideMargin: 12
+    property real waybarOuterRadius: 20
     FileView {
         path: Quickshell.env("HOME")+"/.config/hyprcandy/waybar-position.txt"
         watchChanges: true; onFileChanged: reload()
@@ -69,6 +70,11 @@ ShellRoot {
         path: Quickshell.env("HOME")+"/.config/hyprcandy/waybar_side_margin.state"
         watchChanges: true; onFileChanged: reload()
         onLoaded: { const v=parseFloat(text().trim()); if(!isNaN(v)&&v>=0) root.waybarSideMargin=v }
+    }
+    FileView {
+        path: Quickshell.env("HOME")+"/.config/hyprcandy/waybar_outer_radius.state"
+        watchChanges: true; onFileChanged: reload()
+        onLoaded: { const v=parseFloat(text().trim()); if(!isNaN(v)&&v>=0) root.waybarOuterRadius=v }
     }
 
     IpcHandler { target: "startmenu"
@@ -114,6 +120,10 @@ ShellRoot {
     function toggleMute(){ const c="pactl set-sink-mute @DEFAULT_SINK@ toggle"; if(volSetProc.running){ volSetProc._queued=c } else { volSetProc._cmd=c; volSetProc.running=true; muteRefreshTimer.restart() } }
     Timer { id:muteRefreshTimer; interval:350; repeat:false; onTriggered: if(!volReadProc.running) volReadProc.running=true }
     Timer { interval:250; running:true; repeat:false; onTriggered: if(!volReadProc.running) volReadProc.running=true }
+
+    // ── Clock tick — re-evaluates the date/time binding every 10s ────────
+    property date _now: new Date()
+    Timer { interval:10000; repeat:true; running:true; onTriggered: root._now = new Date() }
 
     // ── Network ────────────────────────────────────────────────────────────────
     property bool networkExpanded: false
@@ -188,7 +198,9 @@ ShellRoot {
         property var _buf: []
         command: ["bash", "-c",
             "POWERED=$(bluetoothctl show 2>/dev/null | grep 'Powered:' | awk '{print $2}'); " +
+            "DISC=$(bluetoothctl show 2>/dev/null | grep 'Discoverable:' | awk '{print $2}'); " +
             "echo \"POWERED:$POWERED\"; " +
+            "echo \"DISCOVERABLE:$DISC\"; " +
             "ALL=$(bluetoothctl devices 2>/dev/null); " +
             "CONN=$(bluetoothctl devices Connected 2>/dev/null); " +
             "echo \"$ALL\" | while read -r line; do " +
@@ -197,16 +209,20 @@ ShellRoot {
             "  name=$(echo \"$line\" | cut -d' ' -f3-); " +
             "  [ -z \"$name\" ] && name=$mac; " +
             "  if echo \"$CONN\" | grep -q \"$mac\"; then c=1; else c=0; fi; " +
-            "  echo \"DEV:$mac|$name|$c\"; " +
+            "  cls=$(bluetoothctl info \"$mac\" 2>/dev/null | grep 'Class:' | awk '{print $2}'); " +
+            "  ico=$(bluetoothctl info \"$mac\" 2>/dev/null | grep 'Icon:' | awk '{print $2}'); " +
+            "  echo \"DEV:$mac|$name|$c|$ico\"; " +
             "done"
         ]
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
             if (l.startsWith("POWERED:"))
                 root.btPowered = l.slice(8).trim() === "yes"
+            else if (l.startsWith("DISCOVERABLE:"))
+                root.btDiscoverable = l.slice(13).trim() === "yes"
             else if (l.startsWith("DEV:")) {
                 const p = l.slice(4).split("|")
                 if (p.length >= 3)
-                    btStatusProc._buf.push({ mac: p[0], name: p[1] || p[0], connected: p[2] === "1" })
+                    btStatusProc._buf.push({ mac:p[0], name:p[1]||p[0], connected:p[2]==="1", icon:p[3]||"" })
             }
         }}
         onRunningChanged: if (running) _buf = []
@@ -224,6 +240,18 @@ ShellRoot {
     function toggleBtPower() {
         btPowerProc._cmd = root.btPowered ? "bluetoothctl power off" : "bluetoothctl power on"
         if (!btPowerProc.running) btPowerProc.running = true
+    }
+    function toggleBtDiscoverable() {
+        btPowerProc._cmd = root.btDiscoverable
+            ? "bluetoothctl discoverable off"
+            : "bluetoothctl discoverable on && bluetoothctl pairable on"
+        if (!btPowerProc.running) btPowerProc.running = true
+    }
+    function btRepair(mac) {
+        // Remove stale pairing data then reconnect — fixes "wrong PIN" after failed pair
+        root.btConnecting = mac; btConnProc._lastMac = mac
+        btConnProc._cmd = "bluetoothctl remove " + mac + " 2>/dev/null; sleep 0.5; bluetoothctl pair " + mac
+        if (!btConnProc.running) btConnProc.running = true
     }
 
     // ── Discovery scan (20-second timeout, live refresh every 3s while scanning)
@@ -331,6 +359,7 @@ ShellRoot {
 
     // ── File receive: start/stop obexd auto-accept to ~/Downloads ─────────────
     property bool btReceiving: false
+    property bool btDiscoverable: false
     Process { id: btObexProc; property string _cmd: ""
         command: ["bash", "-c", btObexProc._cmd]
         onExited: root.btReceiving = false
@@ -400,6 +429,21 @@ ShellRoot {
         Component.onCompleted: running=true
     }
 
+    // ── Close on real-window focus ────────────────────────────────────────────
+    //  HyprlandFocusedClient.address changes whenever Hyprland reports a newly
+    //  focused *client* (a regular XDG toplevel window).  Layer shells — waybar,
+    //  rofi, the dock, other quickshell panels — are NOT tracked as focused
+    //  clients, so interacting with them leaves the menu open as intended.
+    //  Only clicking into a real app window closes the menu.
+    Connections {
+        target: HyprlandFocusedClient
+        function onAddressChanged() {
+            if (HyprlandFocusedClient.address !== "") {
+                root.menuVisible = false
+            }
+        }
+    }
+
     // ── Panel window ─────────────────────────────────────────────────────────
     PanelWindow {
         id: panel
@@ -408,28 +452,16 @@ ShellRoot {
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
         anchors { top: !root.waybarAtBottom; bottom: root.waybarAtBottom; right: true }
-        margins { top: 2; right: root.waybarSideMargin; bottom: 2 }
+        margins { top: 6; right: root.waybarSideMargin; bottom: 6 }
         width: 340
         height: mainCol.implicitHeight + 32
         color: "transparent"
-
-        HyprlandFocusGrab {
-            id: focusGrab
-            windows: [panel]
-            active: false
-            onCleared: { if(!active) root.menuVisible = false }
-        }
-        Connections { target: root; function onMenuVisibleChanged() {
-            if(root.menuVisible) grabDelayTimer.restart()
-            else focusGrab.active = false
-        }}
-        Timer { id:grabDelayTimer; interval:80; repeat:false; onTriggered: { if(root.menuVisible) focusGrab.active=true } }
 
         Rectangle {
             id: panelRect
             anchors.fill: parent
             color: root.cPanelBg
-            radius: 20
+            radius: root.waybarOuterRadius
             focus: true
             border.width: 1; border.color: Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.40)
             scale: root.menuVisible ? 1.0 : 0.92
@@ -452,18 +484,38 @@ ShellRoot {
                     }
                     ColumnLayout { Layout.fillWidth:true; spacing:1
                         Text { text:Quickshell.env("USER"); color:root.cOnSurf; font.pixelSize:13; font.weight:Font.Medium }
-                        Text { text:Qt.formatDate(new Date(),"ddd d MMM")+" · "+Qt.formatTime(new Date(),"hh:mm"); color:root.cOnSurfVar; font.pixelSize:10 }
+                        Text { text:Qt.formatDate(root._now,"ddd d MMM")+" · "+Qt.formatTime(root._now,"hh:mm"); color:root.cOnSurfVar; font.pixelSize:10 }
                     }
                     // Recorder + screenshot
                     Rectangle {
                         width:30;height:30;radius:15
-                        color:rrh.containsMouse?Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.18):Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.6)
-                        border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.55)
+                        color: root.isRecording
+                            ? "transparent"
+                            : rrh.containsMouse
+                                ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.18)
+                                : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.6)
+                        border.width:1
+                        border.color: root.isRecording
+                            ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.85)
+                            : Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.55)
                         Behavior on color{ColorAnimation{duration:100}}
+
+                        // Bold gradient fill while recording — visible in both light + dark themes
+                        Rectangle {
+                            anchors.fill:parent; radius:parent.radius
+                            visible: root.isRecording
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position:0.0; color:Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.85) }
+                                GradientStop { position:1.0; color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.70) }
+                            }
+                        }
+
                         Text { anchors.centerIn:parent; text:"󰑋"; font.pixelSize:15; font.family:"Symbols Nerd Font Mono"
-                            color:root.isRecording?root.cErr:root.cOnSurfVar
+                            color: root.isRecording ? root.cOnPrim : root.cOnSurfVar
+                            Behavior on color{ColorAnimation{duration:100}}
                             SequentialAnimation on opacity { running:root.isRecording; loops:Animation.Infinite
-                                NumberAnimation{to:0.2;duration:500}
+                                NumberAnimation{to:0.3;duration:500}
                                 NumberAnimation{to:1.0;duration:500}
                             }
                         }
@@ -477,36 +529,55 @@ ShellRoot {
                         Text { anchors.centerIn:parent; text:"󰹑"; font.pixelSize:15; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
                         MouseArea{id:ssh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:root.takeScreenshot()}
                     }
+                    Rectangle {
+                    height: 24; width: 45; radius: 8
+                    color: clsH.containsMouse
+                        ? Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.0)
+                        : "transparent"
+                    }
+                    Rectangle {
+                    height: 24; width: 24; radius: 8
+                    color: clsH.containsMouse
+                        ? Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.9)
+                        : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    
+                    Text { anchors.centerIn: parent; text: "×"
+                        font.pixelSize: 12; color: root.cOnSurfVar }
+                    MouseArea { id: clsH; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.menuVisible = false }
+                    }
                 }
 
                 Rectangle { Layout.fillWidth:true; height:1; color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.25) }
 
                 // ── Brightness ────────────────────────────────────────────
                 RowLayout { Layout.fillWidth:true; spacing:10
-                    Text { text:"󰃟"; font.pixelSize:16; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary }
-                    Text { text:"Brightness"; color:root.cOnSurfVar; font.pixelSize:12; Layout.preferredWidth:68 }
+                    Text { text:"󰃟"; font.pixelSize:17; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary }
+                    Text { text:"Brightness"; color:root.cOnSurfVar; font.pixelSize:13; Layout.preferredWidth:72 }
                     SliderBg {
-                        Layout.fillWidth:true; height:16
+                        Layout.fillWidth:true; height:20
                         value:root.backlightValue
                         onMoved: function(v){ root.backlightValue=v; root.setBacklight(v) }
                         gradA:root.cInvPrimary; gradB:root.cOnPrim; track:root.cOutVar
                     }
-                    Text { text:Math.round(root.backlightValue*100)+"%"; color:root.cOnSurfVar; font.pixelSize:10; Layout.preferredWidth:28; horizontalAlignment:Text.AlignRight }
+                    Text { text:Math.round(root.backlightValue*100)+"%"; color:root.cOnSurfVar; font.pixelSize:11; Layout.preferredWidth:30; horizontalAlignment:Text.AlignRight }
                 }
 
                 // ── Volume ────────────────────────────────────────────────
                 RowLayout { Layout.fillWidth:true; spacing:10
-                    Text { text:root.volumeMuted?"󰖁":"󰕾"; font.pixelSize:16; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary
+                    Text { text:root.volumeMuted?"󰖁":"󰕾"; font.pixelSize:17; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary
                         MouseArea{anchors.fill:parent;cursorShape:Qt.PointingHandCursor;onClicked:root.toggleMute()}
                     }
-                    Text { text:"Volume"; color:root.cOnSurfVar; font.pixelSize:12; Layout.preferredWidth:68 }
+                    Text { text:"Volume"; color:root.cOnSurfVar; font.pixelSize:13; Layout.preferredWidth:72 }
                     SliderBg {
-                        Layout.fillWidth:true; height:16
+                        Layout.fillWidth:true; height:20
                         value:root.volumeValue
                         onMoved: function(v){ root.volumeValue=v; root.setVolume(v) }
                         gradA:root.cInvPrimary; gradB:root.cOnPrim; track:root.cOutVar
                     }
-                    Text { text:Math.round(root.volumeValue*100)+"%"; color:root.cOnSurfVar; font.pixelSize:10; Layout.preferredWidth:28; horizontalAlignment:Text.AlignRight }
+                    Text { text:Math.round(root.volumeValue*100)+"%"; color:root.cOnSurfVar; font.pixelSize:11; Layout.preferredWidth:30; horizontalAlignment:Text.AlignRight }
                 }
 
                 Rectangle { Layout.fillWidth:true; height:1; color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.25) }
@@ -635,13 +706,29 @@ ShellRoot {
                         width: parent.width
                         spacing: 2
 
-                        // Toolbar: Scan toggle + Receive files toggle
+                        // Toolbar: Scan + Discoverable + Receive
                         Row {
                             width: parent.width; spacing: 6
+                            // Discoverable toggle
+                            Rectangle {
+                                height: 26; radius: 8; width: 96
+                                color: root.btDiscoverable
+                                    ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20)
+                                    : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.6)
+                                border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45)
+                                Behavior on color{ColorAnimation{duration:120}}
+                                RowLayout { anchors.centerIn:parent; spacing:4
+                                    Text { text:"󰂯"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"
+                                        color:root.btDiscoverable?root.cPrimary:root.cOnSurfVar }
+                                    Text { text:root.btDiscoverable?"Visible":"Hidden"; font.pixelSize:9; color:root.cOnSurfVar }
+                                }
+                                MouseArea { anchors.fill:parent; cursorShape:Qt.PointingHandCursor
+                                    onClicked: root.btPowered ? root.toggleBtDiscoverable() : root.toggleBtPower() }
+                            }
                             // Scan button
                             Rectangle {
                                 height: 26; radius: 8
-                                width: 90
+                                width: 82
                                 color: root.btScanning
                                     ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20)
                                     : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.6)
@@ -705,9 +792,26 @@ ShellRoot {
                                     border.color: Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.5)
 
                                     RowLayout { anchors.fill:parent; anchors.leftMargin:8; anchors.rightMargin:8; spacing:6
-                                        // Device type icon (generic BT icon; could be refined)
-                                        Text { text:"󰂯"; font.pixelSize:13; font.family:"Symbols Nerd Font Mono"
-                                            color: btDelegate.modelData.connected ? root.cPrimary : root.cOnSurfVar }
+                                        // Per-device-type icon based on BlueZ Icon class
+                                        Text {
+                                            font.pixelSize:13; font.family:"Symbols Nerd Font Mono"
+                                            color: btDelegate.modelData.connected ? root.cPrimary : root.cOnSurfVar
+                                            text: {
+                                                const ic = (btDelegate.modelData.icon||"").toLowerCase()
+                                                if (ic==="audio-headset"||ic==="audio-headphones") return "󰋎"
+                                                if (ic==="audio-card"||ic.includes("speaker"))    return "󰓃"
+                                                if (ic==="input-keyboard")  return "󰌌"
+                                                if (ic==="input-mouse")     return "󰍽"
+                                                if (ic==="input-gaming")    return "󰊗"
+                                                if (ic==="phone")           return "󰏲"
+                                                if (ic==="computer")        return "󰋊"
+                                                if (ic==="printer")         return "󰐪"
+                                                if (ic==="camera-photo")    return "󰄲"
+                                                if (ic==="camera-video")    return "󰕧"
+                                                if (ic==="modem"||ic==="network-wireless") return "󰤨"
+                                                return "󰂯"
+                                            }
+                                        }
                                         Text { Layout.fillWidth:true; text:btDelegate.modelData.name; color:root.cOnSurf; font.pixelSize:11; elide:Text.ElideRight }
 
                                         // Connecting spinner
@@ -777,12 +881,12 @@ ShellRoot {
                                             Item { Layout.fillWidth:true }
                                         }
 
-                                        // Action buttons row: Send File + Forget
+                                        // Action buttons row: Send File + Repair + Forget
                                         RowLayout {
                                             width: parent.width; spacing: 4
                                             // Send File
                                             Rectangle {
-                                                height:22; radius:6; width:90
+                                                height:22; radius:6; width:84
                                                 color:sfh.containsMouse
                                                     ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20)
                                                     : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
@@ -795,10 +899,24 @@ ShellRoot {
                                                 MouseArea{id:sfh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor
                                                     onClicked: root.btSendFile(btDelegate.modelData.mac) }
                                             }
-                                            Item { Layout.fillWidth:true }
+                                            // Repair button
+                                            Rectangle {
+                                                height:22; radius:6; width:62
+                                                color:rph.containsMouse
+                                                    ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.22)
+                                                    : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
+                                                border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45)
+                                                Behavior on color{ColorAnimation{duration:100}}
+                                                RowLayout { anchors.centerIn:parent; spacing:4
+                                                    Text { text:"󰑓"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
+                                                    Text { text:"Repair"; font.pixelSize:10; color:root.cOnSurfVar }
+                                                }
+                                                MouseArea{id:rph;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor
+                                                    onClicked: root.btRepair(btDelegate.modelData.mac) }
+                                            }
                                             // Forget/Remove device
                                             Rectangle {
-                                                height:22; radius:6; width:70
+                                                height:22; radius:6; width:62
                                                 color:fgh.containsMouse
                                                     ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.18)
                                                     : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
@@ -914,59 +1032,76 @@ ShellRoot {
     component SliderBg: Item {
         id: sl
         property real value: 0.0
-        property color gradA:  root.cInvPrimary   // inversePrimary — passed by callers too
-        property color gradB:  root.cOnPrim        // onPrimary
-        property color track:  root.cOutVar        // outlineVariant
-        property color accent: root.cPrimary       // live matugen primary — border + thumb
+        property color gradA:  root.cInvPrimary
+        property color gradB:  root.cOnPrim
+        property color track:  root.cOutVar
+        property color accent: root.cPrimary
         signal moved(real v)
 
-        // Track (height 8, radius 4, 1px primary border)
-        Item {
-            y:(parent.height-8)/2; width:parent.width; height:8
+        // Trough — taller, with inner padding so fill + thumb sit inside it
+        // Inner padding: 3px top+bottom, so fill height = trackH - 6
+        readonly property int trackH: 14       // full trough height
+        readonly property int pad:    3         // inner vertical padding
+        readonly property int innerH: trackH - pad * 2   // = 8
 
+        Item {
+            y: (parent.height - sl.trackH) / 2
+            width: parent.width; height: sl.trackH
+
+            // Trough background
             Rectangle {
-                anchors.fill:parent; radius:4
-                color:Qt.rgba(sl.track.r,sl.track.g,sl.track.b,0.28)
-                border.width:1; border.color:Qt.rgba(sl.accent.r,sl.accent.g,sl.accent.b,0.6)
+                anchors.fill: parent; radius: sl.trackH / 2
+                color: Qt.rgba(sl.track.r, sl.track.g, sl.track.b, 0.28)
+                border.width: 1; border.color: Qt.rgba(sl.accent.r, sl.accent.g, sl.accent.b, 0.55)
             }
 
-            // Filled gradient — inner rect sized to full track width, clip Item limits visible area
+            // Gradient fill — inset by pad, clipped to left portion
             Item {
-                x:1; y:1
-                width:  Math.max(0, (parent.width-2) * sl.value)
-                height: parent.height - 2
+                x: sl.pad; y: sl.pad
+                width:  Math.max(0, (parent.width - sl.pad * 2) * sl.value)
+                height: sl.innerH
                 clip:   true
                 Rectangle {
-                    width:  sl.width   // full slider width so gradient proportions are consistent
-                    height: parent.height
-                    radius: 3
+                    // Full-width gradient so proportions stay consistent regardless of fill amount
+                    width:  parent.parent.width - sl.pad * 2
+                    height: sl.innerH
+                    radius: sl.innerH / 2
                     gradient: Gradient {
                         orientation: Gradient.Horizontal
-                        GradientStop { position:0.0; color:sl.gradA }
-                        GradientStop { position:1.0; color:sl.gradB }
+                        GradientStop { position: 0.0; color: sl.gradA }
+                        GradientStop { position: 1.0; color: sl.gradB }
                     }
                 }
             }
 
-            // Thumb — circle centered on the fill edge
-            Rectangle {
-                width:12; height:12; radius:6
-                x: Math.max(-4, Math.min(parent.width-8, (parent.width)*sl.value - 6))
-                y: (parent.height-12)/2
-                color:  sl.accent
-                border.width:1; border.color:Qt.rgba(sl.accent.r,sl.accent.g,sl.accent.b,0.9)
+            // Thumb — dot-circle glyph (󰟃 nf-md-dots) sitting inside the trough
+            // Sized to innerH so it never overflows the trough boundary
+            Text {
+                text: "󰟃"
+                font.family: "Symbols Nerd Font Mono"
+                font.pixelSize: sl.innerH + 2   // slightly larger than inner for crisp rendering
+                color: sl.accent
+                style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.25)
+                // Centre vertically in trough; x tracks fill edge
+                x: {
+                    const tw = parent.width - sl.pad * 2
+                    const cx = sl.pad + tw * sl.value - implicitWidth / 2
+                    return Math.max(sl.pad - implicitWidth/2 + 1,
+                           Math.min(parent.width - sl.pad - implicitWidth/2 - 1, cx))
+                }
+                y: (sl.trackH - implicitHeight) / 2
             }
         }
 
         MouseArea {
-            anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
-            preventStealing:true
-            onPressed:        function(m){ const v=Math.max(0,Math.min(1,m.x/width)); sl.value=v; sl.moved(v) }
-            onPositionChanged:function(m){ if(pressed){ const v=Math.max(0,Math.min(1,m.x/width)); sl.value=v; sl.moved(v) } }
-            onWheel:          function(e){
-                const step=0.02*(e.angleDelta.y>0?1:-1)
-                const v=Math.max(0,Math.min(1,sl.value+step))
-                sl.value=v; sl.moved(v)
+            anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+            preventStealing: true
+            onPressed:         function(m){ const v=Math.max(0,Math.min(1,m.x/width)); sl.value=v; sl.moved(v) }
+            onPositionChanged: function(m){ if(pressed){ const v=Math.max(0,Math.min(1,m.x/width)); sl.value=v; sl.moved(v) } }
+            onWheel:           function(e){
+                const step = 0.02 * (e.angleDelta.y > 0 ? 1 : -1)
+                const v = Math.max(0, Math.min(1, sl.value + step))
+                sl.value = v; sl.moved(v)
             }
         }
     }

@@ -520,6 +520,41 @@ mkRow(panel, 'Border', borderE);
     });
     mkRow(panel, 'Bottom', botE);
 
+    // Cava Width — edits --width flag for both custom/cava-left and custom/cava-right
+    // in config.jsonc.  State is persisted to ~/.config/hyprcandy/cava-width.state
+    // so the value survives waybar restarts and candy-utils reopens.
+    const cavaWidthE = mkEntry(5);
+    function _loadCavaWidth() {
+        // Prefer state file
+        try {
+            const sv = loadState('cava-width.state', '');
+            if (sv) return sv;
+        } catch (e) {}
+        // Fall back to reading from config.jsonc (first --width occurrence)
+        try {
+            let [ok, c] = GLib.file_get_contents(WAYBAR_CONF);
+            if (ok && c) {
+                let m = imports.byteArray.toString(c).match(/--width\s+(\d+)/);
+                if (m) return m[1];
+            }
+        } catch (e) {}
+        return '10';
+    }
+    cavaWidthE.set_text(_loadCavaWidth());
+    cavaWidthE.connect('activate', () => {
+        const n = parseInt(cavaWidthE.get_text());
+        if (isNaN(n) || n < 1 || n > 200) return;
+        // Replace --width <old> with --width <new> for both cava-left and cava-right
+        // sed -E handles multiple occurrences in one pass
+        GLib.spawn_command_line_async(
+            `sed -i -E 's/(--width )([0-9]+)/\\1${n}/g' '${WAYBAR_CONF}'`
+        );
+        // Reload waybar config without restart
+        GLib.spawn_command_line_async('killall -SIGUSR2 waybar');
+        saveState('cava-width.state', n.toString());
+    });
+    mkRow(panel, 'Cava Width', cavaWidthE);
+
     // Start Icon — targets distro "default" icon on line 230 of config.jsonc
     const distroE = mkEntry(5);
     function loadDistroIcon() {
@@ -660,32 +695,6 @@ mkRow(panel, 'Border', borderE);
         saveBool('bt_module_mode.state', btModuleOn);
     });
     panel.append(btModeBtn);
-    
-    // Notification center direction — cycles right → left → center → right
-    const NT_POSITIONS = ['right', 'center', 'left'];
-    const NT_GLYPHS    = { right: '󰁔', center: '󰘞', left: '󰁍' };
-
-    let ntPos = loadState('nt_pos.state', 'right');
-    // Sanitise legacy bool values ('enabled'/'disabled') from the old two-state toggle
-    if (!NT_POSITIONS.includes(ntPos)) ntPos = 'right';
-
-    const _ntLabel = () => `󰂚 Center: ${NT_GLYPHS[ntPos]}`;
-    const ntPosBtn = mkToggle(_ntLabel(), ntPos !== 'right');
-
-    ntPosBtn.connect('clicked', () => {
-        const prev = ntPos;
-        ntPos = NT_POSITIONS[(NT_POSITIONS.indexOf(ntPos) + 1) % NT_POSITIONS.length];
-        // Replace whatever positionX value was there with the new one
-        GLib.spawn_command_line_async(
-            `sed -i 's/"positionX": "${prev}",/"positionX": "${ntPos}",/' '${SWAYNC_CONF}'`
-        );
-        GLib.spawn_command_line_async('killall swaync');
-        ntPosBtn.set_label(_ntLabel());
-        if (ntPos !== 'right') ntPosBtn.add_css_class('cc-active');
-        else                   ntPosBtn.remove_css_class('cc-active');
-        saveState('nt_pos.state', ntPos);
-    });
-    panel.append(ntPosBtn);
 
     return panel;
 }
@@ -1303,7 +1312,7 @@ function createControlCenterContent() {
     const menuDefs = [
         [' Hyprland',  'hyprland'],
         ['󰔎 Themes',    'themes'],
-        ['󱟛 Bar  󰂚 Center',    'waybar'],
+        ['󱟛 Bar',    'waybar'],
         ['󰞒  Dock',      'dock'],
         //['  SwayNC',    'swaync'],
         ['󰮫 Menus',      'rofi'],

@@ -40,7 +40,7 @@
           "power-profiles-daemon",
           //"custom/system-monitor",
           "custom/rofi",
-          "idle_inhibitor"
+          "custom/idle_inhibitor"
       ]
   },
   // ──────────────────────────────────────────────────────────┤ media group ├───
@@ -131,7 +131,7 @@
   // ──────────────────────────────────────────────────────────────┤ cava ├───
 
   "custom/cava-left": {
-    "exec": "python3 ~/.config/waybar/scripts/cava.py waybar --json --left --width 10 --bar '⣀⣄⣤⣦⣶⣷⣿' --transparent-when-inactive",
+    "exec": "python3 ~/.config/waybar/scripts/cava.py waybar --json --left --width 25 --bar '⣀⣄⣤⣦⣶⣷⣿' --transparent-when-inactive",
     "return-type": "json",
     "format": "{}",
     "restart-interval": 0,
@@ -143,7 +143,7 @@
   // ──────────────────────────────────────────────────────────────┤ cava ├───
 
   "custom/cava-right": {
-    "exec": "python3 ~/.config/waybar/scripts/cava.py waybar --json --right --width 10 --bar '⣀⣄⣤⣦⣶⣷⣿' --transparent-when-inactive",
+    "exec": "python3 ~/.config/waybar/scripts/cava.py waybar --json --right --width 25 --bar '⣀⣄⣤⣦⣶⣷⣿' --transparent-when-inactive",
     "return-type": "json",
     "format": "{}",
     "restart-interval": 0,
@@ -245,17 +245,14 @@
 
   // ─────────────────────────────────────────────────────┤ idle inhibitor ├───
 
-  "idle_inhibitor": {
-    "format": "{icon}",
-
-    "format-icons": {
-      "activated": "󰅶 ",
-      "deactivated": "󰾪 "
-    },
-
-    "tooltip-format-activated": "Caffeine Mode On",
-    "tooltip-format-deactivated": "Caffeine Mode Off",
-    "start-activated": false
+  "custom/idle_inhibitor": {
+    "exec": "~/.config/waybar/scripts/idle-inhibitor.sh status",
+    "return-type": "json",
+    "format": "{}",
+    "interval": "once",
+    "signal": 10,
+    "on-click": "~/.config/waybar/scripts/idle-inhibitor.sh toggle",
+    "tooltip": true
   },
 
   // ───────────────────────────────────────────────────────────────┤ time ├───
@@ -443,12 +440,20 @@
   },
   
   // ─────────────────────────────────────────────────────────┤ notifications ├───
-  
+  // Icon and state are pushed by shell-notifications.qml via signal 12
+  // whenever dnd / inhibitor / unread count changes.
+  // Left-click: toggle history panel   Right-click: toggle DnD
   "custom/notifications": {
-    "format": "󰂜",
+    "exec": "cat ~/.cache/quickshell/notifications/waybar-state.json 2>/dev/null || echo '{\"text\":\"󰂜\",\"tooltip\":\"Notifications\",\"class\":\"\",\"alt\":\"none\"}'",
+    "return-type": "json",
+    "format": "{}",
+    "interval": "once",
+    "signal": 12,
     "tooltip": true,
-    "tooltip-format": "Notifcation Menu",
-    "on-click": "~/.config/hyprcandy/scripts/notifications.sh",
+    "on-click":       "~/.config/hyprcandy/scripts/notifications.sh",
+    "on-click-right": "qs ipc call notifications dndToggle",
+    "min-length": 1,
+    "max-length": 1
   },
   
   // ─────────────────────────────────────────────────────┤ system-monitor ├───
@@ -472,7 +477,8 @@
     },
 
     "format": "{icon} {capacity}%",
-    "format-icons": ["󰂎", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
+    //"format-icons": ["󰂎", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
+    "format-icons": ["", "", "󰪞", "󰪟", "󰪠", "󰪡", "󰪢", "󰪣", "󰪤", "󰪥"],
     "format-charging": " {capacity}%",
     "tooltip-format": "Discharging: {time}\n\nLeft-click: System-Monitor-Widget\nRight-click: System-Monitor-App",
     "tooltip-format-charging": "Charging: {time}\n\nLeft-click: System-Monitor-Widget\nRight-click: System-Monitor-App",

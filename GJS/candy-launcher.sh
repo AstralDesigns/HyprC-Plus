@@ -33,19 +33,19 @@ OPEN_COUNT=$(get_open_count)
 
 case $OPEN_COUNT in
     0)
+        # Two open - open Media Player
+        touch "$TOGGLE_DIR/toggle-media"
+        notify-send "Candy Widgets" "󰲸  Opening Media Player" -t 2000 2>/dev/null || true
+        ;;
+    1)
         # None open - open Utils first
         touch "$TOGGLE_DIR/toggle-utils"
         notify-send "Candy Widgets" "  Opening Utilities" -t 2000 2>/dev/null || true
         ;;
-    1)
+    2)
         # One open - open System Monitor
         touch "$TOGGLE_DIR/toggle-system"
         notify-send "Candy Widgets" "  Opening System Monitor" -t 2000 2>/dev/null || true
-        ;;
-    2)
-        # Two open - open Media Player
-        touch "$TOGGLE_DIR/toggle-media"
-        notify-send "Candy Widgets" "󰲸  Opening Media Player" -t 2000 2>/dev/null || true
         ;;
     3)
         # Three open - open Weather

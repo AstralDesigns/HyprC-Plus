@@ -133,7 +133,7 @@ tooltip label {
 */
 
 #custom-cava-left {
-  color: transparent;
+  color: @primary;
   background: transparent;
   border-radius: 30px;
   margin-right: 0px;
@@ -218,7 +218,7 @@ tooltip label {
 */
 
 #custom-cava-right {
-  color: transparent;
+  color: @primary;
   background: transparent;
   border-radius: 30px;
   margin-left: 0px;
@@ -294,9 +294,9 @@ tooltip label {
   background: linear-gradient(0deg, @inverse_primary, @scrim)
 }
 
-/* ───────────────────────────────────────────────────────┤ idle_inhibitor ├───
+/* ───────────────────────────────────────────────────────┤ custom-idle_inhibitor ├───
 */
-#idle_inhibitor {
+#custom-idle_inhibitor {
   color: @primary;
   background: linear-gradient(180deg, @inverse_primary, @scrim);
   margin-right: 1px;
@@ -305,7 +305,7 @@ tooltip label {
   padding-right: 1px;
 }
 
-#idle_inhibitor:hover {
+#custom-idle_inhibitor:hover {
   color: @primary;
   background: linear-gradient(0deg, @inverse_primary, @scrim)
 }
@@ -643,7 +643,7 @@ tooltip label,
 #custom-wifi,
 #custom-update,
 #custom-notifications,
-#idle_inhibitor,
+#custom-idle_inhibitor,
 #bluetooth,
 #tray,
 #power-profiles-daemon,

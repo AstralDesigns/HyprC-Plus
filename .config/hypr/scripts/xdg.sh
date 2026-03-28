@@ -16,9 +16,8 @@ sleep 1
 systemctl --user stop \
     pipewire \
     wireplumber \
-    background-watcher \
     waybar-idle-monitor \
-    waypaper-watcher \
+	hyprlock-watcher \
     xdg-desktop-portal \
     xdg-desktop-portal-hyprland \
     xdg-desktop-portal-gtk
@@ -38,6 +37,5 @@ sleep 1
 systemctl --user start \
     pipewire \
     wireplumber \
-    background-watcher \
-    waybar-idle-monitor \
-    waypaper-watcher
+	hyprlock-watcher \
+    waybar-idle-monitor

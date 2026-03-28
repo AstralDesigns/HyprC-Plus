@@ -7,4 +7,5 @@ if pgrep -f "/usr/bin/waybar" > /dev/null; then
 else
     # If not running, start it
     systemctl --user restart waybar.service
+    bash "$HOME/.config/waybar/scripts/idle-inhibitor.sh"
 fi

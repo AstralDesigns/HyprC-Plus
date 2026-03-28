@@ -5,23 +5,18 @@ import Quickshell.Hyprland
 import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Effects
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Quickshell Notification + Bluetooth Agent Center
 //  ~/.config/quickshell/notifications/shell.qml
-//
-//  Replaces swaync. Handles:
-//    • org.freedesktop.Notifications  (via dbus-monitor, no external daemon)
-//    • BT pair confirm / PIN prompts  (via bt-agent.py → Process pipe)
-//    • OBEX file transfer prompts     (via bt-agent.py)
-//    • Persistent notification history tray (toggle via IPC "notifications")
-//    • Matugen live color theming identical to startmenu
+//  toggle: qs -c notifications
 // ═══════════════════════════════════════════════════════════════════════════
 
 ShellRoot {
     id: root
 
-    // ── Matugen colors (mirrored from startmenu) ──────────────────────────
+    // ── Matugen colors ────────────────────────────────────────────────────
     property string _m3primary:              "#f7c382"
     property string _m3onPrimary:            "#1d1100"
     property string _m3onSecondary:          "#100a00"
@@ -34,16 +29,16 @@ ShellRoot {
     property string _m3inversePrimary:       "#69361d"
     property string _m3error:               "#ffb4ab"
 
-    readonly property color cPrimary:    Qt.color(_m3primary)
-    readonly property color cOnPrim:     Qt.color(_m3onPrimary)
-    readonly property color cSurfHi:     Qt.color(_m3surfaceContainerHigh)
-    readonly property color cSurfMid:    Qt.color(_m3surfaceContainer)
-    readonly property color cOnSurf:     Qt.color(_m3onSurface)
-    readonly property color cOnSurfVar:  Qt.color(_m3onSurfaceVariant)
-    readonly property color cOutVar:     Qt.color(_m3outlineVariant)
-    readonly property color cInvPrim:    Qt.color(_m3inversePrimary)
-    readonly property color cErr:        Qt.color(_m3error)
-    readonly property color cPanelBg:    Qt.rgba(
+    readonly property color cPrimary:   Qt.color(_m3primary)
+    readonly property color cOnPrim:    Qt.color(_m3onPrimary)
+    readonly property color cSurfHi:    Qt.color(_m3surfaceContainerHigh)
+    readonly property color cSurfMid:   Qt.color(_m3surfaceContainer)
+    readonly property color cOnSurf:    Qt.color(_m3onSurface)
+    readonly property color cOnSurfVar: Qt.color(_m3onSurfaceVariant)
+    readonly property color cOutVar:    Qt.color(_m3outlineVariant)
+    readonly property color cInvPrim:   Qt.color(_m3inversePrimary)
+    readonly property color cErr:       Qt.color(_m3error)
+    readonly property color cPanelBg:   Qt.rgba(
         Qt.color(_m3onSecondary).r, Qt.color(_m3onSecondary).g,
         Qt.color(_m3onSecondary).b, 0.40)
 
@@ -56,7 +51,7 @@ ShellRoot {
             case "m3background":           root._m3background = m[2]; break
             case "m3surfaceContainerHigh": root._m3surfaceContainerHigh = m[2]; break
             case "m3surfaceContainer":     root._m3surfaceContainer = m[2]; break
-            case "m3onSurface":            root._m3onSurface = m[2]; break
+            case "m3onSurface":            root._m3onSurf = m[2]; break
             case "m3onSurfaceVariant":     root._m3onSurfaceVariant = m[2]; break
             case "m3outlineVariant":       root._m3outlineVariant = m[2]; break
             case "m3inversePrimary":       root._m3inversePrimary = m[2]; break
@@ -69,9 +64,10 @@ ShellRoot {
         watchChanges: true; onFileChanged: reload(); onLoaded: root.parseColors(text())
     }
 
-    // ── Waybar position (so toast stacks clear the bar) ───────────────────
+    // ── Waybar alignment ──────────────────────────────────────────────────
     property bool waybarAtBottom: false
     property real waybarSideMargin: 12
+    property real waybarOuterRadius: 20
     FileView {
         path: Quickshell.env("HOME") + "/.config/hyprcandy/waybar-position.txt"
         watchChanges: true; onFileChanged: reload()
@@ -82,155 +78,256 @@ ShellRoot {
         watchChanges: true; onFileChanged: reload()
         onLoaded: { const v = parseFloat(text().trim()); if (!isNaN(v) && v >= 0) root.waybarSideMargin = v }
     }
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hyprcandy/waybar_outer_radius.state"
+        watchChanges: true; onFileChanged: reload()
+        onLoaded: { const v = parseFloat(text().trim()); if (!isNaN(v) && v >= 0) root.waybarOuterRadius = v }
+    }
 
-    // ── IPC: toggle notification history tray ─────────────────────────────
+    // ── IPC ───────────────────────────────────────────────────────────────
     property bool historyVisible: false
+    property bool dndEnabled: false
+
     IpcHandler { target: "notifications"
         function toggle() { root.historyVisible = !root.historyVisible }
         function open()   { root.historyVisible = true }
         function close()  { root.historyVisible = false }
+        function dndOn()  { root.dndEnabled = true  }
+        function dndOff() { root.dndEnabled = false }
+        function dndToggle() { root.dndEnabled = !root.dndEnabled }
     }
 
+    // ── Waybar notification state ──────────────────────────────────────────
+    // Writes a JSON state file and pokes waybar signal 12 whenever dnd,
+    // inhibitor state, or notification count changes. waybar custom/notifications
+    // cats the file on signal so the icon and tooltip stay in sync.
+    //
+    // Icon key matrix (matches swaync format-icons):
+    //   dnd  inhibited  hasNotifs  → key
+    //   no   no         yes        → notification
+    //   no   no         no         → none
+    //   yes  no         yes        → dnd-notification
+    //   yes  no         no         → dnd-none
+    //   no   yes        yes        → inhibited-notification
+    //   no   yes        no         → inhibited-none
+    //   yes  yes        yes        → dnd-inhibited-notification
+    //   yes  yes        no         → dnd-inhibited-none
+    property bool inhibitorActive: false   // read from idle-inhibitor state file
+
+    // Read idle inhibitor state written by idle-inhibitor.sh
+    FileView {
+        path: Quickshell.env("HOME") + "/.cache/waybar-idle-inhibitor.state"
+        watchChanges: true; onFileChanged: reload()
+        onLoaded: root.inhibitorActive = text().trim() === "active"
+    }
+
+    // Compute the icon key and emit to waybar whenever any relevant state changes
+    function _waybarIconKey() {
+        const has  = root.history.length > 0
+        const dnd  = root.dndEnabled
+        const inh  = root.inhibitorActive
+        if (!dnd && !inh) return has ? "notification"          : "none"
+        if ( dnd && !inh) return has ? "dnd-notification"      : "dnd-none"
+        if (!dnd &&  inh) return has ? "inhibited-notification" : "inhibited-none"
+        /* dnd && inh */  return has ? "dnd-inhibited-notification" : "dnd-inhibited-none"
+    }
+    function _waybarIconGlyph(key) {
+        const map = {
+            "notification":           "󰅸",
+            "none":                   "󰂜",
+            "dnd-notification":       "󱅫",
+            "dnd-none":               "󰂠",
+            "inhibited-notification": "󰅸",
+            "inhibited-none":         "󱏬",
+            "dnd-inhibited-notification": "󱅫",
+            "dnd-inhibited-none":     "󱏫"
+        }
+        return map[key] || "󰂜"
+    }
+    function _emitWaybarState() {
+        const key    = root._waybarIconKey()
+        const icon   = root._waybarIconGlyph(key)
+        const count  = root.history.length
+        const tip    = root.dndEnabled ? "Do Not Disturb ON" : "Notifications"
+        const cls    = root.dndEnabled ? "dnd" : (count > 0 ? "unread" : "")
+        const json   = JSON.stringify({ text: icon, tooltip: tip, class: cls, alt: key })
+        waybarStateProc._json = json
+        if (!waybarStateProc.running) waybarStateProc.running = true
+    }
+
+    // Write state file then poke waybar signal 12.
+    // Uses a helper script path so the JSON is passed via the property
+    // at run time, not baked into the command array at bind time.
+    Process { id: waybarStateProc; property string _json: "{}"
+        command: ["bash", "-c",
+            "D=~/.cache/quickshell/notifications; mkdir -p \"$D\"; " +
+            "printf '%s' \"$QS_NOTIF_STATE\" > \"$D/waybar-state.json\"; " +
+            "pkill -RTMIN+12 waybar 2>/dev/null; true"
+        ]
+        environment: ({ "QS_NOTIF_STATE": waybarStateProc._json })
+    }
+
+    onDndEnabledChanged:      Qt.callLater(root._emitWaybarState)
+    onInhibitorActiveChanged: Qt.callLater(root._emitWaybarState)
+    onHistoryChanged:         Qt.callLater(root._emitWaybarState)
+
     // ═════════════════════════════════════════════════════════════════════
-    //  NOTIFICATION DATA MODEL
-    //  Each notification: { id, appName, summary, body, icon, urgency,
-    //                       timestamp, actions, category, isPrompt,
-    //                       promptType, promptMac, promptName,
-    //                       promptPasskey, promptTransfer, promptFilename,
-    //                       promptSize, dismissed }
+    //  DATA MODEL
+    //  Each notification: { id, appName, summary, body, icon, iconPath,
+    //    urgency, timestamp, actions[], category, isPrompt, promptType,
+    //    promptMac, promptName, promptPasskey, promptTransfer,
+    //    promptFilename, promptSize, count, groupKey }
     // ═════════════════════════════════════════════════════════════════════
-    property var notifications: []   // toast queue (auto-dismisses)
+    property var notifications: []   // active toasts
     property var history: []         // persistent history
     property int _nextId: 1
 
+    // ── Icon glyph resolver ───────────────────────────────────────────────
+    function iconGlyph(notif) {
+        const ic = (notif.icon || "").toLowerCase()
+        const ap = (notif.appName || "").toLowerCase()
+        const cat = notif.category || ""
+        if (cat === "bt" || ic === "bluetooth" || ic.includes("bluetooth")) return "󰂯"  // nf-md-bluetooth
+        if (ic.includes("wireless") || ic === "network-wireless")           return "󰤨"  // nf-md-wifi_strength_4
+        if (ic === "network" || ic.includes("ethernet"))                    return "󰈀"  // nf-md-ethernet
+        if (ic.includes("volume") || ic.includes("audio") || ic.includes("sound")) return "󰕾"  // nf-md-volume_high
+        if (ic.includes("battery"))                                         return "󰁹"  // nf-md-battery
+        if (ic.includes("screenshot") || ap.includes("screenshot"))        return "󰹑"  // nf-md-monitor_screenshot
+        if (ic.includes("record") || ap.includes("record") || ap.includes("obs")) return "󰑋"  // nf-md-record_circle
+        if (ic.includes("mail") || ap.includes("mail") || ap.includes("thunderbird")) return "󰇮"  // nf-md-email
+        if (ic.includes("discord") || ap.includes("discord"))              return "󰙯"  // nf-md-discord
+        if (ic.includes("telegram") || ap.includes("telegram"))            return ""   // nf-fa-telegram
+        if (ic.includes("spotify") || ap.includes("spotify"))              return "󰓇"  // nf-md-spotify
+        if (ic.includes("firefox") || ap.includes("firefox"))              return "󰈹"  // nf-md-firefox
+        if (ic.includes("chrome") || ic.includes("chromium"))              return ""   // nf-dev-chrome
+        if (ic.includes("update") || ic.includes("package") || ap.includes("pacman")) return "󰏖"  // nf-md-package
+        if (ic.includes("calendar") || ap.includes("calendar"))            return "󰃭"  // nf-md-calendar
+        if (ic.includes("download"))                                        return "󰇚"  // nf-md-download
+        if (ic.includes("upload"))                                          return "󰇹"  // nf-md-upload
+        if (ic.includes("error") || ic.includes("critical") || notif.urgency >= 2) return "󰀦"  // nf-md-alert_circle
+        if (ic.includes("warning") || ic.includes("warn"))                 return "󰀪"  // nf-md-alert
+        if (ic.includes("info"))                                            return "󰋼"  // nf-md-information
+        if (ic.includes("success") || ic.includes("complete"))             return "󰄬"  // nf-md-check_circle
+        if (ic.includes("clock") || ic.includes("alarm"))                  return "󰥔"  // nf-md-clock
+        if (ic.includes("usb") || ap.includes("usb"))                      return "󰙈"  // nf-md-usb
+        return "󰂞"   // nf-md-bell  notification bell (default)
+    }
+
+    function groupKey(n) {
+        return (n.appName || "") + "|" + (n.summary || "")
+    }
+
     function addNotification(obj) {
         const n = Object.assign({
-            id: root._nextId++,
-            appName: "", summary: "", body: "", icon: "",
-            urgency: 1, timestamp: Date.now(), actions: [],
-            category: "app", isPrompt: false,
-            dismissed: false
+            id: root._nextId++, appName: "", summary: "", body: "", icon: "", iconPath: "",
+            urgency: 1, timestamp: Date.now(), actions: [], category: "app",
+            isPrompt: false, count: 1
         }, obj)
+        n.groupKey = groupKey(n)
 
-        // Prepend to toast queue
-        const q = root.notifications.slice()
-        q.unshift(n)
-        // Cap toasts at 5 visible
-        if (q.length > 5) q.pop()
-        root.notifications = q
-
-        // Add to history (prompts go in history too once resolved)
-        if (!n.isPrompt) {
-            const h = root.history.slice()
-            h.unshift(n)
-            if (h.length > 50) h.pop()
-            root.history = h
+        // Toast queue — replace same-group non-prompt (bump count)
+        // Toast queue — suppress when DnD is active (prompts + critical always show)
+        if (!root.dndEnabled || n.isPrompt || n.urgency >= 2) {
+            const q = root.notifications.slice()
+            const ei = q.findIndex(function(x) { return x.groupKey === n.groupKey && !x.isPrompt })
+            if (ei >= 0 && !n.isPrompt) {
+                n.count = (q[ei].count || 1) + 1
+                q.splice(ei, 1)
+            }
+            q.unshift(n)
+            if (q.length > 6) q.pop()
+            root.notifications = q
         }
 
+        // History — group + bump
+        if (!n.isPrompt) {
+            const h = root.history.slice()
+            const hi = h.findIndex(function(x) { return x.groupKey === n.groupKey })
+            if (hi >= 0) {
+                const updated = Object.assign({}, h[hi], {
+                    count: (h[hi].count || 1) + 1,
+                    timestamp: n.timestamp,
+                    body: n.body
+                })
+                h.splice(hi, 1)
+                h.unshift(updated)
+            } else {
+                h.unshift(n)
+                if (h.length > 60) h.pop()
+            }
+            root.history = h
+        }
         return n.id
     }
 
     function dismissNotification(id) {
-        root.notifications = root.notifications.filter(function(n){ return n.id !== id })
+        root.notifications = root.notifications.filter(function(n) { return n.id !== id })
     }
-
-    function clearHistory() {
-        root.history = []
-    }
+    function clearHistory() { root.history = [] }
 
     // ═════════════════════════════════════════════════════════════════════
-    //  D-BUS NOTIFICATION LISTENER  (org.freedesktop.Notifications)
-    //  We run dbus-monitor on the session bus, filtered to the
-    //  Notify method calls.  This is the lightest approach without
-    //  needing to own the service name (which would conflict with
-    //  existing notification daemons while transitioning).
-    //
-    //  To fully replace swaync, add to hyprland.conf:
-    //    exec-once = pkill swaync; qs -c ~/.config/quickshell/notifications
-    //  and ensure no other daemon owns org.freedesktop.Notifications.
-    //  We take the name below via the service-name claim script.
+    //  NOTIFICATION DAEMON  (claims org.freedesktop.Notifications)
     // ═════════════════════════════════════════════════════════════════════
-    Process { id: dbusMonProc
-        property var _buf: []
-        command: ["bash", "-c",
-            "dbus-monitor --session \"interface='org.freedesktop.Notifications',member='Notify'\" 2>/dev/null"
-        ]
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: function(l) {
-                dbusMonProc._buf.push(l.trim())
-                // A Notify call looks like a burst of lines; flush when we see
-                // the closing string (body line or empty line after args)
-                root._parseDbusNotifyBuf(dbusMonProc._buf)
-            }
-        }
-        Component.onCompleted: running = true
-        onExited: { Qt.callLater(function(){ if (!running) running = true }) }
-    }
-
-    // Also run our own notification daemon that claims the DBus name
-    // so swaync / dunst are not needed at all
     Process { id: notifDaemonProc
-        command: ["bash", "-c",
-            "~/.config/quickshell/notifications/notify-daemon.py 2>/dev/null"
-        ]
+        command: ["python3", "-u",
+            Quickshell.env("HOME") + "/.config/quickshell/notifications/notify-daemon.py"]
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
             if (!l.trim()) return
-            try {
-                const ev = JSON.parse(l)
-                root._handleNotifEvent(ev)
-            } catch(e) {}
+            try { root._handleNotifEvent(JSON.parse(l)) } catch(e) {}
+        }}
+        stderr: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            if (l.trim()) console.warn("notify-daemon:", l)
         }}
         Component.onCompleted: running = true
-        onExited: { Qt.callLater(function(){ if (!running) running = true }) }
+        onExited: function(code, status) {
+            console.warn("notify-daemon exited code=" + code + " status=" + status)
+            Qt.callLater(function() { if (!running) running = true })
+        }
     }
 
     function _handleNotifEvent(ev) {
-        if (ev.type === "notify") {
-            const urgMap = {"low":0,"normal":1,"critical":2}
-            addNotification({
-                appName:  ev.app_name  || "",
-                summary:  ev.summary   || "",
-                body:     ev.body      || "",
-                icon:     ev.icon      || "",
-                urgency:  urgMap[ev.urgency] !== undefined ? urgMap[ev.urgency] : 1,
-                actions:  ev.actions   || [],
-                category: ev.category  || "app",
-                _daemonId: ev.id
-            })
-        } else if (ev.type === "close") {
-            // daemon asked to close a notification
-        }
-    }
-
-    // Minimal dbus-monitor buffer parser (fallback path)
-    property var _notifPartial: ({})
-    function _parseDbusNotifyBuf(buf) {
-        // This is a best-effort heuristic parser for dbus-monitor output
-        // The notify-daemon.py path is preferred; this is the fallback
+        if (ev.type !== "notify") return
+        const urgMap = { "low": 0, "normal": 1, "critical": 2 }
+        addNotification({
+            appName:  ev.app_name  || "",
+            summary:  ev.summary   || "",
+            body:     ev.body      || "",
+            icon:     ev.icon      || "",
+            iconPath: ev.icon_path || "",
+            urgency:  urgMap[ev.urgency] !== undefined ? urgMap[ev.urgency] : 1,
+            actions:  ev.actions   || [],
+            category: ev.category  || "app",
+            _daemonId: ev.id
+        })
     }
 
     // ═════════════════════════════════════════════════════════════════════
-    //  BLUETOOTH AGENT PROCESS
-    //  Runs bt-agent.py which registers a BlueZ Agent1 + OBEX Agent1.
-    //  Emits JSON events; we send commands back via stdin.
+    //  BLUETOOTH AGENT
     // ═════════════════════════════════════════════════════════════════════
     property bool btAgentReady: false
 
+    // Create the fifo once at startup — never recreated on agent restart
+    Process { id: btFifoInitProc
+        command: ["bash", "-c", "[ -p /tmp/qs_bt_cmd ] || (rm -f /tmp/qs_bt_cmd && mkfifo /tmp/qs_bt_cmd)"]
+        Component.onCompleted: running = true
+        onExited: { if (!btAgentProc.running) btAgentProc.running = true }
+    }
+
+    // Agent process: reads from the persistent fifo, restarts on crash (fifo stays)
     Process { id: btAgentProc
-        command: ["python3", "-u",
-                  Quickshell.env("HOME") + "/.config/quickshell/notifications/bt-agent.py"]
+        command: ["bash", "-c",
+            "python3 -u " + Quickshell.env("HOME") +
+            "/.config/quickshell/notifications/bt-agent.py < /tmp/qs_bt_cmd"]
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
             if (!l.trim()) return
-            try {
-                const ev = JSON.parse(l)
-                root._handleBtAgentEvent(ev)
-            } catch(e) { console.warn("bt-agent parse error:", l) }
+            try { root._handleBtAgentEvent(JSON.parse(l)) } catch(e) {}
         }}
-        Component.onCompleted: running = true
-        onExited: {
+        stderr: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            if (l.trim()) console.warn("bt-agent:", l)
+        }}
+        onExited: function(code, status) {
             root.btAgentReady = false
-            // Restart after 3s if it dies
+            console.warn("bt-agent exited code=" + code)
             btAgentRestartTimer.restart()
         }
     }
@@ -238,31 +335,14 @@ ShellRoot {
         onTriggered: { if (!btAgentProc.running) btAgentProc.running = true }
     }
 
-    function btAgentSend(cmd) {
-        // Write a command line to the agent's stdin
-        // Quickshell Process doesn't expose stdin directly, so we use a helper
-        btAgentStdinProc._cmd = cmd
-        if (!btAgentStdinProc.running) btAgentStdinProc.running = true
-    }
-    // Stdin bridge: echo command into the agent's stdin via a named pipe
-    Process { id: btAgentSetupProc
-        command: ["bash", "-c",
-            "rm -f /tmp/qs_bt_cmd; mkfifo /tmp/qs_bt_cmd; " +
-            "python3 -u " + Quickshell.env("HOME") +
-            "/.config/quickshell/notifications/bt-agent.py < /tmp/qs_bt_cmd"
-        ]
-        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
-            if (!l.trim()) return
-            try {
-                const ev = JSON.parse(l)
-                root._handleBtAgentEvent(ev)
-            } catch(e) {}
-        }}
-        Component.onCompleted: running = true
-        onExited: { Qt.callLater(function(){ if (!running) { btAgentRestartTimer.restart() } }) }
-    }
+    // Single persistent writer process — sends one command then stays idle
+    // Uses a short-lived echo; the fifo buffers it for the agent to read.
     Process { id: btAgentStdinProc; property string _cmd: ""
-        command: ["bash", "-c", "echo '" + btAgentStdinProc._cmd + "' > /tmp/qs_bt_cmd"]
+        command: ["bash", "-c", "printf '%s\\n' " + btAgentStdinProc._cmd + " >> /tmp/qs_bt_cmd"]
+    }
+    function btAgentSend(cmd) {
+        btAgentStdinProc._cmd = "'" + cmd.replace(/'/g, "'\\''") + "'"
+        if (!btAgentStdinProc.running) btAgentStdinProc.running = true
     }
 
     function _handleBtAgentEvent(ev) {
@@ -270,136 +350,72 @@ ShellRoot {
         case "agent_ready":
             root.btAgentReady = true
             break
-
         case "pair_confirm":
-            // Show confirm-passkey prompt
-            addNotification({
-                isPrompt: true,
-                promptType: "pair_confirm",
-                promptMac: ev.mac,
-                promptName: ev.name || ev.mac,
-                promptPasskey: ev.passkey || "",
-                summary: "Bluetooth Pairing Request",
-                body: "Confirm passkey on " + (ev.name || ev.mac),
-                icon: "bluetooth",
-                urgency: 2,
-                category: "bt"
-            })
+            addNotification({ isPrompt: true, promptType: "pair_confirm",
+                promptMac: ev.mac, promptName: ev.name || ev.mac, promptPasskey: ev.passkey || "",
+                summary: "Bluetooth Pairing Request", body: "Confirm passkey on " + (ev.name || ev.mac),
+                icon: "bluetooth", urgency: 2, category: "bt" })
             break
-
         case "pair_pin":
-            // Show PIN entry prompt
-            addNotification({
-                isPrompt: true,
-                promptType: "pair_pin",
-                promptMac: ev.mac,
-                promptName: ev.name || ev.mac,
-                promptNeedsPasskey: ev.needs_passkey || false,
-                summary: "Bluetooth PIN Required",
-                body: "Enter PIN for " + (ev.name || ev.mac),
-                icon: "bluetooth",
-                urgency: 2,
-                category: "bt"
-            })
+            addNotification({ isPrompt: true, promptType: "pair_pin",
+                promptMac: ev.mac, promptName: ev.name || ev.mac, promptNeedsPasskey: ev.needs_passkey || false,
+                summary: "Bluetooth PIN Required", body: "Enter PIN for " + (ev.name || ev.mac),
+                icon: "bluetooth", urgency: 2, category: "bt" })
             break
-
         case "pair_authorize":
-            addNotification({
-                isPrompt: true,
-                promptType: "pair_authorize",
-                promptMac: ev.mac,
-                promptName: ev.name || ev.mac,
-                summary: "Bluetooth Pair Request",
-                body: (ev.name || ev.mac) + " wants to pair",
-                icon: "bluetooth",
-                urgency: 2,
-                category: "bt"
-            })
+            addNotification({ isPrompt: true, promptType: "pair_authorize",
+                promptMac: ev.mac, promptName: ev.name || ev.mac,
+                summary: "Bluetooth Pair Request", body: (ev.name || ev.mac) + " wants to pair",
+                icon: "bluetooth", urgency: 2, category: "bt" })
             break
-
         case "display_pin":
-            addNotification({
-                summary: "Bluetooth PIN",
+            addNotification({ summary: "Bluetooth PIN",
                 body: "PIN for " + (ev.name || ev.mac) + ": " + ev.pin,
-                icon: "bluetooth",
-                urgency: 2,
-                category: "bt"
-            })
+                icon: "bluetooth", urgency: 2, category: "bt" })
             break
-
         case "pair_cancelled":
-            addNotification({
-                summary: "Bluetooth",
-                body: "Pairing cancelled",
-                icon: "bluetooth",
-                urgency: 1,
-                category: "bt"
+            if (ev.mac) root.notifications = root.notifications.filter(function(n) {
+                return !(n.isPrompt && n.promptMac === ev.mac)
             })
-            // Dismiss any pending pair prompts for this mac
-            if (ev.mac) {
-                root.notifications = root.notifications.filter(function(n){
-                    return !(n.isPrompt && n.promptMac === ev.mac)
-                })
-            }
+            addNotification({ summary: "Bluetooth", body: "Pairing cancelled",
+                icon: "bluetooth", urgency: 1, category: "bt" })
             break
-
         case "file_request":
-            const sizeMb = ev.size > 0 ? (ev.size / (1024*1024)).toFixed(1) + " MB" : ""
-            addNotification({
-                isPrompt: true,
-                promptType: "file_accept",
-                promptMac: ev.mac,
-                promptName: ev.name || ev.mac,
-                promptTransfer: ev.transfer,
-                promptFilename: ev.filename || "file",
-                promptSize: sizeMb,
+            const szMb = ev.size > 0 ? (ev.size / 1048576).toFixed(1) + " MB" : ""
+            addNotification({ isPrompt: true, promptType: "file_accept",
+                promptMac: ev.mac, promptName: ev.name || ev.mac,
+                promptTransfer: ev.transfer, promptFilename: ev.filename || "file", promptSize: szMb,
                 summary: "Incoming File",
-                body: (ev.name || ev.mac) + " → " + (ev.filename || "file") +
-                      (sizeMb ? "  (" + sizeMb + ")" : ""),
-                icon: "bluetooth",
-                urgency: 2,
-                category: "bt"
-            })
+                body: (ev.name || ev.mac) + " → " + (ev.filename || "file") + (szMb ? " (" + szMb + ")" : ""),
+                icon: "bluetooth", urgency: 2, category: "bt" })
             break
-
         case "file_cancelled":
-            addNotification({
-                summary: "Bluetooth",
-                body: "File transfer cancelled",
-                icon: "bluetooth",
-                urgency: 1,
-                category: "bt"
-            })
+            addNotification({ summary: "Bluetooth", body: "File transfer cancelled",
+                icon: "bluetooth", urgency: 1, category: "bt" })
             break
-
         case "error":
-            console.warn("bt-agent error:", ev.msg)
+            console.warn("bt-agent:", ev.msg)
             break
         }
     }
 
-    // ═════════════════════════════════════════════════════════════════════
-    //  AUTO-DISMISS TIMERS
-    //  Non-prompt, non-critical notifications auto-dismiss after 5s.
-    //  Critical ones stay until manually dismissed.
-    //  Prompts never auto-dismiss.
-    // ═════════════════════════════════════════════════════════════════════
+    // ── Auto-dismiss ───────────────────────────────────────────────────────
     Timer { id: autoDismissTimer; interval: 200; repeat: true; running: true
         onTriggered: {
             const now = Date.now()
-            const remaining = root.notifications.filter(function(n) {
-                if (n.isPrompt) return true            // prompts stay
-                if (n.urgency >= 2) return true        // critical stays
-                return (now - n.timestamp) < 5000      // others: 5s
+            const rem = root.notifications.filter(function(n) {
+                if (n.isPrompt || n.urgency >= 2) return true
+                return (now - n.timestamp) < 5000
             })
-            if (remaining.length !== root.notifications.length)
-                root.notifications = remaining
+            if (rem.length !== root.notifications.length) root.notifications = rem
         }
     }
 
     // ═════════════════════════════════════════════════════════════════════
-    //  TOAST STACK WINDOW  — anchored top-right (or bottom-right)
-    //  Shows live incoming notifications + interactive prompts
+    //  TOAST WINDOW
+    //  Transparent container — each ToastCard is its own opaque surface.
+    //  height is driven by an invisible Item that mirrors the Column's
+    //  implicitHeight so the binding never races.
     // ═════════════════════════════════════════════════════════════════════
     PanelWindow {
         id: toastWindow
@@ -407,11 +423,9 @@ ShellRoot {
         WlrLayershell.namespace: "quickshell:notifications:toasts"
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: {
-            // Need keyboard for PIN entry prompts
-            for (let i = 0; i < root.notifications.length; i++) {
-                if (root.notifications[i].isPrompt &&
-                    (root.notifications[i].promptType === "pair_pin")) return WlrKeyboardFocus.OnDemand
-            }
+            for (let i = 0; i < root.notifications.length; i++)
+                if (root.notifications[i].isPrompt && root.notifications[i].promptType === "pair_pin")
+                    return WlrKeyboardFocus.OnDemand
             return WlrKeyboardFocus.None
         }
         anchors {
@@ -424,14 +438,14 @@ ShellRoot {
             bottom: 42
             left:   root.waybarSideMargin
         }
-        width: 360
+        width:  364
         height: toastCol.implicitHeight + 4
-        color: cPanelBg
+        color: "transparent"  // transparent = no unified shadow rect across the window surface
         exclusionMode: ExclusionMode.Ignore
 
         Column {
             id: toastCol
-            anchors { top: parent.top; right: parent.right; left: parent.left }
+            anchors { top: parent.top; left: parent.left; right: parent.right }
             spacing: 6
 
             Repeater {
@@ -439,15 +453,34 @@ ShellRoot {
                 delegate: ToastCard {
                     required property var modelData
                     required property int index
-                    notif: modelData
-                    width: toastCol.width
+                    notif:  modelData
+                    width:  toastCol.width
                 }
             }
         }
     }
 
     // ═════════════════════════════════════════════════════════════════════
-    //  HISTORY TRAY WINDOW  — full panel, toggled via IPC
+    //  CLOSE ON REAL-WINDOW FOCUS
+    //  Watches HyprlandFocusedClient: fires whenever Hyprland reports a
+    //  newly focused *client* (i.e. a regular XDG toplevel window).
+    //  Layer shells (waybar, rofi, dock, other quickshell panels) are NOT
+    //  tracked as focused clients by Hyprland, so interacting with them
+    //  does NOT trigger this and the panels stay open as requested.
+    //  Only a genuine click into a normal app window closes them.
+    // ═════════════════════════════════════════════════════════════════════
+    Connections {
+        target: HyprlandFocusedClient
+        function onAddressChanged() {
+            // address is non-empty whenever a real window takes focus
+            if (HyprlandFocusedClient.address !== "") {
+                root.historyVisible = false
+            }
+        }
+    }
+
+    // ═════════════════════════════════════════════════════════════════════
+    //  HISTORY PANEL
     // ═════════════════════════════════════════════════════════════════════
     PanelWindow {
         id: historyWindow
@@ -460,207 +493,343 @@ ShellRoot {
             bottom:  root.waybarAtBottom
             left:    true
         }
-        margins { top: 2; bottom: 2; left:  root.waybarSideMargin }
-        width: 380
-        height: Math.min(historyContent.implicitHeight + 32, 700)
-        color: "transparent"
+        margins { top: 6; bottom: 6; left: root.waybarSideMargin }
+        width:  380
+        // Height grows with content up to 720px max, then the Flickable scrolls.
+        height: Math.min(histScrollContent.height + histHeader.implicitHeight + histDivider.height + 42, 720)
+        color:  "transparent"
 
-        HyprlandFocusGrab {
-            id: historyFocusGrab
-            windows: [historyWindow]
-            active: false
-            onCleared: { if (!active) root.historyVisible = false }
-        }
-        Connections { target: root
-            function onHistoryVisibleChanged() {
-                if (root.historyVisible) historyGrabTimer.restart()
-                else historyFocusGrab.active = false
-            }
-        }
-        Timer { id: historyGrabTimer; interval: 80; repeat: false
-            onTriggered: { if (root.historyVisible) historyFocusGrab.active = true }
-        }
 
         Rectangle {
             anchors.fill: parent
-            color: root.cPanelBg
-            radius: 20
+            color:  root.cPanelBg
+            radius: root.waybarOuterRadius
             border.width: 1
             border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.40)
             scale: root.historyVisible ? 1.0 : 0.92
-            transformOrigin: Item.TopRight
+            transformOrigin: Item.TopLeft
             Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             Keys.onEscapePressed: root.historyVisible = false
 
-            ColumnLayout {
-                id: historyContent
+            // ── Header ────────────────────────────────────────────────────
+            RowLayout {
+                id: histHeader
                 anchors { top: parent.top; left: parent.left; right: parent.right; margins: 16 }
                 spacing: 8
 
-                // Header
-                RowLayout { Layout.fillWidth: true
-                    Text {
-                        text: "󰂞  Notifications"
-                        color: root.cOnSurf; font.pixelSize: 14; font.weight: Font.Medium
-                        font.family: "Symbols Nerd Font Mono"
-                        Layout.fillWidth: true
-                    }
-                    // BT agent status dot
-                    Rectangle {
-                        width: 8; height: 8; radius: 4
-                        color: root.btAgentReady
-                            ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.9)
-                            : Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.7)
-                    }
-                    Item { width: 6 }
-                    // Clear all
-                    Rectangle {
-                        height: 24; width: clearLbl.implicitWidth + 16; radius: 8
-                        color: clearH.containsMouse
-                            ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.18)
-                            : Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.6)
-                        border.width: 1
-                        border.color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.4)
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { id: clearLbl; anchors.centerIn: parent; text: "Clear all"
-                            color: root.cErr; font.pixelSize: 11; opacity: 0.85 }
-                        MouseArea { id: clearH; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.clearHistory() }
-                    }
-                    // Close
-                    Rectangle {
-                        height: 24; width: 24; radius: 8
-                        color: closeH.containsMouse
-                            ? Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.9)
+                // ── DnD toggle button ─────────────────────────────────────
+                // Shows the same icon matrix as waybar custom/notifications.
+                // Click toggles Do Not Disturb; icon reflects dnd + inhibitor + unread state.
+                Rectangle {
+                    id: dndBtn
+                    height: 28; width: 28; radius: 8
+                    color: dndBtnMA.containsMouse
+                        ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.18)
+                        : root.dndEnabled
+                            ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.14)
                             : "transparent"
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { anchors.centerIn: parent; text: "󰅖"
-                            font.pixelSize: 12; font.family: "Symbols Nerd Font Mono"
-                            color: root.cOnSurfVar }
-                        MouseArea { id: closeH; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.historyVisible = false }
+                    border.width: 1
+                    border.color: root.dndEnabled
+                        ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.50)
+                        : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.40)
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Text {
+                        anchors.centerIn: parent
+                        text: root._waybarIconGlyph(root._waybarIconKey())
+                        font.pixelSize: 15; font.family: "Symbols Nerd Font Mono"
+                        color: root.dndEnabled ? root.cErr : root.cPrimary
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                    }
+                    MouseArea {
+                        id: dndBtnMA; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.dndEnabled = !root.dndEnabled
                     }
                 }
 
-                Rectangle { Layout.fillWidth: true; height: 1
-                    color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.3) }
-
-                // Empty state
                 Text {
-                    visible: root.history.length === 0
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "No notifications"
-                    color: root.cOnSurfVar; font.pixelSize: 12; font.italic: true
-                    topPadding: 16; bottomPadding: 16
+                    text: root.dndEnabled ? "Do Not Disturb" : "Notifications"
+                    color: root.dndEnabled
+                        ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.85)
+                        : root.cOnSurf
+                    font.pixelSize: 14; font.weight: Font.Medium
+                    font.family: "Symbols Nerd Font Mono"
+                    Layout.fillWidth: true
+                    Behavior on color { ColorAnimation { duration: 120 } }
                 }
+                // BT status dot
+                Rectangle {
+                    width: 8; height: 8; radius: 4
+                    color: root.btAgentReady
+                        ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.9)
+                        : Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.7)
+                }
+                Item { width: 2 }
+                // Clear all
+                Rectangle {
+                    height: 24; implicitWidth: clrLbl.implicitWidth + 16; radius: 8
+                    color: clrH.containsMouse
+                        ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.18)
+                        : Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.6)
+                    border.width: 1; border.color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.4)
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    Text { id: clrLbl; anchors.centerIn: parent; text: "Clear all"
+                        color: root.cErr; font.pixelSize: 11; opacity: 0.85 }
+                    MouseArea { id: clrH; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor; onClicked: root.clearHistory() }
+                }
+                
+                Rectangle {
+                    height: 24; width: 24; radius: 8
+                    color: clsH.containsMouse
+                        ? Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.9)
+                        : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                    
+                    Text { anchors.centerIn: parent; text: "×"
+                        font.pixelSize: 12; color: root.cOnSurfVar }
+                    MouseArea { id: clsH; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.historyVisible = false }
+                }
+            }
 
-                // History list
-                Repeater {
-                    model: root.history
-                    delegate: HistoryCard {
-                        required property var modelData
-                        notif: modelData
-                        Layout.fillWidth: true
+            Rectangle {
+                id: histDivider
+                anchors { top: histHeader.bottom; topMargin: 8; left: parent.left; right: parent.right; leftMargin: 16; rightMargin: 16 }
+                height: 1
+                color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.3)
+            }
+
+            // ── Scrollable history list ───────────────────────────────────
+            Flickable {
+                anchors {
+                    top: histDivider.bottom; topMargin: 8
+                    left: parent.left; right: parent.right; bottom: parent.bottom
+                    leftMargin: 10; rightMargin: 10; bottomMargin: 10
+                }
+                clip: true
+                // Bind to .height not .implicitHeight — ColumnLayout.implicitHeight
+                // does NOT react to children's explicit height: changes (e.g. card
+                // expand animations). .height does once the layout has height:implicitHeight.
+                contentHeight: histScrollContent.height
+                flickableDirection: Flickable.VerticalFlick
+                boundsBehavior: Flickable.StopAtBounds
+
+                ColumnLayout {
+                    id: histScrollContent
+                    width: parent.width
+                    // Explicit height makes contentHeight track expand/collapse live.
+                    height: implicitHeight
+                    spacing: 5
+
+                    // Empty state
+                    Text {
+                        visible: root.history.length === 0
+                        Layout.alignment: Qt.AlignHCenter
+                        text: "No notifications"
+                        color: root.cOnSurfVar; font.pixelSize: 12; font.italic: true
+                        topPadding: 16; bottomPadding: 16
                     }
-                }
 
-                Item { height: 4 }
+                    Repeater {
+                        model: root.history
+                        delegate: HistoryCard {
+                            required property var modelData
+                            notif: modelData
+                            Layout.fillWidth: true
+                        }
+                    }
+                    Item { height: 4 }
+                }
             }
         }
     }
 
     // ═════════════════════════════════════════════════════════════════════
     //  TOAST CARD COMPONENT
-    //  Handles: plain notifications, BT pair confirm, BT PIN entry,
-    //           BT pair authorize, incoming file request
+    //  Per-card blur that respects rounded corners — no Hyprland layerrule needed.
+    //  Uses the same Item + layer.effect MultiEffect mask technique as the lockscreen
+    //  floating panel: all children render to one FBO, then MultiEffect masks the FBO
+    //  to a rounded rect shape (supplied by an opacity:0 Rectangle with its own layer),
+    //  so the blur is composited already-clipped and never bleeds past the corners.
     // ═════════════════════════════════════════════════════════════════════
-    component ToastCard: Rectangle {
+    component ToastCard: Item {
         id: toast
         required property var notif
-        property bool _hovered: toastMA.containsMouse
+        property bool _hov: toastMA.containsMouse
+        property real _radius: 14
 
-        radius: 16
-        color: _hovered
-            ? Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.7)
-            : Qt.rgba(root.cSurfMid.r, root.cSurfMid.g, root.cSurfMid.b, 0.63)
-        border.width: 1
-        border.color: notif.urgency >= 2
-            ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.55)
-            : notif.category === "bt"
-                ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45)
-                : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.35)
-        height: toastInner.implicitHeight + 24
-        clip: true
-        Behavior on color { ColorAnimation { duration: 100 } }
+        // Height driven by content + progress bar slot (same as before, just on Item)
+        height: cardInner.implicitHeight + 24 + (progTrackItem.visible ? 4 : 0)
 
-        // Entry animation
-        property real _progress: 0
-        NumberAnimation on _progress { from: 0; to: 1; duration: 220; easing.type: Easing.OutCubic; running: true }
-        opacity: _progress
-        transform: Translate { x: (1 - toast._progress) * 28 }
-
-        // Urgency accent bar on left edge
-        Rectangle {
-            width: 3; height: parent.height; radius: 2
-            color: toast.notif.urgency >= 2
-                ? root.cErr
-                : toast.notif.category === "bt"
-                    ? root.cPrimary
-                    : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.5)
+        // ── Rounded-corner blur: render all children to FBO, mask to rounded rect ──
+        // Identical technique to shell-lockscreen.qml centerPanel:
+        //   1. layer.enabled renders all children to a single FBO.
+        //   2. MultiEffect masks the FBO using toastRoundMask's layer alpha.
+        //   3. toastRoundMask is opacity:0 (invisible in scene) but its layer FBO
+        //      (captured before the opacity pass) supplies the mask texture.
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            maskEnabled:      true
+            maskSource:       toastRoundMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin:  1.0
         }
 
-        // Progress bar (auto-dismiss countdown) — only for non-prompt, non-critical
+        // Mask shape — white rounded rect at opacity:0.
         Rectangle {
-            visible: !toast.notif.isPrompt && toast.notif.urgency < 2
-            anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
-            height: 2; radius: 1
-            color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.35)
-            property real _age: Math.min(1, (Date.now() - toast.notif.timestamp) / 5000)
-            Timer { interval: 100; repeat: true; running: parent.visible
-                onTriggered: parent._age = Math.min(1, (Date.now() - toast.notif.timestamp) / 5000) }
+            id: toastRoundMask
+            anchors.fill: parent
+            radius: toast._radius
+            color: "white"
+            opacity: 0
+            layer.enabled: true
+        }
+
+        // ── Blurred backdrop slice ─────────────────────────────────────────
+        // Captures the toastWindow's own background colour and blurs it so each
+        // card gets an individual frosted-glass look without a shared layer surface.
+        // (toastWindow.color is already set to cPanelBg — nearly transparent —
+        //  so this primarily blurs compositor content showing through the window.)
+        Item {
+            anchors.fill: parent
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                blurEnabled: true; blur: 1.0; blurMax: 48
+            }
+            // Extend the source rect to the full window so sampling at edges
+            // doesn't wrap/clamp — same trick as the lockscreen wallpaper slice.
             Rectangle {
-                anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                width: parent.width * (1 - parent._age)
-                color: root.cPrimary; radius: 1
-                Behavior on width { NumberAnimation { duration: 100 } }
+                x: -toast.x; y: -toast.y
+                width:  toastWindow.width
+                height: toastWindow.height
+                color:  Qt.rgba(root.cSurfMid.r, root.cSurfMid.g, root.cSurfMid.b, 0.72)
             }
         }
 
-        ColumnLayout {
-            id: toastInner
-            anchors { left: parent.left; right: parent.right; top: parent.top
-                      leftMargin: 16; rightMargin: 12; topMargin: 12 }
-            spacing: 8
+        // ── Card surface (tint + border, radius matches mask) ──────────────
+        Rectangle {
+            anchors.fill: parent
+            radius: toast._radius
+            color: toast._hov
+                ? Qt.rgba(root.cSurfHi.r,  root.cSurfHi.g,  root.cSurfHi.b,  0.55)
+                : Qt.rgba(root.cSurfMid.r, root.cSurfMid.g, root.cSurfMid.b, 0.45)
+            border.width: 1
+            border.color: toast.notif.urgency >= 2
+                ? Qt.rgba(root.cErr.r,     root.cErr.g,     root.cErr.b,     0.6)
+                : toast.notif.category === "bt"
+                    ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.5)
+                    : Qt.rgba(root.cOutVar.r,  root.cOutVar.g,  root.cOutVar.b,  0.38)
+            Behavior on color { ColorAnimation { duration: 100 } }
+        }
 
-            // ── Header row ────────────────────────────────────────────────
-            RowLayout { Layout.fillWidth: true; spacing: 8
+        // ── Slide-in animation ────────────────────────────────────────────
+        property real _p: 0
+        NumberAnimation on _p { from: 0; to: 1; duration: 200; easing.type: Easing.OutCubic; running: true }
+        opacity: _p
+        transform: Translate { x: -(1 - toast._p) * 24 }
 
-                // Icon / category indicator
+        // ── Left urgency accent bar ───────────────────────────────────────
+        Rectangle {
+            x: 0; y: 0; width: 3
+            // Clip accent bar with same radius as card
+            height: parent.height - toast._radius
+            color: toast.notif.urgency >= 2 ? root.cErr
+                : toast.notif.category === "bt" ? root.cPrimary
+                : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.45)
+        }
+        // Rounded bottom of accent bar
+        Rectangle {
+            x: 0; width: 3; radius: 2
+            y: parent.height - toast._radius * 2
+            height: toast._radius * 2
+            color: toast.notif.urgency >= 2 ? root.cErr
+                : toast.notif.category === "bt" ? root.cPrimary
+                : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.45)
+        }
+
+        // ── Progress bar — sits at bottom inside rounded corners ──────────
+        // Uses an Item clipped to the card's rounded bottom area
+        Item {
+            id: progTrackItem
+            visible: !toast.notif.isPrompt && toast.notif.urgency < 2
+            anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
+            height: 3
+            // Clip so it never bleeds outside card radius
+            clip: true
+
+            Rectangle {
+                id: progBg
+                anchors.fill: parent
+                // Small bottom radius to match card
+                radius: toast._radius
+                color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.22)
+
+                property real _age: 0
+                Timer {
+                    interval: 80; repeat: true; running: progTrackItem.visible
+                    onTriggered: progBg._age = Math.min(1, (Date.now() - toast.notif.timestamp) / 5000)
+                }
+
+                // Filled portion
                 Rectangle {
-                    width: 30; height: 30; radius: 8
-                    color: toast.notif.urgency >= 2
-                        ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.18)
-                        : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.15)
+                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+                    width: progBg.width * Math.max(0, 1 - progBg._age)
+                    color: root.cPrimary
+                    radius: toast._radius
+                    Behavior on width { NumberAnimation { duration: 80 } }
+                }
+            }
+        }
+
+        // ── Main content ──────────────────────────────────────────────────
+        ColumnLayout {
+            id: cardInner
+            anchors {
+                left: parent.left; right: parent.right; top: parent.top
+                leftMargin: 14; rightMargin: 10; topMargin: 12
+            }
+            spacing: 6
+
+            // Header row
+            RowLayout { Layout.fillWidth: true; spacing: 10
+
+                // Icon area (app icon image or glyph fallback + count badge)
+                Item { width: 34; height: 34
+                    Rectangle { anchors.fill: parent; radius: 9
+                        color: toast.notif.urgency >= 2
+                            ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.18)
+                            : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.15)
+                    }
+                    Image {
+                        id: toastIcImg
+                        anchors { fill: parent; margins: 4 }
+                        source: toast.notif.iconPath ? "file://" + toast.notif.iconPath : ""
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true; mipmap: true
+                        visible: status === Image.Ready
+                    }
                     Text {
                         anchors.centerIn: parent
-                        text: {
-                            if (toast.notif.category === "bt")   return "󰂯"
-                            if (toast.notif.urgency >= 2)        return "󰀦"
-                            if (toast.notif.icon === "network")  return "󰤨"
-                            if (toast.notif.icon === "volume")   return "󰕾"
-                            if (toast.notif.icon === "battery")  return ""
-                            return "󰂞"
-                        }
-                        font.pixelSize: 15; font.family: "Symbols Nerd Font Mono"
+                        visible: !toastIcImg.visible
+                        text: root.iconGlyph(toast.notif)
+                        font.pixelSize: 17; font.family: "Symbols Nerd Font Mono"
                         color: toast.notif.urgency >= 2 ? root.cErr : root.cPrimary
+                    }
+                    // Group count badge
+                    Rectangle {
+                        visible: (toast.notif.count || 1) > 1
+                        anchors { right: parent.right; top: parent.top; rightMargin: -2; topMargin: -2 }
+                        width: 16; height: 16; radius: 8; color: root.cPrimary
+                        Text { anchors.centerIn: parent; text: toast.notif.count || 1
+                            font.pixelSize: 9; color: root.cOnPrim; font.weight: Font.Bold }
                     }
                 }
 
+                // App name + summary
                 ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    Text {
-                        Layout.fillWidth: true
+                    Text { Layout.fillWidth: true
                         text: toast.notif.summary || toast.notif.appName || "Notification"
                         color: root.cOnSurf; font.pixelSize: 12; font.weight: Font.Medium
                         elide: Text.ElideRight
@@ -672,89 +841,97 @@ ShellRoot {
                     }
                 }
 
-                // Dismiss button (X)
-                Rectangle {
-                    width: 22; height: 22; radius: 6
-                    color: dismissH.containsMouse
+                // Dismiss ×
+                Rectangle { width: 22; height: 22; radius: 6
+                    color: dH.containsMouse
                         ? Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.9)
                         : "transparent"
                     Behavior on color { ColorAnimation { duration: 80 } }
-                    Text { anchors.centerIn: parent; text: "󰅖"
-                        font.pixelSize: 11; font.family: "Symbols Nerd Font Mono"
-                        color: root.cOnSurfVar }
-                    MouseArea { id: dismissH; anchors.fill: parent; hoverEnabled: true
+                    Text { anchors.centerIn: parent; text: "×"
+                        font.pixelSize: 11; color: root.cOnSurfVar }
+                    MouseArea { id: dH; anchors.fill: parent; hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.dismissNotification(toast.notif.id) }
                 }
             }
 
-            // ── Body text ─────────────────────────────────────────────────
+            // Body text
             Text {
-                visible: toast.notif.body !== ""
+                visible: (toast.notif.body || "") !== ""
                 Layout.fillWidth: true
-                text: toast.notif.body
+                text: toast.notif.body || ""
                 color: root.cOnSurfVar; font.pixelSize: 11
-                wrapMode: Text.WordWrap; maximumLineCount: 3
-                elide: Text.ElideRight
-                leftPadding: 38
+                wrapMode: Text.WordWrap; maximumLineCount: 4; elide: Text.ElideRight
+                leftPadding: 44
             }
 
-            // ── BT PAIR CONFIRM (show passkey, Accept/Reject) ─────────────
-            ColumnLayout {
-                visible: toast.notif.isPrompt && toast.notif.promptType === "pair_confirm"
-                Layout.fillWidth: true; spacing: 8
-
-                // Passkey display
-                Rectangle {
-                    Layout.alignment: Qt.AlignLeft
-                    height: 36; radius: 10
-                    color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.12)
-                    border.width: 1
-                    border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.5)
-                    implicitWidth: passcode.implicitWidth + 32
-                    Text {
-                        id: passcode
-                        anchors.centerIn: parent
-                        text: toast.notif.promptPasskey || "------"
-                        color: root.cPrimary; font.pixelSize: 20
-                        font.weight: Font.Bold; font.letterSpacing: 6
+            // Action buttons (non-prompt, standard freedesktop actions)
+            Flow {
+                visible: (toast.notif.actions || []).length > 0 && !toast.notif.isPrompt
+                Layout.fillWidth: true; spacing: 6; leftPadding: 44
+                Repeater { model: toast.notif.actions || []
+                    delegate: Rectangle {
+                        required property var modelData
+                        height: 26; implicitWidth: aLbl.implicitWidth + 16; radius: 8
+                        color: aH.containsMouse
+                            ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.22)
+                            : Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.7)
+                        border.width: 1
+                        border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.35)
+                        Behavior on color { ColorAnimation { duration: 80 } }
+                        Text { id: aLbl; anchors.centerIn: parent
+                            text: modelData.label || modelData.key || ""
+                            color: root.cOnSurf; font.pixelSize: 10 }
+                        MouseArea { id: aH; anchors.fill: parent; hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor }
                     }
                 }
-                Text {
-                    text: "Confirm this passkey appears on the device"
-                    color: root.cOnSurfVar; font.pixelSize: 10; font.italic: true
+            }
+
+            // ── BT Pair Confirm (show passkey, Accept/Reject) ─────────────
+            ColumnLayout {
+                visible: toast.notif.isPrompt && toast.notif.promptType === "pair_confirm"
+                Layout.fillWidth: true; spacing: 8; Layout.leftMargin: 44
+
+                Rectangle {
+                    Layout.alignment: Qt.AlignLeft
+                    height: 40; radius: 10; implicitWidth: pkT.implicitWidth + 32
+                    color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.12)
+                    border.width: 1; border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.5)
+                    Text { id: pkT; anchors.centerIn: parent
+                        text: toast.notif.promptPasskey || "------"
+                        color: root.cPrimary; font.pixelSize: 22; font.weight: Font.Bold; font.letterSpacing: 7
+                    }
                 }
+                Text { text: "Confirm this passkey appears on the device"
+                    color: root.cOnSurfVar; font.pixelSize: 10; font.italic: true }
                 RowLayout { spacing: 8
-                    Rectangle {
-                        height: 32; radius: 8; implicitWidth: 80
-                        color: accH.containsMouse
-                            ? root.cPrimary
+                    Rectangle { height: 32; implicitWidth: 88; radius: 8
+                        color: pcA.containsMouse ? root.cPrimary
                             : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.85)
                         Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { anchors.centerIn: parent; text: "󰄬  Accept"
+                        Text { anchors.centerIn: parent; text: "󰄬  Accept"   // 󰄬
                             color: root.cOnPrim; font.pixelSize: 11
                             font.family: "Symbols Nerd Font Mono"; font.weight: Font.Medium }
-                        MouseArea { id: accH; anchors.fill: parent; hoverEnabled: true
+                        MouseArea { id: pcA; anchors.fill: parent; hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 root.btAgentSend("accept_pair " + toast.notif.promptMac)
                                 root.dismissNotification(toast.notif.id)
-                                root.addNotification({ summary:"Bluetooth", body:"Paired with " + toast.notif.promptName, icon:"bluetooth", urgency:1, category:"bt" })
+                                root.addNotification({ summary: "Bluetooth", body: "Paired with " + toast.notif.promptName,
+                                    icon: "bluetooth", urgency: 1, category: "bt" })
                             }
                         }
                     }
-                    Rectangle {
-                        height: 32; radius: 8; implicitWidth: 80
-                        color: rejH.containsMouse
+                    Rectangle { height: 32; implicitWidth: 80; radius: 8
+                        color: pcR.containsMouse
                             ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.85)
                             : Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.15)
-                        border.width: 1
-                        border.color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.5)
+                        border.width: 1; border.color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.5)
                         Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { anchors.centerIn: parent; text: "󰅖  Reject"
-                            color: rejH.containsMouse ? root.cOnPrim : root.cErr
-                            font.pixelSize: 11; font.family: "Symbols Nerd Font Mono" }
-                        MouseArea { id: rejH; anchors.fill: parent; hoverEnabled: true
+                        Text { anchors.centerIn: parent; text: "×  Reject"
+                            color: pcR.containsMouse ? root.cOnPrim : root.cErr; font.pixelSize: 11 }
+                        MouseArea { id: pcR; anchors.fill: parent; hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 root.btAgentSend("reject_pair " + toast.notif.promptMac)
@@ -765,60 +942,61 @@ ShellRoot {
                 }
             }
 
-            // ── BT PAIR AUTHORIZE (no passkey, just Accept/Reject) ────────
+            // ── BT Pair Authorize (no passkey) ────────────────────────────
             RowLayout {
                 visible: toast.notif.isPrompt && toast.notif.promptType === "pair_authorize"
-                Layout.fillWidth: true; spacing: 8; Layout.leftMargin: 38
-                Rectangle {
-                    height: 32; radius: 8; implicitWidth: 80
-                    color: authAccH.containsMouse ? root.cPrimary
+                Layout.fillWidth: true; spacing: 8; Layout.leftMargin: 44
+                Rectangle { height: 32; implicitWidth: 80; radius: 8
+                    color: paA.containsMouse ? root.cPrimary
                         : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.85)
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Text { anchors.centerIn: parent; text: "󰄬  Pair"
+                    Text { anchors.centerIn: parent; text: "󰄬  Pair"   // 󰄬
                         color: root.cOnPrim; font.pixelSize: 11
                         font.family: "Symbols Nerd Font Mono"; font.weight: Font.Medium }
-                    MouseArea { id: authAccH; anchors.fill: parent; hoverEnabled: true
+                    MouseArea { id: paA; anchors.fill: parent; hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             root.btAgentSend("accept_pair " + toast.notif.promptMac)
                             root.dismissNotification(toast.notif.id)
-                            root.addNotification({ summary:"Bluetooth", body:"Paired with " + toast.notif.promptName, icon:"bluetooth", urgency:1, category:"bt" })
+                            root.addNotification({ summary: "Bluetooth", body: "Paired with " + toast.notif.promptName,
+                                icon: "bluetooth", urgency: 1, category: "bt" })
                         }
                     }
                 }
-                Rectangle {
-                    height: 32; radius: 8; implicitWidth: 80
-                    color: authRejH.containsMouse ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.85)
-                        : Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.15)
-                    border.width: 1; border.color: Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.5)
+                Rectangle { height: 32; implicitWidth: 80; radius: 8
+                    color: paR.containsMouse
+                        ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.85)
+                        : Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.15)
+                    border.width: 1; border.color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.5)
                     Behavior on color { ColorAnimation { duration: 100 } }
                     Text { anchors.centerIn: parent; text: "Reject"
-                        color: authRejH.containsMouse ? root.cOnPrim : root.cErr; font.pixelSize: 11 }
-                    MouseArea { id: authRejH; anchors.fill: parent; hoverEnabled: true
+                        color: paR.containsMouse ? root.cOnPrim : root.cErr; font.pixelSize: 11 }
+                    MouseArea { id: paR; anchors.fill: parent; hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { root.btAgentSend("reject_pair " + toast.notif.promptMac); root.dismissNotification(toast.notif.id) }
+                        onClicked: {
+                            root.btAgentSend("reject_pair " + toast.notif.promptMac)
+                            root.dismissNotification(toast.notif.id)
+                        }
                     }
                 }
             }
 
-            // ── BT PIN ENTRY ──────────────────────────────────────────────
+            // ── BT PIN entry ───────────────────────────────────────────────
             ColumnLayout {
                 visible: toast.notif.isPrompt && toast.notif.promptType === "pair_pin"
-                Layout.fillWidth: true; spacing: 8
+                Layout.fillWidth: true; spacing: 8; Layout.leftMargin: 44
                 RowLayout { spacing: 8
-                    Rectangle {
-                        height: 34; radius: 8; Layout.fillWidth: true; Layout.maximumWidth: 180
+                    Rectangle { height: 34; Layout.preferredWidth: 160; radius: 8
                         color: Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.8)
                         border.width: 1
-                        border.color: pinInput.activeFocus
+                        border.color: pinIn.activeFocus
                             ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.7)
                             : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.5)
                         TextInput {
-                            id: pinInput
-                            anchors { fill: parent; leftMargin: 10; rightMargin: 10; topMargin: 6; bottomMargin: 6 }
-                            color: root.cOnSurf; font.pixelSize: 14; font.letterSpacing: 3
+                            id: pinIn
+                            anchors { fill: parent; margins: 8 }
+                            color: root.cOnSurf; font.pixelSize: 15; font.letterSpacing: 4
                             inputMethodHints: Qt.ImhDigitsOnly
-                            text: "PIN"
                             onAccepted: {
                                 if (text.length > 0) {
                                     root.btAgentSend("pin_pair " + toast.notif.promptMac + " " + text)
@@ -826,172 +1004,268 @@ ShellRoot {
                                 }
                             }
                         }
-                        Component.onCompleted: pinInput.forceActiveFocus()
+                        Text { anchors.centerIn: pinIn; text: "PIN"
+                            color: Qt.rgba(root.cOnSurfVar.r, root.cOnSurfVar.g, root.cOnSurfVar.b, 0.45)
+                            font.pixelSize: 13
+                            visible: pinIn.text.length === 0 && !pinIn.activeFocus
+                        }
+                        Component.onCompleted: pinIn.forceActiveFocus()
                     }
-                    Rectangle {
-                        height: 34; width: 60; radius: 8
-                        color: pinOkH.containsMouse ? root.cPrimary
+                    Rectangle { height: 34; width: 52; radius: 8
+                        color: pOk.containsMouse ? root.cPrimary
                             : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.85)
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Text { anchors.centerIn: parent; text: "OK"
                             color: root.cOnPrim; font.pixelSize: 12; font.weight: Font.Bold }
-                        MouseArea { id: pinOkH; anchors.fill: parent; hoverEnabled: true
+                        MouseArea { id: pOk; anchors.fill: parent; hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
-                                if (pinInput.text.length > 0) {
-                                    root.btAgentSend("pin_pair " + toast.notif.promptMac + " " + pinInput.text)
+                                if (pinIn.text.length > 0) {
+                                    root.btAgentSend("pin_pair " + toast.notif.promptMac + " " + pinIn.text)
                                     root.dismissNotification(toast.notif.id)
                                 }
                             }
                         }
                     }
-                    Rectangle {
-                        height: 34; width: 60; radius: 8
-                        color: Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.15)
-                        border.width:1; border.color:Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.4)
+                    Rectangle { height: 34; width: 64; radius: 8
+                        color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.15)
+                        border.width: 1; border.color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.4)
                         Text { anchors.centerIn: parent; text: "Cancel"
                             color: root.cErr; font.pixelSize: 11 }
                         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                            onClicked: { root.btAgentSend("reject_pair " + toast.notif.promptMac); root.dismissNotification(toast.notif.id) }
+                            onClicked: {
+                                root.btAgentSend("reject_pair " + toast.notif.promptMac)
+                                root.dismissNotification(toast.notif.id)
+                            }
                         }
                     }
                 }
             }
 
-            // ── FILE TRANSFER ACCEPT/REJECT ───────────────────────────────
+            // ── File transfer Accept/Decline ───────────────────────────────
             RowLayout {
                 visible: toast.notif.isPrompt && toast.notif.promptType === "file_accept"
-                Layout.fillWidth: true; spacing: 8; Layout.leftMargin: 38
-                Rectangle {
-                    height: 32; radius: 8; implicitWidth: 100
-                    color: fileAccH.containsMouse ? root.cPrimary
+                Layout.fillWidth: true; spacing: 8; Layout.leftMargin: 44
+                Rectangle { height: 32; implicitWidth: 100; radius: 8
+                    color: faA.containsMouse ? root.cPrimary
                         : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.85)
                     Behavior on color { ColorAnimation { duration: 100 } }
-                    Text { anchors.centerIn: parent; text: "󰇼  Accept"
+                    Text { anchors.centerIn: parent; text: "󰇚  Accept"   // 󰃼
                         color: root.cOnPrim; font.pixelSize: 11
                         font.family: "Symbols Nerd Font Mono"; font.weight: Font.Medium }
-                    MouseArea { id: fileAccH; anchors.fill: parent; hoverEnabled: true
+                    MouseArea { id: faA; anchors.fill: parent; hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             root.btAgentSend("accept_file " + toast.notif.promptTransfer)
                             root.dismissNotification(toast.notif.id)
-                            root.addNotification({
-                                summary: "File Received",
+                            root.addNotification({ summary: "File Received",
                                 body: toast.notif.promptFilename + " saved to Downloads",
-                                icon: "bluetooth", urgency: 1, category: "bt"
-                            })
+                                icon: "bluetooth", urgency: 1, category: "bt" })
                         }
                     }
                 }
-                Rectangle {
-                    height: 32; radius: 8; implicitWidth: 80
-                    color: fileRejH.containsMouse ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.85)
-                        : Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.15)
-                    border.width: 1; border.color: Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.5)
+                Rectangle { height: 32; implicitWidth: 80; radius: 8
+                    color: faR.containsMouse
+                        ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.85)
+                        : Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.15)
+                    border.width: 1; border.color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.5)
                     Behavior on color { ColorAnimation { duration: 100 } }
                     Text { anchors.centerIn: parent; text: "Decline"
-                        color: fileRejH.containsMouse ? root.cOnPrim : root.cErr; font.pixelSize: 11 }
-                    MouseArea { id: fileRejH; anchors.fill: parent; hoverEnabled: true
+                        color: faR.containsMouse ? root.cOnPrim : root.cErr; font.pixelSize: 11 }
+                    MouseArea { id: faR; anchors.fill: parent; hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: { root.btAgentSend("reject_file " + toast.notif.promptTransfer); root.dismissNotification(toast.notif.id) }
+                        onClicked: {
+                            root.btAgentSend("reject_file " + toast.notif.promptTransfer)
+                            root.dismissNotification(toast.notif.id)
+                        }
                     }
                 }
-                Text {
-                    visible: toast.notif.promptSize !== undefined && toast.notif.promptSize !== ""
+                Text { visible: (toast.notif.promptSize || "") !== ""
                     text: toast.notif.promptSize || ""
                     color: root.cOnSurfVar; font.pixelSize: 10
                 }
             }
 
-            Item { height: 4 }
+            Item { height: 2 }
         }
 
-        // Hover/dismiss background handler
-        MouseArea { id: toastMA; anchors.fill: parent; hoverEnabled: true
-            // Right-click dismisses
+        // Hover/right-click dismiss
+        MouseArea { id: toastMA; anchors.fill: parent; hoverEnabled: true; z: -1
             acceptedButtons: Qt.RightButton
             onClicked: function(e) {
-                if (e.button === Qt.RightButton && !toast.notif.isPrompt)
-                    root.dismissNotification(toast.notif.id)
+                if (!toast.notif.isPrompt) root.dismissNotification(toast.notif.id)
             }
         }
     }
 
     // ═════════════════════════════════════════════════════════════════════
-    //  HISTORY CARD COMPONENT  (compact, read-only)
+    //  HISTORY CARD COMPONENT
+    //  Compact, collapsible. Shows icon glyph, group count badge,
+    //  expand toggle reveals full body + action buttons.
     // ═════════════════════════════════════════════════════════════════════
     component HistoryCard: Rectangle {
         id: hcard
         required property var notif
-        height: hcardInner.implicitHeight + 16
+        property bool _exp: false
+
         radius: 12
-        color: hcardMA.containsMouse
+        // clip:false — the Flickable's clip:true is the only viewport boundary.
+        height: hcBody.implicitHeight + 16
+        // Tell the parent ColumnLayout about our explicit height so implicitHeight
+        // propagates correctly when we expand/collapse.
+        Layout.preferredHeight: height
+        color: hcMA.containsMouse
             ? Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.7)
             : Qt.rgba(root.cSurfMid.r, root.cSurfMid.g, root.cSurfMid.b, 0.5)
         border.width: 1
-        border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.25)
+        border.color: hcard.notif.urgency >= 2
+            ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.35)
+            : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.25)
         Behavior on color { ColorAnimation { duration: 100 } }
+        Behavior on height { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
 
-        RowLayout {
-            id: hcardInner
-            anchors { left: parent.left; right: parent.right; top: parent.top
-                      margins: 10 }
-            spacing: 8
+        ColumnLayout {
+            id: hcBody
+            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+            spacing: 4
 
-            // Category dot
-            Rectangle {
-                width: 6; height: 6; radius: 3
-                anchors.verticalCenter: parent.verticalCenter
-                color: hcard.notif.urgency >= 2 ? root.cErr
-                    : hcard.notif.category === "bt" ? root.cPrimary
-                    : Qt.rgba(root.cOnSurfVar.r, root.cOnSurfVar.g, root.cOnSurfVar.b, 0.5)
-            }
-            ColumnLayout { Layout.fillWidth: true; spacing: 1
-                Text { Layout.fillWidth: true
-                    text: hcard.notif.summary || hcard.notif.appName || "Notification"
-                    color: root.cOnSurf; font.pixelSize: 11; font.weight: Font.Medium
-                    elide: Text.ElideRight }
-                Text {
-                    visible: hcard.notif.body !== ""
-                    Layout.fillWidth: true
-                    text: hcard.notif.body
-                    color: root.cOnSurfVar; font.pixelSize: 10
-                    elide: Text.ElideRight; maximumLineCount: 2
-                    wrapMode: Text.WordWrap }
-            }
-            // Timestamp
-            Text {
-                text: {
-                    const d = new Date(hcard.notif.timestamp)
-                    const now = new Date()
-                    const diffMin = Math.floor((now - d) / 60000)
-                    if (diffMin < 1)  return "now"
-                    if (diffMin < 60) return diffMin + "m"
-                    const diffH = Math.floor(diffMin / 60)
-                    if (diffH < 24) return diffH + "h"
-                    return d.toLocaleDateString(undefined, {month:"short",day:"numeric"})
+            // ── Summary row ───────────────────────────────────────────────
+            RowLayout { Layout.fillWidth: true; spacing: 8
+
+                // Urgency dot
+                Rectangle { width: 6; height: 6; radius: 3
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: hcard.notif.urgency >= 2 ? root.cErr
+                        : hcard.notif.category === "bt" ? root.cPrimary
+                        : Qt.rgba(root.cOnSurfVar.r, root.cOnSurfVar.g, root.cOnSurfVar.b, 0.5)
                 }
-                color: root.cOnSurfVar; font.pixelSize: 9; opacity: 0.7
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            // Dismiss
-            Rectangle {
-                width: 20; height: 20; radius: 5
-                color: hcardDismH.containsMouse
-                    ? Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.9)
-                    : "transparent"
-                Behavior on color { ColorAnimation { duration: 80 } }
-                Text { anchors.centerIn: parent; text: "󰅖"
+
+                // App icon (image if available, else glyph)
+                Item { width: 20; height: 20
+                    Image {
+                        id: hcIcImg
+                        anchors.fill: parent; anchors.margins: 1
+                        source: hcard.notif.iconPath ? "file://" + hcard.notif.iconPath : ""
+                        fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
+                        visible: status === Image.Ready
+                    }
+                    Text {
+                        anchors.centerIn: parent; visible: !hcIcImg.visible
+                        text: root.iconGlyph(hcard.notif)
+                        font.pixelSize: 12; font.family: "Symbols Nerd Font Mono"
+                        color: hcard.notif.urgency >= 2 ? root.cErr : root.cOnSurfVar
+                    }
+                }
+
+                // Text
+                ColumnLayout { Layout.fillWidth: true; spacing: 0
+                    RowLayout {
+                        Text { Layout.fillWidth: true
+                            text: hcard.notif.summary || hcard.notif.appName || "Notification"
+                            color: root.cOnSurf; font.pixelSize: 11; font.weight: Font.Medium
+                            elide: Text.ElideRight
+                        }
+                        // Group count badge
+                        Rectangle {
+                            visible: (hcard.notif.count || 1) > 1
+                            height: 16; implicitWidth: cntT.implicitWidth + 10; radius: 8
+                            color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.25)
+                            border.width: 1; border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.4)
+                            Text { id: cntT; anchors.centerIn: parent
+                                text: "×" + (hcard.notif.count || 1)
+                                font.pixelSize: 9; color: root.cPrimary
+                            }
+                        }
+                    }
+                    Text {
+                        visible: hcard.notif.appName !== "" && hcard.notif.summary !== ""
+                        text: hcard.notif.appName
+                        color: root.cOnSurfVar; font.pixelSize: 9; opacity: 0.7
+                    }
+                }
+
+                // Timestamp
+                Text {
+                    text: {
+                        const d = new Date(hcard.notif.timestamp), now = new Date()
+                        const dm = Math.floor((now - d) / 60000)
+                        if (dm < 1)  return "now"
+                        if (dm < 60) return dm + "m"
+                        const dh = Math.floor(dm / 60)
+                        if (dh < 24) return dh + "h"
+                        return d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                    }
+                    color: root.cOnSurfVar; font.pixelSize: 9; opacity: 0.65
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                // Expand/collapse toggle — only when there's something to show
+                Text {
+                    visible: (hcard.notif.body || "") !== "" || ((hcard.notif.actions || []).length > 0)
+                    // nf-md-chevron-down / up
+                    text: hcard._exp ? "󰅃" : "󰅀"
                     font.pixelSize: 10; font.family: "Symbols Nerd Font Mono"
-                    color: root.cOnSurfVar; opacity: 0.7 }
-                MouseArea { id: hcardDismH; anchors.fill: parent; hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        root.history = root.history.filter(function(n){ return n.id !== hcard.notif.id })
+                    color: root.cOnSurfVar; opacity: 0.8
+                    anchors.verticalCenter: parent.verticalCenter
+                    MouseArea { anchors.fill: parent; anchors.margins: -4
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: hcard._exp = !hcard._exp
+                    }
+                }
+
+                // Dismiss
+                Rectangle { width: 18; height: 18; radius: 5
+                    color: hcDH.containsMouse
+                        ? Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.9)
+                        : "transparent"
+                    Behavior on color { ColorAnimation { duration: 80 } }
+                    Text { anchors.centerIn: parent; text: "×"
+                        font.pixelSize: 9; color: root.cOnSurfVar; opacity: 0.7 }
+                    MouseArea { id: hcDH; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.history = root.history.filter(function(n) { return n.id !== hcard.notif.id })
+                    }
+                }
+            }
+
+            // ── Expanded body + actions ────────────────────────────────────
+            ColumnLayout {
+                visible: hcard._exp
+                Layout.fillWidth: true; spacing: 6
+
+                Text {
+                    visible: (hcard.notif.body || "") !== ""
+                    Layout.fillWidth: true
+                    text: hcard.notif.body || ""
+                    color: root.cOnSurfVar; font.pixelSize: 10
+                    wrapMode: Text.WordWrap; leftPadding: 14
+                }
+
+                Flow {
+                    visible: (hcard.notif.actions || []).length > 0
+                    Layout.fillWidth: true; spacing: 5; leftPadding: 14
+                    Repeater { model: hcard.notif.actions || []
+                        delegate: Rectangle {
+                            required property var modelData
+                            height: 22; implicitWidth: haL.implicitWidth + 12; radius: 6
+                            color: haH.containsMouse
+                                ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.22)
+                                : Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.7)
+                            border.width: 1
+                            border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.3)
+                            Behavior on color { ColorAnimation { duration: 80 } }
+                            Text { id: haL; anchors.centerIn: parent
+                                text: modelData.label || modelData.key || ""
+                                color: root.cOnSurf; font.pixelSize: 9
+                            }
+                            MouseArea { id: haH; anchors.fill: parent; hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor }
+                        }
                     }
                 }
             }
         }
-        MouseArea { id: hcardMA; anchors.fill: parent; hoverEnabled: true; z: -1 }
+
+        MouseArea { id: hcMA; anchors.fill: parent; hoverEnabled: true; z: -1 }
     }
 }
