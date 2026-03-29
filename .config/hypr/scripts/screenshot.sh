@@ -30,61 +30,49 @@ mkdir -p "$screenshot_folder"
 # -----------------------------------------------------
 # Notification with thumbnail
 # Usage: notify_with_thumb "Title" "Message" "/path/to/image.png"
+#
+# Generates a resized thumbnail via ImageMagick (magick) before firing
+# notify-send so the notification daemon receives a compact preview image
+# rather than the full-resolution capture. Mirrors the recorder pipeline.
+# The -a Screenshot app-name tag lets the quickshell daemon detect and
+# route the notification into the screenshot thumbnail display path.
 # -----------------------------------------------------
+_SS_THUMB="/tmp/hyprcandy-screenshot-thumb.jpg"
+
+_make_thumb() {
+    local src="$1"
+    [ -f "$src" ] || return 1
+    # Resize to max 640×360, convert to JPEG for fast loading, strip metadata
+    magick "$src" -resize '640x360>' -quality 88 -strip "$_SS_THUMB" 2>/dev/null \
+        && [ -f "$_SS_THUMB" ]
+}
+
 notify_with_thumb() {
     local title="$1"
     local message="$2"
     local image_path="$3"
     local urgency="${4:-normal}"
-    
-    # Check which notification daemon is running
-    if pgrep -x "swaync" >/dev/null 2>&1; then
-        # SwayNC - uses standard icon path but supports image preview
-        if [ -f "$image_path" ]; then
-            notify-send -i "$image_path" -u "$urgency" "$title" "$message"
+
+    # Generate thumbnail; fall back to original path if magick is unavailable
+    local thumb_path=""
+    if [ -f "$image_path" ]; then
+        if _make_thumb "$image_path"; then
+            thumb_path="$_SS_THUMB"
         else
-            notify-send -i camera-photo-symbolic -u "$urgency" "$title" "$message"
+            thumb_path="$image_path"
         fi
-        
-    elif pgrep -x "mako" >/dev/null 2>&1; then
-        # Mako - uses icon-data hint with base64
-        if [ -f "$image_path" ]; then
-            # Convert image to base64 for mako
-            local icon_data
-            icon_data=$(base64 -w 0 "$image_path" 2>/dev/null)
-            if [ -n "$icon_data" ]; then
-                notify-send -u "$urgency" \
-                    -h "string:x-canonical-private-synchronous:anything" \
-                    -h "string:icon-data:image/png;base64,$icon_data" \
-                    "$title" "$message"
-            else
-                notify-send -i camera-photo-symbolic -u "$urgency" "$title" "$message"
-            fi
-        else
-            notify-send -i camera-photo-symbolic -u "$urgency" "$title" "$message"
-        fi
-        
-    elif pgrep -x "dunst" >/dev/null 2>&1; then
-        # Dunst - supports inline images via icon
-        if [ -f "$image_path" ]; then
-            notify-send -i "$image_path" -u "$urgency" "$title" "$message"
-        else
-            notify-send -i camera-photo-symbolic -u "$urgency" "$title" "$message"
-        fi
-        
+    fi
+
+    if [ -n "$thumb_path" ]; then
+        notify-send -a Screenshot -i "$thumb_path" -u "$urgency" "$title" "$message"
     else
-        # Generic fallback - try icon path directly
-        if [ -f "$image_path" ]; then
-            notify-send -i "$image_path" -u "$urgency" "$title" "$message"
-        else
-            notify-send -i camera-photo-symbolic -u "$urgency" "$title" "$message"
-        fi
+        notify-send -a Screenshot -i camera-photo-symbolic -u "$urgency" "$title" "$message"
     fi
 }
 
 # Simple notification without image (for errors/cancellations)
 notify_simple() {
-    notify-send -i camera-photo-symbolic -u normal "$1" "$2"
+    notify-send -a Screenshot -i camera-photo-symbolic -u normal "$1" "$2"
 }
 
 # -----------------------------------------------------

@@ -190,6 +190,7 @@ ShellRoot {
         if (cat === "bt" || ic === "bluetooth" || ic.includes("bluetooth")) return "󰂯"  // nf-md-bluetooth
         if (ic.includes("wireless") || ic === "network-wireless")           return "󰤨"  // nf-md-wifi_strength_4
         if (ic === "network" || ic.includes("ethernet"))                    return "󰈀"  // nf-md-ethernet
+        if (cat === "media.playing" || ap === "now playing") return "󰝚"   // nf-md-music_note
         if (ic.includes("volume") || ic.includes("audio") || ic.includes("sound")) return "󰕾"  // nf-md-volume_high
         if (ic.includes("battery"))                                         return "󰁹"  // nf-md-battery
         if (ic.includes("screenshot") || ap.includes("screenshot"))        return "󰹑"  // nf-md-monitor_screenshot
@@ -239,7 +240,8 @@ ShellRoot {
             root.notifications = q
         }
 
-        // History — group + bump
+        // History — group + bump. All non-prompt notifications go here, including
+        // media.playing (each new track is a history entry; same track updates in place).
         if (!n.isPrompt) {
             const h = root.history.slice()
             const hi = h.findIndex(function(x) { return x.groupKey === n.groupKey })
@@ -247,7 +249,9 @@ ShellRoot {
                 const updated = Object.assign({}, h[hi], {
                     count: (h[hi].count || 1) + 1,
                     timestamp: n.timestamp,
-                    body: n.body
+                    body: n.body,
+                    // For media, keep the new album art; for others keep whichever is set
+                    iconPath: n.iconPath || h[hi].iconPath
                 })
                 h.splice(hi, 1)
                 h.unshift(updated)
@@ -306,18 +310,33 @@ ShellRoot {
     // ═════════════════════════════════════════════════════════════════════
     property bool btAgentReady: false
 
-    // Create the fifo once at startup — never recreated on agent restart
+    // ── Fifo setup ──────────────────────────────────────────────────────────
+    // Create the fifo once, then immediately open a persistent write-end
+    // holder (sleep infinity) so bt-agent.py never sees EOF on its stdin.
+    // Without this every short-lived btAgentStdinProc write closes the
+    // last writer, delivering EOF → bt-agent exits (code=9).
     Process { id: btFifoInitProc
-        command: ["bash", "-c", "[ -p /tmp/qs_bt_cmd ] || (rm -f /tmp/qs_bt_cmd && mkfifo /tmp/qs_bt_cmd)"]
+        command: ["bash", "-c",
+            "[ -p /tmp/qs_bt_cmd ] || (rm -f /tmp/qs_bt_cmd && mkfifo /tmp/qs_bt_cmd)"]
         Component.onCompleted: running = true
-        onExited: { if (!btAgentProc.running) btAgentProc.running = true }
+        onExited: { if (!btFifoHolderProc.running) btFifoHolderProc.running = true }
     }
 
-    // Agent process: reads from the persistent fifo, restarts on crash (fifo stays)
+    // Persistent writer keeping the fifo write-end open indefinitely.
+    // Restarted automatically if it dies (e.g. suspend/resume).
+    Process { id: btFifoHolderProc
+        command: ["bash", "-c", "sleep infinity >> /tmp/qs_bt_cmd"]
+        onExited: {
+            if (!btFifoHolderProc.running) btFifoHolderProc.running = true
+            if (!btAgentProc.running)      btAgentProc.running = true
+        }
+    }
+
+    // Agent process — bt-agent.py opens the fifo itself via its stdin_reader loop.
     Process { id: btAgentProc
-        command: ["bash", "-c",
-            "python3 -u " + Quickshell.env("HOME") +
-            "/.config/quickshell/notifications/bt-agent.py < /tmp/qs_bt_cmd"]
+        command: ["python3", "-u",
+            Quickshell.env("HOME") +
+            "/.config/quickshell/notifications/bt-agent.py"]
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
             if (!l.trim()) return
             try { root._handleBtAgentEvent(JSON.parse(l)) } catch(e) {}
@@ -335,13 +354,12 @@ ShellRoot {
         onTriggered: { if (!btAgentProc.running) btAgentProc.running = true }
     }
 
-    // Single persistent writer process — sends one command then stays idle
-    // Uses a short-lived echo; the fifo buffers it for the agent to read.
+    // Send a command to bt-agent.py via the fifo.
     Process { id: btAgentStdinProc; property string _cmd: ""
         command: ["bash", "-c", "printf '%s\\n' " + btAgentStdinProc._cmd + " >> /tmp/qs_bt_cmd"]
     }
     function btAgentSend(cmd) {
-        btAgentStdinProc._cmd = "'" + cmd.replace(/'/g, "'\\''") + "'"
+        btAgentStdinProc._cmd = "'" + cmd.replace(/'/g, "'\\''" ) + "'"
         if (!btAgentStdinProc.running) btAgentStdinProc.running = true
     }
 
@@ -405,6 +423,7 @@ ShellRoot {
             const now = Date.now()
             const rem = root.notifications.filter(function(n) {
                 if (n.isPrompt || n.urgency >= 2) return true
+                if (n.category === "media.playing") return (now - n.timestamp) < 4000
                 return (now - n.timestamp) < 5000
             })
             if (rem.length !== root.notifications.length) root.notifications = rem
@@ -720,7 +739,9 @@ ShellRoot {
                 ? Qt.rgba(root.cErr.r,     root.cErr.g,     root.cErr.b,     0.6)
                 : toast.notif.category === "bt"
                     ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.5)
-                    : Qt.rgba(root.cOutVar.r,  root.cOutVar.g,  root.cOutVar.b,  0.38)
+                    : toast.notif.category === "media.playing"
+                        ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.35)
+                        : Qt.rgba(root.cOutVar.r,  root.cOutVar.g,  root.cOutVar.b,  0.38)
             Behavior on color { ColorAnimation { duration: 100 } }
         }
 
@@ -737,7 +758,9 @@ ShellRoot {
             height: parent.height - toast._radius
             color: toast.notif.urgency >= 2 ? root.cErr
                 : toast.notif.category === "bt" ? root.cPrimary
-                : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.45)
+                : toast.notif.category === "media.playing"
+                    ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.5)
+                    : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.45)
         }
         // Rounded bottom of accent bar
         Rectangle {
@@ -746,7 +769,9 @@ ShellRoot {
             height: toast._radius * 2
             color: toast.notif.urgency >= 2 ? root.cErr
                 : toast.notif.category === "bt" ? root.cPrimary
-                : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.45)
+                : toast.notif.category === "media.playing"
+                    ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.5)
+                    : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.45)
         }
 
         // ── Progress bar — sits at bottom inside rounded corners ──────────
@@ -795,26 +820,49 @@ ShellRoot {
             // Header row
             RowLayout { Layout.fillWidth: true; spacing: 10
 
-                // Icon area (app icon image or glyph fallback + count badge)
-                Item { width: 34; height: 34
-                    Rectangle { anchors.fill: parent; radius: 9
+                // Icon area — media.playing shows circular album art (48px),
+                // all others show app icon or glyph (34px)
+                Item {
+                    width:  toast.notif.category === "media.playing" ? 48 : 34
+                    height: toast.notif.category === "media.playing" ? 48 : 34
+                    Rectangle { anchors.fill: parent
+                        radius: toast.notif.category === "media.playing" ? width / 2 : 9
                         color: toast.notif.urgency >= 2
                             ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.18)
                             : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.15)
                     }
-                    Image {
-                        id: toastIcImg
-                        anchors { fill: parent; margins: 4 }
-                        source: toast.notif.iconPath ? "file://" + toast.notif.iconPath : ""
-                        fillMode: Image.PreserveAspectFit
-                        smooth: true; mipmap: true
-                        visible: status === Image.Ready
+                    // For media.playing, clip album art to circle using the
+                    // same MultiEffect mask technique as the ToastCard itself.
+                    Item {
+                        id: toastIcImgWrap
+                        anchors { fill: parent; margins: toast.notif.category === "media.playing" ? 0 : 4 }
+                        visible: toastIcImg.status === Image.Ready
+                        layer.enabled: toast.notif.category === "media.playing"
+                        layer.effect: MultiEffect {
+                            maskEnabled:      true
+                            maskSource:       toastArtMask
+                            maskThresholdMin: 0.5
+                            maskSpreadAtMin:  1.0
+                        }
+                        Rectangle {
+                            id: toastArtMask
+                            anchors.fill: parent; radius: width / 2
+                            color: "white"; opacity: 0; layer.enabled: true
+                        }
+                        Image {
+                            id: toastIcImg
+                            anchors.fill: parent
+                            source: toast.notif.iconPath ? "file://" + toast.notif.iconPath : ""
+                            fillMode: Image.PreserveAspectCrop
+                            smooth: true; mipmap: true
+                        }
                     }
                     Text {
                         anchors.centerIn: parent
                         visible: !toastIcImg.visible
                         text: root.iconGlyph(toast.notif)
-                        font.pixelSize: 17; font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: toast.notif.category === "media.playing" ? 22 : 17
+                        font.family: "Symbols Nerd Font Mono"
                         color: toast.notif.urgency >= 2 ? root.cErr : root.cPrimary
                     }
                     // Group count badge
@@ -863,6 +911,37 @@ ShellRoot {
                 color: root.cOnSurfVar; font.pixelSize: 11
                 wrapMode: Text.WordWrap; maximumLineCount: 4; elide: Text.ElideRight
                 leftPadding: 44
+            }
+
+            // ── Thumbnail — shown when the icon IS a file path (screenshots,
+            //   recordings, etc.). Media album art is already shown as a circle
+            //   in the icon area so it is excluded here.
+            // Detection: notif.icon starts with "/" means notify-send -i /path/to/file
+            Image {
+                id: toastThumb
+                property bool _isFilePath: (toast.notif.icon || "").startsWith("/") ||
+                                           (toast.notif.icon || "").startsWith("file://")
+                visible: _isFilePath &&
+                         toast.notif.category !== "media.playing" &&
+                         !toast.notif.isPrompt &&
+                         status === Image.Ready
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(implicitHeight, 180)
+                source: toast.notif.iconPath ? "file://" + toast.notif.iconPath : ""
+                fillMode: Image.PreserveAspectFit
+                smooth: true; mipmap: true
+                layer.enabled: true
+                layer.effect: MultiEffect {
+                    maskEnabled:      true
+                    maskSource:       thumbMask
+                    maskThresholdMin: 0.5
+                    maskSpreadAtMin:  1.0
+                }
+                Rectangle {
+                    id: thumbMask
+                    anchors.fill: parent
+                    radius: 8; color: "white"; opacity: 0; layer.enabled: true
+                }
             }
 
             // Action buttons (non-prompt, standard freedesktop actions)
@@ -1141,11 +1220,17 @@ ShellRoot {
                 }
 
                 // App icon (image if available, else glyph)
+                // Skip for file-path icons (screenshots/recordings) — the full
+                // thumbnail renders in the expanded section instead.
                 Item { width: 20; height: 20
                     Image {
                         id: hcIcImg
                         anchors.fill: parent; anchors.margins: 1
-                        source: hcard.notif.iconPath ? "file://" + hcard.notif.iconPath : ""
+                        source: {
+                            const ic = hcard.notif.icon || ""
+                            if (ic.startsWith("/") || ic.startsWith("file://")) return ""
+                            return hcard.notif.iconPath ? "file://" + hcard.notif.iconPath : ""
+                        }
                         fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                         visible: status === Image.Ready
                     }
@@ -1232,6 +1317,30 @@ ShellRoot {
             ColumnLayout {
                 visible: hcard._exp
                 Layout.fillWidth: true; spacing: 6
+
+                // Thumbnail — screenshots, recordings, any file-path icon
+                Image {
+                    id: hcThumb
+                    property bool _isFilePath: (hcard.notif.icon || "").startsWith("/") ||
+                                               (hcard.notif.icon || "").startsWith("file://")
+                    visible: _isFilePath &&
+                             hcard.notif.category !== "media.playing" &&
+                             status === Image.Ready
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(implicitHeight, 160)
+                    source: hcard.notif.iconPath ? "file://" + hcard.notif.iconPath : ""
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true; mipmap: true
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled: true; maskSource: hcThumbMask
+                        maskThresholdMin: 0.5; maskSpreadAtMin: 1.0
+                    }
+                    Rectangle {
+                        id: hcThumbMask; anchors.fill: parent
+                        radius: 6; color: "white"; opacity: 0; layer.enabled: true
+                    }
+                }
 
                 Text {
                     visible: (hcard.notif.body || "") !== ""

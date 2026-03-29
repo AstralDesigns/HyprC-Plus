@@ -83,6 +83,17 @@ ShellRoot {
         function close()  { root.menuVisible = false }
     }
 
+    // Re-sync volume from pactl every time the menu opens so the slider
+    // always reflects the current system level regardless of what other
+    // volume handlers (waybar, keys, wpctl, etc.) may have changed it.
+    Connections {
+        target: root
+        function onMenuVisibleChanged() {
+            if (root.menuVisible && !volReadProc.running)
+                volReadProc.running = true
+        }
+    }
+
     // ── Brightness ───────────────────────────────────────────────────────────
     // brightnessctl -m → name,subsystem,max,current%,current_raw
     // e.g. intel_backlight,backlight,4882,100%,4882
@@ -193,6 +204,42 @@ ShellRoot {
     property string btConnectedMac: ""   // MAC that just succeeded — shows ✓ briefly
     property string netConnectedSSID: "" // SSID that just succeeded — shows ✓ briefly
 
+    // ── Trust state ───────────────────────────────────────────────────────────
+    // Persisted per-MAC in ~/.config/hyprcandy/bt-trust/<MAC>.trust
+    // Watches (phone, computer) get auto-trusted on first connect.
+    // All other non-audio devices default to untrusted and show a toggle.
+    property var btTrusted: ({})   // mac → bool
+
+    property string _btTrustDir: Quickshell.env("HOME") + "/.config/hyprcandy/bt-trust"
+
+    function _btTrustFile(mac) {
+        return root._btTrustDir + "/" + mac.replace(/:/g, "_") + ".trust"
+    }
+    function btIsTrusted(mac) {
+        return root.btTrusted[mac] === true
+    }
+    function btIsAutoTrust(mac) {
+        // Audio, watches, phones/tablets, computers/laptops auto-trusted on first connect.
+        // Printers get the trust toggle (require explicit user trust).
+        // Gamepads, keyboards, mice: no trust concept — not file-capable.
+        const dev = root.btDevices.find(function(d) { return d.mac === mac })
+        if (!dev) return false
+        const ic = (dev.icon || "").toLowerCase()
+        return ic === "audio-headset"        || ic === "audio-headset-gateway" ||
+               ic === "audio-headphones"     || ic === "audio-card"            ||
+               ic.includes("speaker")        ||
+               ic === "phone"                || ic === "computer"              ||
+               ic.includes("watch")          || ic.includes("wearable")
+    }
+    function btLoadTrust(mac) {
+        // Check trust file
+        const f = root._btTrustFile(mac)
+        try {
+            const [ok, c] = [false, ""] // placeholder — read via Process below
+        } catch(e) {}
+        return false
+    }
+
     // ── Status poll: power state + paired/connected device list ──────────────
     Process { id: btStatusProc
         property var _buf: []
@@ -226,8 +273,81 @@ ShellRoot {
             }
         }}
         onRunningChanged: if (running) _buf = []
-        onExited: root.btDevices = _buf.slice()
+        onExited: {
+            root.btDevices = _buf.slice()
+            // Load trust state for all devices
+            btTrustReadProc._macs = root.btDevices.map(function(d) { return d.mac })
+            if (!btTrustReadProc.running) btTrustReadProc.running = true
+            // Auto-trust audio + watch/phone/computer devices on first see
+            root.btDevices.forEach(function(d) {
+                if (root.btIsAutoTrust(d.mac) && root.btTrusted[d.mac] === undefined) {
+                    root.btSetTrust(d.mac, true)
+                }
+            })
+            // Auto-reconnect once at startup — fires regardless of menu visibility
+            // since btStatusProc.Component.onCompleted starts the first poll.
+            if (!btStatusProc._autoReconnectDone && root.btPowered) {
+                btStatusProc._autoReconnectDone = true
+                const disconnected = root.btDevices.filter(function(x) { return !x.connected })
+                if (disconnected.length > 0) {
+                    btAutoReconnProc._macs = disconnected.map(function(x) { return x.mac })
+                    if (!btAutoReconnProc.running) btAutoReconnProc.running = true
+                }
+            }
+        }
+        property bool _autoReconnectDone: false
         Component.onCompleted: running = true
+    }
+    // Reconnects all previously-paired-but-disconnected devices once at startup.
+    // Runs regardless of menu visibility — fires after first btStatusProc poll.
+    Process { id: btAutoReconnProc; property var _macs: []
+        command: ["bash", "-c",
+            "for mac in " + btAutoReconnProc._macs.join(" ") + "; do " +
+            "  bluetoothctl connect $mac 2>/dev/null; sleep 1; " +
+            "done"]
+        onExited: { if (!btStatusProc.running) btStatusProc.running = true }
+    }
+
+    // ── Trust management ──────────────────────────────────────────────────────
+    // Reads trust files for all known devices once per status poll.
+    // Trust state is a simple presence check: file exists = trusted.
+    Process { id: btTrustReadProc; property var _macs: []
+        command: ["bash", "-c",
+            "mkdir -p '" + root._btTrustDir + "'; " +
+            "for mac in " + btTrustReadProc._macs.join(" ") + "; do " +
+            "  f='" + root._btTrustDir + "/'$(echo $mac | tr ':' '_')'.trust'; " +
+            "  [ -f \"$f\" ] && echo \"TRUSTED:$mac\" || echo \"UNTRUSTED:$mac\"; " +
+            "done"]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            if (l.startsWith("TRUSTED:")) {
+                const mac = l.slice(8).trim()
+                const o = Object.assign({}, root.btTrusted); o[mac] = true; root.btTrusted = o
+            } else if (l.startsWith("UNTRUSTED:")) {
+                const mac = l.slice(10).trim()
+                const o = Object.assign({}, root.btTrusted); o[mac] = false; root.btTrusted = o
+            }
+        }}
+    }
+
+    Process { id: btTrustSetProc; property string _cmd: ""
+        command: ["bash", "-c", btTrustSetProc._cmd]
+        onExited: {
+            // Re-read trust state after change
+            btTrustReadProc._macs = root.btDevices.map(function(d) { return d.mac })
+            if (!btTrustReadProc.running) btTrustReadProc.running = true
+        }
+    }
+    function btSetTrust(mac, trusted) {
+        const f = "'" + root._btTrustDir + "/'$(echo " + mac + " | tr ':' '_')'.trust'"
+        if (trusted) {
+            btTrustSetProc._cmd =
+                "mkdir -p '" + root._btTrustDir + "' && touch " + f + " && " +
+                "bluetoothctl trust " + mac + " 2>/dev/null"
+        } else {
+            btTrustSetProc._cmd =
+                "rm -f " + f + " && bluetoothctl untrust " + mac + " 2>/dev/null"
+        }
+        if (!btTrustSetProc.running) btTrustSetProc.running = true
     }
     Timer { interval: 8000; repeat: true; running: true;
         onTriggered: if (!btStatusProc.running) btStatusProc.running = true }
@@ -283,18 +403,86 @@ ShellRoot {
     }
 
     // ── Connect / disconnect / forget ─────────────────────────────────────────
-    Process { id: btConnProc; property string _cmd: ""; property string _lastMac: ""
+    Process { id: btConnProc; property string _cmd: ""; property string _lastMac: ""; property string _capturedPct: ""
         command: ["bash", "-c", btConnProc._cmd]
         onExited: function(code) {
             root.btConnecting = ""
-            if (code === 0) { root.btConnectedMac = btConnProc._lastMac; btConnFeedbackTimer.restart() }
+            if (code === 0) {
+                root.btConnectedMac = btConnProc._lastMac
+                btConnFeedbackTimer.restart()
+                // Restore the volume that was active before the connect.
+                // _capturedPct was snapshot in btConnect() before the process started.
+                root.btSetSinkVolume(btConnProc._lastMac, btConnProc._capturedPct)
+            }
             if (!btStatusProc.running) btStatusProc.running = true
         }
     }
     Timer { id: btConnFeedbackTimer; interval: 2500; repeat: false
         onTriggered: root.btConnectedMac = "" }
+    // ── BT volume preservation ────────────────────────────────────────────────
+    // Earphones implement A2DP Absolute Volume: after the profile negotiates they
+    // advertise their hardware level (often 100%) back to PipeWire, overwriting
+    // whatever pactl set a moment before.  The fix is a three-shot retry loop:
+    //   shot 1 — immediate, catches the initial 100% default on sink creation
+    //   shot 2 — +800 ms, catches the late A2DP re-sync after codec negotiation
+    //   shot 3 — via @DEFAULT_SINK@ in case PipeWire remapped the default by then
+    // capturedPct is snapshotted BEFORE any connect/switch so the slider value
+    // at the time of the action is preserved, not whatever it drifts to afterward.
+    Process { id: btSinkVolProc; property string _cmd: ""
+        command: ["bash", "-c", btSinkVolProc._cmd]
+        onExited: { if (!volReadProc.running) volReadProc.running = true }
+    }
+    function btSetSinkVolume(mac, capturedPct) {
+        const macFrag = mac.replace(/:/g, "_").toLowerCase()
+        const pct = capturedPct || (Math.round(root.volumeValue * 100) + "%")
+        btSinkVolProc._cmd =
+            "PCT='" + pct + "'; FRAG='" + macFrag + "'; " +
+            // Wait up to 6 s for the BT sink to appear in pactl
+            "for i in $(seq 1 12); do " +
+            "  SINK=$(pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -i \"$FRAG\" | head -1); " +
+            "  [ -n \"$SINK\" ] && break; sleep 0.5; " +
+            "done; " +
+            "[ -z \"$SINK\" ] && exit 0; " +
+            // Shot 1 — immediately after sink appears
+            "pactl set-sink-volume \"$SINK\" \"$PCT\" 2>/dev/null; " +
+            // Shot 2 — after A2DP codec negotiation settles (~800 ms later)
+            "sleep 0.8; pactl set-sink-volume \"$SINK\" \"$PCT\" 2>/dev/null; " +
+            // Shot 3 — via default alias in case PipeWire remapped it
+            "pactl set-sink-volume @DEFAULT_SINK@ \"$PCT\" 2>/dev/null; true"
+        if (!btSinkVolProc.running) btSinkVolProc.running = true
+    }
+
+    // "Set Default" — capture volume NOW (before the switch can disturb it),
+    // then restore after the sink switch completes.
+    Process { id: btDefaultSinkProc; property string _cmd: ""
+                                     property string _capturedPct: ""
+                                     property string _mac: ""
+        command: ["bash", "-c", btDefaultSinkProc._cmd]
+        onExited: {
+            if (_mac !== "") root.btSetSinkVolume(_mac, _capturedPct)
+            if (!volReadProc.running) volReadProc.running = true
+        }
+    }
+    function btSetDefaultSink(mac) {
+        const macFrag = mac.replace(/:/g, "_").toLowerCase()
+        // Snapshot NOW before any sink switch can change the level
+        btDefaultSinkProc._capturedPct = Math.round(root.volumeValue * 100) + "%"
+        btDefaultSinkProc._mac = mac
+        btDefaultSinkProc._cmd =
+            "FRAG='" + macFrag + "'; " +
+            "SINK=$(pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -i \"$FRAG\" | head -1); " +
+            "[ -z \"$SINK\" ] && SINK=$(pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -i '" + mac.toLowerCase() + "' | head -1); " +
+            "[ -z \"$SINK\" ] && { echo 'No BT sink found for " + mac + "' >&2; exit 1; }; " +
+            "pactl set-default-sink \"$SINK\"; " +
+            "pactl list short sink-inputs 2>/dev/null | awk '{print $1}' | " +
+            "  xargs -r -I{} pactl move-sink-input {} \"$SINK\" 2>/dev/null; " +
+            "command -v wpctl >/dev/null && wpctl set-default \"$SINK\" 2>/dev/null; true"
+        if (!btDefaultSinkProc.running) btDefaultSinkProc.running = true
+    }
     function btConnect(mac) {
         root.btConnecting = mac; btConnProc._lastMac = mac
+        // Snapshot volume before connect so btSetSinkVolume can restore it
+        btConnProc._capturedPct = Math.round(root.volumeValue * 100) + "%"
         btConnProc._cmd = "bluetoothctl connect " + mac
         if (!btConnProc.running) btConnProc.running = true
     }
@@ -379,36 +567,82 @@ ShellRoot {
     }
 
     // ── Recorder ─────────────────────────────────────────────────────────────
+    // ── Recorder ─────────────────────────────────────────────────────────
+    // Saves to ~/Videos/Recordings/. On stop: waits for wf-recorder to flush,
+    // then extracts a frame thumbnail (ffmpeg → ImageMagick fallback) and fires
+    // notify-send -i <thumb> so the notification toast shows a preview.
     property bool isRecording: false
+    property string _recFile: ""   // set when recording starts
+
     Process { id: recCheckProc
         command:["bash","-c","pgrep -x wf-recorder > /dev/null && echo 1 || echo 0"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){ root.isRecording=l.trim()==="1" } }
         Component.onCompleted: running=true
     }
-    Timer { interval:3000; repeat:true; running:true; onTriggered: if(!recCheckProc.running) recCheckProc.running=true }
+    Timer { interval:3000; repeat:true; running:true
+        onTriggered: if(!recCheckProc.running) recCheckProc.running=true }
+
     Process { id: recProc; property string _cmd:""; command:["bash","-c",recProc._cmd]
         onRunningChanged: if(!running) recStopRefreshTimer.restart()
     }
-    Timer { id:recStopRefreshTimer; interval:500; repeat:false; onTriggered: if(!recCheckProc.running) recCheckProc.running=true }
+    Timer { id:recStopRefreshTimer; interval:500; repeat:false
+        onTriggered: if(!recCheckProc.running) recCheckProc.running=true }
+
+    // Runs the post-stop thumbnail + notification independently of recProc
+    // so blocking on ffmpeg never stalls the main process.
+    Process { id: recNotifyProc; property string _cmd:""
+        command:["bash","-c",recNotifyProc._cmd] }
+
     function toggleRecorder(){
         if(root.isRecording){
-            recProc._cmd="pkill -SIGINT wf-recorder"
+            const savedFile = root._recFile
+            root._recFile = ""
+            recProc._cmd = "pkill -SIGINT wf-recorder"
             if(!recProc.running) recProc.running=true
+
+            const sf = savedFile.replace(/'/g, "'\''")
+            recNotifyProc._cmd =
+                "sleep 2; " +
+                "FILE='" + sf + "'; " +
+                "[ -f \"$FILE\" ] || FILE=$(ls -t ~/Videos/Recordings/*.mp4 2>/dev/null | head -1); " +
+                "[ -f \"$FILE\" ] || exit 0; " +
+                "THUMB=/tmp/qs_rec_thumb.jpg; " +
+                "ffmpeg -y -loglevel quiet -ss 00:00:01 -i \"$FILE\" -vframes 1 -q:v 3 \"$THUMB\" 2>/dev/null || " +
+                "magick \"${FILE}[24]\" -resize '640x360>' \"$THUMB\" 2>/dev/null || " +
+                "magick \"${FILE}[0]\"  -resize '640x360>' \"$THUMB\" 2>/dev/null || true; " +
+                "BASE=$(basename \"$FILE\"); " +
+                "if [ -f \"$THUMB\" ]; then " +
+                "  notify-send -a Recorder -i \"$THUMB\" '\uf70b Recording Saved' \"$BASE\"; " +
+                "else " +
+                "  notify-send -a Recorder -i media-record '\uf70b Recording Saved' \"$BASE\"; " +
+                "fi"
+            if(!recNotifyProc.running) recNotifyProc.running=true
         } else {
-            // setsid -f detaches from QS process group so it lives independently
-            const s=Quickshell.env("HOME")+"/.config/hyprcandy/scripts/recorder.sh"
-            recProc._cmd="setsid -f bash -c \"[ -x '"+s+"' ]&&'"+s+"'||wf-recorder -f ~/Videos/record_\$(date +%Y%m%d_%H%M%S).mp4\" &>/dev/null &"
+            const home   = Quickshell.env("HOME")
+            const folder = home + "/Videos/Recordings"
+            const ts     = Qt.formatDateTime(new Date(), "yyyyMMdd-HHmmss")
+            const dest   = folder + "/recording-" + ts + ".mp4"
+            root._recFile = dest
+            const sf2    = dest.replace(/'/g, "'\\''")
+            const sfo    = folder.replace(/'/g, "'\\''")
+            const s      = home + "/.config/hyprcandy/scripts/recorder.sh"
+            const ss     = s.replace(/'/g, "'\\''")
+            recProc._cmd =
+                "mkdir -p '" + sfo + "'; " +
+                "setsid -f bash -c \"[ -x '" + ss + "' ] && '" + ss + "' || " +
+                "wf-recorder -f '" + sf2 + "'\" &>/dev/null &"
             if(!recProc.running) recProc.running=true
         }
     }
-    // Screenshot: close menu first, then fire-and-forget via setsid so it
-    // doesn't inherit the QS process group (killing it won't kill startmenu)
-    Process { id: ssProc; property string _cmd:""; command:["bash","-c",ssProc._cmd] }
+
+    // ── Screenshot — delegates to the rofi screenshot script ───────────────
+    // Runs ~/.config/hypr/scripts/screenshot.sh via setsid -f so the rofi
+    // menu opens independently and the startmenu can close immediately.
+    Process { id: ssProc; command: ["setsid", "-f",
+        Quickshell.env("HOME") + "/.config/hypr/scripts/screenshot.sh"] }
     function takeScreenshot(){
-        root.menuVisible=false
-        const s=Quickshell.env("HOME")+"/.config/hyprcandy/scripts/screenshot.sh"
-        ssProc._cmd="sleep 0.3 && ([ -x '"+s+"' ]&&setsid -f '"+s+"' &>/dev/null || setsid -f grimblast --notify copy area &>/dev/null) &"
-        if(!ssProc.running) ssProc.running=true
+        root.menuVisible = false
+        if (!ssProc.running) ssProc.running = true
     }
     Process { id: logoutProc; command:["bash","-c","hyprctl dispatch exit"] }
     Process { id: powerProc; property string _cmd:""; command:["bash","-c",powerProc._cmd] }
@@ -798,15 +1032,16 @@ ShellRoot {
                                             color: btDelegate.modelData.connected ? root.cPrimary : root.cOnSurfVar
                                             text: {
                                                 const ic = (btDelegate.modelData.icon||"").toLowerCase()
-                                                if (ic==="audio-headset"||ic==="audio-headphones") return "󰋎"
+                                                if (ic==="audio-headset"||ic==="audio-headphones"||ic==="audio-headset-gateway") return "󰋎"
                                                 if (ic==="audio-card"||ic.includes("speaker"))    return "󰓃"
                                                 if (ic==="input-keyboard")  return "󰌌"
                                                 if (ic==="input-mouse")     return "󰍽"
                                                 if (ic==="input-gaming")    return "󰊗"
                                                 if (ic==="phone")           return "󰏲"
-                                                if (ic==="computer")        return "󰋊"
+                                                if (ic==="computer")        return "󰇄"
+                                                if (ic.includes("watch")||ic.includes("wearable")) return "󰓹"
                                                 if (ic==="printer")         return "󰐪"
-                                                if (ic==="camera-photo")    return "󰄲"
+                                                if (ic==="camera-photo")    return "󰄀"
                                                 if (ic==="camera-video")    return "󰕧"
                                                 if (ic==="modem"||ic==="network-wireless") return "󰤨"
                                                 return "󰂯"
@@ -867,13 +1102,17 @@ ShellRoot {
                                         anchors { left:parent.left; right:parent.right; top:parent.top; margins:6 }
                                         spacing: 6
 
-                                        // Profile selector row
-                                        // FIX: pragma ComponentBehavior:Bound forbids inner
-                                        // Repeater delegates from accessing outer Repeater IDs
-                                        // (btDelegate). Replace inner Repeater with three direct
-                                        // ProfilePill instances — no nested component boundary.
+                                        // ── Audio device controls: profile pills ─────────────
                                         RowLayout {
                                             width: parent.width; spacing: 4
+                                            visible: {
+                                                const ic = (btDelegate.modelData.icon || "").toLowerCase()
+                                                return ic === "audio-headset"         ||
+                                                       ic === "audio-headset-gateway"  ||
+                                                       ic === "audio-headphones"       ||
+                                                       ic === "audio-card"             ||
+                                                       ic.includes("speaker")
+                                            }
                                             Text { text:"Profile:"; font.pixelSize:10; color:root.cOnSurfVar; Layout.preferredWidth:40 }
                                             ProfilePill { pLabel:"A2DP";    pProfile:"a2dp-sink";         pMac:btDelegate.modelData.mac }
                                             ProfilePill { pLabel:"HSP/HFP"; pProfile:"headset-head-unit"; pMac:btDelegate.modelData.mac }
@@ -881,48 +1120,138 @@ ShellRoot {
                                             Item { Layout.fillWidth:true }
                                         }
 
-                                        // Action buttons row: Send File + Repair + Forget
+                                        // ── Action buttons row ────────────────────────────────
+                                        // Audio devices: Default Output + Repair + Forget
+                                        // Other devices: Send File + Repair + Forget
                                         RowLayout {
                                             width: parent.width; spacing: 4
-                                            // Send File
+
+                                            // "Set as Default Output" — audio devices only, when connected
                                             Rectangle {
-                                                height:22; radius:6; width:84
+                                                height:22; radius:6; implicitWidth: sdLbl.implicitWidth + 20
+                                                visible: {
+                                                    const ic = (btDelegate.modelData.icon || "").toLowerCase()
+                                                    return btDelegate.modelData.connected && (
+                                                        ic === "audio-headset"         ||
+                                                        ic === "audio-headset-gateway"  ||
+                                                        ic === "audio-headphones"       ||
+                                                        ic === "audio-card"             ||
+                                                        ic.includes("speaker"))
+                                                }
+                                                color: sdh.containsMouse
+                                                    ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.22)
+                                                    : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
+                                                border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.50)
+                                                Behavior on color{ColorAnimation{duration:100}}
+                                                RowLayout { id: sdLbl; anchors.centerIn:parent; spacing:4
+                                                    Text { text:"󰓃"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary }
+                                                    Text { text:"Default Output"; font.pixelSize:10; color:root.cOnSurf }
+                                                }
+                                                MouseArea { id:sdh; anchors.fill:parent; hoverEnabled:true
+                                                    cursorShape:Qt.PointingHandCursor
+                                                    onClicked: root.btSetDefaultSink(btDelegate.modelData.mac) }
+                                            }
+
+                                            // Trust toggle — non-audio, non-auto-trust devices
+                                            // (keyboards, mice, unknown) default untrusted.
+                                            // Watches and phones are auto-trusted so they don't show this.
+                                            Rectangle {
+                                                id: trustRect
+                                                height: 22; radius: 6; implicitWidth: trLbl.implicitWidth + 20
+                                                property bool _isTrusted: root.btIsTrusted(btDelegate.modelData.mac)
+                                                visible: {
+                                                    // Trust toggle: file-capable non-audio devices only
+                                                    // watches, phones/tablets, computers, printers
+                                                    // Excluded: audio devices, gamepads, keyboards, mice
+                                                    const ic = (btDelegate.modelData.icon || "").toLowerCase()
+                                                    return ic === "phone"              ||
+                                                           ic === "computer"           ||
+                                                           ic === "printer"            ||
+                                                           ic.includes("watch")        ||
+                                                           ic.includes("wearable")
+                                                }
+                                                color: trh.containsMouse
+                                                    ? (trustRect._isTrusted
+                                                        ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.18)
+                                                        : Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20))
+                                                    : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
+                                                border.width: 1
+                                                border.color: trustRect._isTrusted
+                                                    ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.5)
+                                                    : Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45)
+                                                Behavior on color { ColorAnimation { duration: 100 } }
+                                                RowLayout { id: trLbl; anchors.centerIn: parent; spacing: 4
+                                                    Text {
+                                                        // 󰒃 = shield-lock (trusted)  󰒄 = shield-off (untrusted)
+                                                        text: trustRect._isTrusted ? "󰒃" : "󰒄"
+                                                        font.pixelSize: 11; font.family: "Symbols Nerd Font Mono"
+                                                        color: trustRect._isTrusted ? root.cErr : root.cPrimary
+                                                    }
+                                                    Text {
+                                                        text: trustRect._isTrusted ? "Untrust" : "Trust"
+                                                        font.pixelSize: 10
+                                                        color: trustRect._isTrusted ? root.cErr : root.cOnSurf
+                                                    }
+                                                }
+                                                MouseArea { id: trh; anchors.fill: parent; hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: root.btSetTrust(btDelegate.modelData.mac, !trustRect._isTrusted)
+                                                }
+                                            }
+
+                                            // Send File — phones, watches, and non-audio devices
+                                            Rectangle {
+                                                height:22; radius:6; implicitWidth: sfLbl.implicitWidth + 20
+                                                visible: {
+                                                    // Send File: watches, phones/tablets, computers, printers
+                                                    // Not audio devices, not gamepads/keyboards/mice
+                                                    const ic = (btDelegate.modelData.icon || "").toLowerCase()
+                                                    return ic === "phone"           ||
+                                                           ic === "computer"        ||
+                                                           ic === "printer"         ||
+                                                           ic.includes("watch")     ||
+                                                           ic.includes("wearable")
+                                                }
                                                 color:sfh.containsMouse
                                                     ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20)
                                                     : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
                                                 border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45)
                                                 Behavior on color{ColorAnimation{duration:100}}
-                                                RowLayout { anchors.centerIn:parent; spacing:4
+                                                RowLayout { id: sfLbl; anchors.centerIn:parent; spacing:4
                                                     Text { text:"󰏢"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
                                                     Text { text:"Send File"; font.pixelSize:10; color:root.cOnSurfVar }
                                                 }
                                                 MouseArea{id:sfh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor
                                                     onClicked: root.btSendFile(btDelegate.modelData.mac) }
                                             }
-                                            // Repair button
+
+                                            Item { Layout.fillWidth: true }
+
+                                            // Repair
                                             Rectangle {
-                                                height:22; radius:6; width:62
+                                                height:22; radius:6; implicitWidth: rpLbl.implicitWidth + 20
                                                 color:rph.containsMouse
                                                     ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.22)
                                                     : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
                                                 border.width:1; border.color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45)
                                                 Behavior on color{ColorAnimation{duration:100}}
-                                                RowLayout { anchors.centerIn:parent; spacing:4
+                                                RowLayout { id: rpLbl; anchors.centerIn:parent; spacing:4
                                                     Text { text:"󰑓"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
                                                     Text { text:"Repair"; font.pixelSize:10; color:root.cOnSurfVar }
                                                 }
                                                 MouseArea{id:rph;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor
                                                     onClicked: root.btRepair(btDelegate.modelData.mac) }
                                             }
-                                            // Forget/Remove device
+
+                                            // Forget
                                             Rectangle {
-                                                height:22; radius:6; width:62
+                                                height:22; radius:6; implicitWidth: fgLbl.implicitWidth + 20
                                                 color:fgh.containsMouse
                                                     ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.18)
                                                     : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)
                                                 border.width:1; border.color:Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.45)
                                                 Behavior on color{ColorAnimation{duration:100}}
-                                                RowLayout { anchors.centerIn:parent; spacing:4
+                                                RowLayout { id: fgLbl; anchors.centerIn:parent; spacing:4
                                                     Text { text:"󰆴"; font.pixelSize:11; font.family:"Symbols Nerd Font Mono"; color:root.cErr; opacity:0.8 }
                                                     Text { text:"Forget"; font.pixelSize:10; color:root.cErr; opacity:0.8 }
                                                 }

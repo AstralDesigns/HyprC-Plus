@@ -20,6 +20,8 @@ Command format (stdin): accept_pair AA:BB:CC:DD:EE:FF
 """
 
 import sys
+import os
+import time
 import json
 import threading
 import dbus
@@ -73,6 +75,38 @@ def mac_from_path(bus, path):
         mac = part.replace("dev_","").replace("_",":")
         return mac, mac
 
+
+def _trust_device(bus, mac):
+    """Set Trusted=True and AutoConnect=True on the BlueZ device object.
+
+    This is the critical step for bidirectional connectivity: without it,
+    a device that paired via an incoming request is 'Paired' but not
+    'Trusted', so BlueZ refuses connection attempts initiated from the
+    remote side. Setting Trusted also enables AutoConnect so BlueZ will
+    reconnect the device automatically after suspend/resume.
+    """
+    try:
+        mgr = dbus.Interface(bus.get_object(BLUEZ_SERVICE, "/"),
+                             "org.freedesktop.DBus.ObjectManager")
+        objects = mgr.GetManagedObjects()
+        for path, ifaces in objects.items():
+            if "org.bluez.Device1" not in ifaces:
+                continue
+            addr = str(ifaces["org.bluez.Device1"].get("Address", ""))
+            if addr.upper() != mac.upper():
+                continue
+            dev_obj = bus.get_object(BLUEZ_SERVICE, path)
+            props = dbus.Interface(dev_obj, "org.freedesktop.DBus.Properties")
+            props.Set("org.bluez.Device1", "Trusted", dbus.Boolean(True))
+            try:
+                props.Set("org.bluez.Device1", "AutoConnect", dbus.Boolean(True))
+            except Exception:
+                pass  # AutoConnect not always writable; Trusted is sufficient
+            emit({"type": "error", "msg": f"Trusted {mac}"})  # info log
+            return
+    except Exception as e:
+        raise RuntimeError(f"_trust_device({mac}): {e}")
+
 class QuickshellBTAgent(dbus.service.Object):
     def __init__(self, bus, path):
         self.bus = bus
@@ -102,6 +136,14 @@ class QuickshellBTAgent(dbus.service.Object):
             reply_h(dbus.String(pin or "0000"))
         elif kind == "passkey":
             reply_h(dbus.UInt32(int(pin or "0")))
+        # Trust + enable AutoConnect so the device can reconnect from either side.
+        # Without this, the remote device is paired but not trusted, so BlueZ
+        # won't let it initiate connections back to the desktop.
+        if accept:
+            try:
+                _trust_device(self.bus, mac)
+            except Exception as e:
+                emit({"type": "error", "msg": f"trust failed: {e}"})
         return True
 
     @dbus.service.method(AGENT_IFACE, in_signature="o", out_signature="s", async_callbacks=("reply_handler","error_handler"))
@@ -144,9 +186,15 @@ class QuickshellBTAgent(dbus.service.Object):
         mac, name = mac_from_path(self.bus, str(device))
         emit({"type":"display_pin","mac":mac,"name":name,"pin":"%06d" % int(passkey)})
 
-    @dbus.service.method(AGENT_IFACE, in_signature="o", out_signature="")
+    @dbus.service.method(AGENT_IFACE, in_signature="", out_signature="")
     def Cancel(self):
-        emit({"type":"pair_cancelled"})
+        # BlueZ calls Cancel when the remote side aborts pairing.
+        # Emit with the first pending MAC if we have one, else null.
+        with self._lock:
+            mac = next(iter(self._pending), None)
+            if mac:
+                self._pending.pop(mac, None)
+        emit({"type": "pair_cancelled", "mac": mac})
 
     @dbus.service.method(AGENT_IFACE, in_signature="", out_signature="")
     def Release(self):
@@ -205,29 +253,47 @@ class QuickshellObexAgent(dbus.service.Object):
 
 
 def stdin_reader(loop, bt_agent, obex_agent):
-    """Read commands from stdin in a background thread."""
-    for raw in sys.stdin:
-        line = raw.strip()
-        if not line:
-            continue
-        parts = line.split()
-        cmd = parts[0] if parts else ""
+    """Read commands from the persistent fifo in a background thread.
+
+    Each QML send is a short-lived `echo >> /tmp/qs_bt_cmd` process.
+    When that process exits it is the last writer, so the fifo delivers
+    EOF to us.  We must NOT exit on EOF — loop back and reopen so the
+    GLib mainloop and D-Bus agent registration stay alive indefinitely.
+    """
+    FIFO = "/tmp/qs_bt_cmd"
+    import fcntl as _fcntl
+    while True:
         try:
-            if cmd == "accept_pair" and len(parts) >= 2:
-                bt_agent.respond(parts[1], True)
-            elif cmd == "reject_pair" and len(parts) >= 2:
-                bt_agent.respond(parts[1], False)
-            elif cmd == "pin_pair" and len(parts) >= 3:
-                bt_agent.respond(parts[1], True, pin=parts[2])
-            elif cmd == "accept_file" and len(parts) >= 2:
-                # parts[1] is transfer_path
-                obex_agent.respond_transfer(parts[1], True)
-            elif cmd == "reject_file" and len(parts) >= 2:
-                obex_agent.respond_transfer(parts[1], False)
-            elif cmd == "quit":
-                loop.quit()
+            fd = os.open(FIFO, os.O_RDONLY | os.O_NONBLOCK)
+            flags = _fcntl.fcntl(fd, _fcntl.F_GETFL)
+            _fcntl.fcntl(fd, _fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
+            with os.fdopen(fd, "r") as fh:
+                for raw in fh:
+                    line = raw.strip()
+                    if not line:
+                        continue
+                    parts = line.split()
+                    cmd = parts[0] if parts else ""
+                    try:
+                        if cmd == "accept_pair" and len(parts) >= 2:
+                            bt_agent.respond(parts[1], True)
+                        elif cmd == "reject_pair" and len(parts) >= 2:
+                            bt_agent.respond(parts[1], False)
+                        elif cmd == "pin_pair" and len(parts) >= 3:
+                            bt_agent.respond(parts[1], True, pin=parts[2])
+                        elif cmd == "accept_file" and len(parts) >= 2:
+                            obex_agent.respond_transfer(parts[1], True)
+                        elif cmd == "reject_file" and len(parts) >= 2:
+                            obex_agent.respond_transfer(parts[1], False)
+                        elif cmd == "quit":
+                            loop.quit()
+                            return
+                    except Exception as ex:
+                        emit({"type":"error","msg":str(ex)})
+            # EOF — last writer closed, loop back and reopen
         except Exception as ex:
-            emit({"type":"error","msg":str(ex)})
+            emit({"type":"error","msg":f"stdin_reader reopen: {ex}"})
+            time.sleep(1)
 
 
 def main():
@@ -240,8 +306,14 @@ def main():
     try:
         mgr_obj = system_bus.get_object(BLUEZ_SERVICE, MANAGER_PATH)
         agent_mgr = dbus.Interface(mgr_obj, MANAGER_IFACE)
+        # Unregister any stale registration from a previous run first
+        try:
+            agent_mgr.UnregisterAgent(AGENT_PATH)
+        except Exception:
+            pass
         agent_mgr.RegisterAgent(AGENT_PATH, "DisplayYesNo")
         agent_mgr.RequestDefaultAgent(AGENT_PATH)
+        emit({"type":"error","msg":"BT agent registered as default"})
     except Exception as e:
         emit({"type":"error","msg":f"BT agent register failed: {e}"})
 
