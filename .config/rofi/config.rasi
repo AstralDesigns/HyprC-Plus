@@ -13,7 +13,7 @@ configuration {
     modi:                       "drun,filebrowser,window,run";
     font:                       "JetBrainsMono Nerd Font Propo 11";
     show-icons:                 true;
-    icon-theme:                 "Tela circle black";
+    icon-theme:                 "Tela-circle-black";
     display-drun:               "";
     display-run:                "";
     display-filebrowser:        "";
@@ -114,6 +114,8 @@ entry {
     cursor:                      text;
     placeholder:                 "            Search  ";
     placeholder-color:           inherit;
+    border-color:                @color11;
+    border:			 0.1em;
 }
 
 space-2 {
@@ -130,6 +132,8 @@ listbox {
     children:                    [ "mode-switcher", "listview" ];
     background-color:            @background;
     background-image:            @current-image;
+    border-color:                @color11;
+    border:			 0.1em;
 }
 
 listview {
@@ -234,7 +238,7 @@ element alternate.active {
 }
 
 element-icon {
-    size:                        2.0em;
+    size:                        1.5em;
     cursor:                      inherit;
     background-color:            transparent;
     text-color:                  inherit;

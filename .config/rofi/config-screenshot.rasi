@@ -123,6 +123,8 @@ entry {
     cursor:                      text;
     placeholder:                 "Search ";
     placeholder-color:           inherit;
+    border-color:                @color11;
+    border:			 0.1em;
 }
 
 // Lists //
