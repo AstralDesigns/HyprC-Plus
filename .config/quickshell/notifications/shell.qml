@@ -51,7 +51,7 @@ ShellRoot {
             case "m3background":           root._m3background = m[2]; break
             case "m3surfaceContainerHigh": root._m3surfaceContainerHigh = m[2]; break
             case "m3surfaceContainer":     root._m3surfaceContainer = m[2]; break
-            case "m3onSurface":            root._m3onSurf = m[2]; break
+            case "m3onSurface":            root._m3onSurface = m[2]; break
             case "m3onSurfaceVariant":     root._m3onSurfaceVariant = m[2]; break
             case "m3outlineVariant":       root._m3outlineVariant = m[2]; break
             case "m3inversePrimary":       root._m3inversePrimary = m[2]; break
@@ -632,10 +632,17 @@ ShellRoot {
                     color: clrH.containsMouse
                         ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.18)
                         : Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.6)
-                    border.width: 1; border.color: Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.4)
+                    border.width: 1
+                    border.color: clrH.containsMouse
+                        ? Qt.rgba(root.cErr.r, root.cErr.g, root.cErr.b, 0.85)
+                        : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.55)
                     Behavior on color { ColorAnimation { duration: 100 } }
+                    Behavior on border.color { ColorAnimation { duration: 100 } }
                     Text { id: clrLbl; anchors.centerIn: parent; text: "Clear all"
-                        color: root.cErr; font.pixelSize: 11; opacity: 0.85 }
+                        color: clrH.containsMouse ? root.cErr : root.cOnSurfVar
+                        font.pixelSize: 11
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                    }
                     MouseArea { id: clrH; anchors.fill: parent; hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor; onClicked: root.clearHistory() }
                 }
@@ -1247,6 +1254,52 @@ ShellRoot {
         id: hcard
         required property var notif
         property bool _exp: false
+
+        // ── Two-finger swipe-to-dismiss ───────────────────────────────────
+        property real _swipeX: 0          // live horizontal offset while dragging
+        property bool _dismissing: false  // true once threshold crossed → run exit anim
+
+        x: _swipeX
+        opacity: 1.0 - Math.min(Math.abs(_swipeX) / 160, 0.55)
+
+        Behavior on _swipeX {
+            enabled: !hcSwipe.active  // only spring-back when not dragging
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+
+        // Two-finger horizontal drag handler
+        DragHandler {
+            id: hcSwipe
+            acceptedDevices: PointerDevice.TouchScreen | PointerDevice.TouchPad
+            minimumPointCount: 2
+            maximumPointCount: 2
+            xAxis.enabled: true
+            yAxis.enabled: false
+            xAxis.minimum: -hcard.width * 1.5
+            xAxis.maximum:  hcard.width * 1.5
+
+            onTranslationChanged: {
+                if (!hcard._dismissing)
+                    hcard._swipeX = translation.x
+            }
+
+            onActiveChanged: {
+                if (!active && !hcard._dismissing) {
+                    const thresh = hcard.width * 0.38   // ~38% of card width
+                    if (Math.abs(hcard._swipeX) >= thresh) {
+                        hcard._dismissing = true
+                        const dir = hcard._swipeX > 0 ? 1 : -1
+                        hcard._swipeX = dir * (hcard.width + 40)  // slide fully off
+                        Qt.callLater(function() {
+                            root.history = root.history.filter(
+                                function(n) { return n.id !== hcard.notif.id })
+                        })
+                    } else {
+                        hcard._swipeX = 0   // spring back
+                    }
+                }
+            }
+        }
 
         radius: 12
         // clip:false — the Flickable's clip:true is the only viewport boundary.
