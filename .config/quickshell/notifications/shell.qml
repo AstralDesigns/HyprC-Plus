@@ -240,21 +240,32 @@ ShellRoot {
             root.notifications = q
         }
 
-        // History — group + bump. All non-prompt notifications go here, including
-        // media.playing (each new track is a history entry; same track updates in place).
+        // History — group + bump. All non-prompt notifications go here.
+        // media.playing: always match on category so the single media card updates
+        // in-place (no splice+unshift) regardless of track title changes.
+        // All other notifications: match on groupKey, bump count, move to top.
         if (!n.isPrompt) {
             const h = root.history.slice()
-            const hi = h.findIndex(function(x) { return x.groupKey === n.groupKey })
+            const isMedia = n.category === "media.playing"
+            const hi = isMedia
+                ? h.findIndex(function(x) { return x.category === "media.playing" })
+                : h.findIndex(function(x) { return x.groupKey === n.groupKey })
             if (hi >= 0) {
                 const updated = Object.assign({}, h[hi], {
-                    count: (h[hi].count || 1) + 1,
+                    summary:   n.summary,
+                    body:      n.body,
+                    iconPath:  n.iconPath || h[hi].iconPath,
+                    icon:      n.icon,
                     timestamp: n.timestamp,
-                    body: n.body,
-                    // For media, keep the new album art; for others keep whichever is set
-                    iconPath: n.iconPath || h[hi].iconPath
+                    count:     isMedia ? (h[hi].count || 1) : (h[hi].count || 1) + 1
                 })
-                h.splice(hi, 1)
-                h.unshift(updated)
+                if (isMedia) {
+                    // Update in-place — card stays at its current position in the list
+                    h[hi] = updated
+                } else {
+                    h.splice(hi, 1)
+                    h.unshift(updated)
+                }
             } else {
                 h.unshift(n)
                 if (h.length > 60) h.pop()
@@ -262,6 +273,37 @@ ShellRoot {
             root.history = h
         }
         return n.id
+    }
+
+    // Invoke a notification action via DBus ActionInvoked signal.
+    // ── Action invocation ─────────────────────────────────────────────────
+    // actionInvokerProc fires gdbus ActionInvoked so the sending app reacts.
+    // urlOpenerProc handles xdg-open for the "default" action (click-to-focus).
+    // Pass daemonId and actionKey as argv so no quoting is needed inside the
+    // QML string — argv[1] and argv[2] are never interpreted by the shell.
+    Process { id: actionInvokerProc
+        property int  _nid: 0
+        property string _key: ""
+        command: ["gdbus", "call", "--session",
+                  "--dest",        "org.freedesktop.Notifications",
+                  "--object-path", "/org/freedesktop/Notifications",
+                  "--method",      "org.freedesktop.Notifications.ActionInvoked",
+                  actionInvokerProc._nid.toString(), actionInvokerProc._key] }
+    Process { id: urlOpenerProc; property string _url: ""
+        command: ["xdg-open", urlOpenerProc._url] }
+
+    function invokeAction(notif, actionKey) {
+        const daemonId = notif._daemonId || notif.id
+        actionInvokerProc._nid = daemonId
+        actionInvokerProc._key = actionKey
+        if (!actionInvokerProc.running) actionInvokerProc.running = true
+        if (actionKey === "default") {
+            const m = (notif.body || "").match(/https?:\/\/\S+/)
+            if (m) {
+                urlOpenerProc._url = m[0]
+                if (!urlOpenerProc.running) urlOpenerProc.running = true
+            }
+        }
     }
 
     function dismissNotification(id) {
@@ -423,7 +465,7 @@ ShellRoot {
             const now = Date.now()
             const rem = root.notifications.filter(function(n) {
                 if (n.isPrompt || n.urgency >= 2) return true
-                if (n.category === "media.playing") return (now - n.timestamp) < 4000
+                if (n.category === "media.playing") return (now - n.timestamp) < 5000
                 return (now - n.timestamp) < 5000
             })
             if (rem.length !== root.notifications.length) root.notifications = rem
@@ -642,13 +684,18 @@ ShellRoot {
                     height: implicitHeight
                     spacing: 5
 
-                    // Empty state
-                    Text {
+                    // Empty state — fixed height matches one collapsed HistoryCard
+                    // (cardInner min ~34px icon + 12 topMargin + 24 card padding = 70px)
+                    // so the panel doesn't resize when the last notification is cleared.
+                    Item {
                         visible: root.history.length === 0
-                        Layout.alignment: Qt.AlignHCenter
-                        text: "No notifications"
-                        color: root.cOnSurfVar; font.pixelSize: 12; font.italic: true
-                        topPadding: 16; bottomPadding: 16
+                        Layout.fillWidth: true
+                        height: 44
+                        Text {
+                            anchors.centerIn: parent
+                            text: "No notifications"
+                            color: root.cOnSurfVar; font.pixelSize: 12; font.italic: true
+                        }
                     }
 
                     Repeater {
@@ -951,6 +998,7 @@ ShellRoot {
                 Repeater { model: toast.notif.actions || []
                     delegate: Rectangle {
                         required property var modelData
+                        visible: modelData.key !== "default"
                         height: 26; implicitWidth: aLbl.implicitWidth + 16; radius: 8
                         color: aH.containsMouse
                             ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.22)
@@ -962,7 +1010,12 @@ ShellRoot {
                             text: modelData.label || modelData.key || ""
                             color: root.cOnSurf; font.pixelSize: 10 }
                         MouseArea { id: aH; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor }
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.invokeAction(toast.notif, modelData.key)
+                                root.dismissNotification(toast.notif.id)
+                            }
+                        }
                     }
                 }
             }
@@ -1170,9 +1223,17 @@ ShellRoot {
 
         // Hover/right-click dismiss
         MouseArea { id: toastMA; anchors.fill: parent; hoverEnabled: true; z: -1
-            acceptedButtons: Qt.RightButton
+            acceptedButtons: Qt.LeftButton | Qt.RightButton
             onClicked: function(e) {
-                if (!toast.notif.isPrompt) root.dismissNotification(toast.notif.id)
+                if (e.button === Qt.LeftButton) {
+                    const hasDefault = (toast.notif.actions || []).some(function(a) { return a.key === "default" })
+                    if (hasDefault) {
+                        root.invokeAction(toast.notif, "default")
+                        root.dismissNotification(toast.notif.id)
+                    }
+                } else {
+                    if (!toast.notif.isPrompt) root.dismissNotification(toast.notif.id)
+                }
             }
         }
     }
@@ -1356,6 +1417,7 @@ ShellRoot {
                     Repeater { model: hcard.notif.actions || []
                         delegate: Rectangle {
                             required property var modelData
+                            visible: modelData.key !== "default"
                             height: 22; implicitWidth: haL.implicitWidth + 12; radius: 6
                             color: haH.containsMouse
                                 ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.22)
@@ -1368,7 +1430,9 @@ ShellRoot {
                                 color: root.cOnSurf; font.pixelSize: 9
                             }
                             MouseArea { id: haH; anchors.fill: parent; hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor }
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.invokeAction(hcard.notif, modelData.key)
+                            }
                         }
                     }
                 }

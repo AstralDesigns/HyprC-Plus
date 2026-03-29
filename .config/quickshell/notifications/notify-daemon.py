@@ -231,15 +231,23 @@ def _resolve_all(app_name: str, app_icon: str, hints: dict, summary: str, body: 
 
 MEDIA_NOTIF_ID = 0xDEAD   # fixed synthetic ID so updates replace themselves
 _last_media_key = ""      # "artist|title" of last emitted notification
-_art_tmp_raw    = "/tmp/qs_media_notif_raw.png"
-_art_tmp_circle = "/tmp/qs_media_notif_circle.png"
+_art_tmp_raw = "/tmp/qs_media_notif_raw.png"
 
 
 def _fetch_art_circle(art_url: str) -> str:
     """Download/copy art and convert to 96px circle PNG via ImageMagick.
-    Returns path on success, empty string on failure."""
+
+    The output path is derived from a short hash of art_url so each unique
+    album/track art maps to a distinct file.  Qt's image cache keys on the
+    file:// URL, so a new path forces a fresh texture load — no stale art.
+    Returns path on success, empty string on failure.
+    """
     if not art_url:
         return ""
+    import hashlib
+    art_hash  = hashlib.md5(art_url.encode()).hexdigest()[:10]
+    dest_path = f"/tmp/qs_media_art_{art_hash}.png"
+
     src_path = art_url
     if art_url.startswith("file://"):
         src_path = art_url[7:]
@@ -260,11 +268,11 @@ def _fetch_art_circle(art_url: str) -> str:
              "-fill", "black", "-colorize", "100",
              "-fill", "white", "-draw", "circle 48,48 48,0", ")",
              "-alpha", "off", "-compose", "CopyOpacity", "-composite",
-             "-strip", _art_tmp_circle],
+             "-strip", dest_path],
             timeout=8, capture_output=True
         )
-        if result.returncode == 0 and os.path.isfile(_art_tmp_circle):
-            return _art_tmp_circle
+        if result.returncode == 0 and os.path.isfile(dest_path):
+            return dest_path
     except Exception:
         pass
     return ""
@@ -322,7 +330,7 @@ def _poll_mpris(notif_service):
                 "urgency":   "low",
                 "category":  "media.playing",
                 "actions":   [],
-                "timeout":   5000
+                "timeout":   6000
             })
         except Exception:
             pass
