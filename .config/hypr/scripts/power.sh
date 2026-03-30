@@ -64,8 +64,7 @@ fi
 
 if [[ "$1" == "suspend" ]]; then
   echo ":: Suspend"
-  qs -c candylock
-  sleep 2
+  sleep 1
   systemctl suspend
 fi
 
