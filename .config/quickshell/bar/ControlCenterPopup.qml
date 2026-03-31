@@ -730,8 +730,11 @@ PanelWindow {
                                 delegate: CCBtn {
                                     required property string modelData
                                     text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
-                                    onClicked: _gapProc.command = ["bash", "-c",
-                                        "$HOME/.config/hyprcandy/hooks/hyprland_gap_presets.sh " + modelData]
+                                    onClicked: {
+                                        _gapProc.command = ["bash", "-c",
+                                            "$HOME/.config/hyprcandy/hooks/hyprland_gap_presets.sh " + modelData]
+                                        _gapProc.running = true
+                                    }
                                 }
                             }
                         }
