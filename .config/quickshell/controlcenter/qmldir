@@ -1,7 +1,0 @@
-singleton CCConfig     1.0 CCConfig.qml
-singleton CCTheme      1.0 CCTheme.qml
-singleton ControlCenterState 1.0 ControlCenterState.qml
-CCButton               1.0 CCButton.qml
-CCEntry                1.0 CCEntry.qml
-UserProfile            1.0 UserProfile.qml
-ImagePicker            1.0 ImagePicker.qml
