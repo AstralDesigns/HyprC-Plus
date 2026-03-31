@@ -123,67 +123,6 @@ QtObject {
     readonly property int    fontSize:   12
     readonly property int    fontWeight: Font.Normal
 
-    // ── Wallpaper directory ──────────────────────────────────────────────
-    readonly property string wallpaperDir: _home + "/.config/hyprcandy/wallpapers"
-
-    // ── Theme presets (used by CalendarPopup Themes tab) ─────────────────
-    property string currentTheme: "default"
-
-    readonly property var themeKeys: Object.keys(themes)
-
-    readonly property var themes: ({
-        "default": {
-            name: "Default",
-            background: root.background,
-            text: root.text,
-            separator: root.separator,
-            caution: root.caution,
-            accent: root.accent,
-            process: root.process,
-            misc: root.misc,
-            warning: root.warning
-        },
-        "ocean": {
-            name: "Ocean",
-            background: "#0d1b2a",
-            text: "#e0e1dd",
-            separator: "#1b263b",
-            caution: "#415a77",
-            accent: "#778da9",
-            process: "#778da9",
-            misc: "#415a77",
-            warning: "#e63946"
-        },
-        "forest": {
-            name: "Forest",
-            background: "#1b2d1b",
-            text: "#d4e4d4",
-            separator: "#2d4a2d",
-            caution: "#4a7c4a",
-            accent: "#6aaa6a",
-            process: "#6aaa6a",
-            misc: "#4a7c4a",
-            warning: "#cc5533"
-        },
-        "rose": {
-            name: "Rosé",
-            background: "#191724",
-            text: "#e0def4",
-            separator: "#26233a",
-            caution: "#6e6a86",
-            accent: "#c4a7e7",
-            process: "#c4a7e7",
-            misc: "#9ccfd8",
-            warning: "#eb6f92"
-        }
-    })
-
-    function setTheme(key) {
-        if (themes[key]) {
-            currentTheme = key
-        }
-    }
-
     // ── Dimensions fallbacks (Config.qml is authoritative) ────────────────
     readonly property int barHeight:     32
     readonly property int margin:        6

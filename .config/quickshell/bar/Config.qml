@@ -223,7 +223,6 @@ QtObject {
     property int    mediaThumbSize:     18   // px — album art disc diameter
     property int    mediaPlayPauseSize:  6    // px — play/pause icon
     property string mediaToggleGlyph:  "󰽲"  // nf-md-music_note — GJS toggle & no-art fallback
-    property bool   mediaShowText:     true  // show track title+artist text next to controls
     // mediaInfoFontSize and mediaGlyphSize are defined in Tab 2 Icons
 
     //  Media island content-area padding (disc + controls + text group):
