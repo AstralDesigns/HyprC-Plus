@@ -43,7 +43,7 @@ Item {
 
     readonly property var _wallpaperApplyProc: Process {
         property string wallpaperPath: ""
-        command: ["awww", "img", wallpaperPath, "--transition-type", "wave", "--transition-duration", "2"]
+        command: ["swww", "img", wallpaperPath, "--transition-type", "wave", "--transition-duration", "2"]
         running: false
     }
 
