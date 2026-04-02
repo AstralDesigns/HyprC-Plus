@@ -7,21 +7,206 @@ import QtCore
 //  Config.qml — Single source of truth for all bar behaviour and appearance.
 //  Edit here; future control-center UI will write these values at runtime.
 //
-//  CONTROL CENTER TABS
-//    TAB 1 · General     — bar mode, geometry, island style, edge padding
-//    TAB 2 · Icons       — glyph/text sizes, per-module colors
-//    TAB 3 · Workspaces  — icon mode, sizes, spacing, separators
-//    TAB 4 · Media       — sizes, padding, enable/disable
-//    TAB 5 · Cava        — style presets, color, width
-//    TAB 6 · Background  — per-type island bg colors and opacities
-//  + Module visibility   — show/hide individual modules
-//  + Behaviour           — intervals, scroll, hover
-//  + Runtime paths       — resolved at startup
-//  + Legacy aliases      — backward-compat shorthands
+//  PERSISTENCE: All values are saved to ~/.config/hyprcandy/qs_bar_config.json
+//  and loaded on startup. Fresh installs use defaults below.
 // ═══════════════════════════════════════════════════════════════════════════
 
 QtObject {
     id: cfg
+
+    // ── Set application identifiers for Settings ───────────────────────────
+    Component.onCompleted: {
+        Qt.application.name = "hyprcandy-bar"
+        Qt.application.organization = "hyprcandy"
+        Qt.application.organizationDomain = "hyprcandy.local"
+        // Load persisted values after properties are initialized
+        _loadSettings()
+    }
+
+    // ── Settings persistence helper ────────────────────────────────────────
+    property Settings _settings: Settings { category: "qs-bar-config-v1" }
+    // Auto-save every 5 seconds
+    property Timer _saveTimer: Timer {
+        interval: 5000
+        repeat: true
+        running: true
+        onTriggered: _saveSettings()
+    }
+    
+    function _loadSettings() {
+        // Initialize cavaGradientEndColor from theme on first load
+        var savedGradientEnd = _settings.value("cavaGradientEndColor")
+        if (savedGradientEnd !== undefined && savedGradientEnd !== null) cavaGradientEndColor = savedGradientEnd
+        else cavaGradientEndColor = Theme.cSecondary
+        // Tab 1: General
+        var v = _settings.value("barMode"); if (v !== undefined && v !== null) barMode = v
+        v = _settings.value("barPosition"); if (v !== undefined && v !== null) barPosition = v
+        v = _settings.value("barHeight"); if (v !== undefined && v !== null) barHeight = v
+        v = _settings.value("moduleHeight"); if (v !== undefined && v !== null) moduleHeight = v
+        v = _settings.value("outerMarginTop"); if (v !== undefined && v !== null) outerMarginTop = v
+        v = _settings.value("outerMarginBottom"); if (v !== undefined && v !== null) outerMarginBottom = v
+        v = _settings.value("outerMarginSide"); if (v !== undefined && v !== null) outerMarginSide = v
+        v = _settings.value("barRadius"); if (v !== undefined && v !== null) barRadius = v
+        v = _settings.value("islandRadius"); if (v !== undefined && v !== null) islandRadius = v
+        v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
+        v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
+        v = _settings.value("barBorderWidth"); if (v !== undefined && v !== null) barBorderWidth = v
+        v = _settings.value("barBorderAlpha"); if (v !== undefined && v !== null) barBorderAlpha = v
+        v = _settings.value("moduleBgOpacity"); if (v !== undefined && v !== null) moduleBgOpacity = v
+        v = _settings.value("islandBgOpacityIsland"); if (v !== undefined && v !== null) islandBgOpacityIsland = v
+        v = _settings.value("islandSpacing"); if (v !== undefined && v !== null) islandSpacing = v
+        v = _settings.value("modPadH"); if (v !== undefined && v !== null) modPadH = v
+        v = _settings.value("modPadV"); if (v !== undefined && v !== null) modPadV = v
+        v = _settings.value("groupedSpacing"); if (v !== undefined && v !== null) groupedSpacing = v
+        v = _settings.value("glyphSize"); if (v !== undefined && v !== null) glyphSize = v
+        v = _settings.value("infoGlyphSize"); if (v !== undefined && v !== null) infoGlyphSize = v
+        v = _settings.value("mediaPlayPauseSize"); if (v !== undefined && v !== null) mediaPlayPauseSize = v
+        v = _settings.value("mediaThumbSize"); if (v !== undefined && v !== null) mediaThumbSize = v
+        v = _settings.value("batteryRadialVisible"); if (v !== undefined && v !== null) batteryRadialVisible = v
+        v = _settings.value("batteryRadialSize"); if (v !== undefined && v !== null) batteryRadialSize = v
+        v = _settings.value("batteryRadialWidth"); if (v !== undefined && v !== null) batteryRadialWidth = v
+        v = _settings.value("trayIconSz"); if (v !== undefined && v !== null) trayIconSz = v
+        v = _settings.value("ccGlyph"); if (v !== undefined && v !== null) ccGlyph = v
+        v = _settings.value("wsIconMode"); if (v !== undefined && v !== null) wsIconMode = v
+        v = _settings.value("wsGlyphSize"); if (v !== undefined && v !== null) wsGlyphSize = v
+        v = _settings.value("wsSpacing"); if (v !== undefined && v !== null) wsSpacing = v
+        v = _settings.value("wsMarginLeft"); if (v !== undefined && v !== null) wsMarginLeft = v
+        v = _settings.value("wsMarginRight"); if (v !== undefined && v !== null) wsMarginRight = v
+        v = _settings.value("wsPadLeft"); if (v !== undefined && v !== null) wsPadLeft = v
+        v = _settings.value("wsPadRight"); if (v !== undefined && v !== null) wsPadRight = v
+        v = _settings.value("wsPadTop"); if (v !== undefined && v !== null) wsPadTop = v
+        v = _settings.value("wsPadBottom"); if (v !== undefined && v !== null) wsPadBottom = v
+        v = _settings.value("wsSeparators"); if (v !== undefined && v !== null) wsSeparators = v
+        v = _settings.value("wsSeparatorSize"); if (v !== undefined && v !== null) wsSeparatorSize = v
+        v = _settings.value("wsSeparatorPadLeft"); if (v !== undefined && v !== null) wsSeparatorPadLeft = v
+        v = _settings.value("wsSeparatorPadRight"); if (v !== undefined && v !== null) wsSeparatorPadRight = v
+        v = _settings.value("wsSeparatorGlyph"); if (v !== undefined && v !== null) wsSeparatorGlyph = v
+        v = _settings.value("wsDotActive"); if (v !== undefined && v !== null) wsDotActive = v
+        v = _settings.value("wsDotPersistent"); if (v !== undefined && v !== null) wsDotPersistent = v
+        v = _settings.value("wsDotEmpty"); if (v !== undefined && v !== null) wsDotEmpty = v
+        v = _settings.value("mediaInfoFontSize"); if (v !== undefined && v !== null) mediaInfoFontSize = v
+        v = _settings.value("mediaPadLeft"); if (v !== undefined && v !== null) mediaPadLeft = v
+        v = _settings.value("mediaPadRight"); if (v !== undefined && v !== null) mediaPadRight = v
+        v = _settings.value("mediaPadTop"); if (v !== undefined && v !== null) mediaPadTop = v
+        v = _settings.value("mediaPadBottom"); if (v !== undefined && v !== null) mediaPadBottom = v
+        v = _settings.value("cavaWidth"); if (v !== undefined && v !== null) cavaWidth = v
+        v = _settings.value("cavaBarSpacing"); if (v !== undefined && v !== null) cavaBarSpacing = v
+        v = _settings.value("cavaStyle"); if (v !== undefined && v !== null) cavaStyle = v
+        v = _settings.value("cavaTransparentWhenInactive"); if (v !== undefined && v !== null) cavaTransparentWhenInactive = v
+        v = _settings.value("cavaActiveOpacity"); if (v !== undefined && v !== null) cavaActiveOpacity = v
+        v = _settings.value("cavaInactiveOpacity"); if (v !== undefined && v !== null) cavaInactiveOpacity = v
+        v = _settings.value("cavaAutoHide"); if (v !== undefined && v !== null) cavaAutoHide = v
+        v = _settings.value("cavaGradientEnabled"); if (v !== undefined && v !== null) cavaGradientEnabled = v
+        v = _settings.value("cavaGradientEndColor"); if (v !== undefined && v !== null) cavaGradientEndColor = v
+        v = _settings.value("wsBgOpacity"); if (v !== undefined && v !== null) wsBgOpacity = v
+        v = _settings.value("groupedBgOpacity"); if (v !== undefined && v !== null) groupedBgOpacity = v
+        v = _settings.value("ungroupedBgOpacity"); if (v !== undefined && v !== null) ungroupedBgOpacity = v
+        v = _settings.value("mediaBgOpacity"); if (v !== undefined && v !== null) mediaBgOpacity = v
+        v = _settings.value("cavaBgOpacity"); if (v !== undefined && v !== null) cavaBgOpacity = v
+        v = _settings.value("distroBgOpacity"); if (v !== undefined && v !== null) distroBgOpacity = v
+        v = _settings.value("activeWindowBgOpacity"); if (v !== undefined && v !== null) activeWindowBgOpacity = v
+        v = _settings.value("activeWindowMinWidth"); if (v !== undefined && v !== null) activeWindowMinWidth = v
+        v = _settings.value("showCava"); if (v !== undefined && v !== null) showCava = v
+        v = _settings.value("showWeather"); if (v !== undefined && v !== null) showWeather = v
+        v = _settings.value("showBattery"); if (v !== undefined && v !== null) showBattery = v
+        v = _settings.value("showMediaPlayer"); if (v !== undefined && v !== null) showMediaPlayer = v
+        v = _settings.value("showIdleInhibitor"); if (v !== undefined && v !== null) showIdleInhibitor = v
+        v = _settings.value("showRofi"); if (v !== undefined && v !== null) showRofi = v
+        v = _settings.value("showUpdates"); if (v !== undefined && v !== null) showUpdates = v
+        v = _settings.value("showPowerProfiles"); if (v !== undefined && v !== null) showPowerProfiles = v
+        v = _settings.value("showOverview"); if (v !== undefined && v !== null) showOverview = v
+        v = _settings.value("showNotifications"); if (v !== undefined && v !== null) showNotifications = v
+        v = _settings.value("showWallpaper"); if (v !== undefined && v !== null) showWallpaper = v
+        v = _settings.value("showTray"); if (v !== undefined && v !== null) showTray = v
+        v = _settings.value("showBluetooth"); if (v !== undefined && v !== null) showBluetooth = v
+        //v = _settings.value("showWindow"); if (v !== undefined && v !== null) showWindow = v
+        v = _settings.value("showDistro"); if (v !== undefined && v !== null) showDistro = v
+    }
+    
+    function _saveSettings() {
+        _settings.setValue("barMode", barMode)
+        _settings.setValue("barPosition", barPosition)
+        _settings.setValue("barHeight", barHeight)
+        _settings.setValue("moduleHeight", moduleHeight)
+        _settings.setValue("outerMarginTop", outerMarginTop)
+        _settings.setValue("outerMarginBottom", outerMarginBottom)
+        _settings.setValue("outerMarginSide", outerMarginSide)
+        _settings.setValue("barRadius", barRadius)
+        _settings.setValue("islandRadius", islandRadius)
+        _settings.setValue("islandBorder", islandBorder)
+        _settings.setValue("islandBorderAlpha", islandBorderAlpha)
+        _settings.setValue("barBorderWidth", barBorderWidth)
+        _settings.setValue("barBorderAlpha", barBorderAlpha)
+        _settings.setValue("moduleBgOpacity", moduleBgOpacity)
+        _settings.setValue("islandBgOpacityIsland", islandBgOpacityIsland)
+        _settings.setValue("islandSpacing", islandSpacing)
+        _settings.setValue("modPadH", modPadH)
+        _settings.setValue("modPadV", modPadV)
+        _settings.setValue("groupedSpacing", groupedSpacing)
+        _settings.setValue("glyphSize", glyphSize)
+        _settings.setValue("infoGlyphSize", infoGlyphSize)
+        _settings.setValue("mediaPlayPauseSize", mediaPlayPauseSize)
+        _settings.setValue("mediaThumbSize", mediaThumbSize)
+        _settings.setValue("batteryRadialVisible", batteryRadialVisible)
+        _settings.setValue("batteryRadialSize", batteryRadialSize)
+        _settings.setValue("batteryRadialWidth", batteryRadialWidth)
+        _settings.setValue("trayIconSz", trayIconSz)
+        _settings.setValue("ccGlyph", ccGlyph)
+        _settings.setValue("wsIconMode", wsIconMode)
+        _settings.setValue("wsGlyphSize", wsGlyphSize)
+        _settings.setValue("wsSpacing", wsSpacing)
+        _settings.setValue("wsMarginLeft", wsMarginLeft)
+        _settings.setValue("wsMarginRight", wsMarginRight)
+        _settings.setValue("wsPadLeft", wsPadLeft)
+        _settings.setValue("wsPadRight", wsPadRight)
+        _settings.setValue("wsPadTop", wsPadTop)
+        _settings.setValue("wsPadBottom", wsPadBottom)
+        _settings.setValue("wsSeparators", wsSeparators)
+        _settings.setValue("wsSeparatorSize", wsSeparatorSize)
+        _settings.setValue("wsSeparatorPadLeft", wsSeparatorPadLeft)
+        _settings.setValue("wsSeparatorPadRight", wsSeparatorPadRight)
+        _settings.setValue("wsSeparatorGlyph", wsSeparatorGlyph)
+        _settings.setValue("wsDotActive", wsDotActive)
+        _settings.setValue("wsDotPersistent", wsDotPersistent)
+        _settings.setValue("wsDotEmpty", wsDotEmpty)
+        _settings.setValue("mediaInfoFontSize", mediaInfoFontSize)
+        _settings.setValue("mediaPadLeft", mediaPadLeft)
+        _settings.setValue("mediaPadRight", mediaPadRight)
+        _settings.setValue("mediaPadTop", mediaPadTop)
+        _settings.setValue("mediaPadBottom", mediaPadBottom)
+        _settings.setValue("cavaWidth", cavaWidth)
+        _settings.setValue("cavaBarSpacing", cavaBarSpacing)
+        _settings.setValue("cavaStyle", cavaStyle)
+        _settings.setValue("cavaTransparentWhenInactive", cavaTransparentWhenInactive)
+        _settings.setValue("cavaActiveOpacity", cavaActiveOpacity)
+        _settings.setValue("cavaInactiveOpacity", cavaInactiveOpacity)
+        _settings.setValue("cavaAutoHide", cavaAutoHide)
+        _settings.setValue("cavaGradientEnabled", cavaGradientEnabled)
+        _settings.setValue("cavaGradientEndColor", cavaGradientEndColor)
+        _settings.setValue("wsBgOpacity", wsBgOpacity)
+        _settings.setValue("groupedBgOpacity", groupedBgOpacity)
+        _settings.setValue("ungroupedBgOpacity", ungroupedBgOpacity)
+        _settings.setValue("mediaBgOpacity", mediaBgOpacity)
+        _settings.setValue("cavaBgOpacity", cavaBgOpacity)
+        _settings.setValue("distroBgOpacity", distroBgOpacity)
+        _settings.setValue("activeWindowBgOpacity", activeWindowBgOpacity)
+        _settings.setValue("activeWindowMinWidth", activeWindowMinWidth)
+        _settings.setValue("showCava", showCava)
+        _settings.setValue("showWeather", showWeather)
+        _settings.setValue("showBattery", showBattery)
+        _settings.setValue("showMediaPlayer", showMediaPlayer)
+        _settings.setValue("showIdleInhibitor", showIdleInhibitor)
+        _settings.setValue("showRofi", showRofi)
+        _settings.setValue("showUpdates", showUpdates)
+        _settings.setValue("showPowerProfiles", showPowerProfiles)
+        _settings.setValue("showOverview", showOverview)
+        _settings.setValue("showNotifications", showNotifications)
+        _settings.setValue("showWallpaper", showWallpaper)
+        _settings.setValue("showTray", showTray)
+        _settings.setValue("showBluetooth", showBluetooth)
+        //_settings.setValue("showWindow", showWindow)
+        _settings.setValue("showDistro", showDistro)
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     //  TAB 1 · General
@@ -291,7 +476,6 @@ QtObject {
     // Not bound to Theme.cSecondary so a user pick isn't snapped back by
     // matugen re-evaluations.  Seeded once from the theme in onCompleted.
     property color cavaGradientEndColor:    "#000000"
-    Component.onCompleted: cavaGradientEndColor = Theme.cSecondary
     // Fraction of glyph height at which start→end color splits (0.0–1.0, default 0.5)
     property real  cavaGradientSplit:       0.5
 

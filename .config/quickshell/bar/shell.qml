@@ -13,11 +13,9 @@ import Quickshell.Hyprland
 ShellRoot {
     id: root
 
-    // Set Qt application identifiers early so QtCore.Settings initialises without warnings.
+    // Sync settings after Config initializes
     Component.onCompleted: {
-        Qt.application.name             = "quickshell"
-        Qt.application.organization     = "quickshell"
-        Qt.application.organizationDomain = "quickshell.io"
+        if (Config._settings) Config._settings.sync()
     }
 
     // ── Optional popup overlays (loaded on demand) ─────────────────────────
