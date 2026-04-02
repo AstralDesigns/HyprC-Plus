@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$HOME/.config/hyprcandy/scripts/qs-theme-env.sh"
+qs_export_theme_env
+
 # If the wallpaper picker is already running, just toggle visibility via IPC.
 # If not, start it (hidden) and then open it.
 if pgrep -f "qs -c wallpaper" > /dev/null; then

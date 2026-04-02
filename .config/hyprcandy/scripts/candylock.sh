@@ -5,6 +5,8 @@
 set -euo pipefail
 
 CONFDIR="$HOME/.config/quickshell"
+source "$HOME/.config/hyprcandy/scripts/qs-theme-env.sh"
+qs_export_theme_env
 
 # Rebuild pam_auth if source is newer than binary or binary missing
 if [ "$CONFDIR/candylock/pam_auth.c" -nt "$CONFDIR/candylock/pam_auth" ] 2>/dev/null || \

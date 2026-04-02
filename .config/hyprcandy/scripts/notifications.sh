@@ -1,5 +1,8 @@
 #!/bin/bash
 
+source "$HOME/.config/hyprcandy/scripts/qs-theme-env.sh"
+qs_export_theme_env
+
 # If the notifications instance is already running, just toggle it.
 # If not, start it and then toggle open.
 if pgrep -f "qs -c notifications" > /dev/null; then
