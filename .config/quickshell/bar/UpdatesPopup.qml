@@ -120,7 +120,7 @@ PanelWindow {
     // Process to run updates - shared with Updates module
     Process {
         id: _updateRunProc
-        command: [Config.home + "/.config/waybar/scripts/system-update.sh", "up"]
+        command: [Config.home + "/.config/hyprcandy/scripts/system-update.sh", "up"]
         running: false
     }
 }
