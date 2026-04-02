@@ -5,7 +5,7 @@ import Quickshell.Io
 import ".."
 
 // Control-center launcher button.
-// ccGlyph is the default; reads ~/.config/hyprcandy/waybar-start-icon.txt if present.
+// ccGlyph is the default; reads ~/.config/hyprcandy/candy-start-icon.txt if present.
 // Left-click → toggle control center
 Item {
     id: root
@@ -15,9 +15,9 @@ Item {
 
     property string _glyph: Config.ccGlyph
 
-    // Live state file (same source as waybar distro icon)
+    // Live state file
     FileView {
-        path: Quickshell.env("HOME") + "/.config/hyprcandy/waybar-start-icon.txt"
+        path: Quickshell.env("HOME") + "/.config/hyprcandy/candy-start-icon.txt"
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {

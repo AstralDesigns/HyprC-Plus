@@ -942,7 +942,18 @@ PanelWindow {
                                         CCIconEntry { label:"WS Separator";   value:Config.wsSeparatorGlyph;onApplied:function(v){Config.wsSeparatorGlyph=v} }
 
                                         CCSection { text: "Control Center" }
-                                        CCIconEntry { label:"CC Glyph";    value:Config.ccGlyph;    onApplied:function(v){Config.ccGlyph=v} }
+                                        CCIconEntry {
+                                            label:"CC Glyph"
+                                            value:Config.ccGlyph
+                                            onApplied:function(v){
+                                                Config.ccGlyph=v
+                                                // Also write to candy-start-icon.txt for hot-update
+                                                _ccGlyphWrite.command = ["bash", "-c",
+                                                    "echo -n '" + v + "' > \"$HOME/.config/hyprcandy/candy-start-icon.txt\""]
+                                                _ccGlyphWrite.running = true
+                                            }
+                                        }
+                                        Process { id:_ccGlyphWrite; running:false }
 
                                         CCSection { text: "Battery" }
                                         CCToggle { label:"Radial Visible"; value:Config.batteryRadialVisible; onToggled:function(v){Config.batteryRadialVisible=v} }
