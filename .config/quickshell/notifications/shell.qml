@@ -89,12 +89,13 @@ ShellRoot {
     property bool dndEnabled: false
 
     IpcHandler { target: "notifications"
-        function toggle() { root.historyVisible = !root.historyVisible }
-        function open()   { root.historyVisible = true }
-        function close()  { root.historyVisible = false }
-        function dndOn()  { root.dndEnabled = true  }
-        function dndOff() { root.dndEnabled = false }
-        function dndToggle() { root.dndEnabled = !root.dndEnabled }
+        function toggle()        { root.historyVisible = !root.historyVisible }
+        function toggleHistory() { root.historyVisible = !root.historyVisible }
+        function open()          { root.historyVisible = true }
+        function close()         { root.historyVisible = false }
+        function dndOn()         { root.dndEnabled = true  }
+        function dndOff()        { root.dndEnabled = false }
+        function dndToggle()     { root.dndEnabled = !root.dndEnabled }
     }
 
     // ── Waybar notification state ──────────────────────────────────────────
@@ -150,7 +151,7 @@ ShellRoot {
         const count  = root.history.length
         const tip    = root.dndEnabled ? "Do Not Disturb ON" : "Notifications"
         const cls    = root.dndEnabled ? "dnd" : (count > 0 ? "unread" : "")
-        const json   = JSON.stringify({ text: icon, tooltip: tip, class: cls, alt: key })
+        const json   = JSON.stringify({ text: icon, tooltip: tip, class: cls, alt: key, count: count })
         waybarStateProc._json = json
         if (!waybarStateProc.running) waybarStateProc.running = true
     }
@@ -158,11 +159,12 @@ ShellRoot {
     // Write state file then poke waybar signal 12.
     // Uses a helper script path so the JSON is passed via the property
     // at run time, not baked into the command array at bind time.
+    // Writes the notification state JSON for the bar's Notifications module.
+    // File is watched via FileView in Notifications.qml — no waybar signal needed.
     Process { id: waybarStateProc; property string _json: "{}"
         command: ["bash", "-c",
             "D=~/.cache/quickshell/notifications; mkdir -p \"$D\"; " +
-            "printf '%s' \"$QS_NOTIF_STATE\" > \"$D/waybar-state.json\"; " +
-            "pkill -RTMIN+12 waybar 2>/dev/null; true"
+            "printf '%s' \"$QS_NOTIF_STATE\" > \"$D/waybar-state.json\""
         ]
         environment: ({ "QS_NOTIF_STATE": waybarStateProc._json })
     }
@@ -357,18 +359,27 @@ ShellRoot {
     // holder (sleep infinity) so bt-agent.py never sees EOF on its stdin.
     // Without this every short-lived btAgentStdinProc write closes the
     // last writer, delivering EOF → bt-agent exits (code=9).
+    //
+    // IMPORTANT: kill any stale holders from a previous instance BEFORE
+    // starting a new one — otherwise every qs restart stacks another
+    // "sleep infinity" process that never gets reaped.
     Process { id: btFifoInitProc
         command: ["bash", "-c",
+            "pkill -f 'sleep infinity >> /tmp/qs_bt_cmd' 2>/dev/null; sleep 0.1; " +
             "[ -p /tmp/qs_bt_cmd ] || (rm -f /tmp/qs_bt_cmd && mkfifo /tmp/qs_bt_cmd)"]
         Component.onCompleted: running = true
-        onExited: { if (!btFifoHolderProc.running) btFifoHolderProc.running = true }
+        onExited: btFifoHolderRestartTimer.restart()
     }
 
     // Persistent writer keeping the fifo write-end open indefinitely.
-    // Restarted automatically if it dies (e.g. suspend/resume).
+    // onExited uses a timer so it never re-enters synchronously, and only
+    // restarts when not already running to prevent accumulation.
     Process { id: btFifoHolderProc
         command: ["bash", "-c", "sleep infinity >> /tmp/qs_bt_cmd"]
-        onExited: {
+        onExited: btFifoHolderRestartTimer.restart()
+    }
+    Timer { id: btFifoHolderRestartTimer; interval: 500; repeat: false
+        onTriggered: {
             if (!btFifoHolderProc.running) btFifoHolderProc.running = true
             if (!btAgentProc.running)      btAgentProc.running = true
         }
@@ -533,10 +544,7 @@ ShellRoot {
     Connections {
         target: HyprlandFocusedClient
         function onAddressChanged() {
-            // address is non-empty whenever a real window takes focus
-            if (HyprlandFocusedClient.address !== "") {
-                root.historyVisible = false
-            }
+            root.historyVisible = false
         }
     }
 
@@ -562,6 +570,7 @@ ShellRoot {
 
 
         Rectangle {
+            id: histPanel
             anchors.fill: parent
             color:  root.cPanelBg
             radius: root.waybarOuterRadius
@@ -670,7 +679,10 @@ ShellRoot {
             }
 
             // ── Scrollable history list ───────────────────────────────────
+            // Swipe-to-dismiss is handled per-card via a WheelHandler inside
+            // each HistoryCard — no cursor-Y arithmetic needed.
             Flickable {
+                id: histFlickable
                 anchors {
                     top: histDivider.bottom; topMargin: 8
                     left: parent.left; right: parent.right; bottom: parent.bottom
@@ -710,12 +722,14 @@ ShellRoot {
                         delegate: HistoryCard {
                             required property var modelData
                             notif: modelData
+                            flickable: histFlickable
                             Layout.fillWidth: true
                         }
                     }
                     Item { height: 4 }
                 }
             }
+
         }
     }
 
@@ -1228,20 +1242,87 @@ ShellRoot {
             Item { height: 2 }
         }
 
-        // Hover/right-click dismiss
+        // Click-to-dismiss: left click anywhere on a non-prompt card dismisses it.
+        // Action buttons and the × button have their own MouseAreas with z>0,
+        // so clicks on those are consumed before reaching this z:-1 area.
+        // For cards that have a "default" action, invoke it before dismissing.
         MouseArea { id: toastMA; anchors.fill: parent; hoverEnabled: true; z: -1
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             onClicked: function(e) {
+                if (toast.notif.isPrompt) return
                 if (e.button === Qt.LeftButton) {
                     const hasDefault = (toast.notif.actions || []).some(function(a) { return a.key === "default" })
-                    if (hasDefault) {
-                        root.invokeAction(toast.notif, "default")
-                        root.dismissNotification(toast.notif.id)
-                    }
+                    if (hasDefault) root.invokeAction(toast.notif, "default")
+                    root.dismissNotification(toast.notif.id)
                 } else {
-                    if (!toast.notif.isPrompt) root.dismissNotification(toast.notif.id)
+                    root.dismissNotification(toast.notif.id)
                 }
             }
+        }
+
+        // ── Two-finger touchpad swipe-to-dismiss on toast ────────────────
+        // Mirrors the HistoryCard gesture: horizontal pixelDelta drives x-offset;
+        // release beyond 35 % threshold dismisses, otherwise snaps back.
+        property real _swipeX:    0
+        property bool _dismissing: false
+        property bool _swipeLock:  false
+
+        x: _swipeX
+        Behavior on _swipeX {
+            enabled: !toast._swipeLock
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+
+        function _commitDismiss() {
+            if (toast._dismissing) return
+            toast._dismissing = true
+            toast._swipeX = (toast._swipeX >= 0 ? 1 : -1) * (toast.width + 40)
+            Qt.callLater(function() { root.dismissNotification(toast.notif.id) })
+        }
+
+        function _endSwipe() {
+            toast._swipeLock = false
+            if (toast._dismissing) return
+            if (Math.abs(toast._swipeX) >= toast.width * 0.35)
+                toast._commitDismiss()
+            else
+                toast._swipeX = 0
+        }
+
+        Timer {
+            id: toastSwipeIdle; interval: 200; repeat: false
+            onTriggered: toast._endSwipe()
+        }
+
+        WheelHandler {
+            onWheel: function(ev) {
+                if (toast.notif.isPrompt) { ev.accepted = false; return }
+                const px = ev.pixelDelta.x !== 0 ? ev.pixelDelta.x : -(ev.angleDelta.x / 8.0)
+                const py = ev.pixelDelta.y !== 0 ? ev.pixelDelta.y : -(ev.angleDelta.y / 8.0)
+                const hm = Math.abs(px), vm = Math.abs(py)
+                if (hm < 2 || vm > hm * 0.8) { ev.accepted = false; return }
+                ev.accepted      = true
+                toast._swipeLock = true
+                toast._swipeX    = Math.max(-toast.width * 1.3,
+                                   Math.min( toast.width * 1.3, toast._swipeX + px))
+                toastSwipeIdle.restart()
+                if (Math.abs(toast._swipeX) >= toast.width * 0.70) toast._commitDismiss()
+            }
+        }
+
+        // TouchScreen: two-finger drag
+        DragHandler {
+            acceptedDevices: PointerDevice.TouchScreen
+            minimumPointCount: 2; maximumPointCount: 2
+            xAxis.enabled: true; yAxis.enabled: false
+            xAxis.minimum: -toast.width * 1.3; xAxis.maximum: toast.width * 1.3
+            onTranslationChanged: {
+                if (toast.notif.isPrompt || toast._dismissing) return
+                toast._swipeLock = true
+                toast._swipeX = translation.x
+                if (Math.abs(toast._swipeX) >= toast.width * 0.70) toast._commitDismiss()
+            }
+            onActiveChanged: { if (!active) toast._endSwipe() }
         }
     }
 
@@ -1253,52 +1334,89 @@ ShellRoot {
     component HistoryCard: Rectangle {
         id: hcard
         required property var notif
+        // Passed from delegate so this component can freeze/restore the parent
+        // Flickable during a swipe gesture. Required because pragma ComponentBehavior:
+        // Bound prevents direct ID references to items outside the component.
+        required property var flickable
         property bool _exp: false
 
-        // ── Two-finger swipe-to-dismiss ───────────────────────────────────
-        property real _swipeX: 0          // live horizontal offset while dragging
-        property bool _dismissing: false  // true once threshold crossed → run exit anim
+        // ── Two-finger side-swipe to dismiss ─────────────────────────────
+        property real _swipeX: 0          // accumulated / animated horizontal offset
+        property bool _dismissing: false   // latched once threshold crossed
+        property bool _swipeLock: false    // true while gesture is in flight
 
         x: _swipeX
         opacity: 1.0 - Math.min(Math.abs(_swipeX) / 160, 0.55)
 
         Behavior on _swipeX {
-            enabled: !hcSwipe.active  // only spring-back when not dragging
+            enabled: !hcard._swipeLock
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
 
-        // Two-finger horizontal drag handler
+        function _commitDismiss() {
+            if (hcard._dismissing) return
+            hcard._dismissing = true
+            const dir = hcard._swipeX >= 0 ? 1 : -1
+            hcard._swipeX = dir * (hcard.width + 40)
+            Qt.callLater(function() {
+                root.history = root.history.filter(
+                    function(n) { return n.id !== hcard.notif.id })
+            })
+        }
+
+        function _endGesture() {
+            hcard._swipeLock = false
+            hcard.flickable.interactive = true
+            if (hcard._dismissing) return
+            if (Math.abs(hcard._swipeX) >= hcard.width * 0.35)
+                hcard._commitDismiss()
+            else
+                hcard._swipeX = 0
+        }
+
+        // Idle timer: gesture ended when no events arrive for 200 ms
+        Timer {
+            id: swipeIdleTimer; interval: 200; repeat: false
+            onTriggered: hcard._endGesture()
+        }
+
+        // ── TouchPad: horizontal wheel events → swipe-to-dismiss ────────────
+        // Bare WheelHandler (no acceptedDevices/acceptedModifiers filters) —
+        // matching the pattern used by the wallpaper picker which works correctly.
+        // On Wayland/libinput touchpad scroll arrives as PointerDevice.Mouse and
+        // may carry modifier flags, so any filter silently drops all events.
+        WheelHandler {
+            onWheel: function(ev) {
+                const px = ev.pixelDelta.x !== 0 ? ev.pixelDelta.x : -(ev.angleDelta.x / 8.0)
+                const py = ev.pixelDelta.y !== 0 ? ev.pixelDelta.y : -(ev.angleDelta.y / 8.0)
+                const hm = Math.abs(px), vm = Math.abs(py)
+                // Pass vertical-dominant events through so Flickable still scrolls
+                if (hm < 2 || vm > hm * 0.8) { ev.accepted = false; return }
+                ev.accepted = true
+                hcard.flickable.interactive = false
+                hcard._swipeLock = true
+                hcard._swipeX = Math.max(-hcard.width * 1.3,
+                                Math.min( hcard.width * 1.3, hcard._swipeX + px))
+                swipeIdleTimer.restart()
+                if (Math.abs(hcard._swipeX) >= hcard.width * 0.70) hcard._commitDismiss()
+            }
+        }
+
+        // ── TouchScreen: two-finger drag ─────────────────────────────────────
         DragHandler {
-            id: hcSwipe
-            acceptedDevices: PointerDevice.TouchScreen | PointerDevice.TouchPad
-            minimumPointCount: 2
-            maximumPointCount: 2
-            xAxis.enabled: true
-            yAxis.enabled: false
-            xAxis.minimum: -hcard.width * 1.5
-            xAxis.maximum:  hcard.width * 1.5
-
+            id: hcTouchDrag
+            acceptedDevices: PointerDevice.TouchScreen
+            minimumPointCount: 2; maximumPointCount: 2
+            xAxis.enabled: true; yAxis.enabled: false
+            xAxis.minimum: -hcard.width * 1.3; xAxis.maximum: hcard.width * 1.3
             onTranslationChanged: {
-                if (!hcard._dismissing)
-                    hcard._swipeX = translation.x
+                if (hcard._dismissing) return
+                hcard._swipeLock = true
+                hcard._swipeX = translation.x
+                if (Math.abs(hcard._swipeX) >= hcard.width * 0.70)
+                    hcard._commitDismiss()
             }
-
-            onActiveChanged: {
-                if (!active && !hcard._dismissing) {
-                    const thresh = hcard.width * 0.38   // ~38% of card width
-                    if (Math.abs(hcard._swipeX) >= thresh) {
-                        hcard._dismissing = true
-                        const dir = hcard._swipeX > 0 ? 1 : -1
-                        hcard._swipeX = dir * (hcard.width + 40)  // slide fully off
-                        Qt.callLater(function() {
-                            root.history = root.history.filter(
-                                function(n) { return n.id !== hcard.notif.id })
-                        })
-                    } else {
-                        hcard._swipeX = 0   // spring back
-                    }
-                }
-            }
+            onActiveChanged: { if (!active) hcard._endGesture() }
         }
 
         radius: 12
@@ -1492,6 +1610,6 @@ ShellRoot {
             }
         }
 
-        MouseArea { id: hcMA; anchors.fill: parent; hoverEnabled: true; z: -1 }
+        MouseArea { id: hcMA; anchors.fill: parent; hoverEnabled: true; z: -1; propagateComposedEvents: true }
     }
 }

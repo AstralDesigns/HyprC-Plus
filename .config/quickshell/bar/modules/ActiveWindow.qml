@@ -6,10 +6,9 @@ import Quickshell.Hyprland
 import ".."
 
 // Active window — icon + truncated title of the focused window.
-// Icon resolution mirrors the working overview/OverviewWindow.qml pattern:
-//   1. DesktopEntries.heuristicLookup(class) → icon name from .desktop file
-//   2. Quickshell.iconPath(name, fallback) → theme icon path (covers most apps)
-//   3. tray-icon-resolve.py fallback for edge cases
+// Icon resolution (no DesktopEntries — not available in all builds):
+//   1. Quickshell.iconPath(class) → XDG theme icon lookup by window class
+//   2. tray-icon-resolve.py python fallback for edge cases
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
@@ -18,75 +17,56 @@ Item {
     implicitHeight: Config.moduleHeight
     visible: true
 
-    readonly property string winTitle:    HyprlandFocusedClient.title        ?? ""
-    readonly property string winClass:    HyprlandFocusedClient.class        ?? ""
-    readonly property string initialClass:HyprlandFocusedClient.initialClass ?? ""
-    readonly property string winAddress:  HyprlandFocusedClient.address      ?? ""
-    readonly property bool   _noWindow:   winAddress === ""
+    // ── Focused client state — direct property bindings ───────────────────
+    readonly property var    _focused:     (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
+    readonly property string winTitle:     _focused?.title        ?? ""
+    readonly property string winClass:     _focused?.class        ?? ""
+    readonly property string initialClass: _focused?.initialClass ?? ""
+    readonly property string winAddress:   _focused?.address      ?? ""
+    readonly property bool   _noWindow:    winAddress === ""
 
-    // ── Icon resolution (mirrors OverviewWindow.qml) ─────────────────────
-    // Use the same proven pattern as the working overview widget:
-    //   entry = DesktopEntries.heuristicLookup(class)
-    //   iconPath = Quickshell.iconPath(entry?.icon ?? class, fallback)
-    readonly property var _entry: DesktopEntries.heuristicLookup(
-        winClass !== "" ? winClass : initialClass)
+    // ── Icon resolution ───────────────────────────────────────────────────
+    readonly property string _classKey: winClass !== "" ? winClass : initialClass
 
-    // Primary icon path — identical to OverviewWindow.qml approach
+    // Quickshell.iconPath(name, fallback) — returns "" when not found if fallback=""
     readonly property string _primaryIcon: {
-        if (_noWindow) return ""
-        const name = _entry?.icon ?? (winClass !== "" ? winClass : initialClass)
-        if (!name || name === "") return ""
-        // Pass through absolute / URL paths directly
-        if (name.startsWith("/"))        return "file://" + name
-        if (name.startsWith("file://"))  return name
-        if (name.startsWith("image://")) return name
-        return Quickshell.iconPath(name, "image-missing")
+        if (_noWindow || _classKey === "") return ""
+        return Quickshell.iconPath(_classKey, "")
     }
 
-    // Resolved path from tray-icon-resolve.py (fills in when primary misses)
-    property string resolvedIcon: ""
+    // Fallback: python resolver for apps where class != icon name
+    property string _resolvedIcon: ""
 
-    // Final icon source: primary path > resolved fallback > empty
     readonly property string iconSource: {
         if (_noWindow) return ""
-        if (_primaryIcon !== "") return _primaryIcon
-        if (resolvedIcon !== "") return "file://" + resolvedIcon
-        return ""
+        if (_resolvedIcon !== "") return "file://" + _resolvedIcon
+        return _primaryIcon
     }
 
-    // Best candidate name for the fallback resolver
-    readonly property string _lookupKey: {
-        const name = _entry?.icon ?? (winClass !== "" ? winClass : initialClass)
-        return (name || "").trim()
+    onWinClassChanged:     { _resolvedIcon = ""; _tryResolve() }
+    onInitialClassChanged: { _resolvedIcon = ""; _tryResolve() }
+
+    function _tryResolve() {
+        if (!_noWindow && _classKey !== "" && _primaryIcon === "") {
+            iconResolverProc.running = false
+            iconResolverProc.running = true
+        }
     }
 
-    // Whether the resolver needs to run (primary missed or errored)
-    property bool _needsResolve: false
-
-    // Fallback resolver — argv[1] mode, same script as SystemTray uses
     Process {
         id: iconResolverProc
         command: ["python3",
                   Quickshell.env("HOME") + "/.config/quickshell/bar/tray-icon-resolve.py",
-                  root._lookupKey]
+                  root._classKey]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(line) {
                 const p = line.trim()
-                if (p) root.resolvedIcon = p
+                if (p) root._resolvedIcon = p
             }
         }
     }
-
-    function _tryResolve() {
-        resolvedIcon = ""
-        if (!_noWindow && _lookupKey !== "" && _needsResolve)
-            iconResolverProc.running = true
-    }
-
-    on_LookupKeyChanged: { _needsResolve = false; resolvedIcon = "" }
-    Component.onCompleted: if (_lookupKey !== "") _tryResolve()
 
     // ── Layout ────────────────────────────────────────────────────────────
     Row {
@@ -97,27 +77,28 @@ Item {
         Image {
             id: appIcon
             source: root.iconSource
-            width: 14; height: 14
+            width: Config.glyphSize + 2; height: Config.glyphSize + 2
+            sourceSize: Qt.size(width, height)
             fillMode: Image.PreserveAspectFit
             smooth: true; mipmap: true
             anchors.verticalCenter: parent.verticalCenter
-            visible: !root._noWindow && source !== "" && status !== Image.Error
+            visible: !root._noWindow && source !== "" && status === Image.Ready
 
-            // If primary icon failed to load, fire the python resolver
             onStatusChanged: {
-                if (status === Image.Error && root.resolvedIcon === "" && root._lookupKey !== "") {
-                    root._needsResolve = true
-                    root._tryResolve()
+                if (status === Image.Error && root._resolvedIcon === "" && root._classKey !== "") {
+                    root._resolvedIcon = ""
+                    iconResolverProc.running = false
+                    iconResolverProc.running = true
                 }
             }
         }
 
-        // Placeholder glyph when no window / icon unavailable
         Text {
             visible: root._noWindow ||
                      root.iconSource === "" ||
-                     appIcon.status === Image.Error
-            text:           "󱑙"   // nf-md-circle_off_outline
+                     appIcon.status === Image.Error ||
+                     appIcon.status === Image.Null
+            text:           "󱑙"
             color:          Theme.cOnSurfVar
             font.family:    Config.fontFamily
             font.pixelSize: Config.glyphSize

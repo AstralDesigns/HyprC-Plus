@@ -158,6 +158,15 @@ ShellRoot {
     Timer { interval:8000; repeat:true; running:true; onTriggered: if(!netStatusProc.running) netStatusProc.running=true }
 
     property var _netBuf: []
+    property var _savedNets: []   // SSIDs with saved NM profiles
+    Process { id: netSavedProc
+        command: ["bash", "-c", "nmcli --escape no -t -f NAME con show 2>/dev/null"]
+        running: true
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            const n = l.trim(); if (n) root._savedNets.push(n)
+        }}
+        onRunningChanged: if (running) root._savedNets = []
+    }
     Process { id: netScanProc
         // --escape no prevents colons in SSIDs from corrupting fields; SSID is last field
         command:["bash","-c","nmcli --escape no -t -f IN-USE,SECURITY,SIGNAL,SSID dev wifi list 2>/dev/null | head -25"]
@@ -169,7 +178,8 @@ ShellRoot {
             const sec=l.substring(c1+1,c2)
             const sig=l.substring(c2+1,c3)
             const ssid=l.substring(c3+1)
-            if(ssid) root._netBuf.push({active:inuse==="*",secure:sec!=="",signal:parseInt(sig)||0,ssid:ssid})
+            const saved = root._savedNets.indexOf(ssid) >= 0
+            if(ssid) root._netBuf.push({active:inuse==="*",secure:sec!=="",signal:parseInt(sig)||0,ssid:ssid,saved:saved})
         }}
         onRunningChanged: if(running) { root._netBuf=[] } else { root.networkList=root._netBuf.slice() }
     }
@@ -201,6 +211,7 @@ ShellRoot {
     property string btConnecting:  ""     // MAC currently being connected/disconnected
     property string btExpandedMac: ""     // MAC whose options panel is open
     property var    btActiveProfile: ({}) // mac → active PulseAudio profile string
+    property var    btHasAudioCard:  ({}) // mac → bool: device has a bluez PulseAudio card
     property string btConnectedMac: ""   // MAC that just succeeded — shows ✓ briefly
     property string netConnectedSSID: "" // SSID that just succeeded — shows ✓ briefly
 
@@ -499,19 +510,28 @@ ShellRoot {
         if (!root.btScanning) root.toggleBtScan()
     }
 
-    // ── Audio profile query (pactl) ───────────────────────────────────────────
+    // ── Audio profile query (PipeWire-native) ────────────────────────────────
+    // Card existence via pw-dump (always present with PipeWire, no pipewire-pulse needed).
+    // Active profile via pactl compat layer (present when pipewire-pulse is installed,
+    // which is standard on all major distros using PipeWire).
     Process { id: btProfileQueryProc; property string _mac: ""; property var _lines: []
         command: ["bash", "-c",
             "CARD=\"bluez_card.$(echo '" + btProfileQueryProc._mac + "' | tr ':' '_')\"; " +
+            "pw-dump 2>/dev/null | grep -qF \"$CARD\" && echo CARD_EXISTS; " +
             "pactl list cards 2>/dev/null | awk \"/Name: $CARD/{f=1} f&&/Active Profile:/{print; f=0}\""
         ]
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) { btProfileQueryProc._lines.push(l.trim()) }}
         onRunningChanged: if (running) _lines = []
         onExited: {
+            const mac = btProfileQueryProc._mac
+            const hasCard = btProfileQueryProc._lines.some(function(x) { return x === "CARD_EXISTS" })
+            const h = Object.assign({}, root.btHasAudioCard)
+            h[mac] = hasCard
+            root.btHasAudioCard = h
             const line = _lines.find(function(x) { return x.startsWith("Active Profile:") })
             if (line) {
                 const o = Object.assign({}, root.btActiveProfile)
-                o[btProfileQueryProc._mac] = line.replace("Active Profile:", "").trim()
+                o[mac] = line.replace("Active Profile:", "").trim()
                 root.btActiveProfile = o
             }
         }
@@ -647,8 +667,10 @@ ShellRoot {
     Process { id: logoutProc; command:["bash","-c","hyprctl dispatch exit"] }
     Process { id: powerProc; property string _cmd:""; command:["bash","-c",powerProc._cmd] }
 
-    // ── User icon — pre-process to circle via ImageMagick ─────────────────────
+    // ── User icon — process on menu open + watch for changes ────────────────
     property string _userIconPath: ""
+    property string _lastIconTime: "0"
+
     Process { id: smIconProc
         property string _dst: "/tmp/qs_sm_user_circle.png"
         property string _src: Quickshell.env("HOME")+"/.config/hyprcandy/user-icon.png"
@@ -659,8 +681,46 @@ ShellRoot {
             "  \\( +clone -alpha extract -fill black -colorize 100 "+
             "     -fill white -draw 'circle 48,48 48,0' \\) "+
             "  -alpha off -compose CopyOpacity -composite -strip \"$DST\""]
-        onExited: function(code){ if(code===0) root._userIconPath = smIconProc._dst+"?"+Date.now() }
-        Component.onCompleted: running=true
+        onExited: function(code){
+            if(code===0) root._userIconPath = smIconProc._dst+"?"+Date.now()
+        }
+    }
+
+    // Watch user icon file for changes (same as CC sidebar)
+    Timer {
+        id: smIconWatchTimer
+        interval: 1000; running: true; repeat: true
+        onTriggered: {
+            _smIconCheck.running = true
+        }
+    }
+
+    Process { id: _smIconCheck
+        command: ["bash", "-c",
+            "SRC=\"$HOME/.config/hyprcandy/user-icon.png\"; "+
+            "[ -f \"$SRC\" ] && stat -c %Y \"$SRC\" || echo 0"]
+        onExited: function(code) {
+            const newTime = _smIconCheck._stdout.trim()
+            if (newTime && newTime !== "0" && newTime !== root._lastIconTime) {
+                root._lastIconTime = newTime
+                if (!smIconProc.running) smIconProc.running = true
+            }
+        }
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) { _smIconCheck._stdout = line.trim() }
+        }
+        property string _stdout: ""
+    }
+
+    // Process icon when menu opens
+    Connections {
+        target: root
+        function onMenuVisibleChanged() {
+            if (root.menuVisible && !smIconProc.running) {
+                smIconProc.running = true
+            }
+        }
     }
 
     // ── Close on real-window focus ────────────────────────────────────────────
@@ -835,7 +895,10 @@ ShellRoot {
                             Text { anchors.centerIn:parent; text:root.networkExpanded?"󰁆":"󰁄"; font.pixelSize:13; font.family:"Symbols Nerd Font Mono"; color:root.cPrimary }
                             MouseArea{id:nxh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:{
                                 root.networkExpanded=!root.networkExpanded
-                                if(root.networkExpanded&&!netScanProc.running) netScanProc.running=true
+                                if(root.networkExpanded) {
+                                    if(!netSavedProc.running) netSavedProc.running=true
+                                    if(!netScanProc.running) netScanProc.running=true
+                                }
                             }}
                         }
 
@@ -900,8 +963,11 @@ ShellRoot {
                                     }
                                     MouseArea{id:nh;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:{
                                         if(netDelegate.modelData.active) return
-                                        if(netDelegate.modelData.secure) netDelegate._showPass=!netDelegate._showPass
-                                        else root.connectNetwork(netDelegate.modelData.ssid,"")
+                                        // If network is saved (previously connected), reconnect directly — no password prompt
+                                        if(netDelegate.modelData.saved || !netDelegate.modelData.secure)
+                                            root.connectNetwork(netDelegate.modelData.ssid,"")
+                                        else
+                                            netDelegate._showPass=!netDelegate._showPass
                                     }}
                                 }
 
@@ -1103,16 +1169,12 @@ ShellRoot {
                                         spacing: 6
 
                                         // ── Audio device controls: profile pills ─────────────
+                                        // Shown for any device the OS registers a bluez PulseAudio
+                                        // card for — phones, laptops, speakers, headsets etc.
+                                        // Printers and gamepad-class devices never get a bluez card.
                                         RowLayout {
                                             width: parent.width; spacing: 4
-                                            visible: {
-                                                const ic = (btDelegate.modelData.icon || "").toLowerCase()
-                                                return ic === "audio-headset"         ||
-                                                       ic === "audio-headset-gateway"  ||
-                                                       ic === "audio-headphones"       ||
-                                                       ic === "audio-card"             ||
-                                                       ic.includes("speaker")
-                                            }
+                                            visible: root.btHasAudioCard[btDelegate.modelData.mac] === true
                                             Text { text:"Profile:"; font.pixelSize:10; color:root.cOnSurfVar; Layout.preferredWidth:40 }
                                             ProfilePill { pLabel:"A2DP";    pProfile:"a2dp-sink";         pMac:btDelegate.modelData.mac }
                                             ProfilePill { pLabel:"HSP/HFP"; pProfile:"headset-head-unit"; pMac:btDelegate.modelData.mac }
@@ -1126,18 +1188,11 @@ ShellRoot {
                                         RowLayout {
                                             width: parent.width; spacing: 4
 
-                                            // "Set as Default Output" — audio devices only, when connected
+                                            // "Set as Default Output" — any device with an audio card, when connected
                                             Rectangle {
                                                 height:22; radius:6; implicitWidth: sdLbl.implicitWidth + 20
-                                                visible: {
-                                                    const ic = (btDelegate.modelData.icon || "").toLowerCase()
-                                                    return btDelegate.modelData.connected && (
-                                                        ic === "audio-headset"         ||
-                                                        ic === "audio-headset-gateway"  ||
-                                                        ic === "audio-headphones"       ||
-                                                        ic === "audio-card"             ||
-                                                        ic.includes("speaker"))
-                                                }
+                                                visible: btDelegate.modelData.connected &&
+                                                         root.btHasAudioCard[btDelegate.modelData.mac] === true
                                                 color: sdh.containsMouse
                                                     ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.22)
                                                     : Qt.rgba(root.cSurfHi.r,root.cSurfHi.g,root.cSurfHi.b,0.8)

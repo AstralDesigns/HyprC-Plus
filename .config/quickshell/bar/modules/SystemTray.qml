@@ -9,6 +9,18 @@ Item {
 
     property var rootWindow
 
+    // trayMaxW: maximum implicitWidth budget (-1 = unconstrained).
+    // Set by Bar.qml to enforce 4 px gap between right and center groups.
+    property real trayMaxW: -1
+
+    // How many tray icons fit within the budget
+    readonly property int _maxVisibleIcons: {
+        if (trayMaxW < 0) return SystemTray.items.values.length
+        const iconSlot = Config.trayIconSz + Config.trayItemPadH * 2 + Config.trayItemSpacing
+        const budget = Math.max(0, trayMaxW - Config.trayItemPadH * 2)
+        return Math.max(0, Math.floor(budget / iconSlot))
+    }
+
     Layout.alignment: Qt.AlignVCenter
     // Always full width when icons present; Island hides the whole thing when implicitWidth == 0
     implicitWidth:  SystemTray.items.values.length > 0
@@ -27,6 +39,9 @@ Item {
             delegate: Item {
                 id: trayItem
                 required property SystemTrayItem modelData
+                required property int index
+                // Hide icons that exceed the budget
+                visible: index < root._maxVisibleIcons
 
                 width:  Config.trayIconSz + Config.trayItemPadH * 2
                 height: Config.trayIconSz + Config.trayItemPadV * 2

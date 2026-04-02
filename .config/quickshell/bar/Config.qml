@@ -31,7 +31,10 @@ QtObject {
     //  "bar"    — blurBackground fill + border on whole bar; islands are
     //             transparent pill outlines only (no gradient fill).
     //  "island" — no whole-bar fill; islands have gradient fill + border.
-    property string barMode:     "bar"   // "bar" | "island"
+    //  "tri"    — three separate bar-background rects (left / center / right),
+    //             each styled like "bar" mode but physically split. Internal
+    //             module layout is unchanged; edit options are shared with bar mode.
+    property string barMode:     "bar"   // "bar" | "island" | "tri"
     property string barPosition: "top"   // "top" | "bottom" | "left" | "right"
 
     // ── Bar geometry ─────────────────────────────────────────────────────
@@ -244,7 +247,8 @@ QtObject {
     //  TAB 5 · Cava
     // ═══════════════════════════════════════════════════════════════════════
 
-    property int cavaWidth: 25   // display columns
+    property int cavaWidth: 25      // ASCII bar count (number of columns rendered by cava)
+    property real cavaBarSpacing: 0  // px — letter-spacing between bars (0 = no gap; fine increments)
 
     //  cavaStyle selects a named preset. Set to "" to use cavaBars directly.
     //  Presets:  "dots" | "bars" | "braille_fill" | "braille_hollow" |
@@ -273,6 +277,10 @@ QtObject {
     property bool cavaTransparentWhenInactive: true
     property real cavaActiveOpacity:   0.85
     property real cavaInactiveOpacity: 0.0
+    // cavaAutoHide: when true and showCava is enabled, cava auto-hides when no
+    //   media is detected and auto-shows when media starts playing.
+    //   When showCava is false, auto-hide is disabled and cava stays hidden.
+    property bool cavaAutoHide: false
 
     // ── Cava color ───────────────────────────────────────────────────────
     //  Single color: cavaGlyphColor
@@ -280,7 +288,12 @@ QtObject {
     property color cavaGlyphColor:          Theme.cPrimary
     property bool  cavaGradientEnabled:     false
     property color cavaGradientStartColor:  Theme.cPrimary
-    property color cavaGradientEndColor:    Theme.cSecondary
+    // Not bound to Theme.cSecondary so a user pick isn't snapped back by
+    // matugen re-evaluations.  Seeded once from the theme in onCompleted.
+    property color cavaGradientEndColor:    "#000000"
+    Component.onCompleted: cavaGradientEndColor = Theme.cSecondary
+    // Fraction of glyph height at which start→end color splits (0.0–1.0, default 0.5)
+    property real  cavaGradientSplit:       0.5
 
     // ═══════════════════════════════════════════════════════════════════════
     //  TAB 6 · Background
@@ -305,6 +318,9 @@ QtObject {
 
     property color cavaBgColor:   Theme.cOnSecondary
     property real  cavaBgOpacity: -1
+
+    property color distroBgColor:   Theme.cOnSecondary
+    property real  distroBgOpacity: -1   // -1 = global; independent distro/CC-button BG opacity
 
     property color activeWindowBgColor:   Theme.cOnSecondary
     property real  activeWindowBgOpacity: 0

@@ -519,21 +519,18 @@ function createMediaBox() {
     };
 
     // ── Cava ring (slim radial bars outside the disc) ──────────────────────
-    const CAVA_SCRIPT    = GLib.build_filenamev([GLib.get_home_dir(), '.config', 'waybar', 'scripts', 'cava.py']);
-    const CAVA_SOCK      = GLib.build_filenamev([GLib.get_user_runtime_dir(), 'hyprcandy', 'cava.sock']);
-    const CAVA_RANGE     = 15;    // must match manager --range
-    const CAVA_N_MAX     = 64;    // buffer ceiling; actual count comes from socket
+    const CAVA_RANGE     = 15;    // ascii_max_range in config
+    const CAVA_N_MAX     = 64;    // bar count in config / buffer ceiling
     const CAVA_GAP       = 4;     // px between disc edge and bar base
-    const CAVA_BAR_MAX   = 27;    // max bar length outward at full amplitude (×1.5)
+    const CAVA_BAR_MAX   = 27;    // max bar length outward at full amplitude
     const CAVA_BAR_W     = 1.5;   // stroke width — slim
-    // Ring canvas sized to fully contain bars within its own allocation.
-    // No clip_children override needed — bars never exceed this boundary.
     const CAVA_RING_SIZE = THUMB_SIZE + 2 * (CAVA_GAP + CAVA_BAR_MAX + 2);
+    const CAVA_CFG_PATH  = GLib.build_filenamev([GLib.get_user_runtime_dir(), 'hyprcandy-media-cava.ini']);
 
     const _cavaBars  = new Float32Array(CAVA_N_MAX);
-    let   _cavaN     = 32;
+    let   _cavaN     = CAVA_N_MAX;
     let   _cavaOn    = false;
-    let   _cavaConn  = null;
+    let   _cavaProc  = null;
     let   _cavaStream= null;
 
     const cavaRingDa = new Gtk.DrawingArea();
@@ -569,17 +566,13 @@ function createMediaBox() {
 
     function _cavaReadLine() {
         if (!_cavaOn || !_cavaStream) return;
-        // PRIORITY_DEFAULT: cava data must be processed before animation ticks
-        // (which are PRIORITY_LOW). Without this, frames pile up in the socket
-        // buffer while the main loop is busy and the ring looks jagged.
         _cavaStream.read_line_async(GLib.PRIORITY_DEFAULT, null, (s, res) => {
             if (!_cavaOn) return;
             try {
                 const [line] = s.read_line_finish_utf8(res);
                 if (line === null) {
-                    // EOF — manager shut down (e.g. waybar hidden, cava.py auto-exited).
-                    // Use the backoff-retry path: fast first attempt, slow down if needed.
-                    _cavaOn = false; _cavaConn = null; _cavaStream = null;
+                    // EOF — cava exited; restart after delay
+                    _cavaOn = false; _cavaStream = null; _cavaProc = null;
                     _scheduleRetry();
                     return;
                 }
@@ -596,21 +589,15 @@ function createMediaBox() {
                 }
                 _cavaReadLine();
             } catch (e) {
-                // Connection error — same backoff-retry path as EOF.
-                _cavaOn = false; _cavaConn = null; _cavaStream = null;
+                _cavaOn = false; _cavaStream = null; _cavaProc = null;
                 _scheduleRetry();
             }
         });
     }
 
     // ── Cava reconnect state ───────────────────────────────────────────────
-    // _cavaRetryCount tracks how many consecutive failed connect attempts have
-    // been made since the last successful connection.  The backoff schedule is:
-    //   attempts 1-3  → 1 s   (fast retry: manager may just be starting up)
-    //   attempts 4-6  → 3 s   (medium: give waybar cava modules time to relaunch it)
-    //   attempts 7+   → 10 s  (slow: something is genuinely wrong, don't hammer)
     let _cavaRetryCount = 0;
-    let _cavaRetryTimer = 0;  // GLib source id for pending retry
+    let _cavaRetryTimer = 0;
 
     function _cavaClearRetry() {
         if (_cavaRetryTimer) { GLib.source_remove(_cavaRetryTimer); _cavaRetryTimer = 0; }
@@ -622,32 +609,10 @@ function createMediaBox() {
         return 10000;
     }
 
-    function _cavaConnect() {
-        if (_cavaOn) return;
-        if (!GLib.file_test(CAVA_SOCK, GLib.FileTest.EXISTS)) return;
-        try {
-            const client = new Gio.SocketClient();
-            client.connect_async(Gio.UnixSocketAddress.new(CAVA_SOCK), null, (sc, res) => {
-                try {
-                    _cavaConn   = sc.connect_finish(res);
-                    _cavaStream = new Gio.DataInputStream({ base_stream: _cavaConn.get_input_stream() });
-                    _cavaOn     = true;
-                    _cavaRetryCount = 0;  // reset on success
-                    _cavaClearRetry();
-                    _cavaReadLine();
-                } catch (e) {
-                    _cavaConn = null; _cavaStream = null;
-                    _scheduleRetry();
-                }
-            });
-        } catch (e) { _scheduleRetry(); }
-    }
-
     function _scheduleRetry() {
         if (_cavaOn || _cavaRetryTimer) return;
         _cavaRetryCount++;
-        const delay = _cavaRetryDelay();
-        _cavaRetryTimer = GLib.timeout_add(GLib.PRIORITY_LOW, delay, () => {
+        _cavaRetryTimer = GLib.timeout_add(GLib.PRIORITY_LOW, _cavaRetryDelay(), () => {
             _cavaRetryTimer = 0;
             _startCava();
             return GLib.SOURCE_REMOVE;
@@ -656,29 +621,36 @@ function createMediaBox() {
 
     function _startCava() {
         if (_cavaOn) return;
-        if (GLib.file_test(CAVA_SOCK, GLib.FileTest.EXISTS)) {
-            // Socket already up (waybar cava module may have restarted the manager) — connect now
-            _cavaConnect();
-        } else {
-            // Socket gone: waybar was hidden and the cava manager auto-shut down.
-            // Re-launch the manager ourselves, then schedule a connect once it is ready.
-            if (GLib.file_test(CAVA_SCRIPT, GLib.FileTest.EXISTS) && GLib.find_program_in_path('python3')) {
-                try {
-                    Gio.Subprocess.new(
-                        ['python3', CAVA_SCRIPT, 'manager'],
-                        Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE
-                    );
-                } catch (e) {}
-            }
-            // Give the manager ~2.5 s to create the socket, then attempt to connect.
-            // If that connect also fails, _scheduleRetry() will keep trying with backoff.
-            if (!_cavaRetryTimer) {
-                _cavaRetryTimer = GLib.timeout_add(GLib.PRIORITY_LOW, 2500, () => {
-                    _cavaRetryTimer = 0;
-                    _cavaConnect();
-                    return GLib.SOURCE_REMOVE;
-                });
-            }
+        // Write config then spawn cava directly — no socket manager needed.
+        const cfg =
+            '[general]\n' +
+            'bars = ' + CAVA_N_MAX + '\n' +
+            'framerate = 60\n' +
+            '\n' +
+            '[output]\n' +
+            'method = raw\n' +
+            'raw_target = /dev/stdout\n' +
+            'data_format = ascii\n' +
+            'ascii_max_range = ' + CAVA_RANGE + '\n' +
+            'channels = mono\n';
+        try {
+            GLib.file_set_contents(CAVA_CFG_PATH, cfg);
+        } catch (e) {
+            _scheduleRetry(); return;
+        }
+        try {
+            _cavaProc = Gio.Subprocess.new(
+                ['cava', '-p', CAVA_CFG_PATH],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE
+            );
+            _cavaStream = new Gio.DataInputStream({ base_stream: _cavaProc.get_stdout_pipe() });
+            _cavaOn = true;
+            _cavaRetryCount = 0;
+            _cavaClearRetry();
+            _cavaReadLine();
+        } catch (e) {
+            _cavaProc = null; _cavaStream = null;
+            _scheduleRetry();
         }
     }
 
@@ -686,7 +658,7 @@ function createMediaBox() {
         _cavaOn = false;
         _cavaClearRetry();
         _cavaRetryCount = 0;
-        if (_cavaConn) { try { _cavaConn.close(null); } catch (e) {} _cavaConn = null; }
+        if (_cavaProc) { try { _cavaProc.force_exit(); } catch (e) {} _cavaProc = null; }
         _cavaStream = null;
         _cavaBars.fill(0);
         cavaRingDa.queue_draw();

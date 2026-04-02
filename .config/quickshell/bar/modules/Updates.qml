@@ -4,8 +4,8 @@ import Quickshell.Io
 import ".."
 
 // System updates indicator — matches waybar custom/update module.
-// Shows 󰸟 when up-to-date, "" with count when updates available.
-// Left-click runs the update script.
+// Shows 󰸟 when up-to-date, update count when updates available.
+// Click opens popover with "Apply Updates" button when updates are available.
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
@@ -54,13 +54,6 @@ Item {
         onTriggered: if (!checkProc.running) checkProc.running = true
     }
 
-    // Run update (opens terminal with package manager)
-    Process {
-        id: updateRunProc
-        command: [Config.home + "/.config/waybar/scripts/system-update.sh", "up"]
-        running: false
-    }
-
     Text {
         id: updIcon
         anchors.centerIn: parent
@@ -82,14 +75,9 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: function(ev) {
-            if (ev.button === Qt.RightButton) {
-                if (!updateRunProc.running) updateRunProc.running = true
-            } else {
-                const cx = root.mapToItem(null, root.width / 2, 0).x
-                UpdatesPopupState.toggle(cx, root._tooltip, root._hasUpdates)
-            }
+        onClicked: {
+            const cx = root.mapToItem(null, root.width / 2, 0).x
+            UpdatesPopupState.toggle(cx, root._tooltip, root._hasUpdates)
         }
     }
 }

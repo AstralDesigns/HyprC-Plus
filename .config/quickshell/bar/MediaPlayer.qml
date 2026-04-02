@@ -141,6 +141,9 @@ Item {
                     id: discContainer
                     width: root._ts; height: root._ts
                     anchors.verticalCenter: parent.verticalCenter
+                    antialiasing: true
+                    layer.enabled: true
+                    layer.smooth: true
 
                     Text {
                         visible: root._artPath === ""
@@ -156,12 +159,12 @@ Item {
                         anchors.fill: parent
                         source: root._artPath !== "" ? ("file://" + root._artPath.split("?")[0]) : ""
                         fillMode: Image.PreserveAspectCrop
-                        smooth: true; cache: false; asynchronous: true
+                        smooth: true; mipmap: true; cache: false; asynchronous: true
                     }
 
                     RotationAnimator on rotation {
                         from: discContainer.rotation; to: discContainer.rotation + 360
-                        duration: 8000; loops: Animation.Infinite
+                        duration: 70000; loops: Animation.Infinite
                         running: root._playing
                     }
                 }

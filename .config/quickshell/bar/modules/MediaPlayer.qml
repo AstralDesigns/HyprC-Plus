@@ -38,6 +38,18 @@ Item {
     // shrinkToControls: when true, collapses text label — shows only disc + play/pause.
     // Animate width so the island breathes in/out smoothly.
     property bool shrinkToControls: false
+    // mediaMaxW: maximum implicitWidth budget for the whole module (-1 = unconstrained).
+    // Set by Bar.qml to enforce 4 px gap between left and center groups.
+    property real mediaMaxW: -1
+    // Effective max width for the title clip area (budget minus controls).
+    // Recalculated whenever mediaMaxW or the controls width changes.
+    readonly property real _titleMaxW: {
+        if (mediaMaxW < 0 || shrinkToControls) return -1
+        // Controls = toggle button + disc + play/pause + padding (everything except titleClip)
+        const controlsW = padContainer.implicitWidth - (titleClip.implicitWidth > 0 ? titleClip.implicitWidth : 0)
+        const budget = mediaMaxW - controlsW
+        return Math.max(0, budget)
+    }
 
     // ── playerctl metadata watcher ───────────────────────────────────────────
     Process {
@@ -186,10 +198,16 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter
                     }
 
-                    // ── Title – Artist (collapses with shrinkToControls) ───
+                    // ── Title – Artist (collapses with shrinkToControls or spacing budget) ───
                     Item {
                         id: titleClip
-                        implicitWidth: root.shrinkToControls ? 0 : titleLbl.implicitWidth
+                        // Width is the minimum of: natural text width, spacing budget, or 0 when shrunk
+                        implicitWidth: {
+                            if (root.shrinkToControls) return 0
+                            const nat = titleLbl.implicitWidth
+                            if (root._titleMaxW < 0) return nat
+                            return Math.min(nat, root._titleMaxW)
+                        }
                         implicitHeight: titleLbl.implicitHeight
                         clip: true
                         anchors.verticalCenter: parent.verticalCenter

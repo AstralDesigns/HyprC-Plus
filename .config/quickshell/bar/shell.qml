@@ -13,6 +13,13 @@ import Quickshell.Hyprland
 ShellRoot {
     id: root
 
+    // Set Qt application identifiers early so QtCore.Settings initialises without warnings.
+    Component.onCompleted: {
+        Qt.application.name             = "quickshell"
+        Qt.application.organization     = "quickshell"
+        Qt.application.organizationDomain = "quickshell.io"
+    }
+
     // ── Optional popup overlays (loaded on demand) ─────────────────────────
     Loader { active: PowerMenuState.visible;    source: "PowerMenu.qml"     }
     Loader { active: PowerLauncherState.visible; source: "PowerLauncher.qml" }
@@ -70,10 +77,10 @@ ShellRoot {
             }
         }
 
-        // Workspace icon mode: "dot" | "number" | "custom"
+        // Workspace icon mode: "number" | "icon"
         function setWsIconMode(m: string) { Config.wsIconMode = m }
         function cycleWsIconMode() {
-            const modes = ["dot", "number", "custom"]
+            const modes = ["number", "icon"]
             Config.wsIconMode = modes[(modes.indexOf(Config.wsIconMode) + 1) % modes.length]
         }
 

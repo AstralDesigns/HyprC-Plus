@@ -7,10 +7,10 @@
 // Each tag is unique in the file so sed can target it unambiguously.
 //
 // Numeric @HCD variables (replace N with new value):
-//   sed -i 's/appIconSize:[ \t]*[0-9]*/appIconSize: N/' config.js
+//   sed -i 's/appIconSize: 20[ \t]*[0-9]*/appIconSize: 20N/' config.js
 //
 // String @HCD variables (replace GLYPH with new character or escape):
-//   sed -i "s/startIcon: '[^']*'/startIcon: 'GLYPH'/" config.js
+//   sed -i "s/startIcon: '',
 //
 // Same pattern applies to all @HCD-tagged variables — just swap the key name.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,9 +20,8 @@ var DockConfig = {
     // ── Start button icon (NerdFont glyph) ────────────────────────────────
     // Paste any glyph directly (use rofi glyph menu or any NerdFont codepoint).
     // null = fall back to the GLYPH_START const in dock-main.js.
-    // candy-utils sed pattern:  sed -i "s/startIcon: '[^']*'/startIcon: 'GLYPH'/" config.js
-    startIcon: '',               // @HCD:startIcon
-
+    // candy-utils sed pattern:  sed -i "s/startIcon: '',
+    startIcon: '',              // @HCD:startIcon
     // ── Button spacing (gap between every button in the dock) ─────────────
     // Controls GtkBox spacing — applies uniformly between start↔first-app,
     // app↔app, and last-app↔trash so all gaps are edited in one place.
@@ -92,7 +91,7 @@ var DockConfig = {
     // from the base config above.
     //
     // Example: if you want a thicker border for left dock:
-    //   positionOverrides: { left: { borderWidth: 4 } }
+    //   positionOverrides: { left: { borderWidth: 2 } }
     positionOverrides: {
         left: {
             marginLeft:   6,   // screen edge gap
