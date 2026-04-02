@@ -29,7 +29,7 @@ Item {
     // Poll on startup and every hour (3600 s)
     Process {
         id: checkProc
-        command: [Config.home + "/.config/waybar/scripts/system-update.sh"]
+        command: [Config.scriptsDir + "/system-update.sh"]
         onRunningChanged: root._checking = running
         stdout: SplitParser {
             splitMarker: "\n"

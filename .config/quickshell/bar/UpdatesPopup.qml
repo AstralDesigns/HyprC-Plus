@@ -100,7 +100,6 @@ PanelWindow {
                     color: Theme.cPrimary
                     font.family: Config.labelFont
                     font.pixelSize: 13
-                    font.weight: Font.SemiBold
                 }
 
                 MouseArea {
@@ -108,19 +107,25 @@ PanelWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        UpdatesPopupState.close()
-                        _updateRunProc.running = true
-                    }
+                    onClicked: _updateRunProc.running = true
                 }
             }
         }
     }
 
-    // Process to run updates - shared with Updates module
     Process {
         id: _updateRunProc
-        command: [Config.home + "/.config/hyprcandy/scripts/system-update.sh", "up"]
+        command: [
+            "kitty",
+            "--class", "floating-installer",
+            "--title", "   System Update",
+            "-e", "bash", "-ic",
+            Quickshell.env("HOME") + "/.config/hyprcandy/scripts/system-update.sh run"
+        ]
         running: false
+        onExited: {
+            running = false
+            UpdatesPopupState.close()
+        }
     }
 }
