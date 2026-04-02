@@ -6,6 +6,7 @@ import Quickshell.Io
 
 PanelWindow {
     id: win
+    visible: UpdatesPopupState.visible
     color: "transparent"
 
     anchors { top: true; left: true; right: true }
@@ -96,7 +97,7 @@ PanelWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text: "󰑓  Apply Updates"
+                    text: _updateRunProc.running ? "󰑓  Running ..." : "󰑓  Apply Updates"
                     color: Theme.cPrimary
                     font.family: Config.labelFont
                     font.pixelSize: 13

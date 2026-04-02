@@ -114,7 +114,7 @@ if [ "$1" == "run" ]; then
 
   # Print update summary header
   aur_updates_now=$(${aur_helper} -Qua 2>/dev/null | grep -c '^' || echo 0)
-  official_updates_now=$( (while pgrep -x checkupdates >/dev/null; do sleep 1; done); checkupdates 2>/dev/null | grep -c '^' )
+  official_updates_now=$( (while pgrep -x checkupdates >/dev/null; do sleep 1; done); checkupdates 2>/dev/null | grep -c '^' || echo 0)
   flatpak_updates_now=$(pkg_installed flatpak && flatpak remote-ls --updates 2>/dev/null | grep -c '^' || echo 0)
   printf "Official:  %-10s\nAUR (%s): %-10s\nFlatpak:   %-10s\n\n" \
     "$official_updates_now" "$aur_helper" "$aur_updates_now" "$flatpak_updates_now"

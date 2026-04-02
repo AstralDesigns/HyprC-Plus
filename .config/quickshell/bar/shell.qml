@@ -27,7 +27,7 @@ ShellRoot {
     Loader { active: NetworkPopupState.visible;  source: "NetworkPopup.qml"  }
     Loader { active: CalendarPopupState.visible; source: "CalendarPopup.qml" }
     Loader { active: TrayMenuState.visible;      source: "TrayMenuPopup.qml" }
-    Loader { active: UpdatesPopupState.visible;  source: "UpdatesPopup.qml" }
+    UpdatesPopup {}
     Loader { active: ControlCenterState.visible;  source: "ControlCenterPopup.qml" }
 
     // ── One bar instance per monitor ────────────────────────────────────────
