@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# Add near the top, after get_aur_helper
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
@@ -14,7 +13,6 @@ fi
 
 pkg_installed() {
   local pkg=$1
-
   if pacman -Qi "${pkg}" &>/dev/null; then
     return 0
   elif pacman -Qi "flatpak" &>/dev/null && flatpak info "${pkg}" &>/dev/null; then
@@ -37,7 +35,6 @@ get_aur_helper() {
 get_aur_helper
 export -f pkg_installed
 
-# EDITED: New function to handle cache cleaning
 clean_cache() {
     echo
     print_warning "Clearing the cache frees disk space but requires redownloading if you need to downgrade later."
@@ -74,26 +71,18 @@ prompt_reboot() {
     esac
 }
 
-# Trigger upgrade
+# Trigger upgrade (legacy — via waybar/kitty self-spawn)
 if [ "$1" == "up" ]; then
   trap 'pkill -RTMIN+20 waybar' EXIT
-  
-  # Export functions and variables so they're available in the subshell
-  # EDITED: Added clean_cache to exports
   export -f prompt_reboot print_warning print_status clean_cache
   export YELLOW NC aur_helper
-  
   command="
-    $0 upgrade 
+    $0 upgrade
     ${aur_helper} -Syu
-    
-    # Check for packages that need rebuilding (requires 'rebuild-detector')
     if command -v checkrebuild >/dev/null; then
         echo
         print_status \"Checking for packages requiring a rebuild...\"
-        # Filter for 'foreign' (AUR) packages that checkrebuild identifies as broken
         broken_pkgs=\$(checkrebuild | grep '^foreign' | awk '{print \$2}')
-        
         if [ -n \"\$broken_pkgs\" ]; then
             print_warning \"Found broken packages: \$broken_pkgs\"
             print_status \"Rebuilding them now...\"
@@ -102,16 +91,55 @@ if [ "$1" == "up" ]; then
             print_status \"No packages require rebuilding.\"
         fi
     fi
-
     hyprctl reload
     if pkg_installed flatpak; then flatpak update; fi
-    
-    # EDITED: Trigger the cache cleaner before reboot prompt
     clean_cache
-    
     prompt_reboot
     "
   kitty --title "   System Update" sh -c "${command}"
+fi
+
+# Run upgrade inside terminal (launched directly by QML via kitty)
+if [ "$1" == "run" ]; then
+  # Keep window open on any error
+  trap 'echo; print_warning "An error occurred (exit code: $?)"; echo "Press Enter to close..."; read' ERR
+
+  if [ -z "$aur_helper" ]; then
+      print_warning "No AUR helper (yay/paru) found in PATH."
+      echo "PATH: $PATH"
+      echo "Press Enter to close..."
+      read
+      exit 1
+  fi
+
+  # Print update summary header
+  aur_updates_now=$(${aur_helper} -Qua 2>/dev/null | grep -c '^' || echo 0)
+  official_updates_now=$( (while pgrep -x checkupdates >/dev/null; do sleep 1; done); checkupdates 2>/dev/null | grep -c '^' )
+  flatpak_updates_now=$(pkg_installed flatpak && flatpak remote-ls --updates 2>/dev/null | grep -c '^' || echo 0)
+  printf "Official:  %-10s\nAUR (%s): %-10s\nFlatpak:   %-10s\n\n" \
+    "$official_updates_now" "$aur_helper" "$aur_updates_now" "$flatpak_updates_now"
+
+  ${aur_helper} -Syu
+
+  if command -v checkrebuild >/dev/null; then
+      echo
+      print_status "Checking for packages requiring a rebuild..."
+      broken_pkgs=$(checkrebuild | grep '^foreign' | awk '{print $2}')
+      if [ -n "$broken_pkgs" ]; then
+          print_warning "Found broken packages: $broken_pkgs"
+          print_status "Rebuilding them now..."
+          ${aur_helper} -S --rebuild $broken_pkgs
+      else
+          print_status "No packages require rebuilding."
+      fi
+  fi
+
+  hyprctl reload
+  if pkg_installed flatpak; then flatpak update; fi
+
+  clean_cache
+  prompt_reboot
+  exit 0
 fi
 
 # Check for AUR updates
@@ -134,22 +162,16 @@ else
   flatpak_updates=0
 fi
 
-# Calculate total available updates
 total_updates=$((official_updates + aur_updates + flatpak_updates))
 
-# Handle formatting based on AUR helper
 if [ "$aur_helper" == "yay" ]; then
   [ "${1}" == upgrade ] && printf "Official:  %-10s\nAUR ($aur_helper): %-10s\nFlatpak:   %-10s\n\n" "$official_updates" "$aur_updates" "$flatpak_updates" && exit
-
   tooltip="Official:  $official_updates\nAUR ($aur_helper): $aur_updates\nFlatpak:   $flatpak_updates"
-
 elif [ "$aur_helper" == "paru" ]; then
   [ "${1}" == upgrade ] && printf "Official:   %-10s\nAUR ($aur_helper): %-10s\nFlatpak:    %-10s\n\n" "$official_updates" "$aur_updates" "$flatpak_updates" && exit
-
   tooltip="Official:   $official_updates\nAUR ($aur_helper): $aur_updates\nFlatpak:    $flatpak_updates"
 fi
 
-# Module and tooltip
 if [ $total_updates -eq 0 ]; then
   echo "{\"text\":\"󰸟\", \"tooltip\":\"Packages are up to date\"}"
 else
