@@ -1,19 +1,11 @@
 #!/bin/bash
 set +e
 
-restart_swaync() {
-    swaync &
-    sleep 1
-    swaync-client -rs & >/dev/null 2>&1
-}
-
-restart_swaync
-
 # Update ROFI background 
 ROFI_RASI="$HOME/.config/rofi/colors.rasi"
 
 if command -v sed >/dev/null; then
-    sed -i "2s/, 1)/, 0.4)/" "$ROFI_RASI"
+    sed -i "2s/, 1)/, 0.3)/" "$ROFI_RASI"
     echo "Rofi color updated"
 fi
 
@@ -23,7 +15,10 @@ if command -v magick >/dev/null && [ -f "$HOME/.config/background" ]; then
 fi
 
 # ── Update SDDM background path and BackgroundColor from waypaper/colors.css ──
+WP_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper/wallpaper.ini"
 WAYPAPER_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/waypaper/config.ini"
+# Prefer quickshell wallpaper picker config; fall back to waypaper
+[[ -f "$WP_CONFIG" ]] && WAYPAPER_CONFIG="$WP_CONFIG"
 SDDM_CONF="/usr/share/sddm/themes/sugar-candy/theme.conf"
 SDDM_BG_DIR="/usr/share/sddm/themes/sugar-candy/Backgrounds"
 COLORS_CSS="${XDG_CONFIG_HOME:-$HOME/.config}/gtk-4.0/colors.css"
@@ -44,9 +39,11 @@ if [[ -f "$WAYPAPER_CONFIG" && -f "$SDDM_CONF" ]]; then
         if [[ "${WP_EXT,,}" == "webp" ]]; then
             WP_FILENAME="${WP_FILENAME%.*}.jpg"
             sudo magick "$CURRENT_WP" "$SDDM_BG_DIR/$WP_FILENAME"
+            sudo chmod 644 "$SDDM_BG_DIR/$WP_FILENAME"
             echo "🔄 Converted webp → $WP_FILENAME"
         else
             sudo magick "$CURRENT_WP" "$SDDM_BG_DIR/$WP_FILENAME"
+            sudo chmod 644 "$SDDM_BG_DIR/$WP_FILENAME"
         fi
 
         sudo sed -i "s|^Background=.*|Background=\"Backgrounds/$WP_FILENAME\"|" "$SDDM_CONF"

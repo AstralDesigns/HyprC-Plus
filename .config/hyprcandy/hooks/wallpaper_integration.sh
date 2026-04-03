@@ -29,8 +29,7 @@ update_config_background() {
         matugen image "$bg_path" --type scheme-content -m dark -r nearest --base16-backend wal --lightness-dark -0.1 --source-color-index 0 --contrast 0.2
         sleep 0.5
         magick "$bg_path" "$HOME/.config/background"
-        sleep 0.5
-        "$HOOKS_DIR/clear_swww.sh"
+        sleep 1
         "$HOOKS_DIR/update_background.sh"
         echo "✅ Updated ~/.config/background to point to: $bg_path"
         return 0
