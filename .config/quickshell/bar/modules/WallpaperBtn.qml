@@ -22,19 +22,25 @@ Item {
     Behavior on opacity { NumberAnimation { duration: 80 } }
 
     Process { id: wpPickProc;  command: [Config.scriptsDir + "/wallpaper.sh"];                           running: false }
-    Process { id: wpCycleProc; command: [Config.home + "/.config/quickshell/wallpaper/wallpaper-cycle.sh"]; running: false }
+    Process { id: wpNextProc;  command: [Config.home + "/.config/quickshell/wallpaper/wallpaper-cycle.sh", "--next"]; running: false }
+    Process { id: wpPrevProc;  command: [Config.home + "/.config/quickshell/wallpaper/wallpaper-cycle.sh", "--prev"]; running: false }
 
     MouseArea {
         id: ma
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton
         onClicked: function(ev) {
-            if (ev.button === Qt.RightButton) {
-                if (!wpCycleProc.running) wpCycleProc.running = true
+            if (!wpPickProc.running) wpPickProc.running = true
+        }
+        onWheel: function(wheel) {
+            if (wheel.angleDelta.y > 0) {
+                // Scroll up → next wallpaper
+                if (!wpNextProc.running) wpNextProc.running = true
             } else {
-                if (!wpPickProc.running) wpPickProc.running = true
+                // Scroll down → previous wallpaper
+                if (!wpPrevProc.running) wpPrevProc.running = true
             }
         }
     }

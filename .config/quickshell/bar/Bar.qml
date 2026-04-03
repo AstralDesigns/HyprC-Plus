@@ -358,7 +358,7 @@ PanelWindow {
                         text: "󱙪"; color: Config.glyphColor
                         font.family: Config.fontFamily; font.pixelSize: Config.fontSize
                     }
-                    ToolTip.visible: _rofiMa.containsMouse; ToolTip.text: "Utilities"; ToolTip.delay: 500
+                    ToolTip.visible: false; ToolTip.text: ""; ToolTip.delay: 500
                     opacity: _rofiMa.containsMouse ? 0.7 : 1.0
                     Behavior on opacity { NumberAnimation { duration: 150 } }
                     MouseArea { id: _rofiMa; anchors.fill: parent; hoverEnabled: true
@@ -545,7 +545,7 @@ PanelWindow {
                             text: "󱙪"; color: Config.glyphColor
                             font.family: Config.fontFamily; font.pixelSize: Config.fontSize
                         }
-                        ToolTip.visible: _triRofiMa.containsMouse; ToolTip.text: "Utilities"; ToolTip.delay: 500
+                        ToolTip.visible: false; ToolTip.text: ""; ToolTip.delay: 500
                         opacity: _triRofiMa.containsMouse ? 0.7 : 1.0
                         Behavior on opacity { NumberAnimation { duration: 150 } }
                         MouseArea {

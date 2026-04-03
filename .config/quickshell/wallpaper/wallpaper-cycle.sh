@@ -97,22 +97,43 @@ case "${SORT,,}" in
   *) WALLPAPERS=( $(printf '%s\n' "${WALLPAPERS[@]}" | sort) ) ;;
 esac
 
-# ── Find the next wallpaper ───────────────────────────────────────────────────
-NEXT=""
-FOUND=false
+# ── Direction: default is --next ──────────────────────────────────────────────
+DIRECTION="${1:---next}"
 
-for WP in "${WALLPAPERS[@]}"; do
-  if $FOUND; then
-    NEXT="$WP"
-    break
-  fi
-  [[ "$WP" == "$CURRENT" ]] && FOUND=true
-done
+# ── Find the next / previous wallpaper ────────────────────────────────────────
+TARGET=""
 
-[[ -z "$NEXT" ]] && NEXT="${WALLPAPERS[0]}"
+if [[ "$DIRECTION" == "--prev" || "$DIRECTION" == "-p" ]]; then
+  # Go backwards — find the wallpaper before the current one
+  PREV=""
+  for WP in "${WALLPAPERS[@]}"; do
+    if [[ "$WP" == "$CURRENT" ]]; then
+      break
+    fi
+    PREV="$WP"
+  done
+  # Wrap to last if already at the beginning
+  [[ -z "$PREV" ]] && PREV="${WALLPAPERS[-1]}"
+  TARGET="$PREV"
+  echo "Direction: prev"
+else
+  # Go forwards — default behavior
+  NEXT=""
+  FOUND=false
+  for WP in "${WALLPAPERS[@]}"; do
+    if $FOUND; then
+      NEXT="$WP"
+      break
+    fi
+    [[ "$WP" == "$CURRENT" ]] && FOUND=true
+  done
+  [[ -z "$NEXT" ]] && NEXT="${WALLPAPERS[0]}"
+  TARGET="$NEXT"
+  echo "Direction: next"
+fi
 
 echo "Current : $CURRENT"
-echo "Next    : $NEXT"
+echo "Target  : $TARGET"
 
 # ── Ensure awww daemon is running ─────────────────────────────────────────────
 if ! awww query &>/dev/null; then
@@ -122,7 +143,7 @@ if ! awww query &>/dev/null; then
 fi
 
 # ── Apply wallpaper ───────────────────────────────────────────────────────────
-awww img "$NEXT" \
+awww img "$TARGET" \
   --transition-type     "${TRANSITION_TYPE:-any}" \
   --transition-step     "${TRANSITION_STEP:-90}" \
   --transition-angle    "${TRANSITION_ANGLE:-0}" \
@@ -130,14 +151,14 @@ awww img "$NEXT" \
   --transition-fps      "${TRANSITION_FPS:-60}"
 
 # ── Update wallpaper.ini with the new wallpaper path ─────────────────────────
-NEXT_STORED="${NEXT/$HOME/\~}"
+TARGET_STORED="${TARGET/$HOME/\~}"
 if grep -qE "^\s*wallpaper\s*=" "$WP_CONFIG"; then
-  sed -i "s|^wallpaper\s*=.*|wallpaper = $NEXT_STORED|" "$WP_CONFIG"
+  sed -i "s|^wallpaper\s*=.*|wallpaper = $TARGET_STORED|" "$WP_CONFIG"
 else
-  sed -i "/^\[Settings\]/a wallpaper = $NEXT_STORED" "$WP_CONFIG"
+  sed -i "/^\[Settings\]/a wallpaper = $TARGET_STORED" "$WP_CONFIG"
 fi
 
-echo "Config updated → wallpaper = $NEXT_STORED"
+echo "Config updated → wallpaper = $TARGET_STORED"
 
 # ── Trigger color regeneration ────────────────────────────────────────────────
 [[ -x "$INTEGRATION" ]] && nohup "$INTEGRATION" >/dev/null 2>&1 &
