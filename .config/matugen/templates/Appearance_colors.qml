@@ -7,7 +7,8 @@ QtObject {
     property color m3onPrimary: "{{colors.on_primary.default.hex}}"
     property color m3primaryContainer: "{{colors.primary_container.default.hex}}"
     property color m3onPrimaryContainer: "{{colors.on_primary_container.default.hex}}"
-    property color m3onPrimaryFixedVariant: "{{colors.on_primary_fixed_variant.default.hex}}"
+    property color m3primaryFixed: "{{colors.primary_fixed.default.hex}}"
+    property color m3primaryFixedDim: "{{colors.primary_fixed_dim.default.hex}}"
     property color m3secondary: "{{colors.secondary.default.hex}}"
     property color m3onSecondary: "{{colors.on_secondary.default.hex}}"
     property color m3onSecondaryTransparent: Qt.rgba(
@@ -17,6 +18,14 @@ QtObject {
         0.4)
     property color m3secondaryContainer: "{{colors.secondary_container.default.hex}}"
     property color m3onSecondaryContainer: "{{colors.on_secondary_container.default.hex}}"
+    property color m3secondaryFixed: "{{colors.secondary_fixed.default.hex}}"
+    property color m3secondaryFixedDim: "{{colors.secondary_fixed_dim.default.hex}}"
+    property color m3tertiary: "{{colors.tertiary.default.hex}}"
+    property color m3onTertiary: "{{colors.on_tertiary.default.hex}}"
+    property color m3tertiaryContainer: "{{colors.tertiary_container.default.hex}}"
+    property color m3onTertiaryContainer: "{{colors.on_tertiary_container.default.hex}}"
+    property color m3tertiaryFixed: "{{colors.tertiary_fixed.default.hex}}"
+    property color m3tertiaryFixedDim: "{{colors.tertiary_fixed_dim.default.hex}}"
     property color m3background: "{{colors.on_secondary.default.hex}}"
     property color m3onBackground: "{{colors.on_background.default.hex}}"
     property color m3surface: "{{colors.surface.default.hex}}"
@@ -33,8 +42,4 @@ QtObject {
     property color m3outline: "{{colors.outline.default.hex}}"
     property color m3outlineVariant: "{{colors.outline_variant.default.hex}}"
     property color m3shadow: "{{colors.shadow.default.hex}}"
-    property color m3primaryFixed:           "{{colors.primary_fixed.default.hex}}"
-    property color m3primaryFixedDim:         "{{colors.primary_fixed_dim.default.hex}}"
-    property color m3onPrimaryFixed:          "{{colors.on_primary_fixed.default.hex}}"
-    property color m3onPrimaryFixedVariant:   "{{colors.on_primary_fixed_variant.default.hex}}"
 }
