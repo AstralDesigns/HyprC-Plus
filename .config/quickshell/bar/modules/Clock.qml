@@ -13,12 +13,57 @@ Item {
 
     property string _time: Qt.formatDateTime(new Date(), "HH:mm")
 
+    // ── Sunrise / sunset (astronomical, no API) ───────────────────────────
+    //  Standard solar-declination formula; accurate to ~1 min for most latitudes.
+    //  Adjust lat/lon to your location (positive = N/E, negative = S/W).
+    readonly property real _lat: 0.0   // ← set your latitude  (e.g. 51.5 for London)
+    readonly property real _lon: 0.0   // ← set your longitude (e.g. -0.1 for London)
+
+    // Returns { rise, set } as fractional hours in local time (e.g. 6.5 = 06:30).
+    function _sunTimes() {
+        const now       = new Date()
+        const D2R       = Math.PI / 180
+        const tzOff     = -now.getTimezoneOffset() / 60   // hours ahead of UTC
+        const dayOfYear = Math.floor(
+            (now - new Date(now.getFullYear(), 0, 0)) / 86400000)
+
+        const lngHour = _lon / 15
+
+        function _calc(isRise) {
+            const t   = dayOfYear + ((isRise ? 6 : 18) - lngHour) / 24
+            const M   = (0.9856 * t - 3.289)
+            let   L   = M + 1.916 * Math.sin(M * D2R) + 0.020 * Math.sin(2 * M * D2R) + 282.634
+            L = ((L % 360) + 360) % 360
+            let   RA  = Math.atan(0.91764 * Math.tan(L * D2R)) / D2R
+            RA = ((RA % 360) + 360) % 360
+            RA = (RA + (Math.floor(L / 90) * 90 - Math.floor(RA / 90) * 90)) / 15
+            const sinDec = 0.39782 * Math.sin(L * D2R)
+            const cosDec = Math.cos(Math.asin(sinDec))
+            const cosH   = (-0.01454 - sinDec * Math.sin(_lat * D2R))
+                         / (cosDec  * Math.cos(_lat * D2R))
+            if (cosH < -1) return isRise ? 0  : 24   // midnight sun
+            if (cosH >  1) return isRise ? 12 : 12   // polar night
+            const H      = isRise
+                ? (360 - Math.acos(cosH) / D2R) / 15
+                : (      Math.acos(cosH) / D2R) / 15
+            const localT = H + RA - (0.06571 * t) - 6.622 + tzOff - lngHour
+            return ((localT % 24) + 24) % 24
+        }
+
+        return { rise: _calc(true), set: _calc(false) }
+    }
+
     // ── Hour-based clock icon ─────────────────────────────────────────────
-    //  nf-md-clock_time_one … clock_time_twelve = U+F144B … U+F1456 (1-based)
-    //  All hours use the filled variant (more legible at small sizes).
+    //  Day   (sunrise → sunset): nf-md-clock_time_X filled
+    //  Night (sunset → sunrise): nf-md-clock_time_X outline
     function _clockIcon() {
-        const h12 = new Date().getHours() % 12 || 12   // 1–12
-        return String.fromCodePoint(0xF144A + h12 - 1)
+        const h12     = new Date().getHours() % 12 || 12   // 1–12
+        const filled  = ["󱐿","󱑀","󱑁","󱑂","󱑃","󱑄","󱑅","󱑆","󱑇","󱑈","󱑉","󱑊"]
+        const outline = ["󱑋","󱑌","󱑍","󱑎","󱑏","󱑐","󱑑","󱑒","󱑓","󱑔","󱑕","󱑖"]
+        const sun     = _sunTimes()
+        const nowH    = new Date().getHours() + new Date().getMinutes() / 60
+        const isDay   = nowH >= sun.rise && nowH < sun.set
+        return isDay ? filled[h12 - 1] : outline[h12 - 1]
     }
 
     property string _icon: _clockIcon()
