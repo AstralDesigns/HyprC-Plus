@@ -84,6 +84,7 @@ QtObject {
         v = _settings.value("wsDotActive"); if (v !== undefined && v !== null) wsDotActive = v
         v = _settings.value("wsDotPersistent"); if (v !== undefined && v !== null) wsDotPersistent = v
         v = _settings.value("wsDotEmpty"); if (v !== undefined && v !== null) wsDotEmpty = v
+        v = _settings.value("wsIcons"); if (v !== undefined && v !== null) { try { wsIcons = JSON.parse(v) } catch(e) {} }
         v = _settings.value("mediaInfoFontSize"); if (v !== undefined && v !== null) mediaInfoFontSize = v
         v = _settings.value("mediaPadLeft"); if (v !== undefined && v !== null) mediaPadLeft = v
         v = _settings.value("mediaPadRight"); if (v !== undefined && v !== null) mediaPadRight = v
@@ -170,6 +171,7 @@ QtObject {
         _settings.setValue("wsDotActive", wsDotActive)
         _settings.setValue("wsDotPersistent", wsDotPersistent)
         _settings.setValue("wsDotEmpty", wsDotEmpty)
+        _settings.setValue("wsIcons", JSON.stringify(wsIcons))
         _settings.setValue("mediaInfoFontSize", mediaInfoFontSize)
         _settings.setValue("mediaPadLeft", mediaPadLeft)
         _settings.setValue("mediaPadRight", mediaPadRight)
@@ -361,11 +363,11 @@ QtObject {
         "",   // ws 3
         "",   // ws 4
         "",   // ws 5
-        "󰺕",  // ws 6
-        "󰺕",  // ws 7
-        "󰺕",  // ws 8
-        "󰺕",  // ws 9
-        "󰺕"   // ws 10
+        "",   // ws 6  — empty → inherits wsDotPersistent automatically
+        "",   // ws 7
+        "",   // ws 8
+        "",   // ws 9
+        ""    // ws 10
     ]
 
     property var wsSpecialIcons: ({

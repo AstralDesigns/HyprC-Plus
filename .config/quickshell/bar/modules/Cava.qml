@@ -113,23 +113,46 @@ Item {
                 root._active = !allZero
             }
         }
-        onExited: restartTimer.restart()
+        onExited: {
+            if (root._intentionalRestart) {
+                root._intentionalRestart = false
+                quickRestartTimer.restart()
+            } else {
+                crashRestartTimer.restart()
+            }
+        }
     }
-    Timer { id: restartTimer; interval: 50; repeat: false
+
+    // Set to true before intentionally killing cavaProc so onExited routes
+    // to the fast timer instead of the crash-recovery back-off.
+    property bool _intentionalRestart: false
+
+    // Fast restart — intentional config changes (width / style tweak).
+    // Tune this; 50 ms is enough for cava to fully exit on a clean SIGTERM.
+    Timer { id: quickRestartTimer; interval: 50; repeat: false
+        onTriggered: if (!cavaProc.running) cavaProc.running = true }
+
+    // Slow restart — unexpected exit / crash recovery back-off.
+    Timer { id: crashRestartTimer; interval: 2000; repeat: false
         onTriggered: if (!cavaProc.running) cavaProc.running = true }
 
     // ── Restart cava when bar count or style changes ──────────────────────
     //  Handles ControlCenter slider adjustments and any direct Config.cavaWidth
     //  writes (including those from the FileView hot-reload path in shell.qml).
-    //  Killing the running process triggers onExited → restartTimer → fresh
-    //  cavaProc with the re-evaluated command (which reads the new cavaWidth).
+    //  Sets _intentionalRestart so onExited uses the fast path.
     Connections {
         target: Config
         function onCavaWidthChanged() {
-            if (cavaProc.running) cavaProc.running = false
+            if (cavaProc.running) {
+                root._intentionalRestart = true
+                cavaProc.running = false
+            }
         }
         function onCavaStyleChanged() {
-            if (cavaProc.running) cavaProc.running = false
+            if (cavaProc.running) {
+                root._intentionalRestart = true
+                cavaProc.running = false
+            }
         }
     }
 

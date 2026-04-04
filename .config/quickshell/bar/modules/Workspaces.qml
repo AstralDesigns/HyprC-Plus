@@ -21,10 +21,15 @@ Item {
             case "number": return String(id)
             case "icon": {
                 const idx = id - 1
-                // ws 1-5: use active/persistent/empty state icons; ws 6+: use wsIcons entry
+                // All workspaces: use wsIcons entry if set; otherwise fall through to state-based
                 if (idx >= 0 && idx < Config.wsIcons.length && Config.wsIcons[idx] !== "")
                     return Config.wsIcons[idx]
-                // fall through to state-based
+                // No custom icon — use same active/persistent/empty logic as _wsStateIcon
+                // so ws 6-10 honour wsDotPersistent just like ws 1-5 do.
+                const active = id === (Hyprland.focusedMonitor?.activeWorkspace?.id ?? -999)
+                if (active)   return Config.wsDotActive
+                if (!isEmpty) return Config.wsDotPersistent
+                return Config.wsDotEmpty
             }
             // "dot" and fallback:
             default:
