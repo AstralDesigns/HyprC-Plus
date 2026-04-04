@@ -82,6 +82,10 @@ QtObject {
         v = _settings.value("wsDotPersistent"); if (v !== undefined && v !== null) wsDotPersistent = v
         v = _settings.value("wsDotEmpty"); if (v !== undefined && v !== null) wsDotEmpty = v
         v = _settings.value("wsIcons"); if (v !== undefined && v !== null) { try { wsIcons = JSON.parse(v) } catch(e) {} }
+        v = _settings.value("wsActiveOpacity");     if (v !== undefined && v !== null) wsActiveOpacity     = v
+        v = _settings.value("wsPersistentOpacity"); if (v !== undefined && v !== null) wsPersistentOpacity = v
+        v = _settings.value("wsEmptyOpacity");      if (v !== undefined && v !== null) wsEmptyOpacity      = v
+        v = _settings.value("wsSeparatorOpacity");  if (v !== undefined && v !== null) wsSeparatorOpacity  = v
         v = _settings.value("mediaInfoFontSize"); if (v !== undefined && v !== null) mediaInfoFontSize = v
         v = _settings.value("mediaPadLeft"); if (v !== undefined && v !== null) mediaPadLeft = v
         v = _settings.value("mediaPadRight"); if (v !== undefined && v !== null) mediaPadRight = v
@@ -175,6 +179,10 @@ QtObject {
         _settings.setValue("wsDotPersistent", wsDotPersistent)
         _settings.setValue("wsDotEmpty", wsDotEmpty)
         _settings.setValue("wsIcons", JSON.stringify(wsIcons))
+        _settings.setValue("wsActiveOpacity",     wsActiveOpacity)
+        _settings.setValue("wsPersistentOpacity", wsPersistentOpacity)
+        _settings.setValue("wsEmptyOpacity",      wsEmptyOpacity)
+        _settings.setValue("wsSeparatorOpacity",  wsSeparatorOpacity)
         _settings.setValue("mediaInfoFontSize", mediaInfoFontSize)
         _settings.setValue("mediaPadLeft", mediaPadLeft)
         _settings.setValue("mediaPadRight", mediaPadRight)
@@ -386,12 +394,14 @@ QtObject {
     })
 
     // ── Workspace colors ─────────────────────────────────────────────────
-    property color wsActiveColor:     Theme.cPrimary
-    property color wsPersistentColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.7)
-    property color wsEmptyColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
-    readonly property real wsActiveOpacity:     1.0
-    readonly property real wsPersistentOpacity: 1.0
-    readonly property real wsEmptyOpacity:      1.0
+    //  Colors are readonly so their Theme.cPrimary binding is never broken.
+    //  Sliders write to the opacity properties; colors always follow the live theme.
+    property real wsActiveOpacity:     1.0
+    property real wsPersistentOpacity: 0.7
+    property real wsEmptyOpacity:      0.55
+    readonly property color wsActiveColor:     Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsActiveOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsPersistentOpacity)
+    readonly property color wsEmptyColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
     //  wsGlyphSize controls the font size of workspace button icons.
@@ -412,7 +422,8 @@ QtObject {
     // ── Workspace separators ─────────────────────────────────────────────
     property bool   wsSeparators:        false  // show glyph separator between buttons
     property string wsSeparatorGlyph:    ""
-    property color  wsSeparatorColor:    Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+    property real   wsSeparatorOpacity:  0.3
+    readonly property color wsSeparatorColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsSeparatorOpacity)
     property int    wsSeparatorSize:     10    // px — font size of the separator glyph
     property int    wsSeparatorPadLeft:  2     // px — space between left ws button and separator
     property int    wsSeparatorPadRight: 2     // px — space between separator and right ws button

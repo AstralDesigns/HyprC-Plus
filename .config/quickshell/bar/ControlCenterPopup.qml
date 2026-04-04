@@ -1050,13 +1050,13 @@ PanelWindow {
 
                                         CCSection { text: "Workspace Icon Glyphs" }
                                         CCIconEntry { label:"Active Dot";     value:Config.wsDotActive;     onApplied:function(v){Config.wsDotActive=v} }
-                                        CCSlider { label:"Active Opacity";     from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsActiveOpacity>=0?Config.wsActiveOpacity:1;    onMoved:function(v){Config.wsActiveColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
+                                        CCSlider { label:"Active Opacity";     from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsActiveOpacity;     onMoved:function(v){Config.wsActiveOpacity=v} }
                                         CCIconEntry { label:"Persistent Dot"; value:Config.wsDotPersistent; onApplied:function(v){Config.wsDotPersistent=v} }
-                                        CCSlider { label:"Persistent Opacity"; from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsPersistentColor.a;                            onMoved:function(v){Config.wsPersistentColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
+                                        CCSlider { label:"Persistent Opacity"; from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsPersistentOpacity; onMoved:function(v){Config.wsPersistentOpacity=v} }
                                         CCIconEntry { label:"Empty Dot";      value:Config.wsDotEmpty;      onApplied:function(v){Config.wsDotEmpty=v} }
-                                        CCSlider { label:"Empty Opacity";      from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsEmptyColor.a;                                 onMoved:function(v){Config.wsEmptyColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
+                                        CCSlider { label:"Empty Opacity";      from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsEmptyOpacity;      onMoved:function(v){Config.wsEmptyOpacity=v} }
                                         CCIconEntry { label:"WS Separator";   value:Config.wsSeparatorGlyph;onApplied:function(v){Config.wsSeparatorGlyph=v} }
-                                        CCSlider { label:"Separator Opacity";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsSeparatorColor.a;                             onMoved:function(v){Config.wsSeparatorColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
+                                        CCSlider { label:"Separator Opacity";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsSeparatorOpacity;  onMoved:function(v){Config.wsSeparatorOpacity=v} }
 
                                         CCSection { text: "Control Center" }
                                         CCIconEntry {
