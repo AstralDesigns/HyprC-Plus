@@ -113,6 +113,19 @@ PanelWindow {
         visible: Config.barMode !== "tri"
         radius:       Config.barRadius
         Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+
+        // Gradient child — only visible when barRectBgStyle === "gradient" in bar mode
+        Rectangle {
+            anchors.fill: parent; radius: parent.radius
+            visible: Config.barMode === "bar" && Config.barRectBgStyle === "gradient"
+            opacity: Config.islandBgOpacityIsland
+            gradient: Gradient {
+                orientation: Gradient.Vertical
+                GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                GradientStop { position: 1.0; color: Theme.cScrim }
+            }
+            Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
+        }
     }
 
     // ── Island component ─────────────────────────────────────────────────────
@@ -149,6 +162,7 @@ PanelWindow {
                 case "media":        return Config.mediaBgColor
                 case "cava":         return Config.cavaBgColor
                 case "distro":       return Config.distroBgColor
+                case "tray":         return Config.trayBgColor
                 case "activewindow": return Config.activeWindowBgColor
                 default:             return Theme.cOnSecondary
             }
@@ -165,6 +179,7 @@ PanelWindow {
                 case "media":        raw = Config.mediaBgOpacity; break
                 case "cava":         raw = Config.cavaBgOpacity; break
                 case "distro":       raw = Config.distroBgOpacity; break
+                case "tray":         raw = Config.trayBgOpacity; break
                 case "activewindow": raw = Config.activeWindowBgOpacity; break
             }
             if (raw > -0.5) return raw   // 0.0 = truly transparent; only -1 sentinel falls through
@@ -184,18 +199,18 @@ PanelWindow {
                                   Config.islandBorderAlpha)
             clip: true
 
-            // Bar mode: flat tinted fill
+            // Flat fill — shown when islandBgStyle is "flat" (default bar-mode look)
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
-                visible: Config.barMode === "bar"
+                visible: Config.islandBgStyle === "flat"
                 color: Qt.rgba(isl._effectiveBgColor.r, isl._effectiveBgColor.g,
                                isl._effectiveBgColor.b, isl._bgOpacity)
                 Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
             }
-            // Island mode: gradient fill
+            // Gradient fill — shown when islandBgStyle is "gradient" (island-mode look)
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
-                visible: Config.barMode !== "bar"
+                visible: Config.islandBgStyle === "gradient"
                 opacity: isl._bgOpacity
                 gradient: Gradient {
                     orientation: Gradient.Vertical
@@ -370,7 +385,7 @@ PanelWindow {
             }
 
             Island {
-                bgType: "ungrouped"
+                bgType: "tray"
                 visible_: Config.showTray
                 Modules.SystemTray {
                     rootWindow: bar
@@ -415,6 +430,18 @@ PanelWindow {
                                    Config.barBorderAlpha)
             clip: false
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+
+            Rectangle {
+                anchors.fill: parent; radius: parent.radius
+                visible: Config.barRectBgStyle === "gradient"
+                opacity: Config.islandBgOpacityIsland
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                    GradientStop { position: 1.0; color: Theme.cScrim }
+                }
+                Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
+            }
 
             Row {
                 id: triLeftRow
@@ -474,6 +501,18 @@ PanelWindow {
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
+            Rectangle {
+                anchors.fill: parent; radius: parent.radius
+                visible: Config.barRectBgStyle === "gradient"
+                opacity: Config.islandBgOpacityIsland
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                    GradientStop { position: 1.0; color: Theme.cScrim }
+                }
+                Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
+            }
+
             Row {
                 id: triCenterRow
                 anchors {
@@ -518,6 +557,18 @@ PanelWindow {
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
+            Rectangle {
+                anchors.fill: parent; radius: parent.radius
+                visible: Config.barRectBgStyle === "gradient"
+                opacity: Config.islandBgOpacityIsland
+                gradient: Gradient {
+                    orientation: Gradient.Vertical
+                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                    GradientStop { position: 1.0; color: Theme.cScrim }
+                }
+                Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
+            }
+
             Row {
                 id: triRightRow
                 anchors {
@@ -559,7 +610,7 @@ PanelWindow {
                 }
 
                 Island {
-                    bgType: "ungrouped"
+                    bgType: "tray"
                     visible_: Config.showTray
                     Modules.SystemTray {
                         rootWindow: bar
@@ -603,7 +654,7 @@ PanelWindow {
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
 
             // Bottom group: tray + power
-            Island { visible_: Config.showTray; Modules.SystemTray { rootWindow: bar } }
+            Island { bgType: "tray"; visible_: Config.showTray; Modules.SystemTray { rootWindow: bar } }
             Island { bgType: "startmenu"; Modules.PowerButton {} }
         }
     }

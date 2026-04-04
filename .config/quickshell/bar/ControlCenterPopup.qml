@@ -1393,6 +1393,43 @@ PanelWindow {
                                     ColumnLayout {
                                         width: parent.width; spacing: 5
 
+                                        CCSection { text: "Island Pill Style" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Fill style for island pills in all modes. Gradient uses cInversePrimary → cScrim; Flat uses the solid cOnSecondary tint."
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                           Theme.cPrimary.b, 0.48)
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                            wrapMode: Text.Wrap
+                                        }
+                                        CCToggle {
+                                            label: "Gradient Pills"
+                                            value: Config.islandBgStyle === "gradient"
+                                            onToggled: function(v) {
+                                                Config.islandBgStyle = v ? "gradient" : "flat"
+                                            }
+                                        }
+
+                                        Item { height: 4 }
+
+                                        CCSection { text: "Bar / Tri Rect Style" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Fill style for the outer bar strip (bar mode) and tri-bar rectangles. Independent of island pills."
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                           Theme.cPrimary.b, 0.48)
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                            wrapMode: Text.Wrap
+                                        }
+                                        CCSegmented {
+                                            label: "Rect Fill"
+                                            options: ["glass", "gradient"]
+                                            current: Config.barRectBgStyle
+                                            onPicked: function(v) { Config.barRectBgStyle = v }
+                                        }
+
+                                        Item { height: 4 }
+
                                         CCSection { text: "Per-Group Background Opacity" }
                                         Text {
                                             Layout.fillWidth: true
@@ -1406,6 +1443,7 @@ PanelWindow {
                                         CCSlider { label:"Workspaces";    from:-1;to:1;stepSize:0.05;decimals:2; value:Config.wsBgOpacity;          onMoved:function(v){Config.wsBgOpacity=v} }
                                         CCSlider { label:"Grouped";       from:-1;to:1;stepSize:0.05;decimals:2; value:Config.groupedBgOpacity;      onMoved:function(v){Config.groupedBgOpacity=v} }
                                         CCSlider { label:"Ungrouped";     from:-1;to:1;stepSize:0.05;decimals:2; value:Config.ungroupedBgOpacity;    onMoved:function(v){Config.ungroupedBgOpacity=v} }
+                                        CCSlider { label:"Tray";          from:-1;to:1;stepSize:0.05;decimals:2; value:Config.trayBgOpacity;          onMoved:function(v){Config.trayBgOpacity=v} }
                                         CCSlider { label:"Start Menu";    from:-1;to:1;stepSize:0.05;decimals:2; value:Config.startMenuBgOpacity;    onMoved:function(v){Config.startMenuBgOpacity=v} }
                                         CCSlider { label:"Media";         from:-1;to:1;stepSize:0.05;decimals:2; value:Config.mediaBgOpacity;        onMoved:function(v){Config.mediaBgOpacity=v} }
                                         CCSlider { label:"Cava";          from:-1;to:1;stepSize:0.05;decimals:2; value:Config.cavaBgOpacity;         onMoved:function(v){Config.cavaBgOpacity=v} }

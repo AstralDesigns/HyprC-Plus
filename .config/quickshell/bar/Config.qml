@@ -49,6 +49,8 @@ QtObject {
         v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
         v = _settings.value("barBorderWidth"); if (v !== undefined && v !== null) barBorderWidth = v
         v = _settings.value("barBorderAlpha"); if (v !== undefined && v !== null) barBorderAlpha = v
+        v = _settings.value("islandBgStyle");  if (v !== undefined && v !== null) islandBgStyle  = v
+        v = _settings.value("barRectBgStyle"); if (v !== undefined && v !== null) barRectBgStyle = v
         v = _settings.value("moduleBgOpacity"); if (v !== undefined && v !== null) moduleBgOpacity = v
         v = _settings.value("islandBgOpacityIsland"); if (v !== undefined && v !== null) islandBgOpacityIsland = v
         v = _settings.value("islandSpacing"); if (v !== undefined && v !== null) islandSpacing = v
@@ -109,6 +111,7 @@ QtObject {
         v = _settings.value("wsBgOpacity"); if (v !== undefined && v !== null) wsBgOpacity = v
         v = _settings.value("groupedBgOpacity"); if (v !== undefined && v !== null) groupedBgOpacity = v
         v = _settings.value("ungroupedBgOpacity"); if (v !== undefined && v !== null) ungroupedBgOpacity = v
+        v = _settings.value("trayBgOpacity"); if (v !== undefined && v !== null) trayBgOpacity = v
         v = _settings.value("startMenuBgOpacity"); if (v !== undefined && v !== null) startMenuBgOpacity = v
         v = _settings.value("mediaBgOpacity"); if (v !== undefined && v !== null) mediaBgOpacity = v
         v = _settings.value("cavaBgOpacity"); if (v !== undefined && v !== null) cavaBgOpacity = v
@@ -146,6 +149,8 @@ QtObject {
         _settings.setValue("islandBorderAlpha", islandBorderAlpha)
         _settings.setValue("barBorderWidth", barBorderWidth)
         _settings.setValue("barBorderAlpha", barBorderAlpha)
+        _settings.setValue("islandBgStyle",  islandBgStyle)
+        _settings.setValue("barRectBgStyle", barRectBgStyle)
         _settings.setValue("moduleBgOpacity", moduleBgOpacity)
         _settings.setValue("islandBgOpacityIsland", islandBgOpacityIsland)
         _settings.setValue("islandSpacing", islandSpacing)
@@ -206,6 +211,7 @@ QtObject {
         _settings.setValue("wsBgOpacity", wsBgOpacity)
         _settings.setValue("groupedBgOpacity", groupedBgOpacity)
         _settings.setValue("ungroupedBgOpacity", ungroupedBgOpacity)
+        _settings.setValue("trayBgOpacity", trayBgOpacity)
         _settings.setValue("startMenuBgOpacity", startMenuBgOpacity)
         _settings.setValue("mediaBgOpacity", mediaBgOpacity)
         _settings.setValue("cavaBgOpacity", cavaBgOpacity)
@@ -275,6 +281,9 @@ QtObject {
     // ── Island background opacity ─────────────────────────────────────────
     //  moduleBgOpacity  — flat tint alpha in bar mode (also used by islandBgOpacityBar)
     //  islandBgOpacityIsland — gradient alpha in island mode
+    property string islandBgStyle:  "flat"    // "flat" | "gradient" — island pill fill style
+    property string barRectBgStyle: "glass"   // "glass" | "gradient" — outer bar/tri rect fill
+
     property real moduleBgOpacity:       0.5   // 0.0 transparent → 1.0 opaque
     property real islandBgOpacityIsland: 1.0
     property real islandBgAlpha:         0.7   // legacy alias
@@ -587,6 +596,9 @@ QtObject {
 
     property color ungroupedBgColor:   Theme.cOnSecondary
     property real  ungroupedBgOpacity: -1
+
+    property color trayBgColor:   Theme.cOnSecondary
+    property real  trayBgOpacity: -1
 
     property color startMenuBgColor:   Theme.cOnSecondary
     property real  startMenuBgOpacity: -1   // -1 = use ungroupedBgOpacity; independent Start/Power-btn BG opacity
