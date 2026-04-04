@@ -79,6 +79,33 @@ PanelWindow {
     // ── Hyprland border colors ─────────────────────────────────────────────
     property color _activeBorderColor:   Theme.cPrimary
     property color _inactiveBorderColor: Theme.cOnSecondary
+    
+    // Border color mode: "matugen" (uses $variable) or "custom" (uses hex color)
+    property string _activeBorderMode: "matugen"   // "matugen" | "custom"
+    property string _inactiveBorderMode: "matugen" // "matugen" | "custom"
+    
+    // Selected matugen variables for borders
+    property string _activeBorderVar: "$source_color"
+    property string _inactiveBorderVar: "$background"
+    
+    // Available matugen border variables
+    readonly property var _matugenBorderVars: [
+        {label: "$source_color", var: "$source_color"},
+        {label: "$primary", var: "$primary"},
+        {label: "$primary_container", var: "$primary_container"},
+        {label: "$primary_fixed_dim", var: "$primary_fixed_dim"},
+        {label: "$inverse_primary", var: "$inverse_primary"},
+        {label: "$secondary", var: "$secondary"},
+        {label: "$secondary_container", var: "$secondary_container"},
+        {label: "$secondary_fixed_dim", var: "$secondary_fixed_dim"},
+        {label: "$tertiary", var: "$tertiary"},
+        {label: "$tertiary_container", var: "$tertiary_container"},
+        {label: "$tertiary_fixed_dim", var: "$tertiary_fixed_dim"},
+        {label: "$background", var: "$background"},
+        {label: "$surface", var: "$surface"},
+        {label: "$surface_container", var: "$surface_container"},
+        {label: "$outline", var: "$outline"}
+    ]
 
     // Load dock + rofi + sddm + hyprland values when CC opens
     Connections {
@@ -107,8 +134,8 @@ PanelWindow {
             'grep "gaps_out = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
             'grep "border_size = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
             'grep "rounding = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
-            'grep "col.active_border" "$f" 2>/dev/null | head -1 | grep -oP "(?<=#)[0-9a-fA-F]{6,8}" | head -1 || echo ""; ' +
-            'grep "col.inactive_border" "$f" 2>/dev/null | head -1 | grep -oP "(?<=#)[0-9a-fA-F]{6,8}" | head -1 || echo ""; ' +
+            'grep "col.active_border" "$f" 2>/dev/null | head -1 | sed "s/.*= *//" | xargs; ' +
+            'grep "col.inactive_border" "$f" 2>/dev/null | head -1 | sed "s/.*= *//" | xargs; ' +
             'hyprctl getoption general:layout -j 2>/dev/null | grep -oP "(?<=\"str\": \")[^\"]+\" || ' +
             'grep "layout = " "$f" 2>/dev/null | head -1 | grep -oP "(?<=layout = )\\S+"']
         running: false
@@ -118,7 +145,15 @@ PanelWindow {
             onRead: function(l) { _hyprlandValReader._output += l.trim() + "\n" }
         }
         Component.onCompleted: {
-            // Restore persisted border colors on startup
+            // Restore persisted border colors and modes on startup
+            if (ccBorderColorSettings.activeBorderMode !== "")
+                ccWin._activeBorderMode = ccBorderColorSettings.activeBorderMode
+            if (ccBorderColorSettings.inactiveBorderMode !== "")
+                ccWin._inactiveBorderMode = ccBorderColorSettings.inactiveBorderMode
+            if (ccBorderColorSettings.activeBorderVar !== "")
+                ccWin._activeBorderVar = ccBorderColorSettings.activeBorderVar
+            if (ccBorderColorSettings.inactiveBorderVar !== "")
+                ccWin._inactiveBorderVar = ccBorderColorSettings.inactiveBorderVar
             if (ccBorderColorSettings.activeBorderColor !== "")
                 ccWin._activeBorderColor = ccBorderColorSettings.activeBorderColor
             if (ccBorderColorSettings.inactiveBorderColor !== "")
@@ -136,11 +171,51 @@ PanelWindow {
             if (lines.length > 4) { _gapsOuterEntryVal = lines[4] || "0"; _gapsOuterTI.text  = _gapsOuterEntryVal }
             if (lines.length > 5) { _borderWEntryVal   = lines[5] || "0"; _borderWTI.text    = _borderWEntryVal }
             if (lines.length > 6) { _borderREntryVal   = lines[6] || "0"; _borderRTI.text    = _borderREntryVal }
-            // Parse border colors — only update if a hex color was found in the file
-            if (lines.length > 7 && lines[7] && lines[7].length >= 6)
-                ccWin._activeBorderColor = "#" + lines[7].replace(/^#+/, "")
-            if (lines.length > 8 && lines[8] && lines[8].length >= 6)
-                ccWin._inactiveBorderColor = "#" + lines[8].replace(/^#+/, "")
+            // Parse border colors — detect matugen variables or hex colors
+            if (lines.length > 7) {
+                const activeVal = lines[7] ? lines[7].trim() : ""
+                if (activeVal.length > 0) {
+                    if (activeVal.startsWith("$")) {
+                        // Matugen variable detected
+                        ccWin._activeBorderMode = "matugen"
+                        ccWin._activeBorderVar = activeVal
+                    } else {
+                        // Hex color detected
+                        ccWin._activeBorderMode = "custom"
+                        ccWin._activeBorderColor = "#" + activeVal.replace(/^#+/, "").replace(/^0x/, "").substring(activeVal.startsWith("0xff") ? 2 : 0)
+                        // Normalize to #AARRGGBB or #RRGGBB
+                        const hex = activeVal.replace(/^#+/, "").replace(/^0x/, "")
+                        if (hex.startsWith("ff") && hex.length === 8) {
+                            ccWin._activeBorderColor = "#" + hex.substring(2)
+                        } else if (hex.length === 8) {
+                            ccWin._activeBorderColor = "#" + hex
+                        } else {
+                            ccWin._activeBorderColor = "#" + hex
+                        }
+                    }
+                }
+            }
+            if (lines.length > 8) {
+                const inactiveVal = lines[8] ? lines[8].trim() : ""
+                if (inactiveVal.length > 0) {
+                    if (inactiveVal.startsWith("$")) {
+                        // Matugen variable detected
+                        ccWin._inactiveBorderMode = "matugen"
+                        ccWin._inactiveBorderVar = inactiveVal
+                    } else {
+                        // Hex color detected
+                        ccWin._inactiveBorderMode = "custom"
+                        const hex = inactiveVal.replace(/^#+/, "").replace(/^0x/, "")
+                        if (hex.startsWith("ff") && hex.length === 8) {
+                            ccWin._inactiveBorderColor = "#" + hex.substring(2)
+                        } else if (hex.length === 8) {
+                            ccWin._inactiveBorderColor = "#" + hex
+                        } else {
+                            ccWin._inactiveBorderColor = "#" + hex
+                        }
+                    }
+                }
+            }
             // Parse current layout (line 9 — from hyprctl getoption or grep fallback)
             if (lines.length > 9 && lines[9] && lines[9].trim().length > 0)
                 ccWin._currentLayout = lines[9].trim().toLowerCase()
@@ -350,6 +425,10 @@ PanelWindow {
         category: "cc-border-colors-v1"
         property string activeBorderColor:   ""
         property string inactiveBorderColor: ""
+        property string activeBorderMode:    "matugen"  // "matugen" | "custom"
+        property string inactiveBorderMode:  "matugen"  // "matugen" | "custom"
+        property string activeBorderVar:     "$source_color"
+        property string inactiveBorderVar:   "$background"
     }
 
     // ── The panel itself ───────────────────────────────────────────────────
@@ -1709,40 +1788,181 @@ PanelWindow {
                             CCSection { text: "Border Colors" }
                             Text {
                                 Layout.fillWidth: true
-                                text: "Writes hex color to col.active_border / col.inactive_border in hyprviz.conf"
+                                text: "Use matugen variables (auto-updates with wallpaper) or custom hex colors"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
                                 font.family: Config.labelFont; font.pixelSize: 11
                                 wrapMode: Text.Wrap
                             }
-                            CCColorPicker {
-                                label: "Active Border"
-                                currentColor: ccWin._activeBorderColor
-                                onColorPicked: function(c) {
-                                    ccWin._activeBorderColor = c
-                                    ccBorderColorSettings.activeBorderColor = c.toString()
-                                    const hex = c.toString().replace("#", "").substring(0, 6)
-                                    _borderColorWrite.command = ["bash", "-c",
-                                        'f="$HOME/.config/hypr/hyprviz.conf"; ' +
-                                        'sed -i "s|col\\.active_border\\s*=.*|col.active_border = 0xff' + hex + '|g" "$f"; ' +
-                                        'hyprctl reload 2>/dev/null || true']
-                                    _borderColorWrite.running = true
+
+                            // Active Border Configuration
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Text {
+                                    text: "Active Border"
+                                    color: Theme.cPrimary
+                                    font.family: Config.labelFont; font.pixelSize: 13
+                                    Layout.preferredWidth: 130
+                                }
+                                // Mode toggle
+                                CCPillBtn {
+                                    text: ccWin._activeBorderMode === "matugen" ? "󰋉 Variable" : " Custom"
+                                    active: true
+                                    onClicked: {
+                                        ccWin._activeBorderMode = ccWin._activeBorderMode === "matugen" ? "custom" : "matugen"
+                                        ccBorderColorSettings.activeBorderMode = ccWin._activeBorderMode
+                                        if (ccWin._activeBorderMode === "matugen") {
+                                            _activeBorderApply.command = [scriptDir + "/hyprland-border-active-set.sh", ccWin._activeBorderVar]
+                                            _activeBorderApply.running = true
+                                        }
+                                    }
                                 }
                             }
-                            CCColorPicker {
-                                label: "Inactive Border"
-                                currentColor: ccWin._inactiveBorderColor
-                                onColorPicked: function(c) {
-                                    ccWin._inactiveBorderColor = c
-                                    ccBorderColorSettings.inactiveBorderColor = c.toString()
-                                    const hex = c.toString().replace("#", "").substring(0, 6)
-                                    _borderColorWrite.command = ["bash", "-c",
-                                        'f="$HOME/.config/hypr/hyprviz.conf"; ' +
-                                        'sed -i "s|col\\.inactive_border\\s*=.*|col.inactive_border = 0xff' + hex + '|g" "$f"; ' +
-                                        'hyprctl reload 2>/dev/null || true']
-                                    _borderColorWrite.running = true
+                            
+                            // Active Border selector container (variable pills OR color picker)
+                            Item {
+                                Layout.fillWidth: true
+                                implicitHeight: _activeVarLoader.active ? (_activeVarLoader.item ? _activeVarLoader.item.height : 0)
+                                                : (_activeColorLoader.item ? _activeColorLoader.item.height : 0)
+                                Loader {
+                                    id: _activeVarLoader
+                                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                                    active: ccWin._activeBorderMode === "matugen"
+                                    sourceComponent: ColumnLayout {
+                                        spacing: 6
+                                        Text {
+                                            text: "  Variable:"
+                                            color: Theme.cOnSurfVar
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                        }
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            Repeater {
+                                                model: ccWin._matugenBorderVars
+                                                delegate: CCPillBtn {
+                                                    required property var modelData
+                                                    text: modelData.label.replace("$", "")
+                                                    active: ccWin._activeBorderVar === modelData.var
+                                                    onClicked: {
+                                                        ccWin._activeBorderVar = modelData.var
+                                                        ccBorderColorSettings.activeBorderVar = modelData.var
+                                                        _activeBorderApply.command = [scriptDir + "/hyprland-border-active-set.sh", modelData.var]
+                                                        _activeBorderApply.running = true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Loader {
+                                    id: _activeColorLoader
+                                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                                    active: ccWin._activeBorderMode === "custom"
+                                    sourceComponent: CCColorPicker {
+                                        label: "Custom Color"
+                                        currentColor: ccWin._activeBorderColor
+                                        onColorPicked: function(c) {
+                                            ccWin._activeBorderColor = c
+                                            ccBorderColorSettings.activeBorderColor = c.toString()
+                                            const hex = c.toString().replace("#", "").substring(0, 6)
+                                            _activeBorderWrite.command = ["bash", "-c",
+                                                'f="$HOME/.config/hypr/hyprviz.conf"; ' +
+                                                'sed -i "s|^\\s*col\\.active_border\\s*=.*|col.active_border = 0xff' + hex + '|g" "$f"; ' +
+                                                'hyprctl reload 2>/dev/null || true']
+                                            _activeBorderWrite.running = true
+                                        }
+                                    }
                                 }
                             }
-                            Process { id: _borderColorWrite; running: false; onExited: running = false }
+                            Process { id: _activeBorderWrite; running: false; onExited: running = false }
+                            Process { id: _activeBorderApply; running: false; onExited: running = false }
+
+                            Item { height: 8 }
+
+                            // Inactive Border Configuration
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Text {
+                                    text: "Inactive Border"
+                                    color: Theme.cPrimary
+                                    font.family: Config.labelFont; font.pixelSize: 13
+                                    Layout.preferredWidth: 130
+                                }
+                                // Mode toggle
+                                CCPillBtn {
+                                    text: ccWin._inactiveBorderMode === "matugen" ? "󰋉 Variable" : " Custom"
+                                    active: true
+                                    onClicked: {
+                                        ccWin._inactiveBorderMode = ccWin._inactiveBorderMode === "matugen" ? "custom" : "matugen"
+                                        ccBorderColorSettings.inactiveBorderMode = ccWin._inactiveBorderMode
+                                        if (ccWin._inactiveBorderMode === "matugen") {
+                                            _inactiveBorderApply.command = [scriptDir + "/hyprland-border-inactive-set.sh", ccWin._inactiveBorderVar]
+                                            _inactiveBorderApply.running = true
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // Inactive Border selector container (variable pills OR color picker)
+                            Item {
+                                Layout.fillWidth: true
+                                implicitHeight: _inactiveVarLoader.active ? (_inactiveVarLoader.item ? _inactiveVarLoader.item.height : 0)
+                                                : (_inactiveColorLoader.item ? _inactiveColorLoader.item.height : 0)
+                                Loader {
+                                    id: _inactiveVarLoader
+                                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                                    active: ccWin._inactiveBorderMode === "matugen"
+                                    sourceComponent: ColumnLayout {
+                                        spacing: 6
+                                        Text {
+                                            text: "  Variable:"
+                                            color: Theme.cOnSurfVar
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                        }
+                                        Flow {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            Repeater {
+                                                model: ccWin._matugenBorderVars
+                                                delegate: CCPillBtn {
+                                                    required property var modelData
+                                                    text: modelData.label.replace("$", "")
+                                                    active: ccWin._inactiveBorderVar === modelData.var
+                                                    onClicked: {
+                                                        ccWin._inactiveBorderVar = modelData.var
+                                                        ccBorderColorSettings.inactiveBorderVar = modelData.var
+                                                        _inactiveBorderApply.command = [scriptDir + "/hyprland-border-inactive-set.sh", modelData.var]
+                                                        _inactiveBorderApply.running = true
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Loader {
+                                    id: _inactiveColorLoader
+                                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                                    active: ccWin._inactiveBorderMode === "custom"
+                                    sourceComponent: CCColorPicker {
+                                        label: "Custom Color"
+                                        currentColor: ccWin._inactiveBorderColor
+                                        onColorPicked: function(c) {
+                                            ccWin._inactiveBorderColor = c
+                                            ccBorderColorSettings.inactiveBorderColor = c.toString()
+                                            const hex = c.toString().replace("#", "").substring(0, 6)
+                                            _inactiveBorderWrite.command = ["bash", "-c",
+                                                'f="$HOME/.config/hypr/hyprviz.conf"; ' +
+                                                'sed -i "s|^\\s*col\\.inactive_border\\s*=.*|col.inactive_border = 0xff' + hex + '|g" "$f"; ' +
+                                                'hyprctl reload 2>/dev/null || true']
+                                            _inactiveBorderWrite.running = true
+                                        }
+                                    }
+                                }
+                            }
+                            Process { id: _inactiveBorderWrite; running: false; onExited: running = false }
+                            Process { id: _inactiveBorderApply; running: false; onExited: running = false }
                             Item { height: 10 }
                         }
                     }
