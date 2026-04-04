@@ -145,6 +145,7 @@ PanelWindow {
                 case "workspace":    return Config.wsBgColor
                 case "grouped":      return Config.groupedBgColor
                 case "ungrouped":    return Config.ungroupedBgColor
+                case "startmenu":    return Config.startMenuBgColor
                 case "media":        return Config.mediaBgColor
                 case "cava":         return Config.cavaBgColor
                 case "distro":       return Config.distroBgColor
@@ -160,13 +161,14 @@ PanelWindow {
                 case "workspace":    raw = Config.wsBgOpacity; break
                 case "grouped":      raw = Config.groupedBgOpacity; break
                 case "ungrouped":    raw = Config.ungroupedBgOpacity; break
+                case "startmenu":    raw = Config.startMenuBgOpacity; break
                 case "media":        raw = Config.mediaBgOpacity; break
                 case "cava":         raw = Config.cavaBgOpacity; break
                 case "distro":       raw = Config.distroBgOpacity; break
                 case "activewindow": raw = Config.activeWindowBgOpacity; break
             }
-            if (raw >= 0) return raw
-            return bgOverride >= 0 ? bgOverride
+            if (raw > -0.5) return raw   // 0.0 = truly transparent; only -1 sentinel falls through
+            return bgOverride > -0.5 ? bgOverride
                 : (Config.barMode === "bar" ? Config.islandBgOpacityBar : Config.islandBgOpacityIsland)
         }
 
@@ -317,7 +319,7 @@ PanelWindow {
             anchors.centerIn: parent
             spacing: Config.islandSpacing
 
-            Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { side: "left" } }
+            Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaLeft; side: "left" } }
             Island { bgType: "ungrouped"; Modules.Clock {} }
             Island {
                 bgType: "distro"
@@ -326,7 +328,7 @@ PanelWindow {
                 Modules.ControlCenter {}
             }
             Island { bgType: "ungrouped"; Modules.DateDisplay {} }
-            Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { side: "right" } }
+            Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaRight; side: "right" } }
         }
         // ── RIGHT GROUP ────────────────────────────────────────────────────────────
         Row {
@@ -339,7 +341,7 @@ PanelWindow {
             }
             spacing: Config.islandSpacing
             layoutDirection: Qt.RightToLeft
-            Island { bgType: "ungrouped"; Modules.PowerButton {} }
+            Island { bgType: "startmenu"; Modules.PowerButton {} }
             Island { bgType: "ungrouped"; visible_: Config.showBattery;  Modules.Battery {} }
             Island { bgType: "ungrouped"; visible_: Config.showWeather;  Modules.Weather {} }
 
@@ -481,7 +483,7 @@ PanelWindow {
                 }
                 spacing: Config.islandSpacing
 
-                Island { bgType: "cava";      visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { side: "left" } }
+                Island { bgType: "cava";      visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaLeftV; side: "left" } }
                 Island { bgType: "ungrouped"; Modules.Clock {} }
                 Island {
                     bgType: "distro"
@@ -490,7 +492,7 @@ PanelWindow {
                     Modules.ControlCenter {}
                 }
                 Island { bgType: "ungrouped"; Modules.DateDisplay {} }
-                Island { bgType: "cava";      visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { side: "right" } }
+                Island { bgType: "cava";      visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaRightV; side: "right" } }
             }
         }
 
@@ -526,7 +528,7 @@ PanelWindow {
                 spacing: Config.islandSpacing
                 layoutDirection: Qt.RightToLeft
 
-                Island { bgType: "ungrouped"; Modules.PowerButton {} }
+                Island { bgType: "startmenu"; Modules.PowerButton {} }
                 Island { bgType: "ungrouped"; visible_: Config.showBattery;  Modules.Battery {} }
                 Island { bgType: "ungrouped"; visible_: Config.showWeather;  Modules.Weather {} }
 
@@ -602,7 +604,7 @@ PanelWindow {
 
             // Bottom group: tray + power
             Island { visible_: Config.showTray; Modules.SystemTray { rootWindow: bar } }
-            Island { Modules.PowerButton {} }
+            Island { bgType: "startmenu"; Modules.PowerButton {} }
         }
     }
 }

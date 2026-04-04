@@ -19,6 +19,33 @@ ShellRoot {
         if (Config._settings) Config._settings.sync()
     }
 
+    // ── Cava hot-reload via /tmp/qs-cava-size ─────────────────────────────
+    //  Write a new integer bar-count to this file to hot-reload cava at the
+    //  new width without a manual restart.  Example:
+    //      echo "30" > /tmp/qs-cava-size
+    //  Flow: file changes → reload() re-reads it → onLoaded parses the int →
+    //  saves to Settings → Quickshell.reload(false) restarts QML + cava fresh.
+    //  The  n === Config.cavaWidth  guard prevents an infinite reload loop
+    //  (after reload the file still holds the same value but Config is already
+    //  initialised from the persisted setting, so the guard exits early).
+    FileView {
+        id: cavaSizeWatch
+        path: "/tmp/qs-cava-size"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            const raw = text().trim()
+            if (!raw) return
+            const n = parseInt(raw, 10)
+            if (isNaN(n) || n < 1 || n > 300) return
+            if (n === Config.cavaWidth) return   // already at this width — skip
+            Config.cavaWidth = n
+            Config._settings.setValue("cavaWidth", n)
+            Config._settings.sync()
+            Quickshell.reload(false)
+        }
+    }
+
     // ── Optional popup overlays (loaded on demand) ─────────────────────────
     Loader { active: PowerMenuState.visible;    source: "PowerMenu.qml"     }
     Loader { active: PowerLauncherState.visible; source: "PowerLauncher.qml" }
@@ -94,6 +121,11 @@ ShellRoot {
         function toggleIdleInhibitor() { Config.showIdleInhibitor = !Config.showIdleInhibitor }
         function toggleTray()          { Config.showTray          = !Config.showTray }
         function toggleWindow()        { Config.showWindow        = !Config.showWindow }
+
+        // Cava hot-reload — equivalent to writing /tmp/qs-cava-size but callable
+        // directly via IPC:  qs ipc call bar reloadCava
+        // Useful after manually updating Config.cavaWidth from another tool.
+        function reloadCava() { Quickshell.reload(false) }
 
         // Control center toggle
         function toggleControlCenter() { ControlCenterState.toggle() }

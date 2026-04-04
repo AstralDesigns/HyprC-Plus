@@ -115,8 +115,23 @@ Item {
         }
         onExited: restartTimer.restart()
     }
-    Timer { id: restartTimer; interval: 2000; repeat: false
+    Timer { id: restartTimer; interval: 50; repeat: false
         onTriggered: if (!cavaProc.running) cavaProc.running = true }
+
+    // ── Restart cava when bar count or style changes ──────────────────────
+    //  Handles ControlCenter slider adjustments and any direct Config.cavaWidth
+    //  writes (including those from the FileView hot-reload path in shell.qml).
+    //  Killing the running process triggers onExited → restartTimer → fresh
+    //  cavaProc with the re-evaluated command (which reads the new cavaWidth).
+    Connections {
+        target: Config
+        function onCavaWidthChanged() {
+            if (cavaProc.running) cavaProc.running = false
+        }
+        function onCavaStyleChanged() {
+            if (cavaProc.running) cavaProc.running = false
+        }
+    }
 
     // ── Hidden sizer: reserves correct width before first output ─────────────
     // Uses TextMetrics so the island bg always matches what cavaLabel will render.

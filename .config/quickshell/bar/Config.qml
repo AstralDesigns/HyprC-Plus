@@ -101,6 +101,7 @@ QtObject {
         v = _settings.value("wsBgOpacity"); if (v !== undefined && v !== null) wsBgOpacity = v
         v = _settings.value("groupedBgOpacity"); if (v !== undefined && v !== null) groupedBgOpacity = v
         v = _settings.value("ungroupedBgOpacity"); if (v !== undefined && v !== null) ungroupedBgOpacity = v
+        v = _settings.value("startMenuBgOpacity"); if (v !== undefined && v !== null) startMenuBgOpacity = v
         v = _settings.value("mediaBgOpacity"); if (v !== undefined && v !== null) mediaBgOpacity = v
         v = _settings.value("cavaBgOpacity"); if (v !== undefined && v !== null) cavaBgOpacity = v
         v = _settings.value("distroBgOpacity"); if (v !== undefined && v !== null) distroBgOpacity = v
@@ -186,6 +187,7 @@ QtObject {
         _settings.setValue("wsBgOpacity", wsBgOpacity)
         _settings.setValue("groupedBgOpacity", groupedBgOpacity)
         _settings.setValue("ungroupedBgOpacity", ungroupedBgOpacity)
+        _settings.setValue("startMenuBgOpacity", startMenuBgOpacity)
         _settings.setValue("mediaBgOpacity", mediaBgOpacity)
         _settings.setValue("cavaBgOpacity", cavaBgOpacity)
         _settings.setValue("distroBgOpacity", distroBgOpacity)
@@ -496,6 +498,9 @@ QtObject {
 
     property color ungroupedBgColor:   Theme.cOnSecondary
     property real  ungroupedBgOpacity: -1
+
+    property color startMenuBgColor:   Theme.cOnSecondary
+    property real  startMenuBgOpacity: -1   // -1 = use ungroupedBgOpacity; independent Start/Power-btn BG opacity
 
     property color mediaBgColor:   Theme.cOnSecondary
     property real  mediaBgOpacity: -1

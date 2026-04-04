@@ -74,6 +74,11 @@ PanelWindow {
     property string _gapsOuterEntryVal:  ""
     property string _borderWEntryVal:    ""
     property string _borderREntryVal:    ""
+    property string _currentLayout:      ""   // "scrolling" | "dwindle" | "master" | "monocle"
+
+    // ── Hyprland border colors ─────────────────────────────────────────────
+    property color _activeBorderColor:   Theme.cPrimary
+    property color _inactiveBorderColor: Theme.cOnSecondary
 
     // Load dock + rofi + sddm + hyprland values when CC opens
     Connections {
@@ -101,12 +106,23 @@ PanelWindow {
             'grep "gaps_in = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
             'grep "gaps_out = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
             'grep "border_size = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
-            'grep "rounding = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"']
+            'grep "rounding = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
+            'grep "col.active_border" "$f" 2>/dev/null | head -1 | grep -oP "(?<=#)[0-9a-fA-F]{6,8}" | head -1 || echo ""; ' +
+            'grep "col.inactive_border" "$f" 2>/dev/null | head -1 | grep -oP "(?<=#)[0-9a-fA-F]{6,8}" | head -1 || echo ""; ' +
+            'hyprctl getoption general:layout -j 2>/dev/null | grep -oP "(?<=\"str\": \")[^\"]+\" || ' +
+            'grep "layout = " "$f" 2>/dev/null | head -1 | grep -oP "(?<=layout = )\\S+"']
         running: false
         property string _output: ""
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(l) { _hyprlandValReader._output += l.trim() + "\n" }
+        }
+        Component.onCompleted: {
+            // Restore persisted border colors on startup
+            if (ccBorderColorSettings.activeBorderColor !== "")
+                ccWin._activeBorderColor = ccBorderColorSettings.activeBorderColor
+            if (ccBorderColorSettings.inactiveBorderColor !== "")
+                ccWin._inactiveBorderColor = ccBorderColorSettings.inactiveBorderColor
         }
         onExited: {
             const lines = _output.trim().split("\n")
@@ -120,6 +136,14 @@ PanelWindow {
             if (lines.length > 4) { _gapsOuterEntryVal = lines[4] || "0"; _gapsOuterTI.text  = _gapsOuterEntryVal }
             if (lines.length > 5) { _borderWEntryVal   = lines[5] || "0"; _borderWTI.text    = _borderWEntryVal }
             if (lines.length > 6) { _borderREntryVal   = lines[6] || "0"; _borderRTI.text    = _borderREntryVal }
+            // Parse border colors — only update if a hex color was found in the file
+            if (lines.length > 7 && lines[7] && lines[7].length >= 6)
+                ccWin._activeBorderColor = "#" + lines[7].replace(/^#+/, "")
+            if (lines.length > 8 && lines[8] && lines[8].length >= 6)
+                ccWin._inactiveBorderColor = "#" + lines[8].replace(/^#+/, "")
+            // Parse current layout (line 9 — from hyprctl getoption or grep fallback)
+            if (lines.length > 9 && lines[9] && lines[9].trim().length > 0)
+                ccWin._currentLayout = lines[9].trim().toLowerCase()
         }
     }
     Process {
@@ -320,6 +344,12 @@ PanelWindow {
         property string pinnedName: ""
         property double pinnedLat: 0.0
         property double pinnedLon: 0.0
+    }
+    Settings {
+        id: ccBorderColorSettings
+        category: "cc-border-colors-v1"
+        property string activeBorderColor:   ""
+        property string inactiveBorderColor: ""
     }
 
     // ── The panel itself ───────────────────────────────────────────────────
@@ -937,9 +967,13 @@ PanelWindow {
 
                                         CCSection { text: "Workspace Icon Glyphs" }
                                         CCIconEntry { label:"Active Dot";     value:Config.wsDotActive;     onApplied:function(v){Config.wsDotActive=v} }
+                                        CCSlider { label:"Active Opacity";     from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsActiveOpacity>=0?Config.wsActiveOpacity:1;    onMoved:function(v){Config.wsActiveColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
                                         CCIconEntry { label:"Persistent Dot"; value:Config.wsDotPersistent; onApplied:function(v){Config.wsDotPersistent=v} }
+                                        CCSlider { label:"Persistent Opacity"; from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsPersistentColor.a;                            onMoved:function(v){Config.wsPersistentColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
                                         CCIconEntry { label:"Empty Dot";      value:Config.wsDotEmpty;      onApplied:function(v){Config.wsDotEmpty=v} }
+                                        CCSlider { label:"Empty Opacity";      from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsEmptyColor.a;                                 onMoved:function(v){Config.wsEmptyColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
                                         CCIconEntry { label:"WS Separator";   value:Config.wsSeparatorGlyph;onApplied:function(v){Config.wsSeparatorGlyph=v} }
+                                        CCSlider { label:"Separator Opacity";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsSeparatorColor.a;                             onMoved:function(v){Config.wsSeparatorColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
 
                                         CCSection { text: "Control Center" }
                                         CCIconEntry {
@@ -953,6 +987,7 @@ PanelWindow {
                                                 _ccGlyphWrite.running = true
                                             }
                                         }
+                                        CCSlider { label:"CC Glyph Opacity"; from:0;to:1;stepSize:0.05;decimals:2; value:Config.ccGlyphColor.a; onMoved:function(v){Config.ccGlyphColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
                                         Process { id:_ccGlyphWrite; running:false }
 
                                         CCSection { text: "Battery" }
@@ -1110,8 +1145,8 @@ PanelWindow {
                                             }
                                         }
 
-                                        CCSection { text: "Width & Behavior" }
-                                        CCSlider { label:"Bar Count";   from:5;to:80;stepSize:1;    value:Config.cavaWidth;      onMoved:function(v){Config.cavaWidth=v} }
+                                        CCSection { text: "Dimensions & Behavior" }
+                                        CCSlider { label:"Bar Count";   from:5;to:200;stepSize:1;   value:Config.cavaWidth;      onMoved:function(v){Config.cavaWidth=v} }
                                         CCSlider { label:"Bar Spacing"; from:0;to:6;stepSize:0.5;decimals:1; value:Config.cavaBarSpacing; onMoved:function(v){Config.cavaBarSpacing=v} }
                                         CCToggle { label:"Transparent Inactive"; value:Config.cavaTransparentWhenInactive; onToggled:function(v){Config.cavaTransparentWhenInactive=v} }
                                         CCSlider { label:"Active Opacity";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.cavaActiveOpacity;  onMoved:function(v){Config.cavaActiveOpacity=v} }
@@ -1164,7 +1199,7 @@ PanelWindow {
                                         CCSection { text: "Per-Group Background Opacity" }
                                         Text {
                                             Layout.fillWidth: true
-                                            text: "−1 = use global module BG opacity"
+                                            text: "−1 = inherit global BG opacity  •  0 = fully transparent"
                                             color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                            Theme.cPrimary.b, 0.48)
                                             font.family: Config.labelFont; font.pixelSize: 11
@@ -1174,6 +1209,7 @@ PanelWindow {
                                         CCSlider { label:"Workspaces";    from:-1;to:1;stepSize:0.05;decimals:2; value:Config.wsBgOpacity;          onMoved:function(v){Config.wsBgOpacity=v} }
                                         CCSlider { label:"Grouped";       from:-1;to:1;stepSize:0.05;decimals:2; value:Config.groupedBgOpacity;      onMoved:function(v){Config.groupedBgOpacity=v} }
                                         CCSlider { label:"Ungrouped";     from:-1;to:1;stepSize:0.05;decimals:2; value:Config.ungroupedBgOpacity;    onMoved:function(v){Config.ungroupedBgOpacity=v} }
+                                        CCSlider { label:"Start Menu";    from:-1;to:1;stepSize:0.05;decimals:2; value:Config.startMenuBgOpacity;    onMoved:function(v){Config.startMenuBgOpacity=v} }
                                         CCSlider { label:"Media";         from:-1;to:1;stepSize:0.05;decimals:2; value:Config.mediaBgOpacity;        onMoved:function(v){Config.mediaBgOpacity=v} }
                                         CCSlider { label:"Cava";          from:-1;to:1;stepSize:0.05;decimals:2; value:Config.cavaBgOpacity;         onMoved:function(v){Config.cavaBgOpacity=v} }
                                         CCSlider { label:"Distro";        from:-1;to:1;stepSize:0.05;decimals:2; value:Config.distroBgOpacity;       onMoved:function(v){Config.distroBgOpacity=v} }
@@ -1221,6 +1257,33 @@ PanelWindow {
                             width: parent.width; spacing: 5
 
                             CCSection { text: " Hyprland" }
+
+                            // ── Layout switcher ───────────────────────────────────
+                            CCSection { text: "Layout" }
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: 6
+                                Repeater {
+                                    model: [
+                                        { name: "Scrolling", key: "scrolling" },
+                                        { name: "Dwindle",   key: "dwindle"   },
+                                        { name: "Master",    key: "master"    },
+                                        { name: "Monocle",   key: "monocle"   }
+                                    ]
+                                    delegate: CCPillBtn {
+                                        required property var modelData
+                                        text:   modelData.name
+                                        active: ccWin._currentLayout === modelData.key
+                                        onClicked: {
+                                            ccWin._currentLayout = modelData.key
+                                            _layoutProc.command = ["bash", "-c",
+                                                "hyprctl keyword general:layout " + modelData.key + " 2>/dev/null"]
+                                            _layoutProc.running = true
+                                        }
+                                    }
+                                }
+                            }
+                            Process { id: _layoutProc; running: false; onExited: running = false }
 
                             // ── Hyprsunset toggle — reads sentinel state file ─────
                             CCToggle {
@@ -1641,6 +1704,45 @@ PanelWindow {
                                 }
                             }
                             Process { id: _gapProc; running: false }
+
+                            // ── Border Colors ──────────────────────────────────────
+                            CCSection { text: "Border Colors" }
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Writes hex color to col.active_border / col.inactive_border in hyprviz.conf"
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
+                                font.family: Config.labelFont; font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                            CCColorPicker {
+                                label: "Active Border"
+                                currentColor: ccWin._activeBorderColor
+                                onColorPicked: function(c) {
+                                    ccWin._activeBorderColor = c
+                                    ccBorderColorSettings.activeBorderColor = c.toString()
+                                    const hex = c.toString().replace("#", "").substring(0, 6)
+                                    _borderColorWrite.command = ["bash", "-c",
+                                        'f="$HOME/.config/hypr/hyprviz.conf"; ' +
+                                        'sed -i "s|col\\.active_border\\s*=.*|col.active_border = 0xff' + hex + '|g" "$f"; ' +
+                                        'hyprctl reload 2>/dev/null || true']
+                                    _borderColorWrite.running = true
+                                }
+                            }
+                            CCColorPicker {
+                                label: "Inactive Border"
+                                currentColor: ccWin._inactiveBorderColor
+                                onColorPicked: function(c) {
+                                    ccWin._inactiveBorderColor = c
+                                    ccBorderColorSettings.inactiveBorderColor = c.toString()
+                                    const hex = c.toString().replace("#", "").substring(0, 6)
+                                    _borderColorWrite.command = ["bash", "-c",
+                                        'f="$HOME/.config/hypr/hyprviz.conf"; ' +
+                                        'sed -i "s|col\\.inactive_border\\s*=.*|col.inactive_border = 0xff' + hex + '|g" "$f"; ' +
+                                        'hyprctl reload 2>/dev/null || true']
+                                    _borderColorWrite.running = true
+                                }
+                            }
+                            Process { id: _borderColorWrite; running: false; onExited: running = false }
                             Item { height: 10 }
                         }
                     }
