@@ -753,7 +753,7 @@ PanelWindow {
                             // Separator
                             Rectangle {
                                 Layout.fillWidth: true; height: 1
-                                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.22)
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
                             }
 
                             // Bar sub-tab content
