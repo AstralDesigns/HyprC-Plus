@@ -34,10 +34,7 @@ QtObject {
     }
     
     function _loadSettings() {
-        // Initialize cavaGradientEndColor from theme on first load
-        var savedGradientEnd = _settings.value("cavaGradientEndColor")
-        if (savedGradientEnd !== undefined && savedGradientEnd !== null) cavaGradientEndColor = savedGradientEnd
-        else cavaGradientEndColor = Theme.cSecondary
+        // cavaGradientEndColor is now computed from cavaEndMode/cavaEndVar — no seed needed
         // Tab 1: General
         var v = _settings.value("barMode"); if (v !== undefined && v !== null) barMode = v
         v = _settings.value("barPosition"); if (v !== undefined && v !== null) barPosition = v
@@ -98,7 +95,13 @@ QtObject {
         v = _settings.value("cavaInactiveOpacity"); if (v !== undefined && v !== null) cavaInactiveOpacity = v
         v = _settings.value("cavaAutoHide"); if (v !== undefined && v !== null) cavaAutoHide = v
         v = _settings.value("cavaGradientEnabled"); if (v !== undefined && v !== null) cavaGradientEnabled = v
-        v = _settings.value("cavaGradientEndColor"); if (v !== undefined && v !== null) cavaGradientEndColor = v
+        v = _settings.value("cavaStartMode"); if (v !== undefined && v !== null) cavaStartMode = v
+        v = _settings.value("cavaEndMode");   if (v !== undefined && v !== null) cavaEndMode   = v
+        v = _settings.value("cavaStartVar");  if (v !== undefined && v !== null) cavaStartVar  = v
+        v = _settings.value("cavaEndVar");    if (v !== undefined && v !== null) cavaEndVar    = v
+        v = _settings.value("cavaStartCustomColor"); if (v !== undefined && v !== null) _cavaStartCustomColor = v
+        v = _settings.value("cavaEndCustomColor");   if (v !== undefined && v !== null) _cavaEndCustomColor   = v
+        v = _settings.value("cavaGlyphCustomColor"); if (v !== undefined && v !== null) _cavaGlyphCustomColor = v
         v = _settings.value("wsBgOpacity"); if (v !== undefined && v !== null) wsBgOpacity = v
         v = _settings.value("groupedBgOpacity"); if (v !== undefined && v !== null) groupedBgOpacity = v
         v = _settings.value("ungroupedBgOpacity"); if (v !== undefined && v !== null) ungroupedBgOpacity = v
@@ -185,7 +188,13 @@ QtObject {
         _settings.setValue("cavaInactiveOpacity", cavaInactiveOpacity)
         _settings.setValue("cavaAutoHide", cavaAutoHide)
         _settings.setValue("cavaGradientEnabled", cavaGradientEnabled)
-        _settings.setValue("cavaGradientEndColor", cavaGradientEndColor)
+        _settings.setValue("cavaStartMode",        cavaStartMode)
+        _settings.setValue("cavaEndMode",          cavaEndMode)
+        _settings.setValue("cavaStartVar",         cavaStartVar)
+        _settings.setValue("cavaEndVar",           cavaEndVar)
+        _settings.setValue("cavaStartCustomColor", _cavaStartCustomColor)
+        _settings.setValue("cavaEndCustomColor",   _cavaEndCustomColor)
+        _settings.setValue("cavaGlyphCustomColor", _cavaGlyphCustomColor)
         _settings.setValue("wsBgOpacity", wsBgOpacity)
         _settings.setValue("groupedBgOpacity", groupedBgOpacity)
         _settings.setValue("ungroupedBgOpacity", ungroupedBgOpacity)
@@ -474,12 +483,79 @@ QtObject {
     // ── Cava color ───────────────────────────────────────────────────────
     //  Single color: cavaGlyphColor
     //  Gradient (cavaGradientEnabled): cavaGradientStartColor → cavaGradientEndColor
-    property color cavaGlyphColor:          Theme.cPrimary
-    property bool  cavaGradientEnabled:     false
-    property color cavaGradientStartColor:  Theme.cPrimary
-    // Not bound to Theme.cSecondary so a user pick isn't snapped back by
-    // matugen re-evaluations.  Seeded once from the theme in onCompleted.
-    property color cavaGradientEndColor:    "#000000"
+    //
+    //  Color mode ("matugen" | "custom") and selected variable name are stored
+    //  here in Config so the live Theme bindings are active from bar startup —
+    //  not waiting for the CC to open.  The computed color properties below
+    //  re-evaluate automatically whenever Theme updates (wallpaper change).
+
+    // Mode + selected variable for each color slot
+    property string cavaStartMode: "matugen"   // "matugen" | "custom"
+    property string cavaEndMode:   "matugen"   // "matugen" | "custom"
+    property string cavaStartVar:  "$primary"  // selected matugen variable
+    property string cavaEndVar:    "$scrim"    // selected matugen variable
+
+    // Resolve a "$varname" → the live Theme.cXxx color.
+    // Called inside the computed color bindings below so they are reactive:
+    // whenever Theme updates, Qt re-evaluates these expressions automatically.
+    function _cavaThemeColor(varName) {
+        switch (varName) {
+            case "$source_color":           return Theme.cPrimary
+            case "$primary":                return Theme.cPrimary
+            case "$on_primary":             return Theme.cOnPrimary
+            case "$primary_container":      return Theme.cPrimaryContainer
+            case "$on_primary_container":   return Theme.cOnPrimaryContainer
+            case "$primary_fixed":          return Theme.cPrimaryFixed
+            case "$primary_fixed_dim":      return Theme.cPrimaryFixedDim
+            case "$inverse_primary":        return Theme.cInversePrimary
+            case "$secondary":              return Theme.cSecondary
+            case "$on_secondary":           return Theme.cOnSecondary
+            case "$secondary_container":    return Theme.cSecondaryContainer
+            case "$secondary_fixed_dim":    return Theme.cPrimaryFixedDim
+            case "$tertiary":               return Theme.cTertiary
+            case "$on_tertiary":            return Theme.cOnSurf
+            case "$tertiary_container":     return Theme.cTertiaryContainer
+            case "$tertiary_fixed_dim":     return Theme.cTertiary
+            case "$background":             return Theme.cBackground
+            case "$on_background":          return Theme.cOnBackground
+            case "$surface":                return Theme.cSurface
+            case "$surface_variant":        return Theme.cSurfVariant
+            case "$surface_container":      return Theme.cSurfMid
+            case "$surface_container_low":  return Theme.cSurfLow
+            case "$surface_container_high": return Theme.cSurfHi
+            case "$on_surface":             return Theme.cOnSurf
+            case "$on_surface_variant":     return Theme.cOnSurfVar
+            case "$inverse_surface":        return Theme.cInverseSurface
+            case "$outline":                return Theme.cOutline
+            case "$outline_variant":        return Theme.cOutVar
+            case "$error":                  return Theme.cErr
+            case "$scrim":                  return Theme.cScrim
+            case "$shadow":                 return Theme.cShadow
+            default:                        return Theme.cPrimary
+        }
+    }
+
+    // Computed color properties — reactive to both mode/var changes AND Theme updates.
+    // In matugen mode: expression references Theme.cXxx through _cavaThemeColor(),
+    // so Qt's binding system tracks the dependency and re-evaluates on wallpaper change.
+    // In custom mode: a static color value is stored directly (set by CC picker).
+    property color cavaGlyphColor: cavaStartMode === "matugen"
+        ? _cavaThemeColor(cavaStartVar)
+        : _cavaGlyphCustomColor
+    property color _cavaGlyphCustomColor: Theme.cPrimary   // overwritten by CC custom pick
+
+    property bool  cavaGradientEnabled:    false
+
+    property color cavaGradientStartColor: cavaStartMode === "matugen"
+        ? _cavaThemeColor(cavaStartVar)
+        : _cavaStartCustomColor
+    property color _cavaStartCustomColor: Theme.cPrimary   // overwritten by CC custom pick
+
+    property color cavaGradientEndColor: cavaEndMode === "matugen"
+        ? _cavaThemeColor(cavaEndVar)
+        : _cavaEndCustomColor
+    property color _cavaEndCustomColor: Theme.cScrim       // overwritten by CC custom pick
+
     // Fraction of glyph height at which start→end color splits (0.0–1.0, default 0.5)
     property real  cavaGradientSplit:       0.5
 

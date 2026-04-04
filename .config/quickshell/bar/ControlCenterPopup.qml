@@ -107,6 +107,8 @@ PanelWindow {
         {label: "$outline", var: "$outline"}
     ]
 
+    // Resolve a "$varname" string → the matching Theme color
+    // Used by the cava color pickers to apply matugen vars to Config properties
     // Load dock + rofi + sddm + hyprland values when CC opens
     Connections {
         target: ControlCenterState
@@ -158,6 +160,7 @@ PanelWindow {
                 ccWin._activeBorderColor = ccBorderColorSettings.activeBorderColor
             if (ccBorderColorSettings.inactiveBorderColor !== "")
                 ccWin._inactiveBorderColor = ccBorderColorSettings.inactiveBorderColor
+            // Cava color mode/var/binding now owned by Config — no CC-side restore needed
         }
         onExited: {
             const lines = _output.trim().split("\n")
@@ -430,6 +433,7 @@ PanelWindow {
         property string activeBorderVar:     "$source_color"
         property string inactiveBorderVar:   "$background"
     }
+
 
     // ── The panel itself ───────────────────────────────────────────────────
     Rectangle {
@@ -1233,31 +1237,145 @@ PanelWindow {
 
                                         CCSection { text: "Color" }
                                         CCToggle { label:"Gradient"; value:Config.cavaGradientEnabled; onToggled:function(v){Config.cavaGradientEnabled=v} }
-                                        // Color A: single color when gradient off; start color when on
-                                        CCColorPicker {
-                                            label: Config.cavaGradientEnabled ? "Start Color" : "Bar Color"
-                                            currentColor: Config.cavaGradientEnabled
-                                                ? Config.cavaGradientStartColor
-                                                : Config.cavaGlyphColor
-                                            onColorPicked: function(c) {
-                                                if (Config.cavaGradientEnabled)
-                                                    Config.cavaGradientStartColor = c
-                                                else
-                                                    Config.cavaGlyphColor = c
+
+                                        // ── Bar / Start Color ───────────────────────────────
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: Config.cavaGradientEnabled ? "Start Color" : "Bar Color"
+                                                color: Theme.cPrimary
+                                                font.family: Config.labelFont; font.pixelSize: 13
+                                                Layout.preferredWidth: 130
+                                            }
+                                            CCPillBtn {
+                                                text: Config.cavaStartMode === "matugen" ? "󰋉 Variable" : " Custom"
+                                                active: true
+                                                onClicked: {
+                                                    Config.cavaStartMode = Config.cavaStartMode === "matugen" ? "custom" : "matugen"
+                                                }
                                             }
                                         }
-                                        // Color B: gradient end color
-                                        CCColorPicker {
-                                            label: "End Color"
-                                            currentColor: Config.cavaGradientEnabled
-                                                ? Config.cavaGradientEndColor
-                                                : Theme.cSecondary
-                                            pickerEnabled: Config.cavaGradientEnabled
-                                            onColorPicked: function(c) {
-                                                if (Config.cavaGradientEnabled)
-                                                    Config.cavaGradientEndColor = c
+                                        Item {
+                                            Layout.fillWidth: true
+                                            implicitHeight: _cavaStartVarLoader.active
+                                                ? (_cavaStartVarLoader.item ? _cavaStartVarLoader.item.height : 0)
+                                                : (_cavaStartColorLoader.item ? _cavaStartColorLoader.item.height : 0)
+                                            Loader {
+                                                id: _cavaStartVarLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.cavaStartMode === "matugen"
+                                                sourceComponent: ColumnLayout {
+                                                    spacing: 6
+                                                    Text {
+                                                        text: "  Variable:"
+                                                        color: Theme.cOnSurfVar
+                                                        font.family: Config.labelFont; font.pixelSize: 11
+                                                    }
+                                                    Flow {
+                                                        Layout.fillWidth: true; spacing: 6
+                                                        Repeater {
+                                                            model: ccWin._matugenBorderVars
+                                                            delegate: CCPillBtn {
+                                                                required property var modelData
+                                                                text: modelData.label.replace("$", "")
+                                                                active: Config.cavaStartVar === modelData.var
+                                                                onClicked: { Config.cavaStartVar = modelData.var }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Loader {
+                                                id: _cavaStartColorLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.cavaStartMode === "custom"
+                                                sourceComponent: CCColorPicker {
+                                                    label: "Custom Color"
+                                                    currentColor: Config.cavaGradientEnabled
+                                                        ? Config.cavaGradientStartColor
+                                                        : Config.cavaGlyphColor
+                                                    onColorPicked: function(c) {
+                                                        // Write to the private custom slot — leaves the computed
+                                                        // cavaGradientStartColor/cavaGlyphColor bindings intact
+                                                        Config._cavaStartCustomColor = c
+                                                        Config._cavaGlyphCustomColor = c
+                                                    }
+                                                }
                                             }
                                         }
+
+                                        Item { height: 6 }
+
+                                        // ── End Color (gradient only) ───────────────────────
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            opacity: Config.cavaGradientEnabled ? 1.0 : 0.4
+                                            Text {
+                                                text: "End Color"
+                                                color: Theme.cPrimary
+                                                font.family: Config.labelFont; font.pixelSize: 13
+                                                Layout.preferredWidth: 130
+                                            }
+                                            CCPillBtn {
+                                                text: Config.cavaEndMode === "matugen" ? "󰋉 Variable" : " Custom"
+                                                active: true
+                                                enabled: Config.cavaGradientEnabled
+                                                onClicked: {
+                                                    if (!Config.cavaGradientEnabled) return
+                                                    Config.cavaEndMode = Config.cavaEndMode === "matugen" ? "custom" : "matugen"
+                                                }
+                                            }
+                                        }
+                                        Item {
+                                            Layout.fillWidth: true
+                                            opacity: Config.cavaGradientEnabled ? 1.0 : 0.4
+                                            implicitHeight: _cavaEndVarLoader.active
+                                                ? (_cavaEndVarLoader.item ? _cavaEndVarLoader.item.height : 0)
+                                                : (_cavaEndColorLoader.item ? _cavaEndColorLoader.item.height : 0)
+                                            Loader {
+                                                id: _cavaEndVarLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.cavaEndMode === "matugen"
+                                                sourceComponent: ColumnLayout {
+                                                    spacing: 6
+                                                    Text {
+                                                        text: "  Variable:"
+                                                        color: Theme.cOnSurfVar
+                                                        font.family: Config.labelFont; font.pixelSize: 11
+                                                    }
+                                                    Flow {
+                                                        Layout.fillWidth: true; spacing: 6
+                                                        Repeater {
+                                                            model: ccWin._matugenBorderVars
+                                                            delegate: CCPillBtn {
+                                                                required property var modelData
+                                                                text: modelData.label.replace("$", "")
+                                                                active: Config.cavaEndVar === modelData.var
+                                                                onClicked: {
+                                                                    if (!Config.cavaGradientEnabled) return
+                                                                    Config.cavaEndVar = modelData.var
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            Loader {
+                                                id: _cavaEndColorLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.cavaEndMode === "custom"
+                                                sourceComponent: CCColorPicker {
+                                                    label: "Custom Color"
+                                                    pickerEnabled: Config.cavaGradientEnabled
+                                                    currentColor: Config.cavaGradientEndColor
+                                                    onColorPicked: function(c) {
+                                                        if (Config.cavaGradientEnabled)
+                                                            Config._cavaEndCustomColor = c
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         CCSlider {
                                             label: "Gradient Split"
                                             visible: Config.cavaGradientEnabled
