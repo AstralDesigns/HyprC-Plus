@@ -11,21 +11,17 @@ import ".."
 //            the module hides itself when no media is detected and shows again
 //            when media plays. If the media player module is visible, cava always
 //            stays shown (media info is already providing context).
-//
-//  HOT-RELOAD: A `reload()` function rewrites the config and restarts cava.
-//  Config property changes (cavaWidth, cavaStyle, cavaBars) auto-trigger reload
-//  via Connections — no full bar restart needed.
 Item {
     id: root
     property string side: "left"   // "left" or "right"
 
     Layout.alignment: Qt.AlignVCenter
 
-    readonly property string _cfgPath: "/tmp/qs-cava-" + root.side + ".ini"
-
     //  Auto-hide only applies when the toggle is on AND media module is hidden.
     readonly property bool _autoHideActive: Config.cavaAutoHide && !Config.showMediaPlayer
 
+    //  FIX: Transparent Inactive controls whether cava shows at level 0 or hides
+    //       Auto-hide is controlled separately by cavaAutoHide + media visibility
     //  Non-collapse: always reserve full width when transparent-when-inactive.
     //  _sizer uses a placeholder string of cavaWidth first-bar chars so the
     //  island pre-allocates the correct width before cava outputs anything.
@@ -63,85 +59,37 @@ Item {
     Timer { id: mediaWatchRestart; interval: 3000; repeat: false
         onTriggered: if (root._autoHideActive && !mediaWatchProc.running) mediaWatchProc.running = true }
 
-    // ── Config writer: generates the cava ini file ──────────────────────────
-    //  Called on startup and manually via reload().
-    function writeCavaConfig() {
-        const bars    = Config.cavaEffectiveBars
-        const maxR    = Math.max(0, Math.floor((bars.length - 1) * 1.5))
-        const rev     = root.side === "right" ? 1 : 0
-
-        const lines = [
-            "[general]",
-            "bars = "             + Config.cavaWidth,
-            "framerate = 60",
-            "",
-            "[output]",
-            "method = raw",
-            "raw_target = /dev/stdout",
-            "data_format = ascii",
-            "ascii_max_range = "  + maxR,
-            "channels = mono",
-            "reverse = "          + rev
-        ]
-        const quoted   = lines.map(l => JSON.stringify(l)).join(" ")
-        const writeCmd = "printf '%s\\n' " + quoted + " > " + root._cfgPath
-        writeProc.args = ["-c", writeCmd]
-        writeProc.running = true
-    }
-
-    Process {
-        id: writeProc
-        command: ["bash", "-c", ""]
-        running: false
-        onExited: {
-            // Config written — always restart cava
-            cavaProc.running = false
-            restartAfterWrite.restart()
-        }
-    }
-    Timer {
-        id: restartAfterWrite
-        interval: 100
-        repeat: false
-        onTriggered: cavaProc.running = true
-    }
-
-    // ── Public API: reload cava with current config ─────────────────────────
-    //  Call this from outside (e.g. control center slider) to force a hot-reload.
-    function reload() {
-        writeCavaConfig()
-    }
-
-    // ── Auto-restart when cava config properties change ─────────────────────
-    //  Watches the key Config properties; when any change, rewrites config and restarts.
-    //  Debounced via reloadTimer to prevent rapid-fire restarts during slider drag.
-    Timer {
-        id: reloadTimer
-        interval: 300
-        repeat: false
-        onTriggered: reload()
-    }
-
-    Connections {
-        target: Config
-        function onCavaWidthChanged()      { reloadTimer.restart() }
-        function onCavaStyleChanged()      { reloadTimer.restart() }
-        function onCavaBarsChanged()       { reloadTimer.restart() }
-    }
-
     // ── Direct cava invocation ────────────────────────────────────────────────
+    //  Writes a temp config file then runs cava with ascii output.
     //  Each output line: semicolon-separated integers 0..N-1 where N = len(bars).
+    //
+    //  ascii_max_range is a fixed constant (100) so the command binding only
+    //  depends on cavaWidth and side — not on cavaEffectiveBars.  This means
+    //  style changes never cause the command to re-evaluate and cava stays alive;
+    //  the stdout parser re-maps the 0-100 integers to the new glyph set live.
     Process {
         id: cavaProc
-        // Build command at binding time so it reacts to Config changes on restart.
         command: {
-            const cfgPath = root._cfgPath
-            return ["bash", "-c", "cava -p " + cfgPath]
+            const rev     = root.side === "right" ? 1 : 0
+            const cfgPath = "/tmp/qs-cava-" + root.side + ".ini"
+            const lines = [
+                "[general]",
+                "bars = "             + Config.cavaWidth,
+                "framerate = 60",
+                "",
+                "[output]",
+                "method = raw",
+                "raw_target = /dev/stdout",
+                "data_format = ascii",
+                "ascii_max_range = 100",
+                "channels = mono",
+                "reverse = "          + rev
+            ]
+            const quoted   = lines.map(l => JSON.stringify(l)).join(" ")
+            const writeCmd = "printf '%s\\n' " + quoted + " > " + cfgPath
+            return ["bash", "-c", writeCmd + " && cava -p " + cfgPath]
         }
-        Component.onCompleted: {
-            // Write config then start cava
-            writeCavaConfig()
-        }
+        Component.onCompleted: running = true
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(line) {
@@ -149,44 +97,14 @@ Item {
                 if (!t || t.startsWith("[")) return   // skip cava header lines
                 const vals    = t.split(";")
                 const barsStr = Config.cavaEffectiveBars
-                const maxR    = Math.max(0, Math.floor((barsStr.length - 1) * 1.5))
                 let   result  = ""
                 let   allZero = true
-                const expectedWidth = Config.cavaWidth
-                const actualBars = vals.length
-
-                if (actualBars === 0) {
-                    // No data from cava — fill with spaces
-                    result = " ".repeat(expectedWidth)
-                } else if (actualBars >= expectedWidth) {
-                    // Cava outputs enough (or more) — just take what we need
-                    for (let i = 0; i < expectedWidth; i++) {
-                        const v = parseInt(vals[i])
-                        if (!isNaN(v)) {
-                            if (v > 0) allZero = false
-                            const scaledV = Math.floor(v * (barsStr.length - 1) / maxR)
-                            result += barsStr[Math.min(scaledV, barsStr.length - 1)]
-                        } else {
-                            result += " "
-                        }
-                    }
-                } else {
-                    // Cava outputs fewer bars than desired — interpolate to fill
-                    for (let i = 0; i < expectedWidth; i++) {
-                        // Map desired position back to cava's output range
-                        const srcPos = (i * (actualBars - 1)) / (expectedWidth - 1)
-                        const leftIdx = Math.floor(srcPos)
-                        const rightIdx = Math.min(leftIdx + 1, actualBars - 1)
-                        const frac = srcPos - leftIdx
-
-                        const leftVal = parseInt(vals[leftIdx])
-                        const rightVal = parseInt(vals[rightIdx])
-                        const v = isNaN(leftVal) ? 0 :
-                                  isNaN(rightVal) ? leftVal :
-                                  Math.round(leftVal + (rightVal - leftVal) * frac)
-
+                for (let i = 0; i < vals.length; i++) {
+                    const v = parseInt(vals[i])
+                    if (!isNaN(v)) {
                         if (v > 0) allZero = false
-                        const scaledV = maxR > 0 ? Math.floor(v * (barsStr.length - 1) / maxR) : 0
+                        // Scale cava output (0-100) to barsStr index (0-barsStr.length-1)
+                        const scaledV = Math.floor(v * (barsStr.length - 1) / 100)
                         result += barsStr[Math.min(scaledV, barsStr.length - 1)]
                     }
                 }
@@ -194,10 +112,45 @@ Item {
                 root._active = !allZero
             }
         }
-        onExited: restartTimer.restart()
+        onExited: {
+            if (root._intentionalRestart) {
+                root._intentionalRestart = false
+                quickRestartTimer.restart()
+            } else {
+                crashRestartTimer.restart()
+            }
+        }
     }
-    Timer { id: restartTimer; interval: 2000; repeat: false
+
+    // Set to true before intentionally killing cavaProc so onExited routes
+    // to the fast timer instead of the crash-recovery back-off.
+    property bool _intentionalRestart: false
+
+    // Fast restart — intentional config changes (width / style tweak).
+    // Tune this; 50 ms is enough for cava to fully exit on a clean SIGTERM.
+    Timer { id: quickRestartTimer; interval: 50; repeat: false
         onTriggered: if (!cavaProc.running) cavaProc.running = true }
+
+    // Slow restart — unexpected exit / crash recovery back-off.
+    Timer { id: crashRestartTimer; interval: 2000; repeat: false
+        onTriggered: if (!cavaProc.running) cavaProc.running = true }
+
+    // ── Restart cava when bar count changes ───────────────────────────────
+    //  Only cavaWidth requires a cava restart — it changes the 'bars' value
+    //  in the generated config, so cava must be killed and relaunched.
+    //  cavaStyle only affects how QML maps cava's raw output to glyphs, so
+    //  no restart is needed; the running process keeps outputting the same
+    //  integers and the new glyph set is applied immediately on the next frame.
+    //  Gradient and color changes are pure QML bindings — cava is never involved.
+    Connections {
+        target: Config
+        function onCavaWidthChanged() {
+            if (cavaProc.running) {
+                root._intentionalRestart = true
+                cavaProc.running = false
+            }
+        }
+    }
 
     // ── Hidden sizer: reserves correct width before first output ─────────────
     // Uses TextMetrics so the island bg always matches what cavaLabel will render.
