@@ -7,7 +7,7 @@
 var LauncherConfig = {
 
     // ── Search bar width ──────────────────────────────────────────────
-    searchWidthFraction: 1.0,       // @LC:searchWidthFraction
+    searchWidthFraction: 0.30,       // @LC:searchWidthFraction
 
     // ── Icon size ─────────────────────────────────────────────────────
     iconSize: 48,                   // @LC:iconSize
@@ -32,7 +32,7 @@ var LauncherConfig = {
     // ── Border ────────────────────────────────────────────────────────
     borderRadius: 20,               // @LC:borderRadius
     borderWidth:  2,                // @LC:borderWidth
-    searchRadius: 12,               // @LC:searchRadius
+    searchRadius: 19,               // @LC:searchRadius
     listRadius:   12,               // @LC:listRadius
     innerBorderWidth: 1,            // @LC:innerBorderWidth
 

@@ -955,7 +955,7 @@ const AppLauncherWindow = GObject.registerClass({
         root.append(searchFrame);
 
         this._searchEntry = new Gtk.SearchEntry();
-        this._searchEntry.set_placeholder_text('Search applications…');
+        this._searchEntry.set_placeholder_text(' Search applications…');
         this._searchEntry.add_css_class('launcher-search');
         this._searchEntry.set_hexpand(true);
         searchFrame.append(this._searchEntry);
