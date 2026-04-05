@@ -58,7 +58,7 @@ Item {
     //  Night (sunset → sunrise): nf-md-clock_time_X outline
     function _clockIcon() {
         const h12     = new Date().getHours() % 12 || 12   // 1–12
-        const filled  = ["󱐿","󱑀","󱑁","󱑂","󱑃","󱑄","󱑅","󱑆","󱑇","󱑈","󱑉","󱑊"]
+        const filled  = ["󱑋","󱑌","󱑍","󱑎","󱑏","󱑐","󱑑","󱑒","󱑓","󱑔","󱑕","󱑖"]
         const outline = ["󱑋","󱑌","󱑍","󱑎","󱑏","󱑐","󱑑","󱑒","󱑓","󱑔","󱑕","󱑖"]
         const sun     = _sunTimes()
         const nowH    = new Date().getHours() + new Date().getMinutes() / 60

@@ -47,7 +47,7 @@ function _spawnCleanCmd(cmdStr) {
         envp = GLib.environ_unsetenv(envp, 'LD_PRELOAD');
         GLib.spawn_async(GLib.get_home_dir(), argv, envp,
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-            null, null);
+            null);
     } catch (e) { console.error('_spawnCleanCmd failed:', e.message); }
 }
 
@@ -75,10 +75,13 @@ const GLYPH_FALLBACK  = '󱙝';   //  shown when app has no icon
 
 // --- CSS Management ---------------------------------------------------
 const HOME = GLib.get_home_dir();
-const GTK3_COLORS_PATH   = GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors.css']);
-const GTK4_COLORS_PATH   = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
-const DOCK_STYLE_PATH    = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'style.css']);
-const DOCK_CONFIG_PATH   = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'config.js']);
+const GTK3_COLORS_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors.css']);
+const GTK4_COLORS_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
+const DOCK_STYLE_PATH       = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'style.css']);
+const DOCK_CONFIG_PATH      = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'config.js']);
+// Absolute path so the toggle script is found regardless of working-directory
+// (exec-once in hyprland.conf sets cwd to '/', not the dock folder).
+const LAUNCHER_TOGGLE_PATH  = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'toggle-app-launcher.sh']);
 
 let cssProviders = [];          // Static providers cleared/re-added on theme change
 let dynamicConfigProvider = null; // Persistent provider for config-driven values — never cleared
@@ -306,6 +309,16 @@ function hotReload() {
         if (dockWindow.mainBox)
             dockWindow.mainBox.set_spacing(DockConfig.buttonSpacing);
         dockWindow._scheduleExclusiveZoneUpdate();
+
+        // Reload pinned apps from disk so external writes (e.g. from the
+        // App Launcher's "Pin to Dock" action) are reflected immediately.
+        if (dockWindow.daemon) {
+            dockWindow.daemon.pinnedApps.clear();
+            dockWindow.daemon.loadPinnedApps();
+            const clientData = dockWindow.daemon.getClientData();
+            dockWindow._updateFromDaemon(clientData);
+            log('[dock] hot-reload: pinned apps refreshed from disk');
+        }
     }
     log('[dock] hot-reload complete');
 }
@@ -655,9 +668,10 @@ const HyprCandyDock = GObject.registerClass({
         btn.set_child(label);
         btn.set_tooltip_text('Applications');
 
-        // Left click - launch rofi
+        // Left click — toggle the HyprCandy App Launcher
+        // (replaces rofi -show drun; the launcher tracks dock.pos itself)
         btn.connect('clicked', () => {
-            _spawnCleanCmd('rofi -show drun');
+            if (dockWindow && dockWindow.daemon) dockWindow.daemon.toggleLauncher();
         });
 
         // Right click - show settings menu

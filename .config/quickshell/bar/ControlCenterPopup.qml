@@ -61,6 +61,23 @@ PanelWindow {
     property string _rofiBorderVal:  "2"
     property string _rofiRadiusVal:  "1.0"
 
+    // ── App Launcher (launcher-config.state) current values ───────────────
+    property string _lcIconSizeVal:       "48"
+    property string _lcTextFontSizeVal:   "11"
+    property string _lcFixedTileWVal:     "90"
+    property string _lcFixedTileHVal:     "78"
+    property string _lcFrameWidthVal:     "500"
+    property string _lcFrameHeightVal:    "480"
+    property string _lcFrameWVertVal:     "380"
+    property string _lcFrameHVertVal:     "560"
+    property string _lcBorderRadiusVal:   "20"
+    property string _lcBorderWidthVal:    "2"
+    property string _lcSearchRadiusVal:   "12"
+    property string _lcListRadiusVal:     "12"
+    property string _lcInnerBorderWVal:   "1"
+    property string _lcInnerPaddingVal:   "10"
+    property string _lcSearchFracVal:     "1.0"
+
     // ── SDDM current values ───────────────────────────────────────────────
     property string _sddmHeaderVal:  "󰫣󰫣󰫣"
     property string _sddmFormVal:    "center"
@@ -109,13 +126,14 @@ PanelWindow {
 
     // Resolve a "$varname" string → the matching Theme color
     // Used by the cava color pickers to apply matugen vars to Config properties
-    // Load dock + rofi + sddm + hyprland values when CC opens
+    // Load dock + rofi + launcher + sddm + hyprland values when CC opens
     Connections {
         target: ControlCenterState
         function onVisibleChanged() {
             if (ControlCenterState.visible) {
                 _dockValReader.running = true
                 _rofiValReader.running = true
+                _lcValReader.running   = true
                 _sddmValReader.running = true
                 _weatherLocReader.running = true
                 _hyprlandValReader.running = true
@@ -269,6 +287,71 @@ PanelWindow {
             const ls = _lines; _lines = []
             _rofiBorderVal = (ls[0] !== undefined && ls[0]) ? ls[0] : "2"
             _rofiRadiusVal = (ls[1] !== undefined && ls[1]) ? ls[1] : "1.0"
+        }
+    }
+    // Read launcher config directly from launcherConfig.js — the single source
+    // of truth. No state file detour: whatever launcherConfig.js holds is what
+    // the sliders show, and launcher-config-set.sh writes back into that same file.
+    Process {
+        id: _lcValReader
+        command: ["bash", "-c",
+            'lc="$HOME/.hyprcandy/GJS/hyprcandydock/launcherConfig.js"; ' +
+            '[ -f "$lc" ] || { echo "{}"; exit 0; }; ' +
+            'python3 -c \'' +
+            'import re, json, sys\n' +
+            't = open(sys.argv[1]).read()\n' +
+            'keys = [\n' +
+            '  "searchWidthFraction",\n' +
+            '  "iconSize",\n' +
+            '  "textFontSize",\n' +
+            '  "fixedTileWidth",\n' +
+            '  "fixedTileHeight",\n' +
+            '  "frameWidth",\n' +
+            '  "frameHeight",\n' +
+            '  "frameWidthVert",\n' +
+            '  "frameHeightVert",\n' +
+            '  "borderRadius",\n' +
+            '  "borderWidth",\n' +
+            '  "searchRadius",\n' +
+            '  "listRadius",\n' +
+            '  "innerBorderWidth",\n' +
+            '  "innerPadding",\n' +
+            ']\n' +
+            'obj = {}\n' +
+            'for k in keys:\n' +
+            '  m = re.search(rf"\\b{k}:\\s*([0-9][0-9.]*)", t)\n' +
+            '  if m: obj[k] = float(m.group(1)) if "." in m.group(1) else int(m.group(1))\n' +
+            'print(json.dumps(obj))\n' +
+            '\' "$lc"']
+        running: false
+        // _buf MUST be reset to "" before each run so stale output from a
+        // previous CC open cannot corrupt the JSON.parse on the next open.
+        property string _buf: ""
+        onRunningChanged: { if (running) _buf = "" }
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { _lcValReader._buf += l }
+        }
+        onExited: {
+            try {
+                const obj = JSON.parse(_lcValReader._buf)
+                if (obj.searchWidthFraction !== undefined) _lcSearchFracVal   = obj.searchWidthFraction.toFixed(2)
+                if (obj.iconSize            !== undefined) _lcIconSizeVal     = Math.round(obj.iconSize).toString()
+                if (obj.textFontSize        !== undefined) _lcTextFontSizeVal = Math.round(obj.textFontSize).toString()
+                if (obj.fixedTileWidth      !== undefined) _lcFixedTileWVal   = Math.round(obj.fixedTileWidth).toString()
+                if (obj.fixedTileHeight     !== undefined) _lcFixedTileHVal   = Math.round(obj.fixedTileHeight).toString()
+                if (obj.frameWidth          !== undefined) _lcFrameWidthVal   = Math.round(obj.frameWidth).toString()
+                if (obj.frameHeight         !== undefined) _lcFrameHeightVal  = Math.round(obj.frameHeight).toString()
+                if (obj.frameWidthVert      !== undefined) _lcFrameWVertVal   = Math.round(obj.frameWidthVert).toString()
+                if (obj.frameHeightVert     !== undefined) _lcFrameHVertVal   = Math.round(obj.frameHeightVert).toString()
+                if (obj.borderRadius        !== undefined) _lcBorderRadiusVal = Math.round(obj.borderRadius).toString()
+                if (obj.borderWidth         !== undefined) _lcBorderWidthVal  = Math.round(obj.borderWidth).toString()
+                if (obj.searchRadius        !== undefined) _lcSearchRadiusVal = Math.round(obj.searchRadius).toString()
+                if (obj.listRadius          !== undefined) _lcListRadiusVal   = Math.round(obj.listRadius).toString()
+                if (obj.innerBorderWidth    !== undefined) _lcInnerBorderWVal = Math.round(obj.innerBorderWidth).toString()
+                if (obj.innerPadding        !== undefined) _lcInnerPaddingVal = Math.round(obj.innerPadding).toString()
+            } catch(e) { console.warn("[CC] _lcValReader: JSON parse failed:", e, "buf:", _lcValReader._buf) }
+            _lcValReader._buf = ""
         }
     }
     Process {
@@ -2353,11 +2436,204 @@ PanelWindow {
                         }
                     }
 
-                    // ── TAB 4: Menus (Rofi) ──────────────────────────────────
+                    // ── TAB 4: Menus ─────────────────────────────────────────
                     CCScrollPane {
                         ColumnLayout {
                             width: parent.width; spacing: 5
-                            CCSection { text: "󰮫 Menus (Rofi)" }
+                            CCSection { text: "󰮫 Menus" }
+
+                            // ── Application Launcher ──────────────────────────────
+                            CCSection { text: "Application Launcher" }
+
+                            // Search bar width fraction (0.2–1.0) shown as a slider
+                            // Sliders bind directly to Config.launcher* — same pattern as
+                            // every other CC tab. onMoved sets the Config property (reactive,
+                            // survives re-opens) AND calls launcher-config-set.sh to write the
+                            // value back into launcherConfig.js for the GJS launcher to pick up.
+                            CCSlider {
+                                label: "Search Width"
+                                from: 0.2; to: 1.0; stepSize: 0.05; decimals: 2
+                                value: Config.launcherSearchWidth
+                                onMoved: function(v) {
+                                    Config.launcherSearchWidth = v
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "searchWidthFraction", v.toFixed(2)]
+                                    _lcWrite.running = true
+                                }
+                            }
+
+                            CCSection { text: "Icon" }
+                            CCSlider {
+                                label: "Icon Size"
+                                from: 24; to: 96; stepSize: 4
+                                value: Config.launcherIconSize
+                                onMoved: function(v) {
+                                    Config.launcherIconSize = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "iconSize", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Text Size"
+                                from: 8; to: 16; stepSize: 1
+                                value: Config.launcherTextFontSize
+                                onMoved: function(v) {
+                                    Config.launcherTextFontSize = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "textFontSize", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+
+                            CCSection { text: "Tile Size (fixed container)" }
+                            CCSlider {
+                                label: "Tile Width"
+                                from: 60; to: 150; stepSize: 5
+                                value: Config.launcherFixedTileWidth
+                                onMoved: function(v) {
+                                    Config.launcherFixedTileWidth = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "fixedTileWidth", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Tile Height"
+                                from: 50; to: 130; stepSize: 5
+                                value: Config.launcherFixedTileHeight
+                                onMoved: function(v) {
+                                    Config.launcherFixedTileHeight = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "fixedTileHeight", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+
+                            CCSection { text: "Window Size — Horizontal Dock" }
+                            CCSlider {
+                                label: "Width"
+                                from: 320; to: 900; stepSize: 10
+                                value: Config.launcherFrameWidth
+                                onMoved: function(v) {
+                                    Config.launcherFrameWidth = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "frameWidth", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Height"
+                                from: 300; to: 900; stepSize: 10
+                                value: Config.launcherFrameHeight
+                                onMoved: function(v) {
+                                    Config.launcherFrameHeight = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "frameHeight", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+
+                            CCSection { text: "Window Size — Vertical Dock" }
+                            CCSlider {
+                                label: "Width"
+                                from: 240; to: 700; stepSize: 10
+                                value: Config.launcherFrameWidthVert
+                                onMoved: function(v) {
+                                    Config.launcherFrameWidthVert = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "frameWidthVert", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Height"
+                                from: 300; to: 1000; stepSize: 10
+                                value: Config.launcherFrameHeightVert
+                                onMoved: function(v) {
+                                    Config.launcherFrameHeightVert = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "frameHeightVert", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+
+                            CCSection { text: "Borders" }
+                            CCSlider {
+                                label: "Outer Radius"
+                                from: 0; to: 40
+                                value: Config.launcherBorderRadius
+                                onMoved: function(v) {
+                                    Config.launcherBorderRadius = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "borderRadius", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Outer Width"
+                                from: 0; to: 8
+                                value: Config.launcherBorderWidth
+                                onMoved: function(v) {
+                                    Config.launcherBorderWidth = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "borderWidth", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Search Radius"
+                                from: 0; to: 30
+                                value: Config.launcherSearchRadius
+                                onMoved: function(v) {
+                                    Config.launcherSearchRadius = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "searchRadius", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "List Radius"
+                                from: 0; to: 30
+                                value: Config.launcherListRadius
+                                onMoved: function(v) {
+                                    Config.launcherListRadius = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "listRadius", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Inner Border W"
+                                from: 0; to: 4
+                                value: Config.launcherInnerBorderWidth
+                                onMoved: function(v) {
+                                    Config.launcherInnerBorderWidth = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "innerBorderWidth", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+
+                            CCSection { text: "Padding" }
+                            CCSlider {
+                                label: "Inner Padding"
+                                from: 0; to: 30
+                                value: Config.launcherInnerPadding
+                                onMoved: function(v) {
+                                    Config.launcherInnerPadding = Math.round(v)
+                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        "innerPadding", Math.round(v).toString()]
+                                    _lcWrite.running = true
+                                }
+                            }
+
+                            // Shared writer — calls launcher-config-set.sh which writes
+                            // directly into launcherConfig.js (the GJS launcher's source of truth).
+                            Process { id: _lcWrite; running: false; onExited: running = false }
+
+                            // ── Rofi (other menus — drun replaced by App Launcher) ──
+                            CCSection { text: "Rofi (Other Menus)" }
 
                             CCEntryRow {
                                 label: "Border"
@@ -2387,13 +2663,6 @@ PanelWindow {
                             }
                             Process { id: _rofiRadius; running: false }
 
-                            RowLayout { Layout.fillWidth: true; spacing: 8
-                                Text { text: "Icon Size"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
-                                CCPillBtn { text: "−"; onClicked: _rofiIconDec.running = true }
-                                CCPillBtn { text: "+"; onClicked: _rofiIconInc.running = true }
-                            }
-                            Process { id: _rofiIconDec; command: [scriptDir + "/rofi-icon-size.sh", "-0.5"]; running: false }
-                            Process { id: _rofiIconInc; command: [scriptDir + "/rofi-icon-size.sh", "0.5"]; running: false }
                             Item { height: 10 }
                         }
                     }

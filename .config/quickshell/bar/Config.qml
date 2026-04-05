@@ -133,8 +133,24 @@ QtObject {
         v = _settings.value("showBluetooth"); if (v !== undefined && v !== null) showBluetooth = v
         //v = _settings.value("showWindow"); if (v !== undefined && v !== null) showWindow = v
         v = _settings.value("showDistro"); if (v !== undefined && v !== null) showDistro = v
+        // ── Launcher (GJS app-launcher) ───────────────────────────────────
+        v = _settings.value("launcherSearchWidth");    if (v !== undefined && v !== null) launcherSearchWidth    = v
+        v = _settings.value("launcherIconSize");       if (v !== undefined && v !== null) launcherIconSize       = v
+        v = _settings.value("launcherTextFontSize");   if (v !== undefined && v !== null) launcherTextFontSize   = v
+        v = _settings.value("launcherFixedTileWidth"); if (v !== undefined && v !== null) launcherFixedTileWidth = v
+        v = _settings.value("launcherFixedTileHeight");if (v !== undefined && v !== null) launcherFixedTileHeight= v
+        v = _settings.value("launcherFrameWidth");     if (v !== undefined && v !== null) launcherFrameWidth     = v
+        v = _settings.value("launcherFrameHeight");    if (v !== undefined && v !== null) launcherFrameHeight    = v
+        v = _settings.value("launcherFrameWidthVert"); if (v !== undefined && v !== null) launcherFrameWidthVert = v
+        v = _settings.value("launcherFrameHeightVert");if (v !== undefined && v !== null) launcherFrameHeightVert= v
+        v = _settings.value("launcherBorderRadius");   if (v !== undefined && v !== null) launcherBorderRadius   = v
+        v = _settings.value("launcherBorderWidth");    if (v !== undefined && v !== null) launcherBorderWidth    = v
+        v = _settings.value("launcherSearchRadius");   if (v !== undefined && v !== null) launcherSearchRadius   = v
+        v = _settings.value("launcherListRadius");     if (v !== undefined && v !== null) launcherListRadius     = v
+        v = _settings.value("launcherInnerBorderWidth");if(v !== undefined && v !== null) launcherInnerBorderWidth=v
+        v = _settings.value("launcherInnerPadding");   if (v !== undefined && v !== null) launcherInnerPadding   = v
     }
-    
+
     function _saveSettings() {
         _settings.setValue("barMode", barMode)
         _settings.setValue("barPosition", barPosition)
@@ -233,6 +249,22 @@ QtObject {
         _settings.setValue("showBluetooth", showBluetooth)
         //_settings.setValue("showWindow", showWindow)
         _settings.setValue("showDistro", showDistro)
+        // ── Launcher (GJS app-launcher) ───────────────────────────────────
+        _settings.setValue("launcherSearchWidth",     launcherSearchWidth)
+        _settings.setValue("launcherIconSize",        launcherIconSize)
+        _settings.setValue("launcherTextFontSize",    launcherTextFontSize)
+        _settings.setValue("launcherFixedTileWidth",  launcherFixedTileWidth)
+        _settings.setValue("launcherFixedTileHeight", launcherFixedTileHeight)
+        _settings.setValue("launcherFrameWidth",      launcherFrameWidth)
+        _settings.setValue("launcherFrameHeight",     launcherFrameHeight)
+        _settings.setValue("launcherFrameWidthVert",  launcherFrameWidthVert)
+        _settings.setValue("launcherFrameHeightVert", launcherFrameHeightVert)
+        _settings.setValue("launcherBorderRadius",    launcherBorderRadius)
+        _settings.setValue("launcherBorderWidth",     launcherBorderWidth)
+        _settings.setValue("launcherSearchRadius",    launcherSearchRadius)
+        _settings.setValue("launcherListRadius",      launcherListRadius)
+        _settings.setValue("launcherInnerBorderWidth",launcherInnerBorderWidth)
+        _settings.setValue("launcherInnerPadding",    launcherInnerPadding)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -578,6 +610,57 @@ QtObject {
 
     // Fraction of glyph height at which start→end color splits (0.0–1.0, default 0.5)
     property real  cavaGradientSplit:       0.5
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Application Launcher (GJS dock app launcher)
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Values are written to ~/.config/hyprcandy/launcher-config.state
+    //  and read by the GJS launcher on startup.
+
+    property real  launcherSearchWidth:       1.0
+    property int   launcherIconSize:          48
+    property int   launcherTextFontSize:      11
+    property int   launcherFixedTileWidth:    90
+    property int   launcherFixedTileHeight:   78
+    property int   launcherFrameWidth:        500
+    property int   launcherFrameHeight:       480
+    property int   launcherFrameWidthVert:    380
+    property int   launcherFrameHeightVert:   560
+    property int   launcherBorderRadius:      20
+    property int   launcherBorderWidth:       2
+    property int   launcherSearchRadius:      12
+    property int   launcherListRadius:        12
+    property int   launcherInnerBorderWidth:  1
+    property int   launcherInnerPadding:      10
+
+    function _saveLauncherConfig() {
+        const state = {
+            searchWidthFraction: launcherSearchWidth,
+            iconSize:            launcherIconSize,
+            textFontSize:        launcherTextFontSize,
+            fixedTileWidth:      launcherFixedTileWidth,
+            fixedTileHeight:     launcherFixedTileHeight,
+            frameWidth:          launcherFrameWidth,
+            frameHeight:         launcherFrameHeight,
+            frameWidthVert:      launcherFrameWidthVert,
+            frameHeightVert:     launcherFrameHeightVert,
+            borderRadius:        launcherBorderRadius,
+            borderWidth:         launcherBorderWidth,
+            searchRadius:        launcherSearchRadius,
+            listRadius:          launcherListRadius,
+            innerBorderWidth:    launcherInnerBorderWidth,
+            innerPadding:        launcherInnerPadding,
+        };
+        try {
+            const path = Qt.resolvedUrl("file://" + HOME + "/.config/hyprcandy/launcher-config.state")
+                .toString().replace("file://", "");
+            // Use a Process to write — Qt Quick Settings won't write arbitrary JSON
+            _launcherConfigProc.command = ["bash", "-c",
+                'mkdir -p "$HOME/.config/hyprcandy" && ' +
+                'echo \'' + JSON.stringify(state) + '\' > "$HOME/.config/hyprcandy/launcher-config.state"']
+            _launcherConfigProc.running = true
+        } catch(e) { console.error("Failed to save launcher config:", e) }
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     //  TAB 6 · Background
