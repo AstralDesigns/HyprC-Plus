@@ -738,61 +738,6 @@ var Daemon = class {
         return cmd ? cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim() : null;
     }
 
-    // Toggle the app-launcher daemon (send SIGUSR1 / start it if not running).
-    // The launcher runs as a persistent daemon process started by autostart.sh.
-    // SIGUSR1 (signal 10) toggles its window visibility without forking a shell.
-    toggleLauncher() {
-        const HOME = GLib.getenv('HOME');
-        const launcherScript = `${HOME}/.hyprcandy/GJS/hyprcandydock/app-launcher.js`;
-        try {
-            // Check if daemon is running
-            const [, out] = GLib.spawn_command_line_sync(
-                `pgrep -f "gjs ${launcherScript}"`
-            );
-            const pid = parseInt(_decoder.decode(out).trim(), 10);
-            if (pid > 0) {
-                // Daemon running — send SIGUSR1 to toggle visibility
-                GLib.spawn_command_line_async(
-                    `kill -10 ${pid}`
-                );
-            } else {
-                // Daemon not running — start it (it will show immediately via SIGUSR1)
-                const launcherDir = `${HOME}/.hyprcandy/GJS/hyprcandydock`;
-                let ldPreload = '';
-                for (const p of [
-                    '/usr/lib/libgtk4-layer-shell.so',
-                    '/usr/lib64/libgtk4-layer-shell.so',
-                ]) {
-                    try {
-                        if (Gio.File.new_for_path(p).query_exists(null)) {
-                            ldPreload = p; break;
-                        }
-                    } catch (_) {}
-                }
-                let envp = GLib.get_environ();
-                if (ldPreload)
-                    envp = GLib.environ_setenv(envp, 'LD_PRELOAD',
-                        ldPreload + (GLib.getenv('LD_PRELOAD') ? ':' + GLib.getenv('LD_PRELOAD') : ''), true);
-                GLib.spawn_async(launcherDir,
-                    ['gjs', launcherScript],
-                    envp,
-                    GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
-                    null);
-                // Send SIGUSR1 after a short delay to show it on first launch
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
-                    try {
-                        GLib.spawn_command_line_async(
-                            `pkill -10 -f "gjs ${launcherScript}"`
-                        );
-                    } catch (_) {}
-                    return GLib.SOURCE_REMOVE;
-                });
-            }
-        } catch (e) {
-            console.error('[daemon] toggleLauncher error:', e.message);
-        }
-    }
-
     // Clean shutdown
     shutdown() {
         if (this._refreshTimer) {

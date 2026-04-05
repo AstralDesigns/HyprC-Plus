@@ -27,6 +27,9 @@ imports.gi.versions.Gtk = '4.0';
 imports.gi.versions.Gdk = '4.0';
 
 const { Gtk, Gdk, Gio, GLib, GObject } = imports.gi;
+const GLibUnix       = imports.gi.GLibUnix;   // import before Gtk.Application so GJS
+                                               // routes signal_add to the new namespace
+                                               // instead of the deprecated GLib one
 const Gtk4LayerShell = imports.gi.Gtk4LayerShell;
 
 // ── Paths ──────────────────────────────────────────────────────────────────
@@ -216,9 +219,9 @@ function getAllApps() {
 // nf-md-star_four_points_outline  (U+F06D0 in MDI; mapped in Nerd Fonts 3.x)
 // Replace this literal with the glyph from your Nerd Fonts browser if it
 // doesn't render as expected — the codepoint varies slightly between NF versions.
-const FAV_GLYPH  = '\u{F06D0}';
-const CHEV_UP    = '\u{F0140}';  // nf-md-chevron_up_circle  (section expanded)
-const CHEV_DOWN  = '\u{F013F}';  // nf-md-chevron_down_circle (section collapsed)
+const FAV_GLYPH  = '󰫣';
+const CHEV_UP    = '󰬬';  // nf-md-chevron_up_circle  (section expanded)
+const CHEV_DOWN  = '󰬦';  // nf-md-chevron_down_circle (section collapsed)
 
 // FlowBox helpers for arrow-key edge detection
 function flowSelIdx(fb) {
@@ -722,6 +725,7 @@ const AppLauncherWindow = GObject.registerClass({
         this._postPopoverGrace        = false;
         this._graceTimer              = 0;
         this._pendingFavRefreshQuery  = undefined;
+        this._pendingGroupRefresh     = false;   // set by group menu handler; consumed by closed handler
         this._colorMonitor            = null;   // Gio.FileMonitor for gtk-4.0/colors.css
         this._colorReloadTimer        = 0;      // debounce source ID
 
@@ -731,6 +735,10 @@ const AppLauncherWindow = GObject.registerClass({
         this._setupKeyboard();
         this._setupFocusClose();
         this._setupColorMonitor();
+
+        // Daemon mode: close() must hide the window rather than destroy it,
+        // so the process stays alive between toggles and all state is preserved.
+        this.set_hide_on_close(true);
 
         this.connect('destroy', () => this._teardownColorMonitor());
         this.add_css_class('hyprcandy-launcher');
@@ -978,7 +986,7 @@ const AppLauncherWindow = GObject.registerClass({
             this._favCollapsed = !this._favCollapsed;
             this._favFlow.set_visible(!this._favCollapsed);
             this._favSep.set_visible(!this._favCollapsed);
-            this._favChevron.set_text(this._favCollapsed ? CHEV_DOWN : CHEV_UP);
+            this._favChevron.set_text(this._favCollapsed ? CHEV_UP : CHEV_DOWN);
         });
 
         this._favFlow = new Gtk.FlowBox();
@@ -1003,6 +1011,10 @@ const AppLauncherWindow = GObject.registerClass({
         this._favSection.append(favSep);
 
         this._favSection.set_visible(false);  // hidden until populated
+
+        // ── Groups container (collapsible strips, one per group) ─────────
+        this._groupsContainer = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        listFrame.append(this._groupsContainer);
 
         // ── Main scroll + FlowBox ───────────────────────────────────────
         const scroll = new Gtk.ScrolledWindow();
@@ -1029,12 +1041,14 @@ const AppLauncherWindow = GObject.registerClass({
 
         // Initial population
         this._refreshFavorites('');
+        this._refreshGroups('');
         this._populateApps(this._allApps);
 
         // ── Search filtering ───────────────────────────────────────────
         this._searchEntry.connect('search-changed', () => {
             const q = this._searchEntry.get_text().toLowerCase().trim();
             this._refreshFavorites(q);
+            this._refreshGroups(q);
             this._populateApps(
                 q ? this._allApps.filter(a => a.name.toLowerCase().includes(q)) : this._allApps
             );
@@ -1063,6 +1077,105 @@ const AppLauncherWindow = GObject.registerClass({
         }
         for (const app of apps)
             this._flow.append(this._makeAppTile(app));
+    }
+
+    /**
+     * Rebuild all group strips under _groupsContainer.
+     * Each group is a collapsible accordion strip identical in style to
+     * the Favorites section. Strips are fully recreated on each call so
+     * ordering stays consistent with the JSON object key order.
+     */
+    _refreshGroups(query) {
+        const q = (query ?? '').toLowerCase().trim();
+
+        // Remove all existing strips
+        let ch = this._groupsContainer.get_first_child();
+        while (ch) {
+            const nx = ch.get_next_sibling();
+            this._groupsContainer.remove(ch);
+            ch = nx;
+        }
+
+        const groups = readGroups();   // plain object { name: [className, …] }
+
+        for (const [groupName, members] of Object.entries(groups)) {
+            const groupApps = this._allApps.filter(a =>
+                members.includes(a.className) &&
+                (!q || a.name.toLowerCase().includes(q))
+            );
+            if (groupApps.length === 0) continue;
+
+            // Preserve collapse state across rebuilds
+            if (!this._groupCollapsed) this._groupCollapsed = {};
+            const collapsed = this._groupCollapsed[groupName] ?? false;
+
+            const strip = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+
+            // ── Header row (identical structure to Favorites header) ────
+            const headerRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+            headerRow.add_css_class('fav-section-row');
+
+            const toggleBtn = Gtk.Button.new();
+            toggleBtn.add_css_class('fav-toggle-btn');
+            toggleBtn.set_can_focus(false);
+            toggleBtn.set_hexpand(true);
+
+            const btnInner = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+            btnInner.set_hexpand(true);
+
+            const glyphLbl = Gtk.Label.new('󰐱');  // nf-md-layers
+            glyphLbl.add_css_class('fav-glyph');
+            btnInner.append(glyphLbl);
+
+            const titleLbl = Gtk.Label.new(groupName);
+            titleLbl.add_css_class('fav-section-label');
+            titleLbl.set_halign(Gtk.Align.START);
+            titleLbl.set_hexpand(true);
+            btnInner.append(titleLbl);
+
+            const chevron = Gtk.Label.new(collapsed ? CHEV_DOWN : CHEV_UP);
+            chevron.add_css_class('fav-glyph');
+            btnInner.append(chevron);
+
+            toggleBtn.set_child(btnInner);
+            headerRow.append(toggleBtn);
+            strip.append(headerRow);
+
+            // ── FlowBox grid ─────────────────────────────────────────────
+            const flow = new Gtk.FlowBox();
+            const cols = this._isVert ? COLS_VERT : COLS_HORIZ;
+            flow.set_max_children_per_line(cols);
+            flow.set_min_children_per_line(2);
+            flow.set_row_spacing(2);
+            flow.set_column_spacing(2);
+            flow.set_homogeneous(true);
+            flow.set_selection_mode(Gtk.SelectionMode.SINGLE);
+            flow.add_css_class('launcher-grid');
+            flow.set_visible(!collapsed);
+            for (const app of groupApps) flow.append(this._makeAppTile(app));
+            flow.connect('child-activated', (_fb, child) => {
+                const btn = child.get_child();
+                if (btn && btn._appData) { spawnApp(btn._appData.exec); this.close(); }
+            });
+            strip.append(flow);
+
+            // ── Separator ────────────────────────────────────────────────
+            const sep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            sep.add_css_class('fav-separator');
+            sep.set_visible(!collapsed);
+            strip.append(sep);
+
+            // Toggle collapse on header click
+            toggleBtn.connect('clicked', () => {
+                this._groupCollapsed[groupName] = !this._groupCollapsed[groupName];
+                const nowCollapsed = this._groupCollapsed[groupName];
+                flow.set_visible(!nowCollapsed);
+                sep.set_visible(!nowCollapsed);
+                chevron.set_text(nowCollapsed ? CHEV_DOWN : CHEV_UP);
+            });
+
+            this._groupsContainer.append(strip);
+        }
     }
 
     _makeAppTile(app) {
@@ -1170,18 +1283,22 @@ const AppLauncherWindow = GObject.registerClass({
             // stuck and made "Remove from Favorites" appear to do nothing.
             const pendingQuery = this._pendingFavRefreshQuery;
             this._pendingFavRefreshQuery = undefined;
+            const pendingGroup = this._pendingGroupRefresh;
+            this._pendingGroupRefresh = false;
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
                 try { pop.unparent(); } catch (_) {}
-                // If a favorites add/remove happened, refresh the strip now
-                // that the popover is safely gone from the widget tree.
                 if (pendingQuery !== undefined) {
                     this._favoritesSet = readFavorites();
                     this._refreshFavorites(pendingQuery);
-                    // Also re-populate main grid so removed-favorite apps reappear
                     const filtered = pendingQuery
                         ? this._allApps.filter(a => a.name.toLowerCase().includes(pendingQuery) && !this._favoritesSet.has(a.className))
                         : this._allApps.filter(a => !this._favoritesSet.has(a.className));
                     this._populateApps(filtered);
+                }
+                if (pendingGroup) {
+                    const q = this._searchEntry
+                        ? this._searchEntry.get_text().toLowerCase().trim() : '';
+                    this._refreshGroups(q);
                 }
                 return GLib.SOURCE_REMOVE;
             });
@@ -1301,7 +1418,85 @@ const AppLauncherWindow = GObject.registerClass({
         });
         menu.append(favBtn);
 
-        // ── dGPU launch (only shown when switcheroo reports a dGPU) ────
+        // ── Groups ─────────────────────────────────────────────────────
+        const sep3 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        sep3.set_margin_top(4);
+        sep3.set_margin_bottom(4);
+        menu.append(sep3);
+
+        const groupsHdr = Gtk.Label.new('Groups');
+        groupsHdr.set_halign(Gtk.Align.START);
+        groupsHdr.add_css_class('pop-section-header');
+        menu.append(groupsHdr);
+
+        const currentGroups = readGroups();
+
+        // "Remove from <group>" for each group this app already belongs to
+        for (const [gName, members] of Object.entries(currentGroups)) {
+            if (!members.includes(app.className)) continue;
+            const removeBtn = Gtk.Button.new_with_label(`Remove from "${gName}"`);
+            removeBtn.add_css_class('pop-item');
+            removeBtn.set_halign(Gtk.Align.FILL);
+            removeBtn.connect('clicked', () => {
+                removeAppFromGroup(readGroups(), gName, app.className);
+                this._pendingGroupRefresh = true;
+                pop.popdown();
+            });
+            menu.append(removeBtn);
+        }
+
+        // "Add to <group>" for each group this app is NOT yet in
+        for (const [gName, members] of Object.entries(currentGroups)) {
+            if (members.includes(app.className)) continue;
+            const addBtn = Gtk.Button.new_with_label(`Add to "${gName}"`);
+            addBtn.add_css_class('pop-item');
+            addBtn.set_halign(Gtk.Align.FILL);
+            addBtn.connect('clicked', () => {
+                addAppToGroup(readGroups(), gName, app.className);
+                this._pendingGroupRefresh = true;
+                pop.popdown();
+            });
+            menu.append(addBtn);
+        }
+
+        // "New Group…" — inline text entry appears in the popover
+        const newGroupBtn = Gtk.Button.new_with_label('New Group…');
+        newGroupBtn.add_css_class('pop-item');
+        newGroupBtn.set_halign(Gtk.Align.FILL);
+        newGroupBtn.connect('clicked', () => {
+            const entryBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+            entryBox.set_margin_start(8);
+            entryBox.set_margin_end(8);
+            entryBox.set_margin_top(2);
+            entryBox.set_margin_bottom(2);
+
+            const entry = new Gtk.Entry();
+            entry.set_placeholder_text('Group name…');
+            entry.set_hexpand(true);
+            entryBox.append(entry);
+
+            const confirmBtn = Gtk.Button.new_with_label('Add');
+            confirmBtn.add_css_class('pop-item');
+            entryBox.append(confirmBtn);
+
+            const doCreate = () => {
+                const name = entry.get_text().trim();
+                if (!name) return;
+                addAppToGroup(readGroups(), name, app.className);
+                this._pendingGroupRefresh = true;
+                pop.popdown();
+            };
+            confirmBtn.connect('clicked', doCreate);
+            entry.connect('activate', doCreate);
+
+            const parent = newGroupBtn.get_parent();
+            if (parent) {
+                parent.remove(newGroupBtn);
+                parent.append(entryBox);
+            }
+            entry.grab_focus();
+        });
+        menu.append(newGroupBtn);
         const gpus = getAvailableDGPUs();
         if (gpus.length > 0) {
             const gpuSepTop = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
@@ -1479,15 +1674,8 @@ const AppLauncherWindow = GObject.registerClass({
     _setupFocusClose() {
         this._bgWin = null;
 
-        // ── 1. BOTTOM-layer transparent click-catcher ─────────────────────
-        // Covers the full screen at the BOTTOM layer (below normal windows but
-        // above the desktop). Desktop clicks reach it; window clicks go to the
-        // normal window above (launcher stays open for those — user presses ESC
-        // or clicks empty space). Hover never reaches it — no hover-close.
-        //
-        // Using notify::is-active is intentionally avoided: on Hyprland with
-        // focus_follows_mouse, is-active fires on pointer-leave (hover), not
-        // only on click — causing unwanted hover-close.
+        // ── 1. TOP-layer transparent click-catcher ─────────────────────
+        // Covers the full screen at the TOP layer (normal windows level.
         try {
             const bgWin = new Gtk.Window({ decorated: false });
             const thisApp = this.get_application();
@@ -1495,7 +1683,7 @@ const AppLauncherWindow = GObject.registerClass({
 
             Gtk4LayerShell.init_for_window(bgWin);
             Gtk4LayerShell.set_namespace(bgWin, 'hyprcandy-launcher-bg');
-            Gtk4LayerShell.set_layer(bgWin, Gtk4LayerShell.Layer.BOTTOM);
+            Gtk4LayerShell.set_layer(bgWin, Gtk4LayerShell.Layer.TOP);
             Gtk4LayerShell.set_exclusive_zone(bgWin, -1);
             // Anchor all four edges → covers the full output
             Gtk4LayerShell.set_anchor(bgWin, Gtk4LayerShell.Edge.TOP,    true);
@@ -1595,7 +1783,7 @@ const LauncherApp = GObject.registerClass({
         // dock-main.js sends pkill -10 -f "gjs app-launcher.js" instead of
         // spawning toggle-app-launcher.sh, which is faster (no shell fork).
         try {
-            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, 10, () => {
+            GLibUnix.signal_add_full(GLib.PRIORITY_DEFAULT, 10, () => {
                 if (this._win.get_visible()) {
                     this._win.set_visible(false);
                 } else {
@@ -1609,6 +1797,7 @@ const LauncherApp = GObject.registerClass({
                     GLib.idle_add(GLib.PRIORITY_HIGH, () => {
                         this._win._searchEntry.set_text('');
                         this._win._refreshFavorites('');
+                        this._win._refreshGroups('');
                         this._win._populateApps(this._win._allApps);
                         this._win._searchEntry.grab_focus();
                         return GLib.SOURCE_REMOVE;

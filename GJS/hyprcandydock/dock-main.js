@@ -671,7 +671,7 @@ const HyprCandyDock = GObject.registerClass({
         // Left click — toggle the HyprCandy App Launcher
         // (replaces rofi -show drun; the launcher tracks dock.pos itself)
         btn.connect('clicked', () => {
-            if (dockWindow && dockWindow.daemon) dockWindow.daemon.toggleLauncher();
+            _spawnCleanCmd(`bash "${LAUNCHER_TOGGLE_PATH}"`);
         });
 
         // Right click - show settings menu
