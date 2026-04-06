@@ -56,25 +56,65 @@ ShellRoot {
         watchChanges:true; onFileChanged:reload(); onLoaded:root.parseColors(text())
     }
 
-    // ── Visibility state + waybar position tracking ────────────────────────────
+    // ── Visibility state + bar position tracking ────────────────────────────
     property bool menuVisible: false
-    property bool waybarAtBottom: false
-    property real waybarSideMargin: 12
-    property real waybarOuterRadius: 20
+
+    // ── Bar position tracking (reads Qt Settings INI) ─────────────────────
+    //  Parses ~/.config/hyprcandy/hyprcandy-bar.conf [qs-bar-config-v1] group.
+    //  Startmenu panel mirrors bar position (top/bottom) and right margin.
+    property string _barPosition:    "top"
+    property string _barMode:        "bar"
+    property real   _barMarginSide:  6
+    property real   _barMarginTop:   2
+    property real   _barMarginBottom: 0
+    property real   _barRadius:      20
+    property real   _islandRadius:   20
+    property real   _barHeight:      36
+
+    readonly property bool _barAtBottom:  _barPosition === "bottom"
+    // The bar applies outerMarginSide TWICE: once as PanelWindow WlrLayerShell
+    // margins.left/right, and again as the barBg/triRight anchors.rightMargin inside
+    // the panel. Visual bar edge = outerMarginSide × 2 from the screen edge.
+    // We must match that so the panel right edge aligns with the bar content edge.
+    readonly property real  _panelMargin: _barMarginSide * 2
+    readonly property real  _panelRadius: _barMode === "island" ? _islandRadius : _barRadius
+
     FileView {
-        path: Quickshell.env("HOME")+"/.config/hyprcandy/waybar-position.txt"
-        watchChanges: true; onFileChanged: reload()
-        onLoaded: root.waybarAtBottom = text().trim() === "bottom"
+        id: barConfView
+        path: Quickshell.env("HOME") + "/.config/hyprcandy/hyprcandy-bar.conf"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            const lines = text().split("\n")
+            let inGroup = false
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i].trim()
+                if (line === "[qs-bar-config-v1]") { inGroup = true; continue }
+                if (line.startsWith("[") && line.endsWith("]")) { inGroup = false; continue }
+                if (!inGroup || !line.includes("=")) continue
+                const eq = line.indexOf("=")
+                const key = line.substring(0, eq).trim()
+                const val = line.substring(eq + 1).trim()
+                switch (key) {
+                    case "barPosition":       root._barPosition   = val; break
+                    case "barMode":           root._barMode       = val; break
+                    case "outerMarginSide":   root._barMarginSide = parseFloat(val); break
+                    case "outerMarginTop":    root._barMarginTop  = parseFloat(val); break
+                    case "outerMarginBottom": root._barMarginBottom = parseFloat(val); break
+                    case "barRadius":         root._barRadius     = parseFloat(val); break
+                    case "islandRadius":      root._islandRadius  = parseFloat(val); break
+                    case "barHeight":         root._barHeight     = parseFloat(val); break
+                }
+            }
+        }
     }
-    FileView {
-        path: Quickshell.env("HOME")+"/.config/hyprcandy/waybar_side_margin.state"
-        watchChanges: true; onFileChanged: reload()
-        onLoaded: { const v=parseFloat(text().trim()); if(!isNaN(v)&&v>=0) root.waybarSideMargin=v }
-    }
-    FileView {
-        path: Quickshell.env("HOME")+"/.config/hyprcandy/waybar_outer_radius.state"
-        watchChanges: true; onFileChanged: reload()
-        onLoaded: { const v=parseFloat(text().trim()); if(!isNaN(v)&&v>=0) root.waybarOuterRadius=v }
+    // 1-second fallback poll — inotify catches immediate writes; this catches the
+    // bar's 5-second auto-save flush in case the event fires between poll cycles.
+    // A plain reload() on a cached FileView is essentially a stat + conditional read
+    // — negligible cost, no race: QML property assignments are queued and coalesced.
+    Timer {
+        interval: 1000; repeat: true; running: true
+        onTriggered: barConfView.reload()
     }
 
     IpcHandler { target: "startmenu"
@@ -745,8 +785,16 @@ ShellRoot {
         WlrLayershell.namespace: "quickshell:startmenu"
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-        anchors { top: !root.waybarAtBottom; bottom: root.waybarAtBottom; right: true }
-        margins { top: 6; right: root.waybarSideMargin; bottom: 6 }
+        anchors {
+            top:    !root._barAtBottom
+            bottom:  root._barAtBottom
+            right:   true
+        }
+        margins {
+            top:    6
+            bottom: 6
+            right:  root._panelMargin
+        }
         width: 340
         height: mainCol.implicitHeight + 32
         color: "transparent"
@@ -755,7 +803,7 @@ ShellRoot {
             id: panelRect
             anchors.fill: parent
             color: root.cPanelBg
-            radius: root.waybarOuterRadius
+            radius: root._panelRadius
             focus: true
             border.width: 1; border.color: Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.40)
             scale: root.menuVisible ? 1.0 : 0.92
