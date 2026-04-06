@@ -133,12 +133,12 @@ if [ "$1" == "run" ]; then
   # Print update summary header
   aur_updates_now=$(${aur_helper} -Qua 2>/dev/null | grep -c '^' || echo )
   official_updates_now=$( (while pgrep -x checkupdates >/dev/null; do sleep 1; done); checkupdates 2>/dev/null | grep -c '^' || echo )
-  flatpak_updates_now=$(pkg_installed flatpak && flatpak remote-ls --updates 2>/dev/null | grep -c '^' || echo )
+  flatpak_updates_now=$(pkg_installed flatpak && flatpak remote-ls --updates 2>/dev/null | grep -c '^' || echo 0)
   printf "Official:  %-10s\nAUR (%s): %-10s\nFlatpak:   %-10s\n\n" \
     "$official_updates_now" "$aur_helper" "$aur_updates_now" "$flatpak_updates_now"
 
   # Snapshot which qt6 packages have pending updates BEFORE upgrading
-  qt6_will_update=$(${aur_helper} -Qu 2>/dev/null | awk '{print $1}' | grep -i '^qt6')
+  qt6_will_update=$(${aur_helper} -Qu 2>/dev/null | awk '{print $1}' | grep -i '^qt6' || true)
 
   ${aur_helper} -Syu
 
@@ -157,12 +157,12 @@ if [ "$1" == "run" ]; then
       if [ -n "$qt6ct_bin" ] && [ -f "$qt6ct_bin" ]; then
           qt6_linked_ver=$(ldd "$qt6ct_bin" 2>/dev/null \
               | grep 'libQt6Core\.so' \
-              | sed 's/.*libQt6Core\.so\.\([0-9]*\).*/\1/')
+              | sed 's/.*libQt6Core\.so\.\([0-9]*\).*/\1/' || true)
       fi
       qt6_installed_major=$(pacman -Q qt6-base 2>/dev/null \
           | awk '{print $2}' \
           | grep -oP '\d+' \
-          | head -1)
+          | head -1 || true)
       if [ -n "$qt6_linked_ver" ] && [ -n "$qt6_installed_major" ] \
          && [ "$qt6_linked_ver" != "$qt6_installed_major" ]; then
           print_warning "qt6ct-kde links libQt6Core.so.$qt6_linked_ver but qt6-base $qt6_installed_major.x installed — rebuilding..."
