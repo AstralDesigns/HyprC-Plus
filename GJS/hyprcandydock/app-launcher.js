@@ -301,6 +301,22 @@ function removeAppFromGroup(groups, groupName, className) {
     }
 }
 
+/** Rename a group, preserving its members and insertion order */
+function renameGroup(groups, oldName, newName) {
+    if (!groups[oldName] || oldName === newName || !newName) return;
+    // Rebuild the object so the renamed entry keeps its position
+    const rebuilt = {};
+    for (const [k, v] of Object.entries(groups))
+        rebuilt[k === oldName ? newName : k] = v;
+    writeGroups(rebuilt);
+}
+
+/** Delete a group entirely */
+function deleteGroup(groups, groupName) {
+    delete groups[groupName];
+    writeGroups(groups);
+}
+
 // ── dGPU detection (mirrors daemon.js _querySwitcheroo logic) ─────────────
 
 let _gpuCache = undefined;  // undefined = not yet queried; [] = queried but none
@@ -1121,7 +1137,7 @@ const AppLauncherWindow = GObject.registerClass({
 
         const groups = readGroups();   // plain object { name: [className, …] }
 
-        for (const [groupName, members] of Object.entries(groups)) {
+        for (const [groupName, members] of Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))) {
             const groupApps = this._allApps.filter(a =>
                 members.includes(a.className) &&
                 (!q || a.name.toLowerCase().includes(q))
@@ -1223,6 +1239,14 @@ const AppLauncherWindow = GObject.registerClass({
                 sep.set_visible(!nowCollapsed);
                 chevron.set_text(nowCollapsed ? CHEV_UP : CHEV_DOWN);
             });
+
+            // ── Right-click on header → Rename / Delete group popover ────
+            const headerRc = new Gtk.GestureClick();
+            headerRc.set_button(3);
+            headerRc.connect('pressed', () => {
+                this._showGroupHeaderMenu(groupName, headerRow);
+            });
+            headerRow.add_controller(headerRc);
 
             this._groupsContainer.append(strip);
         }
@@ -1595,6 +1619,116 @@ const AppLauncherWindow = GObject.registerClass({
         pop.popup();
     }
 
+    // ─── Group-header context menu (right-click on group bar) ────────────
+    /**
+     * Shows a small popover anchored to the group header row with:
+     *   • Rename Group… — opens a rename dialog
+     *   • Delete Group   — removes the group from disk and refreshes
+     */
+    _showGroupHeaderMenu(groupName, parentWidget) {
+        const pos = this._dockPos;
+        let popPos;
+        if      (pos === 'bottom') popPos = Gtk.PositionType.TOP;
+        else if (pos === 'top'   ) popPos = Gtk.PositionType.BOTTOM;
+        else if (pos === 'left'  ) popPos = Gtk.PositionType.RIGHT;
+        else                       popPos = Gtk.PositionType.LEFT;
+
+        const pop = new Gtk.Popover();
+        pop.set_parent(this);
+        pop.set_has_arrow(false);
+        pop.set_position(popPos);
+        {
+            const [ok, bx, by] = parentWidget.translate_coordinates(this, 0, 0);
+            if (ok)
+                pop.set_pointing_to(new Gdk.Rectangle({
+                    x: Math.round(bx), y: Math.round(by),
+                    width:  parentWidget.get_width(),
+                    height: parentWidget.get_height(),
+                }));
+        }
+        pop.add_css_class('launcher-popover');
+        pop.get_style_context().add_provider(
+            this._getPopoverCSSProvider(),
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        );
+        pop.connect('closed', () => {
+            this._popoverOpen = false;
+            if (this._graceTimer) {
+                GLib.source_remove(this._graceTimer);
+                this._graceTimer = 0;
+            }
+            this._postPopoverGrace = true;
+            this._graceTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 600, () => {
+                this._postPopoverGrace = false;
+                this._graceTimer = 0;
+                return GLib.SOURCE_REMOVE;
+            });
+            const pendingGroup = this._pendingGroupRefresh;
+            this._pendingGroupRefresh = false;
+            GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                try { pop.unparent(); } catch (_) {}
+                if (pendingGroup) {
+                    const q = this._searchEntry
+                        ? this._searchEntry.get_text().toLowerCase().trim() : '';
+                    this._refreshGroups(q);
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        this._popoverOpen = true;
+
+        const menu = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        menu.set_margin_top(6);
+        menu.set_margin_bottom(6);
+        menu.set_margin_start(6);
+        menu.set_margin_end(6);
+
+        // Group name as header label
+        const hdr = Gtk.Label.new(groupName);
+        hdr.set_halign(Gtk.Align.START);
+        hdr.add_css_class('pop-section-header');
+        menu.append(hdr);
+
+        const sep1 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        sep1.set_margin_top(4);
+        sep1.set_margin_bottom(4);
+        menu.append(sep1);
+
+        // ── Rename Group… ───────────────────────────────────────────────
+        const renameBtn = Gtk.Button.new_with_label('Rename Group…');
+        renameBtn.add_css_class('pop-item');
+        renameBtn.set_halign(Gtk.Align.FILL);
+        renameBtn.connect('clicked', () => {
+            pop.popdown();
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                this._showRenameGroupDialog(groupName);
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        menu.append(renameBtn);
+
+        const sep2 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        sep2.set_margin_top(4);
+        sep2.set_margin_bottom(4);
+        menu.append(sep2);
+
+        // ── Delete Group ────────────────────────────────────────────────
+        const deleteBtn = Gtk.Button.new_with_label('Delete Group');
+        deleteBtn.add_css_class('pop-item');
+        deleteBtn.set_halign(Gtk.Align.FILL);
+        deleteBtn.connect('clicked', () => {
+            deleteGroup(readGroups(), groupName);
+            // Drop stale collapse state for this group
+            if (this._groupCollapsed) delete this._groupCollapsed[groupName];
+            this._pendingGroupRefresh = true;
+            pop.popdown();
+        });
+        menu.append(deleteBtn);
+
+        pop.set_child(menu);
+        pop.popup();
+    }
+
     // ─── New-group naming dialog ─────────────────────────────────────────
     /**
      * Shows a modal-style naming dialog centered over the launcher.
@@ -1694,6 +1828,102 @@ const AppLauncherWindow = GObject.registerClass({
         dlg.set_hide_on_close(false);
         dlg.present();
         nameEntry.grab_focus();
+    }
+
+    // ─── Rename-group dialog ──────────────────────────────────────────────
+    /**
+     * Shows a layer-shell dialog pre-filled with the current group name.
+     * On confirm: renames the group in the JSON file and refreshes strips.
+     */
+    _showRenameGroupDialog(groupName) {
+        const dlg = new Gtk.Window({
+            title: 'Rename Group',
+            decorated: false,
+            modal: true,
+            transient_for: this,
+        });
+        dlg.add_css_class('hyprcandy-launcher');
+        dlg.add_css_class('hyprcandy-group-dialog');
+
+        const thisApp = this.get_application();
+        if (thisApp) thisApp.add_window(dlg);
+
+        try {
+            Gtk4LayerShell.init_for_window(dlg);
+            Gtk4LayerShell.set_layer(dlg, Gtk4LayerShell.Layer.OVERLAY);
+            Gtk4LayerShell.set_exclusive_zone(dlg, -1);
+            Gtk4LayerShell.set_keyboard_mode(dlg, Gtk4LayerShell.KeyboardMode.ON_DEMAND);
+            // No anchor → compositor centres the dialog
+        } catch (_) {}
+
+        const box = Gtk.Box.new(Gtk.Orientation.VERTICAL, 12);
+        box.set_margin_top(20);
+        box.set_margin_bottom(20);
+        box.set_margin_start(24);
+        box.set_margin_end(24);
+        dlg.set_child(box);
+
+        const titleLbl = Gtk.Label.new(`Rename group "${groupName}"`);
+        titleLbl.add_css_class('fav-section-label');
+        titleLbl.set_halign(Gtk.Align.START);
+        box.append(titleLbl);
+
+        const entryFrame = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        entryFrame.add_css_class('search-frame');
+        box.append(entryFrame);
+
+        const nameEntry = new Gtk.Entry();
+        nameEntry.set_placeholder_text('New group name…');
+        nameEntry.set_text(groupName);           // pre-fill with current name
+        nameEntry.add_css_class('launcher-search');
+        nameEntry.set_hexpand(true);
+        entryFrame.append(nameEntry);
+
+        const btnRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 8);
+        btnRow.set_halign(Gtk.Align.END);
+        box.append(btnRow);
+
+        const cancelBtn = Gtk.Button.new_with_label('Cancel');
+        cancelBtn.add_css_class('pop-item');
+        btnRow.append(cancelBtn);
+
+        const confirmBtn = Gtk.Button.new_with_label('Rename');
+        confirmBtn.add_css_class('pop-item');
+        btnRow.append(confirmBtn);
+
+        dlg.set_size_request(320, -1);
+
+        const doRename = () => {
+            const newName = nameEntry.get_text().trim();
+            if (!newName) return;
+            if (newName !== groupName)
+                renameGroup(readGroups(), groupName, newName);
+            dlg.close();
+            dlg.destroy();
+            // Migrate collapse state to the new name
+            if (!this._groupCollapsed) this._groupCollapsed = {};
+            this._groupCollapsed[newName] = this._groupCollapsed[groupName] ?? true;
+            delete this._groupCollapsed[groupName];
+            const curQ = this._searchEntry
+                ? this._searchEntry.get_text().toLowerCase().trim() : '';
+            this._refreshGroups(curQ);
+        };
+
+        confirmBtn.connect('clicked', doRename);
+        nameEntry.connect('activate', doRename);
+        cancelBtn.connect('clicked', () => { dlg.close(); dlg.destroy(); });
+
+        const kc = new Gtk.EventControllerKey();
+        kc.connect('key-pressed', (_ctrl, keyval) => {
+            if (keyval === Gdk.KEY_Escape) { dlg.close(); dlg.destroy(); return true; }
+            return false;
+        });
+        dlg.add_controller(kc);
+
+        dlg.set_hide_on_close(false);
+        dlg.present();
+        nameEntry.grab_focus();
+        nameEntry.select_region(0, -1);  // select all so user can type straight away
     }
 
     // ─── Keyboard / close ────────────────────────────────────────────────
