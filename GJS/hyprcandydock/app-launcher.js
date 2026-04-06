@@ -1347,10 +1347,8 @@ const AppLauncherWindow = GObject.registerClass({
         // the dock uses in _showContextMenu / _showStartMenu)
         const pos = this._dockPos;
         let popPos;
-        if      (pos === 'bottom') popPos = Gtk.PositionType.TOP;
-        else if (pos === 'top'   ) popPos = Gtk.PositionType.BOTTOM;
-        else if (pos === 'left'  ) popPos = Gtk.PositionType.RIGHT;
-        else                       popPos = Gtk.PositionType.LEFT;
+        if   (pos === 'right') popPos = Gtk.PositionType.LEFT;
+	else                   popPos = Gtk.PositionType.RIGHT; // bottom, top, left
 
         const pop = new Gtk.Popover();
         // Parent to the launcher window rather than the tile button so that
