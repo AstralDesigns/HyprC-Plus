@@ -647,13 +647,13 @@ popover.launcher-popover button {
 
 .fav-glyph {
     color: @primary;
-    font-size: 14px;
+    font-size: ${Math.round(TEXT_FONT_SIZE * 1.27)}px;
     margin-right: 4px;
 }
 
 .fav-section-label {
     color: @primary;
-    font-size: 11px;
+    font-size: ${TEXT_FONT_SIZE}px;
     font-weight: bold;
 }
 
