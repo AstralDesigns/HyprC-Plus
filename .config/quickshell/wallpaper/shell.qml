@@ -581,15 +581,15 @@ ShellRoot {
                                             : (dirHov.containsMouse ? root.cSurfHiHi : root.cSecCont)
                                         Behavior on color { ColorAnimation { duration: 100 } }
 
+                                        // Click anywhere on the row → navigate into subfolder
                                         MouseArea {
                                             id: dirHov
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
                                             onClicked: {
-                                                root.wallpaperDir = dirEntry.modelData
-                                                appSettings.wallpaperDir = dirEntry.modelData
-                                                root.sidebarOpen = false
+                                                root.sidebarPath = dirEntry.modelData
+                                                root.scanSidebarDirs(dirEntry.modelData)
                                             }
                                         }
 
@@ -600,7 +600,7 @@ ShellRoot {
                                             spacing: 8
 
                                             Text {
-                                                text: "󰅋"
+                                                text: "󰉋"
                                                 color: dirEntry.isSelected ? root.cPrimary : root.cOnSecCont
                                                 font.pixelSize: 14
                                                 font.family: "Symbols Nerd Font Mono"
@@ -612,21 +612,12 @@ ShellRoot {
                                                 font.pixelSize: 13
                                                 elide: Text.ElideRight
                                             }
-                                            // Drill-in arrow — declared after dirHov so it is on top
+                                            // Expand arrow (navigate into subfolder)
                                             Text {
-                                                text: "›"
+                                                text: "󰁔"
                                                 color: root.cOutlineVar
-                                                font.pixelSize: 20
-                                                MouseArea {
-                                                    anchors.fill: parent
-                                                    anchors.margins: -16
-                                                    cursorShape: Qt.PointingHandCursor
-                                                    onClicked: function(mouse) {
-                                                        mouse.accepted = true
-                                                        root.sidebarPath = dirEntry.modelData
-                                                        root.scanSidebarDirs(dirEntry.modelData)
-                                                    }
-                                                }
+                                                font.pixelSize: 12
+                                                font.family: "Symbols Nerd Font Mono"
                                             }
                                         }
                                     }
@@ -641,6 +632,37 @@ ShellRoot {
                             text: "No subdirectories"
                             color: root.cOutline
                             font.pixelSize: 12
+                        }
+
+                        // ── "Use this folder" button ──────────────────────────
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 32
+                            radius: root.rSm
+                            color: useFolderHov.containsMouse
+                                ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.25)
+                                : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.12)
+                            Behavior on color { ColorAnimation { duration: 100 } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "Use this folder"
+                                color: root.cPrimary
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+                            }
+
+                            MouseArea {
+                                id: useFolderHov
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    root.wallpaperDir = root.sidebarPath
+                                    appSettings.wallpaperDir = root.sidebarPath
+                                    root.sidebarOpen = false
+                                }
+                            }
                         }
                     }
                 }
