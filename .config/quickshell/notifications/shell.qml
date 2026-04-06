@@ -544,8 +544,8 @@ ShellRoot {
             left:    true
         }
         margins {
-            top:    root._barAtBottom ? 6 : 6
-            bottom: root._barAtBottom ? 6 : 6
+            top:    root._barAtBottom ? 6 : (root._barHeight + root._barMarginTop + 6) 
+            bottom: root._barAtBottom ? (root._barHeight + root._barMarginBottom + 6) : 6
             left:   root._panelMargin
         }
         width:  364
