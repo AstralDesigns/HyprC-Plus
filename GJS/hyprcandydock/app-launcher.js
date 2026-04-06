@@ -2271,4 +2271,4 @@ const app = new LauncherApp({
     flags: Gio.ApplicationFlags.NON_UNIQUE,
 });
 
-app.run([imports.system.programInvocationName, ...ARGV]);
+app.run([imports.system.programInvocationName, ...ARGV])
