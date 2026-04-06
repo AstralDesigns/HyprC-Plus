@@ -982,9 +982,21 @@ const AppLauncherWindow = GObject.registerClass({
         listFrame.set_vexpand(true);
         root.append(listFrame);
 
-        // ── Favorites section (fixed, not inside scroll) ─────────────────
+        // ── Main scroll — wraps Favorites, Groups, and app grid ──────────
+        const scroll = new Gtk.ScrolledWindow();
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
+        scroll.set_vexpand(true);
+        scroll.add_css_class('launcher-scroll');
+        listFrame.append(scroll);
+
+        // Inner box: stacks Favorites + Groups + FlowBox inside the scroll
+        const scrollInner = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        scrollInner.set_vexpand(true);
+        scroll.set_child(scrollInner);
+
+        // ── Favorites section (now inside scroll) ────────────────────────
         this._favSection = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
-        listFrame.append(this._favSection);
+        scrollInner.append(this._favSection);
 
         const favHeaderRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
         favHeaderRow.add_css_class('fav-section-row');
@@ -1055,15 +1067,9 @@ const AppLauncherWindow = GObject.registerClass({
 
         // ── Groups container (collapsible strips, one per group) ─────────
         this._groupsContainer = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
-        listFrame.append(this._groupsContainer);
+        scrollInner.append(this._groupsContainer);
 
-        // ── Main scroll + FlowBox ───────────────────────────────────────
-        const scroll = new Gtk.ScrolledWindow();
-        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
-        scroll.set_vexpand(true);
-        scroll.add_css_class('launcher-scroll');
-        listFrame.append(scroll);
-
+        // ── Main FlowBox (app grid) ────────────────────────────────────
         this._flow = new Gtk.FlowBox();
         this._flow.set_max_children_per_line(this._isVert ? COLS_VERT : COLS_HORIZ);
         this._flow.set_min_children_per_line(this._isVert ? COLS_VERT : COLS_HORIZ);
@@ -1073,7 +1079,7 @@ const AppLauncherWindow = GObject.registerClass({
         this._flow.set_valign(Gtk.Align.START);   // prevents rows stretching when content is short
         this._flow.set_selection_mode(Gtk.SelectionMode.SINGLE);
         this._flow.add_css_class('launcher-grid');
-        scroll.set_child(this._flow);
+        scrollInner.append(this._flow);
 
         // Keyboard Enter on a focused main-grid item → launch
         this._flow.connect('child-activated', (_fb, child) => {
