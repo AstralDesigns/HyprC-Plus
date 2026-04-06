@@ -7,13 +7,13 @@
 var LauncherConfig = {
 
     // ── Search bar width ──────────────────────────────────────────────
-    searchWidthFraction: 0.30,       // @LC:searchWidthFraction
+    searchWidthFraction: 0.25,       // @LC:searchWidthFraction
 
     // ── Icon size ─────────────────────────────────────────────────────
     iconSize: 48,                   // @LC:iconSize
 
     // ── Label font size ───────────────────────────────────────────────
-    labelFontSize: 11,              // @LC:labelFontSize
+    textFontSize: 14,               // @LC:textFontSize
 
     // ── App tile cell size ────────────────────────────────────────────
     // 0 = auto (iconSize + padding). The grid reflows to more columns
@@ -34,7 +34,7 @@ var LauncherConfig = {
     borderWidth:  2,                // @LC:borderWidth
     searchRadius: 19,               // @LC:searchRadius
     listRadius:   12,               // @LC:listRadius
-    innerBorderWidth: 1,            // @LC:innerBorderWidth
+    innerBorderWidth: 2,            // @LC:innerBorderWidth
 
     // ── Inner frame padding ───────────────────────────────────────────
     innerPadding: 10,               // @LC:innerPadding
