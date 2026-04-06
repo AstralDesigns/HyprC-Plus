@@ -309,19 +309,27 @@ ShellRoot {
         if (!pickerVisible) {
             if (scanProc.running)    scanProc.running = false
             if (sidebarProc.running) sidebarProc.running = false
-            root._thumbQueue = []   // discard pending work; in-flight magick finishes naturally
+            root._thumbQueue   = []    // discard pending work; in-flight magick finishes naturally
+            root._thumbCurrent = ""    // clear so next open can re-request freely
         }
     }
 
     // ── Rounded-thumbnail pipeline (ImageMagick → 160×100 rounded-rect PNG) ──
-    // Each wallpaper is processed once and cached in /tmp/qs_wp_thumbs/<hash>.png.
+    // Thumbnails are cached permanently in ~/.local/share/quickshell/wp-thumbs/
+    // so they survive reboots. The Refresh button wipes that dir and regenerates.
     // A single sequential Process avoids spawning hundreds of magick instances.
     // Delegates request via thumbRequest(); they receive the result via thumbReady().
 
     signal thumbReady(string origPath, string thumbSrc)
 
-    property var  _thumbQueue:   []
-    property bool _thumbRunning: false
+    // Permanent per-user cache — survives reboots, only cleared by Refresh button.
+    readonly property string _thumbDir:
+        (Quickshell.env("XDG_DATA_HOME") || (Quickshell.env("HOME") + "/.local/share")) +
+        "/quickshell/wp-thumbs"
+
+    property var    _thumbQueue:   []
+    property string _thumbCurrent: ""   // path currently being processed by thumbProc
+    property bool   _thumbRunning: false
 
     // djb2 hash of path → deterministic 8-hex cache filename, no shell escaping needed
     function _pathHash(p) {
@@ -333,7 +341,10 @@ ShellRoot {
 
     function thumbRequest(path) {
         if (!path) return
-        if (root._thumbQueue.indexOf(path) < 0) root._thumbQueue.push(path)
+        // Skip if this path is already being processed or is already in the queue
+        if (root._thumbCurrent === path) return
+        if (root._thumbQueue.indexOf(path) >= 0) return
+        root._thumbQueue.push(path)
         _thumbDrain()
     }
 
@@ -341,26 +352,29 @@ ShellRoot {
         if (root._thumbRunning || root._thumbQueue.length === 0) return
         const path  = root._thumbQueue.shift()
         const hash  = root._pathHash(path)
-        const dst   = "/tmp/qs_wp_thumbs/" + hash + ".png"
+        const dir   = root._thumbDir
+        const dst   = dir + "/" + hash + ".png"
         // Single-quote-escape both paths for bash
         const safe  = path.replace(/'/g, "'\\''")
         const safed = dst.replace(/'/g, "'\\''")
+        const safeDir = dir.replace(/'/g, "'\\''")
         // For animated GIFs append [0] so magick only decodes the first frame —
         // processing all frames is ~10–100× slower and returns no rounded result.
         const isGif  = path.toLowerCase().endsWith(".gif")
         const srcArg = isGif ? ("'" + safe + "'[0]") : ("'" + safe + "'")
-        root._thumbRunning = true
+        root._thumbRunning  = true
+        root._thumbCurrent  = path
         thumbProc._origPath = path
         thumbProc._dst      = dst
-        // If cached file exists, just echo and exit — fires thumbReady without re-processing
+        // If cached file already exists, just echo and exit — no re-processing
         thumbProc._cmd =
-            "mkdir -p /tmp/qs_wp_thumbs; " +
+            "mkdir -p '" + safeDir + "'; " +
             "[ -f '" + safed + "' ] && { echo ok; exit 0; }; " +
             "magick " + srcArg + " " +
             "-resize 160x100^ -gravity center -extent 160x100 " +
             "\\( +clone -alpha extract " +
             "   -fill black -colorize 100 " +
-            "   -fill white -draw 'roundrectangle 0,0 159,99 30,30' \\) " +
+            "   -fill white -draw 'roundrectangle 0,0 159,99 20,20' \\) " +
             "-alpha off -compose CopyOpacity -composite " +
             "-strip '" + safed + "' 2>/dev/null && echo ok"
         thumbProc.running = true
@@ -373,6 +387,7 @@ ShellRoot {
         property string _cmd:      "true"
         command: ["bash", "-c", thumbProc._cmd]
         onExited: function(code) {
+            root._thumbCurrent = ""   // clear before draining so next item can start
             if (code === 0)
                 // Append timestamp so QML Image sees a new URL even if file was replaced
                 root.thumbReady(thumbProc._origPath,
@@ -382,13 +397,15 @@ ShellRoot {
         }
     }
 
-    // Hard-refresh: wipe the on-disk thumb cache then re-scan so every
-    // thumbnail is regenerated from scratch.  Triggered by the refresh button.
+    // Hard-refresh: wipe the permanent on-disk thumb cache then re-scan so
+    // every thumbnail is regenerated from scratch. Triggered by the refresh button.
     Process {
         id: thumbCacheClearProc
-        command: ["bash", "-c", "rm -rf /tmp/qs_wp_thumbs"]
+        command: ["bash", "-c",
+            "rm -rf \"${XDG_DATA_HOME:-$HOME/.local/share}/quickshell/wp-thumbs\""]
         onExited: {
             root._thumbQueue   = []
+            root._thumbCurrent = ""
             root._thumbRunning = false
             root.scanDir()
         }
@@ -977,18 +994,30 @@ ShellRoot {
                                         if (origPath === thumb.path) thumb.thumbSrc = src
                                     }
                                 }
-                                // Enqueue when delegate is created; dequeue on destroy (trim work)
-                                Component.onCompleted: root.thumbRequest(path)
+
+                                // Remove from queue when delegate is destroyed so we don't
+                                // waste a magick slot on a tile that's no longer visible.
                                 Component.onDestruction: {
                                     const i = root._thumbQueue.indexOf(path)
                                     if (i >= 0) root._thumbQueue.splice(i, 1)
                                 }
-                                // When GridView recycles a delegate for a new path (e.g. after
-                                // re-scan or sort), reset thumbSrc and re-request the thumbnail.
-                                // Without this, recycled delegates keep the previous thumbnail.
+
+                                // GridView recycles delegates for new paths on scroll/sort.
+                                // _prevPath lets us splice the stale entry out of the queue
+                                // before requesting the new path.
+                                property string _prevPath: ""
                                 onPathChanged: {
-                                    thumbSrc = ""
+                                    if (_prevPath) {
+                                        const i = root._thumbQueue.indexOf(_prevPath)
+                                        if (i >= 0) root._thumbQueue.splice(i, 1)
+                                    }
+                                    _prevPath = path
+                                    thumbSrc  = ""
                                     if (path) root.thumbRequest(path)
+                                }
+                                Component.onCompleted: {
+                                    _prevPath = path
+                                    root.thumbRequest(path)
                                 }
 
                                 // thumbCard — background card; radius 30 matches magick output
@@ -997,11 +1026,9 @@ ShellRoot {
                                     anchors.centerIn: parent
                                     width:  gridView.thumbW
                                     height: gridView.thumbH
-                                    radius: 30
+                                    radius: 20
                                     color:  "#1a1a1a"
-                                    // layer clips the fallback placeholder text to rounded rect
-                                    layer.enabled: true
-                                    layer.smooth:  true
+                                    clip:   true
 
                                     // ImageMagick-generated rounded PNG (transparent corners
                                     // are naturally transparent over the card background)
@@ -1021,6 +1048,7 @@ ShellRoot {
                                     // Placeholder — shown while magick generates the thumb
                                     Rectangle {
                                         anchors.fill: parent
+                                        radius: 20
                                         color: "#252525"
                                         visible: !wallImg.visible
                                         Text {
@@ -1032,23 +1060,46 @@ ShellRoot {
                                         }
                                     }
 
-                                    // Filename bar — inside layer so the card's radius:30 clips
-                                    // the bottom corners automatically; no extra radius needed.
+                                }
+
+                                // Filename bar — sibling of thumbCard, overlaid on its
+                                // bottom edge. An Item clip-wrapper masks the top portion
+                                // of the bar rectangle so only the bottom two rounded
+                                // corners are visible, flush with the card's own corners.
+                                Item {
+                                    anchors {
+                                        left:   thumbCard.left
+                                        right:  thumbCard.right
+                                        bottom: thumbCard.bottom
+                                    }
+                                    height: thumb.isFocused ? 28 : 0
+                                    clip: true
+                                    z: 2
+                                    Behavior on height {
+                                        NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
+                                    }
                                     Rectangle {
                                         anchors {
-                                            bottom: parent.bottom
                                             left:   parent.left
                                             right:  parent.right
+                                            bottom: parent.bottom
                                         }
-                                        height: thumb.isFocused ? 28 : 0
+                                        // Taller than the visible strip by the radius so the
+                                        // top two rounded corners are hidden above parent's
+                                        // clip boundary — only bottom corners show.
+                                        height: (thumb.isFocused ? 28 : 0) + 20
+                                        radius: 20
                                         color: root.cScrim
-                                        clip: true
-                                        Behavior on height {
-                                            NumberAnimation { duration: 200; easing.type: Easing.OutCubic }
-                                        }
                                         Text {
-                                            anchors.fill: parent
-                                            anchors.leftMargin: 8; anchors.rightMargin: 8
+                                            anchors {
+                                                left:   parent.left
+                                                right:  parent.right
+                                                bottom: parent.bottom
+                                                leftMargin:  10
+                                                rightMargin: 10
+                                                bottomMargin: 0
+                                            }
+                                            height: 28
                                             text: thumb.path.split('/').pop()
                                             color: "#ffffff"; font.pixelSize: 12
                                             elide: Text.ElideRight
