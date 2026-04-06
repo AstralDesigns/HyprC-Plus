@@ -219,7 +219,7 @@ function getAllApps() {
 // nf-md-star_four_points_outline  (U+F06D0 in MDI; mapped in Nerd Fonts 3.x)
 // Replace this literal with the glyph from your Nerd Fonts browser if it
 // doesn't render as expected — the codepoint varies slightly between NF versions.
-const FAV_GLYPH  = '󰫣';
+const FAV_GLYPH  = '';
 const CHEV_UP    = '󰬬';  // nf-md-chevron_up_circle  (section expanded)
 const CHEV_DOWN  = '󰬦';  // nf-md-chevron_down_circle (section collapsed)
 
@@ -998,8 +998,12 @@ const AppLauncherWindow = GObject.registerClass({
         favToggleBtn.set_can_focus(false);
         favToggleBtn.set_hexpand(true);
 
-        const favBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
+        const favBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
         favBtnBox.set_hexpand(true);
+
+        const favGlyphLbl = Gtk.Label.new(FAV_GLYPH);
+        favGlyphLbl.add_css_class('fav-glyph');
+        favBtnBox.append(favGlyphLbl);
 
         const favSectionLabel = Gtk.Label.new('Favorites');
         favSectionLabel.add_css_class('fav-section-label');
@@ -1066,6 +1070,7 @@ const AppLauncherWindow = GObject.registerClass({
         this._flow.set_row_spacing(2);
         this._flow.set_column_spacing(2);
         this._flow.set_homogeneous(true);
+        this._flow.set_valign(Gtk.Align.START);   // prevents rows stretching when content is short
         this._flow.set_selection_mode(Gtk.SelectionMode.SINGLE);
         this._flow.add_css_class('launcher-grid');
         scroll.set_child(this._flow);
@@ -1138,13 +1143,17 @@ const AppLauncherWindow = GObject.registerClass({
         const groups = readGroups();   // plain object { name: [className, …] }
 
         for (const [groupName, members] of Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))) {
-            const groupApps = this._allApps.filter(a =>
-                members.includes(a.className) &&
-                (!q || a.name.toLowerCase().includes(q))
-            );
-            if (groupApps.length === 0) continue;
+            // All apps that belong to this group (ignoring query).
+            const allGroupApps = this._allApps.filter(a => members.includes(a.className));
+            // Always skip genuinely empty groups (no installed members).
+            if (allGroupApps.length === 0) continue;
 
-            // Preserve collapse state across rebuilds; default to collapsed.
+            // During search: show ALL group members so the strip is informative
+            // and the drop-target grid is always reachable for drag-and-drop.
+            const groupApps = allGroupApps;
+
+            // Respect stored collapse state during search (collapsed by default);
+            // user can expand manually just as in normal mode.
             if (!this._groupCollapsed) this._groupCollapsed = {};
             const collapsed = this._groupCollapsed[groupName] ?? true;
 
@@ -2180,11 +2189,14 @@ const AppLauncherWindow = GObject.registerClass({
             if (!ch) break;
             this._favFlow.remove(ch);
         }
-        const favApps = this._allApps.filter(a =>
-            this._favoritesSet.has(a.className) &&
-            (!q || a.name.toLowerCase().includes(q))
-        );
-        this._favSection.set_visible(favApps.length > 0);
+        // Section header stays visible as long as ANY favorites exist so the
+        // user can see (and drag to) the bar even when the query filters them out.
+        const allFavApps = this._allApps.filter(a => this._favoritesSet.has(a.className));
+        this._favSection.set_visible(allFavApps.length > 0);
+        // Only populate the grid with apps that match the current query.
+        const favApps = q
+            ? allFavApps.filter(a => a.name.toLowerCase().includes(q))
+            : allFavApps;
         for (const app of favApps)
             this._favFlow.append(this._makeAppTile(app));
     }
