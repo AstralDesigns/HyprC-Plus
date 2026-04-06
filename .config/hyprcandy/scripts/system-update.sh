@@ -78,7 +78,25 @@ if [ "$1" == "up" ]; then
   export YELLOW NC aur_helper
   command="
     $0 upgrade
+    qt6_will_update=\$(${aur_helper} -Qu 2>/dev/null | awk '{print \$1}' | grep -i '^qt6')
     ${aur_helper} -Syu
+    if pkg_installed qt6ct-kde && [ -n \"\$qt6_will_update\" ]; then
+        echo
+        print_status \"Qt6 packages were updated — checking qt6ct-kde linkage...\"
+        qt6ct_bin=\$(pacman -Ql qt6ct-kde 2>/dev/null | awk '{print \$2}' | grep -E '/usr/(bin|lib)/qt6ct' | head -1)
+        qt6_linked_ver=\"\"
+        if [ -n \"\$qt6ct_bin\" ] && [ -f \"\$qt6ct_bin\" ]; then
+            qt6_linked_ver=\$(ldd \"\$qt6ct_bin\" 2>/dev/null | grep 'libQt6Core\.so' | sed 's/.*libQt6Core\.so\.\([0-9]*\).*/\1/')
+        fi
+        qt6_installed_major=\$(pacman -Q qt6-base 2>/dev/null | awk '{print \$2}' | grep -oP '\d+' | head -1)
+        if [ -n \"\$qt6_linked_ver\" ] && [ -n \"\$qt6_installed_major\" ] && [ \"\$qt6_linked_ver\" != \"\$qt6_installed_major\" ]; then
+            print_warning \"qt6ct-kde links libQt6Core.so.\$qt6_linked_ver but qt6-base \$qt6_installed_major.x installed — rebuilding...\"
+            ${aur_helper} -S --rebuild qt6ct-kde
+            print_status \"󰸞 qt6ct-kde rebuilt.\"
+        else
+            print_status \"qt6ct-kde linkage is in sync — no rebuild needed.\"
+        fi
+    fi
     if command -v checkrebuild >/dev/null; then
         echo
         print_status \"Checking for packages requiring a rebuild...\"
@@ -119,7 +137,41 @@ if [ "$1" == "run" ]; then
   printf "Official:  %-10s\nAUR (%s): %-10s\nFlatpak:   %-10s\n\n" \
     "$official_updates_now" "$aur_helper" "$aur_updates_now" "$flatpak_updates_now"
 
+  # Snapshot which qt6 packages have pending updates BEFORE upgrading
+  qt6_will_update=$(${aur_helper} -Qu 2>/dev/null | awk '{print $1}' | grep -i '^qt6')
+
   ${aur_helper} -Syu
+
+  # ── qt6ct-kde sync check ───────────────────────────────────────────────
+  # qt6ct-kde links against libQt6Core.so at build time. When a major qt6
+  # update bumps the soname, qt6ct-kde's binary breaks all QT6 apps until
+  # rebuilt. Detect and fix automatically when qt6 packages were updated.
+  if pkg_installed qt6ct-kde && [ -n "$qt6_will_update" ]; then
+      echo
+      print_status "Qt6 packages were updated — checking qt6ct-kde linkage..."
+      qt6ct_bin=$(pacman -Ql qt6ct-kde 2>/dev/null \
+          | awk '{print $2}' \
+          | grep -E '/usr/(bin|lib)/qt6ct' \
+          | head -1)
+      qt6_linked_ver=""
+      if [ -n "$qt6ct_bin" ] && [ -f "$qt6ct_bin" ]; then
+          qt6_linked_ver=$(ldd "$qt6ct_bin" 2>/dev/null \
+              | grep 'libQt6Core\.so' \
+              | sed 's/.*libQt6Core\.so\.\([0-9]*\).*/\1/')
+      fi
+      qt6_installed_major=$(pacman -Q qt6-base 2>/dev/null \
+          | awk '{print $2}' \
+          | grep -oP '\d+' \
+          | head -1)
+      if [ -n "$qt6_linked_ver" ] && [ -n "$qt6_installed_major" ] \
+         && [ "$qt6_linked_ver" != "$qt6_installed_major" ]; then
+          print_warning "qt6ct-kde links libQt6Core.so.$qt6_linked_ver but qt6-base $qt6_installed_major.x installed — rebuilding..."
+          ${aur_helper} -S --rebuild qt6ct-kde
+          print_status "󰸞 qt6ct-kde rebuilt."
+      else
+          print_status "qt6ct-kde linkage is in sync — no rebuild needed."
+      fi
+  fi
 
   if command -v checkrebuild >/dev/null; then
       echo
