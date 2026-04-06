@@ -354,27 +354,48 @@ PanelWindow {
             _lcValReader._buf = ""
         }
     }
+    // Individual SDDM value readers — mirror the dock pattern so each field
+    // reads directly from theme.conf (world-readable, no sudo needed) and
+    // updates its property independently before the TextInput renders.
     Process {
         id: _sddmValReader
+        command: ["bash", "-c", "true"]   // kept so existing _sddmValReader.running = true calls are harmless
+        running: false
+    }
+    Process {
+        id: _sddmReadHeader
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_header.state\" ] && cat \"$sd/sddm_header.state\" || " +
-            "  sudo grep -oP '^HeaderText=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1; " +
-            "[ -f \"$sd/sddm_form.state\" ] && cat \"$sd/sddm_form.state\" || " +
-            "  sudo grep -oP '^FormPosition=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1; " +
-            "[ -f \"$sd/sddm_blur.state\" ] && cat \"$sd/sddm_blur.state\" || " +
-            "  sudo grep -oP '^BlurRadius=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1"]
+            "  grep -oP '^HeaderText=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1"]
         running: false
-        property var _lines: []
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: function(l) { _sddmValReader._lines.push(l.trim()) }
+            onRead: function(l) { const v = l.trim(); if (v) _sddmHeaderVal = v }
         }
-        onExited: {
-            const ls = _lines; _lines = []
-            _sddmHeaderVal = (ls[0] !== undefined && ls[0]) ? ls[0] : ""
-            _sddmFormVal   = (ls[1] !== undefined && ls[1]) ? ls[1] : "center"
-            _sddmBlurVal   = (ls[2] !== undefined && ls[2]) ? ls[2] : "75"
+    }
+    Process {
+        id: _sddmReadForm
+        command: ["bash", "-c",
+            "sd=\"$HOME/.config/hyprcandy\"; " +
+            "[ -f \"$sd/sddm_form.state\" ] && cat \"$sd/sddm_form.state\" || " +
+            "  grep -oP '^FormPosition=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { const v = l.trim(); if (v) _sddmFormVal = v }
+        }
+    }
+    Process {
+        id: _sddmReadBlur
+        command: ["bash", "-c",
+            "sd=\"$HOME/.config/hyprcandy\"; " +
+            "[ -f \"$sd/sddm_blur.state\" ] && cat \"$sd/sddm_blur.state\" || " +
+            "  grep -oP '^BlurRadius=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { const v = l.trim(); if (v && !isNaN(parseInt(v))) _sddmBlurVal = v }
         }
     }
 
@@ -2709,6 +2730,16 @@ PanelWindow {
                             }
                             Process { id: _sddmBlur; running: false }
 
+                            // Start all SDDM reads on tab render — same pattern as dock
+                            Timer {
+                                interval: 100; running: true; repeat: false
+                                onTriggered: {
+                                    _sddmReadHeader.running = true
+                                    _sddmReadForm.running   = true
+                                    _sddmReadBlur.running   = true
+                                }
+                            }
+
                             CCPillBtn { text: "󰈈 Preview"; onClicked: _sddmPreview.running = true }
                             Process {
                                 id: _sddmPreview
@@ -3749,9 +3780,13 @@ PanelWindow {
 
     // ── Text entry row ───────────────────────────────────────────────────
     component CCEntryRow: RowLayout {
+        id: _cerRoot
         property alias label: _erl.text
         property string value: ""
         signal applied(string val)
+        // Re-sync the TextInput whenever the backing property is updated
+        // by an async process reader (QML breaks text: binding on user interaction)
+        onValueChanged: _cerInput.text = value
 
         Layout.fillWidth: true; spacing: 8
 
@@ -3768,6 +3803,7 @@ PanelWindow {
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
             TextInput {
+                id: _cerInput
                 anchors { fill: parent; margins: 6 }
                 text: value
                 color: Theme.cPrimary
