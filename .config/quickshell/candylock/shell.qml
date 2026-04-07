@@ -132,24 +132,24 @@ ShellRoot {
     }
 
     function wmoIcon(code, isDay, humidity) {
-        if(code===0)  return isDay?"󰖙":"󰖔"
-        if(code<=2)   return isDay?"󰖕":"󰼱"
+        if(code===0)  return isDay?"󰖙":"󰖔"                           // clear day/night
+        if(code<=2)   return isDay?"󰖕":"󰼱"                           // mainly clear
         if(code===3)  return humidity>=85
-            ?(isDay?"":"")
-            :(isDay?"󰼰":"󰖑")
-        if(code<=48)  return isDay?"":" "
-        if(code<=55)  return "󰖗"
-        if(code<=57)  return "󰖒"
-        if(code===61) return "󰖗"
-        if(code<=63)  return "󰖖"
-        if(code<=65)  return "󰙾"
-        if(code<=67)  return "󰙿"
-        if(code===77) return "󰖘"
-        if(code<=77)  return "󰜗"
-        if(code<=82)  return "󰙾"
-        if(code<=86)  return "󰼶"
-        if(code<=99)  return "󰖓"
-        return "󰖐"
+            ?(isDay?"":"")                                            // overcast+humid (rainy)
+            :(isDay?"󰼰":"󰖑")                                          // overcast
+        if(code<=48)  return isDay?"":""                             // fog
+        if(code<=55)  return "󰖗"                                                  // drizzle
+        if(code<=57)  return "󰖒"                                                  // freezing drizzle
+        if(code===61) return "󰖗"                                                  // slight rain
+        if(code<=63)  return "󰖖"                                                  // moderate rain
+        if(code<=65)  return "󰙾"                                                  // heavy rain
+        if(code<=67)  return "󰙿"                                                  // freezing rain
+        if(code===77) return "󰖘"                                                  // snow grains
+        if(code<=77)  return "󰜗"                                                  // snow
+        if(code<=82)  return "󰙾"                                                  // rain showers
+        if(code<=86)  return "󰼶"                                                  // snow showers
+        if(code<=99)  return "󰖓"                                                  // thunderstorm
+        return "󰖐"                                                                 // unknown
     }
 
     function _updateWeatherDisplay() {

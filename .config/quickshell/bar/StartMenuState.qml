@@ -562,6 +562,14 @@ Item {
     Process { id: logoutProc; command:["bash","-c","hyprctl dispatch exit"] }
     Process { id: powerProc; property string _cmd:""; command:["bash","-c",powerProc._cmd] }
 
+    function runPowerCmd(cmd) {
+        powerProc._cmd = cmd
+        if (!powerProc.running) powerProc.running = true
+    }
+    function logout() {
+        if (!logoutProc.running) logoutProc.running = true
+    }
+
     // ── User icon ────────────────────────────────────────────────────────────────
     property string _userIconPath: ""
     property string _lastIconTime: "0"

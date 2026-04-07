@@ -27,7 +27,8 @@ Rectangle {
         id: ph; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
         onClicked: {
             StartMenuState.menuVisible = false
-            Quickshell.execDetached(["sh", "-c", pmb.modelData.cmd])
+            powerProc._cmd = pmb.modelData.cmd
+            if (!powerProc.running) powerProc.running = true
         }
     }
 }
