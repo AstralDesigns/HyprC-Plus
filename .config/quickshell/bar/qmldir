@@ -1,5 +1,7 @@
 singleton Theme 1.0 Theme.qml
 singleton Config 1.0 Config.qml
+singleton NotificationsState 1.0 NotificationsState.qml
+singleton StartMenuState 1.0 StartMenuState.qml
 singleton LauncherState 1.0 LauncherState.qml
 singleton PowerMenuState 1.0 PowerMenuState.qml
 singleton CpuState 1.0 CpuState.qml
@@ -29,3 +31,7 @@ UpdatesPopup 1.0 UpdatesPopup.qml
 singleton PowerLauncherState 1.0 PowerLauncherState.qml
 singleton ControlCenterState 1.0 ControlCenterState.qml
 ControlCenterPopup 1.0 ControlCenterPopup.qml
+NotificationsPopup 1.0 NotificationsPopup.qml
+StartMenuPopup 1.0 StartMenuPopup.qml
+SliderBg 1.0 SliderBg.qml
+ProfilePill 1.0 ProfilePill.qml

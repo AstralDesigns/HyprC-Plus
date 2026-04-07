@@ -21,3 +21,4 @@ ActiveWindow 1.0 ActiveWindow.qml
 WallpaperBtn 1.0 WallpaperBtn.qml
 OverviewBtn 1.0 OverviewBtn.qml
 ControlCenter 1.0 ControlCenter.qml
+StartMenu 1.0 StartMenu.qml

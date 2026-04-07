@@ -55,6 +55,8 @@ ShellRoot {
     Loader { active: TrayMenuState.visible;      source: "TrayMenuPopup.qml" }
     UpdatesPopup {}
     Loader { active: ControlCenterState.visible;  source: "ControlCenterPopup.qml" }
+    Loader { active: NotificationsState.historyVisible || NotificationsState.notifications.length > 0; source: "NotificationsPopup.qml" }
+    Loader { active: StartMenuState.menuVisible;    source: "StartMenuPopup.qml"    }
 
     // ── One bar instance per monitor ────────────────────────────────────────
     Variants {
@@ -129,5 +131,18 @@ ShellRoot {
 
         // Control center toggle
         function toggleControlCenter() { ControlCenterState.toggle() }
+
+        // Notifications toggle (in-process, no separate qs config needed)
+        function toggleNotifications() { NotificationsState.toggle() }
+        function openNotifications()   { NotificationsState.open() }
+        function closeNotifications()  { NotificationsState.close() }
+        function dndToggle()           { NotificationsState.dndToggle() }
+        function dndOn()               { NotificationsState.dndOn() }
+        function dndOff()              { NotificationsState.dndOff() }
+
+        // Start menu toggle (in-process)
+        function toggleStartMenu() { StartMenuState.toggle() }
+        function openStartMenu()   { StartMenuState.open() }
+        function closeStartMenu()  { StartMenuState.close() }
     }
 }
