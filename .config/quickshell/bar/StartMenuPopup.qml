@@ -178,9 +178,7 @@ PanelWindow {
                         MouseArea { id: nxh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 StartMenuState.networkExpanded = !StartMenuState.networkExpanded
-                                if (StartMenuState.networkExpanded) {
-                                    StartMenuState.startNetScan()
-                                }
+                                if (StartMenuState.networkExpanded) StartMenuState.startNetScan()
                             }
                         }
                     }
@@ -315,6 +313,159 @@ PanelWindow {
                     visible: StartMenuState.btExpanded
                     Layout.fillWidth: true; width: parent.width; spacing: 2
 
+                    // ── Pairing confirmation dialog ──────────────────────
+                    Rectangle {
+                        visible: StartMenuState.btPairDialogVisible
+                        width: parent.width
+                        height: visible ? pairDialogCol.implicitHeight + 16 : 0
+                        radius: 10
+                        color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.85)
+                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+
+                        Column {
+                            id: pairDialogCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+                            spacing: 8
+
+                            Text {
+                                width: parent.width
+                                text: StartMenuState.btPairDialogType === "confirm"
+                                    ? "Pair with \"" + StartMenuState.btPairDialogName + "\"?"
+                                    : StartMenuState.btPairDialogType === "authorize"
+                                        ? "Allow \"" + StartMenuState.btPairDialogName + "\" to connect?"
+                                        : "Enter PIN for \"" + StartMenuState.btPairDialogName + "\""
+                                color: Theme.cOnSurf; font.pixelSize: 12; font.weight: Font.Medium; wrapMode: Text.Wrap
+                            }
+
+                            // Passkey display for "confirm" type
+                            Text {
+                                visible: StartMenuState.btPairDialogType === "confirm" && StartMenuState.btPairDialogPasskey !== ""
+                                text: "Passkey: " + StartMenuState.btPairDialogPasskey
+                                color: Theme.cPrimary; font.pixelSize: 18; font.weight: Font.Bold
+                                width: parent.width; horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            // PIN entry for "pin" / "passkey" types
+                            Rectangle {
+                                visible: StartMenuState.btPairDialogType === "pin" || StartMenuState.btPairDialogType === "passkey"
+                                width: parent.width; height: 32; radius: 8
+                                color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.7)
+                                border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.5)
+
+                                readonly property string _placeholderText: StartMenuState.btPairDialogType === "passkey" ? "Passkey (numeric)" : "PIN"
+
+                                TextInput {
+                                    id: btPinInput
+                                    anchors { fill: parent; leftMargin: 10; rightMargin: 10; topMargin: 6; bottomMargin: 6 }
+                                    color: Theme.cOnSurf; font.pixelSize: 12
+                                    inputMethodHints: StartMenuState.btPairDialogType === "passkey"
+                                        ? Qt.ImhDigitsOnly : Qt.ImhNone
+                                    onTextChanged: StartMenuState.btPairDialogPasskey = text
+                                    onAccepted: StartMenuState.btAcceptPair()
+                                    focus: StartMenuState.btPairDialogVisible &&
+                                           (StartMenuState.btPairDialogType === "pin" || StartMenuState.btPairDialogType === "passkey")
+                                }
+
+                                Text {
+                                    text: parent._placeholderText
+                                    color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.5)
+                                    font.pixelSize: 12; font.italic: true
+                                    anchors { left: parent.left; leftMargin: 10; verticalCenter: parent.verticalCenter }
+                                    visible: btPinInput.text === "" && !btPinInput.activeFocus
+                                }
+                            }
+
+                            RowLayout {
+                                width: parent.width; spacing: 6
+                                Item { Layout.fillWidth: true }
+                                Rectangle {
+                                    height: 28; radius: 7; implicitWidth: rejLbl.implicitWidth + 20
+                                    color: rejH.containsMouse
+                                        ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
+                                        : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                    border.width: 1; border.color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.45)
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    RowLayout { id: rejLbl; anchors.centerIn: parent; spacing: 4
+                                        Text { text: "󰅙"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cErr }
+                                        Text { text: "Reject"; font.pixelSize: 11; color: Theme.cErr }
+                                    }
+                                    MouseArea { id: rejH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: StartMenuState.btRejectPair() }
+                                }
+                                Rectangle {
+                                    height: 28; radius: 7; implicitWidth: accLbl.implicitWidth + 20
+                                    color: accH.containsMouse
+                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    RowLayout { id: accLbl; anchors.centerIn: parent; spacing: 4
+                                        Text { text: "󰄬"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cPrimary }
+                                        Text { text: "Accept"; font.pixelSize: 11; color: Theme.cPrimary }
+                                    }
+                                    MouseArea { id: accH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: StartMenuState.btAcceptPair() }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Incoming file dialog ──────────────────────────────
+                    Rectangle {
+                        visible: StartMenuState.btFileDialogVisible
+                        width: parent.width
+                        height: visible ? fileDialogCol.implicitHeight + 16 : 0
+                        radius: 10
+                        color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.85)
+                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+
+                        Column {
+                            id: fileDialogCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+                            spacing: 6
+                            Text {
+                                width: parent.width
+                                text: "Incoming file from \"" + StartMenuState.btFileDialogName + "\""
+                                color: Theme.cOnSurf; font.pixelSize: 12; font.weight: Font.Medium; wrapMode: Text.Wrap
+                            }
+                            Text {
+                                width: parent.width
+                                text: StartMenuState.btFileDialogFile + " (" + (StartMenuState.btFileDialogSize > 1048576
+                                    ? (StartMenuState.btFileDialogSize/1048576).toFixed(1)+" MB"
+                                    : StartMenuState.btFileDialogSize > 1024
+                                        ? (StartMenuState.btFileDialogSize/1024).toFixed(0)+" KB"
+                                        : StartMenuState.btFileDialogSize+" B") + ")"
+                                color: Theme.cOnSurfVar; font.pixelSize: 10; elide: Text.ElideMiddle
+                            }
+                            RowLayout { width: parent.width; spacing: 6
+                                Item { Layout.fillWidth: true }
+                                Rectangle {
+                                    height: 26; radius: 7; implicitWidth: fRejLbl.implicitWidth + 18
+                                    color: fRejH.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18) : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                    border.width: 1; border.color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.45)
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    RowLayout { id: fRejLbl; anchors.centerIn: parent; spacing: 4
+                                        Text { text: "󰅙"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cErr }
+                                        Text { text: "Decline"; font.pixelSize: 10; color: Theme.cErr }
+                                    }
+                                    MouseArea { id: fRejH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.btRejectFile() }
+                                }
+                                Rectangle {
+                                    height: 26; radius: 7; implicitWidth: fAccLbl.implicitWidth + 18
+                                    color: fAccH.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25) : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    RowLayout { id: fAccLbl; anchors.centerIn: parent; spacing: 4
+                                        Text { text: "󰇚"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cPrimary }
+                                        Text { text: "Save"; font.pixelSize: 10; color: Theme.cPrimary }
+                                    }
+                                    MouseArea { id: fAccH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.btAcceptFile() }
+                                }
+                            }
+                        }
+                    }
+
+                    // Toolbar: Discoverable + Scan + Receive
                     Row { width: parent.width; spacing: 6
                         Rectangle {
                             height: 26; radius: 8; width: 96
@@ -373,6 +524,7 @@ PanelWindow {
                         text: "Bluetooth is off"; color: Theme.cOnSurfVar; font.pixelSize: 11; font.italic: true; leftPadding: 4; topPadding: 4
                     }
 
+                    // Device list
                     Repeater {
                         model: StartMenuState.btDevices
                         delegate: Column {
@@ -463,9 +615,9 @@ PanelWindow {
                                         width: parent.width; spacing: 4
                                         visible: StartMenuState.btHasAudioCard[btDelegate.modelData.mac] === true
                                         Text { text: "Profile:"; font.pixelSize: 10; color: Theme.cOnSurfVar; Layout.preferredWidth: 40 }
-                                        ProfilePill { pLabel: "A2DP"; pProfile: "a2dp-sink"; pMac: btDelegate.modelData.mac }
+                                        ProfilePill { pLabel: "A2DP";    pProfile: "a2dp-sink";        pMac: btDelegate.modelData.mac }
                                         ProfilePill { pLabel: "HSP/HFP"; pProfile: "headset-head-unit"; pMac: btDelegate.modelData.mac }
-                                        ProfilePill { pLabel: "Off"; pProfile: "off"; pMac: btDelegate.modelData.mac }
+                                        ProfilePill { pLabel: "Off";     pProfile: "off";               pMac: btDelegate.modelData.mac }
                                         Item { Layout.fillWidth: true }
                                     }
 
@@ -505,12 +657,12 @@ PanelWindow {
                                             Behavior on color { ColorAnimation { duration: 100 } }
                                             RowLayout { id: trLbl; anchors.centerIn: parent; spacing: 4
                                                 Text {
-                                                    text: trustRect._isTrusted ? "󰒃" : "󰒄"
+                                                    text: trustRect._isTrusted ? "󱈘" : "󰒃" //󰒄
                                                     font.pixelSize: 11; font.family: Config.fontFamily
                                                     color: trustRect._isTrusted ? Theme.cErr : Theme.cPrimary
                                                 }
-                                                Text { text: trustRect._isTrusted ? "Untrust" : "Trust"
-                                                    font.pixelSize: 10; color: trustRect._isTrusted ? Theme.cErr : Theme.cOnSurf }
+                                                //Text { text: trustRect._isTrusted ? "Untrust" : "Trust"
+                                                    //font.pixelSize: 10; color: trustRect._isTrusted ? Theme.cErr : Theme.cOnSurf }
                                             }
                                             MouseArea { id: trh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                                 onClicked: StartMenuState.btSetTrust(btDelegate.modelData.mac, !trustRect._isTrusted) }
@@ -542,7 +694,7 @@ PanelWindow {
                                             Behavior on color { ColorAnimation { duration: 100 } }
                                             RowLayout { id: rpLbl; anchors.centerIn: parent; spacing: 4
                                                 Text { text: "󰑓"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
-                                                Text { text: "Repair"; font.pixelSize: 10; color: Theme.cOnSurfVar }
+                                                Text { text: "Fix"; font.pixelSize: 10; color: Theme.cOnSurfVar }
                                             }
                                             MouseArea { id: rph; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                                 onClicked: StartMenuState.btRepair(btDelegate.modelData.mac) }
@@ -555,7 +707,7 @@ PanelWindow {
                                             Behavior on color { ColorAnimation { duration: 100 } }
                                             RowLayout { id: fgLbl; anchors.centerIn: parent; spacing: 4
                                                 Text { text: "󰆴"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cErr; opacity: 0.8 }
-                                                Text { text: "Forget"; font.pixelSize: 10; color: Theme.cErr; opacity: 0.8 }
+                                                //Text { text: "Forget"; font.pixelSize: 10; color: Theme.cErr; opacity: 0.8 }
                                             }
                                             MouseArea { id: fgh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                                 onClicked: StartMenuState.btForget(btDelegate.modelData.mac) }
@@ -630,6 +782,74 @@ PanelWindow {
             }
 
             Item { height: 4 }
+        }
+    }
+
+    // ── ProfilePill component ─────────────────────────────────────────────────
+    component ProfilePill: Rectangle {
+        id: pill
+        required property string pLabel
+        required property string pProfile
+        required property string pMac
+        property bool isActive: (StartMenuState.btActiveProfile[pMac] || "").indexOf(pProfile) >= 0
+        height: 24; radius: 6; width: pillLbl.implicitWidth + 20
+        color: isActive ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+            : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+        border.width: 1
+        border.color: isActive ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.7)
+            : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.4)
+        Behavior on color { ColorAnimation { duration: 100 } }
+        Text { id: pillLbl; anchors.centerIn: parent; text: pill.pLabel; font.pixelSize: 10
+            color: pill.isActive ? Theme.cPrimary : Theme.cOnSurfVar }
+        MouseArea { anchors.fill: parent; anchors.margins: -1; cursorShape: Qt.PointingHandCursor
+            onClicked: StartMenuState.btSetProfile(pill.pMac, pill.pProfile) }
+    }
+
+    // ── SliderBg component ────────────────────────────────────────────────────
+    component SliderBg: Item {
+        id: sl
+        property real value: 0.0
+        property color gradA: Theme.cInversePrimary
+        property color gradB: Theme.cOnPrimary
+        property color track: Theme.cOutVar
+        property color accent: Theme.cPrimary
+        signal moved(real v)
+
+        readonly property int trackH: 14
+        readonly property int pad:    3
+        readonly property int innerH: trackH - pad * 2
+
+        Item {
+            y: (parent.height - sl.trackH) / 2; width: parent.width; height: sl.trackH
+            Rectangle {
+                anchors.fill: parent; radius: sl.trackH / 2
+                color: Qt.rgba(sl.track.r, sl.track.g, sl.track.b, 0.28)
+                border.width: 1; border.color: Qt.rgba(sl.accent.r, sl.accent.g, sl.accent.b, 0.55)
+            }
+            Item {
+                x: sl.pad; y: sl.pad
+                width: Math.max(0, (parent.width - sl.pad * 2) * sl.value); height: sl.innerH; clip: true
+                Rectangle {
+                    width: parent.parent.width - sl.pad * 2; height: sl.innerH; radius: sl.innerH / 2
+                    gradient: Gradient { orientation: Gradient.Horizontal
+                        GradientStop { position: 0.0; color: sl.gradA }
+                        GradientStop { position: 1.0; color: sl.gradB }
+                    }
+                }
+            }
+            Text {
+                text: "󰟃"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: sl.innerH + 2
+                color: sl.accent; style: Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.25)
+                x: { const tw = parent.width - sl.pad * 2; const cx = sl.pad + tw * sl.value - implicitWidth / 2
+                     return Math.max(sl.pad - implicitWidth/2 + 1, Math.min(parent.width - sl.pad - implicitWidth/2 - 1, cx)) }
+                y: (sl.trackH - implicitHeight) / 2
+            }
+        }
+        MouseArea {
+            anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; preventStealing: true
+            onPressed:         function(m) { const v = Math.max(0, Math.min(1, m.x/width)); sl.value = v; sl.moved(v) }
+            onPositionChanged: function(m) { if (pressed) { const v = Math.max(0, Math.min(1, m.x/width)); sl.value = v; sl.moved(v) } }
+            onWheel:           function(e) { const step = 0.02 * (e.angleDelta.y > 0 ? 1 : -1); const v = Math.max(0, Math.min(1, sl.value + step)); sl.value = v; sl.moved(v) }
         }
     }
 }

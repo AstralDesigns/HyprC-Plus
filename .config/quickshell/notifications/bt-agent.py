@@ -176,7 +176,7 @@ class QuickshellBTAgent(dbus.service.Object):
         # Auto-authorize service connections for already-paired devices
         reply_handler()
 
-    @dbus.service.method(AGENT_IFACE, in_signature="o", out_signature="")
+    @dbus.service.method(AGENT_IFACE, in_signature="os", out_signature="")
     def DisplayPinCode(self, device, pincode):
         mac, name = mac_from_path(self.bus, str(device))
         emit({"type":"display_pin","mac":mac,"name":name,"pin":str(pincode)})
