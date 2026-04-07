@@ -29,8 +29,8 @@ PanelWindow {
         right:   true
     }
     margins {
-        top:    6
-        bottom: 6
+        top:    1
+        bottom: 1
         right:  _panelMargin
     }
     implicitWidth: 340
