@@ -38,24 +38,34 @@ Item {
 
     // ── Brightness ───────────────────────────────────────────────────────────
     property real backlightValue: 1.0; property real backlightMax: 100
+    property bool _backlightUserChanging: false
+    Timer { id: backlightUserChangingTimer; interval: 400; repeat: false
+        onTriggered: { sm._backlightUserChanging = false } }
     Process { id: blReadProc
         command:["brightnessctl","-m"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
             const p=l.split(",")
-            if(p.length>=4){
-                sm.backlightMax=parseFloat(p[2])||100
-                sm.backlightValue=parseFloat(p[3].replace("%",""))/100
+            if(p.length>=5){
+                sm.backlightMax=parseFloat(p[4])||4882
+                if (!sm._backlightUserChanging)
+                    sm.backlightValue=parseFloat(p[3].replace("%",""))/100
             }
         }}
         Component.onCompleted: running=true
     }
     Process { id: blSetProc; property string _val:""; property string _queued:""
         command:["brightnessctl","s",blSetProc._val]
-        onExited: { if(_queued!==""){ _val=_queued; _queued=""; running=true } }
+        onExited: { if(_queued!==""){ _val=_queued; _queued=""; running=true } else { backlightUserChangingTimer.restart() } }
     }
-    function setBacklight(v){ const n=String(Math.round(v*sm.backlightMax)); if(blSetProc.running){ blSetProc._queued=n } else { blSetProc._val=n; blSetProc.running=true } }
-    // Poll brightness every 500ms so slider reflects external keybind changes
-    Timer { interval:500; repeat:true; running:true
+    function setBacklight(v){
+        sm._backlightUserChanging = true
+        backlightUserChangingTimer.restart()
+        const n=String(Math.round(v*sm.backlightMax))
+        if(blSetProc.running){ blSetProc._queued=n } else { blSetProc._val=n; blSetProc.running=true }
+    }
+    // Initial poll + fast polling to match volume slider responsiveness
+    Timer { interval:250; running:true; repeat:false; onTriggered: if(!blReadProc.running) blReadProc.running=true }
+    Timer { interval:200; repeat:true; running:true
         onTriggered: { if(!blReadProc.running) blReadProc.running=true } }
 
     // ── Volume ────────────────────────────────────────────────────────────────
