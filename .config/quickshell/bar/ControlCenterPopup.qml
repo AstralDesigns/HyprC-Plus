@@ -141,6 +141,18 @@ PanelWindow {
         }
     }
 
+    // Fix: Connections fires too late on first open (signal already emitted by
+    // the time the Loader instantiates this PanelWindow). Kick all readers
+    // immediately so fields are populated on the very first open.
+    Component.onCompleted: {
+        _hyprlandValReader.running = true
+        _dockValReader.running     = true
+        _rofiValReader.running     = true
+        _lcValReader.running       = true
+        _sddmValReader.running     = true
+        _weatherLocReader.running  = true
+    }
+
     // Read hyprland config values
     Process {
         id: _hyprlandValReader
@@ -183,15 +195,15 @@ PanelWindow {
         onExited: {
             const lines = _output.trim().split("\n")
             _output = ""
-            // Force-set both the backing property AND the TextInput text so stale
-            // QML bindings (broken by prior user edits) are always refreshed.
-            if (lines[0] && lines[0].length > 0) { _opacEntryVal      = lines[0]; _opacTI.text      = lines[0] }
-            if (lines[1] && lines[1].length > 0) { _blurSizeEntryVal  = lines[1]; _blurSizeTI.text  = lines[1] }
-            if (lines[2] && lines[2].length > 0) { _blurPassesEntryVal= lines[2]; _blurPassesTI.text= lines[2] }
-            if (lines.length > 3) { _gapsInnerEntryVal = lines[3] || "0"; _gapsInnerTI.text  = _gapsInnerEntryVal }
-            if (lines.length > 4) { _gapsOuterEntryVal = lines[4] || "0"; _gapsOuterTI.text  = _gapsOuterEntryVal }
-            if (lines.length > 5) { _borderWEntryVal   = lines[5] || "0"; _borderWTI.text    = _borderWEntryVal }
-            if (lines.length > 6) { _borderREntryVal   = lines[6] || "0"; _borderRTI.text    = _borderREntryVal }
+            // Only update backing properties — let the text: bindings propagate.
+            // Direct TI.text assignments break QML bindings permanently.
+            if (lines[0] && lines[0].length > 0) _opacEntryVal       = lines[0]
+            if (lines[1] && lines[1].length > 0) _blurSizeEntryVal   = lines[1]
+            if (lines[2] && lines[2].length > 0) _blurPassesEntryVal = lines[2]
+            if (lines.length > 3) _gapsInnerEntryVal = lines[3] || "0"
+            if (lines.length > 4) _gapsOuterEntryVal = lines[4] || "0"
+            if (lines.length > 5) _borderWEntryVal   = lines[5] || "0"
+            if (lines.length > 6) _borderREntryVal   = lines[6] || "0"
             // Parse border colors — detect matugen variables or hex colors
             if (lines.length > 7) {
                 const activeVal = lines[7] ? lines[7].trim() : ""
@@ -1754,6 +1766,12 @@ PanelWindow {
                                             _opacSet.running = true
                                             _opacEntryVal = text
                                         }
+                                        Connections {
+                                            target: ccWin
+                                            function on_opacEntryValChanged() {
+                                                if (!_opacTI.activeFocus) _opacTI.text = ccWin._opacEntryVal
+                                            }
+                                        }
                                     }
                                 }
                                 CCPillBtn {
@@ -1804,6 +1822,12 @@ PanelWindow {
                                             _blurSizeSet.command = [scriptDir + "/hyprland-blur-size-set.sh", text]
                                             _blurSizeSet.running = true
                                             _blurSizeEntryVal = text
+                                        }
+                                        Connections {
+                                            target: ccWin
+                                            function on_blurSizeEntryValChanged() {
+                                                if (!_blurSizeTI.activeFocus) _blurSizeTI.text = ccWin._blurSizeEntryVal
+                                            }
                                         }
                                     }
                                 }
@@ -1856,6 +1880,12 @@ PanelWindow {
                                             _blurPassesSet.running = true
                                             _blurPassesEntryVal = text
                                         }
+                                        Connections {
+                                            target: ccWin
+                                            function on_blurPassesEntryValChanged() {
+                                                if (!_blurPassesTI.activeFocus) _blurPassesTI.text = ccWin._blurPassesEntryVal
+                                            }
+                                        }
                                     }
                                 }
                                 CCPillBtn {
@@ -1884,11 +1914,8 @@ PanelWindow {
                                     Layout.preferredWidth: 100
                                 }
                                 CCPillBtn { text: "−"; onClicked: {
-                                    const nv = Math.max(0, (parseInt(_gapsInnerEntryVal) || 0) - 1)
-                                    _gapsInnerDec.command=[scriptDir+"/hyprland-gaps-inner-set.sh", nv.toString()]
+                                    _gapsInnerDec.command=[scriptDir+"/hyprland-gaps-inner-adjust.sh", "-1"]
                                     _gapsInnerDec.running=true
-                                    _gapsInnerEntryVal = nv.toString()
-                                    _gapsInnerTI.text  = _gapsInnerEntryVal
                                 }}
                                 Rectangle {
                                     Layout.preferredWidth: 60; height: 28; radius: 7
@@ -1902,30 +1929,30 @@ PanelWindow {
                                         horizontalAlignment: Text.AlignHCenter
                                         validator: IntValidator { bottom: 0; top: 100 }
                                         onAccepted: { _gapsInnerSet.command=[scriptDir+"/hyprland-gaps-inner-set.sh",text]; _gapsInnerSet.running=true; _gapsInnerEntryVal=text }
+                                        Connections {
+                                            target: ccWin
+                                            function on_gapsInnerEntryValChanged() {
+                                                if (!_gapsInnerTI.activeFocus) _gapsInnerTI.text = ccWin._gapsInnerEntryVal
+                                            }
+                                        }
                                     }
                                 }
                                 CCPillBtn { text: "+"; onClicked: {
-                                    const nv = Math.min(100, (parseInt(_gapsInnerEntryVal) || 0) + 1)
-                                    _gapsInnerInc.command=[scriptDir+"/hyprland-gaps-inner-set.sh", nv.toString()]
+                                    _gapsInnerInc.command=[scriptDir+"/hyprland-gaps-inner-adjust.sh", "1"]
                                     _gapsInnerInc.running=true
-                                    _gapsInnerEntryVal = nv.toString()
-                                    _gapsInnerTI.text  = _gapsInnerEntryVal
                                 }}
                             }
-                            Process { id:_gapsInnerDec; running:false }
-                            Process { id:_gapsInnerInc; running:false }
-                            Process { id:_gapsInnerSet; running:false }
+                            Process { id:_gapsInnerDec; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id:_gapsInnerInc; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id:_gapsInnerSet; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
 
                             // Outer Gaps
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 6
                                 Text { text: "Outer Gaps"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
                                 CCPillBtn { text: "−"; onClicked: {
-                                    const nv = Math.max(0, (parseInt(_gapsOuterEntryVal) || 0) - 1)
-                                    _gapsOuterDec.command=[scriptDir+"/hyprland-gaps-outer-set.sh", nv.toString()]
+                                    _gapsOuterDec.command=[scriptDir+"/hyprland-gaps-outer-adjust.sh", "-1"]
                                     _gapsOuterDec.running=true
-                                    _gapsOuterEntryVal = nv.toString()
-                                    _gapsOuterTI.text  = _gapsOuterEntryVal
                                 }}
                                 Rectangle {
                                     Layout.preferredWidth: 60; height: 28; radius: 7
@@ -1939,30 +1966,30 @@ PanelWindow {
                                         horizontalAlignment: Text.AlignHCenter
                                         validator: IntValidator { bottom: 0; top: 100 }
                                         onAccepted: { _gapsOuterSet.command=[scriptDir+"/hyprland-gaps-outer-set.sh",text]; _gapsOuterSet.running=true; _gapsOuterEntryVal=text }
+                                        Connections {
+                                            target: ccWin
+                                            function on_gapsOuterEntryValChanged() {
+                                                if (!_gapsOuterTI.activeFocus) _gapsOuterTI.text = ccWin._gapsOuterEntryVal
+                                            }
+                                        }
                                     }
                                 }
                                 CCPillBtn { text: "+"; onClicked: {
-                                    const nv = Math.min(100, (parseInt(_gapsOuterEntryVal) || 0) + 1)
-                                    _gapsOuterInc.command=[scriptDir+"/hyprland-gaps-outer-set.sh", nv.toString()]
+                                    _gapsOuterInc.command=[scriptDir+"/hyprland-gaps-outer-adjust.sh", "1"]
                                     _gapsOuterInc.running=true
-                                    _gapsOuterEntryVal = nv.toString()
-                                    _gapsOuterTI.text  = _gapsOuterEntryVal
                                 }}
                             }
-                            Process { id:_gapsOuterDec; running:false }
-                            Process { id:_gapsOuterInc; running:false }
-                            Process { id:_gapsOuterSet; running:false }
+                            Process { id:_gapsOuterDec; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id:_gapsOuterInc; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id:_gapsOuterSet; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
 
                             // Border Width
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 6
                                 Text { text: "Border W"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
                                 CCPillBtn { text: "−"; onClicked: {
-                                    const nv = Math.max(0, (parseInt(_borderWEntryVal) || 0) - 1)
-                                    _borderWDec.command=[scriptDir+"/hyprland-border-width-set.sh", nv.toString()]
+                                    _borderWDec.command=[scriptDir+"/hyprland-border-width-adjust.sh", "-1"]
                                     _borderWDec.running=true
-                                    _borderWEntryVal = nv.toString()
-                                    _borderWTI.text  = _borderWEntryVal
                                 }}
                                 Rectangle {
                                     Layout.preferredWidth: 60; height: 28; radius: 7
@@ -1976,30 +2003,30 @@ PanelWindow {
                                         horizontalAlignment: Text.AlignHCenter
                                         validator: IntValidator { bottom: 0; top: 20 }
                                         onAccepted: { _borderWSet.command=[scriptDir+"/hyprland-border-width-set.sh",text]; _borderWSet.running=true; _borderWEntryVal=text }
+                                        Connections {
+                                            target: ccWin
+                                            function on_borderWEntryValChanged() {
+                                                if (!_borderWTI.activeFocus) _borderWTI.text = ccWin._borderWEntryVal
+                                            }
+                                        }
                                     }
                                 }
                                 CCPillBtn { text: "+"; onClicked: {
-                                    const nv = Math.min(20, (parseInt(_borderWEntryVal) || 0) + 1)
-                                    _borderWInc.command=[scriptDir+"/hyprland-border-width-set.sh", nv.toString()]
+                                    _borderWInc.command=[scriptDir+"/hyprland-border-width-adjust.sh", "1"]
                                     _borderWInc.running=true
-                                    _borderWEntryVal = nv.toString()
-                                    _borderWTI.text  = _borderWEntryVal
                                 }}
                             }
-                            Process { id:_borderWDec; running:false }
-                            Process { id:_borderWInc; running:false }
-                            Process { id:_borderWSet; running:false }
+                            Process { id:_borderWDec; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id:_borderWInc; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id:_borderWSet; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
 
                             // Border Radius (Rounding)
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 6
                                 Text { text: "Border R"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
                                 CCPillBtn { text: "−"; onClicked: {
-                                    const nv = Math.max(0, (parseInt(_borderREntryVal) || 0) - 1)
-                                    _borderRDec.command=[scriptDir+"/hyprland-border-radius-set.sh", nv.toString()]
+                                    _borderRDec.command=[scriptDir+"/hyprland-border-radius-adjust.sh", "-1"]
                                     _borderRDec.running=true
-                                    _borderREntryVal = nv.toString()
-                                    _borderRTI.text  = _borderREntryVal
                                 }}
                                 Rectangle {
                                     Layout.preferredWidth: 60; height: 28; radius: 7
@@ -2013,19 +2040,22 @@ PanelWindow {
                                         horizontalAlignment: Text.AlignHCenter
                                         validator: IntValidator { bottom: 0; top: 50 }
                                         onAccepted: { _borderRSet.command=[scriptDir+"/hyprland-border-radius-set.sh",text]; _borderRSet.running=true; _borderREntryVal=text }
+                                        Connections {
+                                            target: ccWin
+                                            function on_borderREntryValChanged() {
+                                                if (!_borderRTI.activeFocus) _borderRTI.text = ccWin._borderREntryVal
+                                            }
+                                        }
                                     }
                                 }
                                 CCPillBtn { text: "+"; onClicked: {
-                                    const nv = Math.min(50, (parseInt(_borderREntryVal) || 0) + 1)
-                                    _borderRInc.command=[scriptDir+"/hyprland-border-radius-set.sh", nv.toString()]
+                                    _borderRInc.command=[scriptDir+"/hyprland-border-radius-adjust.sh", "1"]
                                     _borderRInc.running=true
-                                    _borderREntryVal = nv.toString()
-                                    _borderRTI.text  = _borderREntryVal
                                 }}
                             }
-                            Process { id:_borderRDec; running:false }
-                            Process { id:_borderRInc; running:false }
-                            Process { id:_borderRSet; running:false }
+                            Process { id:_borderRDec; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id:_borderRInc; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id:_borderRSet; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
 
                             CCSection { text: "Gap Presets" }
                             Flow { Layout.fillWidth: true; spacing: 5
