@@ -385,7 +385,7 @@ Item {
         readonly property real  _panelRadius: Config.barMode === "island" ? Config.islandRadius : Config.barRadius
 
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true }
-        margins { top: 1; bottom: 1; left: _panelMargin }
+        margins { top: 0; bottom: 0; left: _panelMargin }
         implicitWidth:  380
         implicitHeight: Math.min(histScrollContent.height + histHeader.implicitHeight + histDivider.height + 42, 720)
         color: "transparent"
