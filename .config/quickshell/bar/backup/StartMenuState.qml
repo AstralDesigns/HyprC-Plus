@@ -27,7 +27,7 @@ Item {
     property bool netSavedProcRunning: false
     function startNetScan() {
         if (!netSavedProc.running) netSavedProc.running = true
-        if (!netRescanProc.running) netRescanProc.running = true
+        if (!netScanProc.running) netScanProc.running = true
     }
 
     // ── BT status state ─────────────────────────────────────────────────
@@ -124,15 +124,6 @@ Item {
             if (running) sm._savedNets = []
         }
     }
-    // netRescanProc: asks the driver for a fresh scan, then kicks netScanProc.
-    // This is what the rescan button triggers so nmcli list shows new APs.
-    Process { id: netRescanProc
-        command: ["bash", "-c", "nmcli dev wifi rescan 2>/dev/null; true"]
-        onRunningChanged: {
-            if (running) { sm.netScanProcRunning = true; sm._netBuf = [] }
-            else if (!netScanProc.running) netScanProc.running = true
-        }
-    }
     Process { id: netScanProc
         command:["bash","-c","nmcli --escape no -t -f IN-USE,SECURITY,SIGNAL,SSID dev wifi list 2>/dev/null | head -25"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
@@ -181,12 +172,29 @@ Item {
     property string netConnectedSSID: ""
     property var    btTrusted: ({})
     property bool   btDiscoverable: false
+    property bool   btReceiving: false
 
     // ── BT pairing agent state ────────────────────────────────────────────────
-    // NotificationsState owns the bt-agent process and FIFO at /tmp/qs_bt_cmd.
-    // Pairing/file-transfer dialogs arrive as notification toasts via
-    // NotificationsPopup.  All agent commands go through
-    // NotificationsState.btAgentSend().
+    // bt-agent.py sits on a FIFO at /tmp/qs_bt_cmd and handles BlueZ
+    // RequestConfirmation / RequestPinCode / Authorize D-Bus calls.
+    // Without a registered agent, BlueZ times-out every new-device pairing with
+    // org.bluez.Error.AuthenticationTimeout after ~30 s.
+    property string _btFifo: "/tmp/qs_bt_cmd"
+
+    // Pairing dialog state
+    property bool   btPairDialogVisible: false
+    property string btPairDialogType:    ""   // "confirm" | "pin" | "passkey" | "authorize"
+    property string btPairDialogMac:     ""
+    property string btPairDialogName:    ""
+    property string btPairDialogPasskey: ""
+
+    // Incoming file dialog state
+    property bool   btFileDialogVisible: false
+    property string btFileDialogMac:     ""
+    property string btFileDialogName:    ""
+    property string btFileDialogFile:    ""
+    property int    btFileDialogSize:    0
+    property string btFileDialogTransfer: ""
 
     property string _btTrustDir: Quickshell.env("HOME") + "/.config/hyprcandy/bt-trust"
 
@@ -337,6 +345,98 @@ Item {
             "bluetoothctl pair "   + mac + " 2>/dev/null; sleep 0.3; " +
             "bluetoothctl connect "+ mac + " 2>/dev/null"
         if (!btConnProc.running) btConnProc.running = true
+    }
+
+    // ── BT pairing agent ──────────────────────────────────────────────────────
+    // Create FIFO then start bt-agent.py once at startup.
+    Process { id: btFifoInitProc
+        command: ["bash", "-c",
+            "[ -p '" + sm._btFifo + "' ] || mkfifo '" + sm._btFifo + "'"]
+        onExited: { if (!btAgentProc.running) btAgentProc.running = true }
+        Component.onCompleted: running = true
+    }
+    Process { id: btAgentProc
+        property string _dir: Quickshell.env("HOME") + "/.config/quickshell/notifications"
+        command: ["python3", btAgentProc._dir + "/bt-agent.py"]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(line) {
+            const l = line.trim(); if (!l) return
+            let ev; try { ev = JSON.parse(l) } catch(e) { return }
+            switch (ev.type) {
+                case "pair_confirm":
+                    sm.btPairDialogType    = "confirm"
+                    sm.btPairDialogMac     = ev.mac    || ""
+                    sm.btPairDialogName    = ev.name   || ev.mac || ""
+                    sm.btPairDialogPasskey = ev.passkey || ""
+                    sm.btPairDialogVisible = true
+                    sm.menuVisible         = true
+                    break
+                case "pair_pin":
+                    sm.btPairDialogType    = ev.needs_passkey ? "passkey" : "pin"
+                    sm.btPairDialogMac     = ev.mac   || ""
+                    sm.btPairDialogName    = ev.name  || ev.mac || ""
+                    sm.btPairDialogPasskey = ""
+                    sm.btPairDialogVisible = true
+                    sm.menuVisible         = true
+                    break
+                case "pair_authorize":
+                    sm.btPairDialogType    = "authorize"
+                    sm.btPairDialogMac     = ev.mac   || ""
+                    sm.btPairDialogName    = ev.name  || ev.mac || ""
+                    sm.btPairDialogPasskey = ""
+                    sm.btPairDialogVisible = true
+                    sm.menuVisible         = true
+                    break
+                case "pair_cancelled":
+                    if (sm.btPairDialogMac === (ev.mac || ""))
+                        sm.btPairDialogVisible = false
+                    break
+                case "file_request":
+                    sm.btFileDialogMac      = ev.mac      || ""
+                    sm.btFileDialogName     = ev.name     || ev.mac || ""
+                    sm.btFileDialogFile     = ev.filename || ""
+                    sm.btFileDialogSize     = ev.size     || 0
+                    sm.btFileDialogTransfer = ev.transfer || ""
+                    sm.btFileDialogVisible  = true
+                    sm.menuVisible          = true
+                    break
+                case "file_cancelled":
+                    sm.btFileDialogVisible = false
+                    break
+            }
+        }}
+        onExited: { if (!btAgentRestartTimer.running) btAgentRestartTimer.start() }
+    }
+    Timer { id: btAgentRestartTimer; interval: 3000; repeat: false
+        onTriggered: { if (!btAgentProc.running) btAgentProc.running = true } }
+
+    // Send a command line to the agent via the FIFO
+    Process { id: btSendCmdProc; property string _cmd: ""
+        command: ["bash", "-c", "echo " + btSendCmdProc._cmd + " >> '" + sm._btFifo + "'"]
+    }
+    function btSendCmd(line) {
+        btSendCmdProc._cmd = "'" + line.replace(/'/g, "'\\''") + "'"
+        if (!btSendCmdProc.running) btSendCmdProc.running = true
+    }
+    function btAcceptPair() {
+        const mac = sm.btPairDialogMac
+        if (sm.btPairDialogType === "pin" || sm.btPairDialogType === "passkey")
+            sm.btSendCmd("pin_pair " + mac + " " + sm.btPairDialogPasskey)
+        else
+            sm.btSendCmd("accept_pair " + mac)
+        sm.btPairDialogVisible = false
+        sm.btConnecting = mac
+    }
+    function btRejectPair() {
+        sm.btSendCmd("reject_pair " + sm.btPairDialogMac)
+        sm.btPairDialogVisible = false
+    }
+    function btAcceptFile() {
+        sm.btSendCmd("accept_file " + sm.btFileDialogTransfer)
+        sm.btFileDialogVisible = false
+    }
+    function btRejectFile() {
+        sm.btSendCmd("reject_file " + sm.btFileDialogTransfer)
+        sm.btFileDialogVisible = false
     }
 
     // ── Discovery scan ─────────────────────────────────────────────────────────
@@ -494,6 +594,25 @@ Item {
             "[ -n \"$FILE\" ] && " +
             "bluetooth-sendto --device='" + esc + "' \"$FILE\" &"
         if (!btSendProc.running) btSendProc.running = true
+    }
+
+    // ── File receive ─────────────────────────────────────────────────────────────
+    Process { id: btObexProc; property string _cmd: ""
+        command: ["bash", "-c", btObexProc._cmd]
+        onExited: sm.btReceiving = false
+    }
+    function toggleBtReceive() {
+        if (sm.btReceiving) {
+            btObexProc._cmd = "pkill -f 'obexd.*auto-accept' 2>/dev/null; true"
+            sm.btReceiving = false
+            if (!btObexProc.running) btObexProc.running = true
+        } else {
+            sm.btReceiving = true
+            btObexProc._cmd =
+                "pkill -f 'obexd.*auto-accept' 2>/dev/null; " +
+                "/usr/lib/bluetooth/obexd --root \"${HOME}/Downloads\" --auto-accept &"
+            if (!btObexProc.running) btObexProc.running = true
+        }
     }
 
     // ── Recorder ─────────────────────────────────────────────────────────

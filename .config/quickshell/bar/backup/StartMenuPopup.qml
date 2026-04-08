@@ -182,38 +182,6 @@ PanelWindow {
                             }
                         }
                     }
-                    // Rescan button — triggers nmcli dev wifi rescan then refreshes list
-                    Rectangle {
-                        width: 24; height: 24; radius: 6
-                        visible: StartMenuState.networkExpanded
-                        color: rescanH.containsMouse
-                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
-                            : "transparent"
-                        border.width: 1
-                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b,
-                                              StartMenuState.netScanProcRunning ? 0.25 : 0.50)
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Text {
-                            anchors.centerIn: parent
-                            text: "󰑐"
-                            font.pixelSize: 13; font.family: Config.fontFamily
-                            color: StartMenuState.netScanProcRunning ? Theme.cOnSurfVar : Theme.cPrimary
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                            RotationAnimator on rotation {
-                                running: StartMenuState.netScanProcRunning
-                                from: 0; to: 360; duration: 900; loops: Animation.Infinite
-                            }
-                        }
-                        MouseArea {
-                            id: rescanH; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: StartMenuState.netScanProcRunning ? Qt.ArrowCursor : Qt.PointingHandCursor
-                            enabled: !StartMenuState.netScanProcRunning
-                            onClicked: {
-                                StartMenuState.networkList = []
-                                StartMenuState.startNetScan()
-                            }
-                        }
-                    }
                     Rectangle { width: 1; height: 20; color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.4) }
                     Text {
                         font.pixelSize: 15; font.family: Config.fontFamily
@@ -345,6 +313,158 @@ PanelWindow {
                     visible: StartMenuState.btExpanded
                     Layout.fillWidth: true; width: parent.width; spacing: 2
 
+                    // ── Pairing confirmation dialog ──────────────────────
+                    Rectangle {
+                        visible: StartMenuState.btPairDialogVisible
+                        width: parent.width
+                        height: visible ? pairDialogCol.implicitHeight + 16 : 0
+                        radius: 10
+                        color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.85)
+                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+
+                        Column {
+                            id: pairDialogCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+                            spacing: 8
+
+                            Text {
+                                width: parent.width
+                                text: StartMenuState.btPairDialogType === "confirm"
+                                    ? "Pair with \"" + StartMenuState.btPairDialogName + "\"?"
+                                    : StartMenuState.btPairDialogType === "authorize"
+                                        ? "Allow \"" + StartMenuState.btPairDialogName + "\" to connect?"
+                                        : "Enter PIN for \"" + StartMenuState.btPairDialogName + "\""
+                                color: Theme.cOnSurf; font.pixelSize: 12; font.weight: Font.Medium; wrapMode: Text.Wrap
+                            }
+
+                            // Passkey display for "confirm" type
+                            Text {
+                                visible: StartMenuState.btPairDialogType === "confirm" && StartMenuState.btPairDialogPasskey !== ""
+                                text: "Passkey: " + StartMenuState.btPairDialogPasskey
+                                color: Theme.cPrimary; font.pixelSize: 18; font.weight: Font.Bold
+                                width: parent.width; horizontalAlignment: Text.AlignHCenter
+                            }
+
+                            // PIN entry for "pin" / "passkey" types
+                            Rectangle {
+                                visible: StartMenuState.btPairDialogType === "pin" || StartMenuState.btPairDialogType === "passkey"
+                                width: parent.width; height: 32; radius: 8
+                                color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.7)
+                                border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.5)
+
+                                readonly property string _placeholderText: StartMenuState.btPairDialogType === "passkey" ? "Passkey (numeric)" : "PIN"
+
+                                TextInput {
+                                    id: btPinInput
+                                    anchors { fill: parent; leftMargin: 10; rightMargin: 10; topMargin: 6; bottomMargin: 6 }
+                                    color: Theme.cOnSurf; font.pixelSize: 12
+                                    inputMethodHints: StartMenuState.btPairDialogType === "passkey"
+                                        ? Qt.ImhDigitsOnly : Qt.ImhNone
+                                    onTextChanged: StartMenuState.btPairDialogPasskey = text
+                                    onAccepted: StartMenuState.btAcceptPair()
+                                    focus: StartMenuState.btPairDialogVisible &&
+                                           (StartMenuState.btPairDialogType === "pin" || StartMenuState.btPairDialogType === "passkey")
+                                }
+
+                                Text {
+                                    text: parent._placeholderText
+                                    color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.5)
+                                    font.pixelSize: 12; font.italic: true
+                                    anchors { left: parent.left; leftMargin: 10; verticalCenter: parent.verticalCenter }
+                                    visible: btPinInput.text === "" && !btPinInput.activeFocus
+                                }
+                            }
+
+                            RowLayout {
+                                width: parent.width; spacing: 6
+                                Item { Layout.fillWidth: true }
+                                Rectangle {
+                                    height: 28; radius: 7; implicitWidth: rejLbl.implicitWidth + 20
+                                    color: rejH.containsMouse
+                                        ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
+                                        : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                    border.width: 1; border.color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.45)
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    RowLayout { id: rejLbl; anchors.centerIn: parent; spacing: 4
+                                        Text { text: "󰅙"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cErr }
+                                        Text { text: "Reject"; font.pixelSize: 11; color: Theme.cErr }
+                                    }
+                                    MouseArea { id: rejH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: StartMenuState.btRejectPair() }
+                                }
+                                Rectangle {
+                                    height: 28; radius: 7; implicitWidth: accLbl.implicitWidth + 20
+                                    color: accH.containsMouse
+                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    RowLayout { id: accLbl; anchors.centerIn: parent; spacing: 4
+                                        Text { text: "󰄬"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cPrimary }
+                                        Text { text: "Accept"; font.pixelSize: 11; color: Theme.cPrimary }
+                                    }
+                                    MouseArea { id: accH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                        onClicked: StartMenuState.btAcceptPair() }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Incoming file dialog ──────────────────────────────
+                    Rectangle {
+                        visible: StartMenuState.btFileDialogVisible
+                        width: parent.width
+                        height: visible ? fileDialogCol.implicitHeight + 16 : 0
+                        radius: 10
+                        color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.85)
+                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+
+                        Column {
+                            id: fileDialogCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+                            spacing: 6
+                            Text {
+                                width: parent.width
+                                text: "Incoming file from \"" + StartMenuState.btFileDialogName + "\""
+                                color: Theme.cOnSurf; font.pixelSize: 12; font.weight: Font.Medium; wrapMode: Text.Wrap
+                            }
+                            Text {
+                                width: parent.width
+                                text: StartMenuState.btFileDialogFile + " (" + (StartMenuState.btFileDialogSize > 1048576
+                                    ? (StartMenuState.btFileDialogSize/1048576).toFixed(1)+" MB"
+                                    : StartMenuState.btFileDialogSize > 1024
+                                        ? (StartMenuState.btFileDialogSize/1024).toFixed(0)+" KB"
+                                        : StartMenuState.btFileDialogSize+" B") + ")"
+                                color: Theme.cOnSurfVar; font.pixelSize: 10; elide: Text.ElideMiddle
+                            }
+                            RowLayout { width: parent.width; spacing: 6
+                                Item { Layout.fillWidth: true }
+                                Rectangle {
+                                    height: 26; radius: 7; implicitWidth: fRejLbl.implicitWidth + 18
+                                    color: fRejH.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18) : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                    border.width: 1; border.color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.45)
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    RowLayout { id: fRejLbl; anchors.centerIn: parent; spacing: 4
+                                        Text { text: "󰅙"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cErr }
+                                        Text { text: "Decline"; font.pixelSize: 10; color: Theme.cErr }
+                                    }
+                                    MouseArea { id: fRejH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.btRejectFile() }
+                                }
+                                Rectangle {
+                                    height: 26; radius: 7; implicitWidth: fAccLbl.implicitWidth + 18
+                                    color: fAccH.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25) : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                    RowLayout { id: fAccLbl; anchors.centerIn: parent; spacing: 4
+                                        Text { text: "󰇚"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cPrimary }
+                                        Text { text: "Save"; font.pixelSize: 10; color: Theme.cPrimary }
+                                    }
+                                    MouseArea { id: fAccH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.btAcceptFile() }
+                                }
+                            }
+                        }
+                    }
+
                     // Toolbar: Discoverable + Scan + Receive
                     Row { width: parent.width; spacing: 6
                         Rectangle {
@@ -383,19 +503,19 @@ PanelWindow {
                         }
                         Rectangle {
                             height: 26; radius: 8; width: 110
-                            color: NotificationsState.btReceiving
+                            color: StartMenuState.btReceiving
                                 ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
                                 : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
                             border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
                             Behavior on color { ColorAnimation { duration: 120 } }
                             RowLayout { anchors.centerIn: parent; spacing: 4
                                 Text { text: "󰶫"; font.pixelSize: 11; font.family: Config.fontFamily
-                                    color: NotificationsState.btReceiving ? Theme.cPrimary : Theme.cOnSurfVar }
-                                Text { text: NotificationsState.btReceiving ? "Receiving…" : "Receive Files"
+                                    color: StartMenuState.btReceiving ? Theme.cPrimary : Theme.cOnSurfVar }
+                                Text { text: StartMenuState.btReceiving ? "Receiving…" : "Receive Files"
                                     font.pixelSize: 10; color: Theme.cOnSurfVar }
                             }
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                onClicked: NotificationsState.btToggleReceive() }
+                                onClicked: StartMenuState.toggleBtReceive() }
                         }
                     }
 

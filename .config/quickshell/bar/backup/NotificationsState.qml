@@ -196,27 +196,25 @@ Item {
     //  BLUETOOTH AGENT
     // ═════════════════════════════════════════════════════════════════════
     property bool btAgentReady: false
-    property bool btReceiving:  false   // driven SOLELY by auto_accept events from bt-agent.py
 
-    function btToggleReceive() {
-        const target = !ns.btReceiving
-        ns.btAgentSend("set_auto_accept " + (target ? "1" : "0"))
-        // Don't update btReceiving here — the auto_accept event from bt-agent
-        // will confirm and set the authoritative state.
-    }
-
-    // ── BT agent startup ────────────────────────────────────────────────────
-    // bt-agent.py creates its own FIFO and kills stale instances.
-    // We just need a holder process to keep the FIFO open for reading.
-    Process { id: btFifoHolderProc
+    // ── Fifo setup ──────────────────────────────────────────────────────────
+    Process { id: btFifoInitProc
         command: ["bash", "-c",
-            "[ -p /tmp/qs_bt_cmd ] || (rm -f /tmp/qs_bt_cmd && mkfifo /tmp/qs_bt_cmd); " +
-            "sleep infinity >> /tmp/qs_bt_cmd"]
+            "pkill -f 'sleep infinity >> /tmp/qs_bt_cmd' 2>/dev/null; sleep 0.1; " +
+            "[ -p /tmp/qs_bt_cmd ] || (rm -f /tmp/qs_bt_cmd && mkfifo /tmp/qs_bt_cmd)"]
         Component.onCompleted: running = true
         onExited: btFifoHolderRestartTimer.restart()
     }
+
+    Process { id: btFifoHolderProc
+        command: ["bash", "-c", "sleep infinity >> /tmp/qs_bt_cmd"]
+        onExited: btFifoHolderRestartTimer.restart()
+    }
     Timer { id: btFifoHolderRestartTimer; interval: 500; repeat: false
-        onTriggered: { if (!btFifoHolderProc.running) btFifoHolderProc.running = true }
+        onTriggered: {
+            if (!btFifoHolderProc.running) btFifoHolderProc.running = true
+            if (!btAgentProc.running)      btAgentProc.running = true
+        }
     }
 
     Process { id: btAgentProc
@@ -230,13 +228,10 @@ Item {
         stderr: SplitParser { splitMarker: "\n"; onRead: function(l) {
             if (l.trim()) console.warn("bt-agent:", l)
         }}
-        Component.onCompleted: running = true
-        onRunningChanged: {
-            if (!running) {
-                ns.btAgentReady = false
-                console.warn("bt-agent exited code=" + exitCode)
-                btAgentRestartTimer.restart()
-            }
+        onExited: function(code, status) {
+            ns.btAgentReady = false
+            console.warn("bt-agent exited code=" + code)
+            btAgentRestartTimer.restart()
         }
     }
     Timer { id: btAgentRestartTimer; interval: 3000; repeat: false
@@ -256,8 +251,6 @@ Item {
         switch (ev.type) {
         case "agent_ready":
             ns.btAgentReady = true
-            // Sync the receiving mode with the freshly started agent
-            ns.btAgentSend("set_auto_accept " + (ns.btReceiving ? "1" : "0"))
             break
         case "pair_confirm":
             ns.addNotification({ isPrompt: true, promptType: "pair_confirm",
@@ -301,17 +294,6 @@ Item {
         case "file_cancelled":
             ns.addNotification({ summary: "Bluetooth", body: "File transfer cancelled",
                 icon: "bluetooth", urgency: 1, category: "bt" })
-            break
-        case "file_auto_accepted":
-            // Receive Files mode: bt-agent accepted automatically, just show a toast
-            ns.addNotification({ summary: "File Received",
-                body: (ev.name || ev.mac) + " → " + (ev.filename || "file") +
-                      (ev.size ? " (" + ev.size + ")" : "") + " saved to Downloads",
-                icon: "bluetooth", urgency: 1, category: "bt" })
-            break
-        case "auto_accept":
-            // bt-agent confirmed the mode change — keep our flag in sync
-            ns.btReceiving = ev.enabled === true
             break
         case "error":
             console.warn("bt-agent:", ev.msg)

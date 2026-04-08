@@ -256,7 +256,7 @@ PanelWindow {
         readonly property int _minGap: 4
         // Tracks whether any MediaPlayer is active (Playing or Paused)
         // Used by cava auto-hide logic.
-        property bool _mediaActive: mp1.mediaActive || mp2.mediaActive
+        property bool _mediaActive: MediaPlayerState.active
         // Left group natural width (without media text — just controls + disc)
         // Right group natural width
         // Available width for left group = center.x - leftEdge - minGap
@@ -465,7 +465,6 @@ PanelWindow {
                     visible_: Config.showMediaPlayer
                     Modules.MediaPlayer {
                         id: mp2
-                        property bool mediaActive: _active
                         // Tri-mode: shrink media if left bar approaches center bar
                         mediaMaxW: {
                             const gap = 4

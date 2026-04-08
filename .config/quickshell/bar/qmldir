@@ -1,6 +1,7 @@
 singleton Theme 1.0 Theme.qml
 singleton Config 1.0 Config.qml
 singleton NotificationsState 1.0 NotificationsState.qml
+singleton MediaPlayerState 1.0 MediaPlayerState.qml
 singleton StartMenuState 1.0 StartMenuState.qml
 singleton LauncherState 1.0 LauncherState.qml
 singleton PowerMenuState 1.0 PowerMenuState.qml
