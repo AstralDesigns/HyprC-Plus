@@ -23,6 +23,7 @@ import sys
 import os
 import time
 import json
+import shutil
 import threading
 import dbus
 import dbus.service
@@ -206,40 +207,35 @@ class QuickshellBTAgent(dbus.service.Object):
 class QuickshellObexAgent(dbus.service.Object):
     def __init__(self, bus, system_bus, path, bt_agent):
         self.bus = bus
-        self.system_bus = system_bus  # reuse the shared system bus for device lookups
+        self.system_bus = system_bus
         self.bt_agent = bt_agent
-        self.auto_accept = False      # set True via "set_auto_accept 1" command
-        self._pending_transfers = {}  # transfer_path → (reply_h, error_h, dest_path)
+        self.auto_accept = False
+        self._pending_transfers = {}
+        self._known_cache_files = set()  # Track files already in obexd cache
+        self._pending_file_moves = {}
+        self._accepted_transfers = set()
+        self._last_authorize_path = None
+        self._known_sessions = set()
         super().__init__(bus, path)
 
     @dbus.service.method(OBEX_AGENT_IFACE, in_signature="o", out_signature="s",
                           async_callbacks=("reply_handler", "error_handler"))
     def AuthorizePush(self, transfer_path, reply_handler, error_handler):
-        """Authorize an incoming OBEX file push.
-
-        BlueZ OBEX AuthorizePush signature is simply (in o transfer, out s path).
-        We must query the Transfer and Session objects ourselves to get file metadata.
-        """
+        """Authorize an incoming OBEX file push."""
         transfer_path_str = str(transfer_path)
+        emit({"type": "error", "msg": f"AuthorizePush called: {transfer_path_str}"})
         name = "unknown"
         size = 0
         mac = "unknown"
         device_name = "Unknown device"
 
-        # Query the Transfer object for Name and Size
+        # Query the Transfer object for Name and Size, and Session for MAC
         try:
             transfer_obj = self.bus.get_object(OBEX_SERVICE, transfer_path_str)
             transfer_props_iface = dbus.Interface(transfer_obj, "org.freedesktop.DBus.Properties")
             name = str(transfer_props_iface.Get("org.bluez.obex.Transfer1", "Name"))
             size = int(transfer_props_iface.Get("org.bluez.obex.Transfer1", "Size"))
-        except Exception:
-            pass
-
-        # Query the Session object for Destination (MAC address)
-        try:
-            # Transfer has a "Session" property; get it from the transfer props
-            transfer_obj = self.bus.get_object(OBEX_SERVICE, transfer_path_str)
-            transfer_props_iface = dbus.Interface(transfer_obj, "org.freedesktop.DBus.Properties")
+            # Get Session path from transfer properties to find the device MAC
             all_props = transfer_props_iface.GetAll("org.bluez.obex.Transfer1")
             session_path = str(all_props.get("Session", ""))
             if session_path:
@@ -250,10 +246,13 @@ class QuickshellObexAgent(dbus.service.Object):
         except Exception:
             pass
 
-        dest_dir = f"{GLib.get_home_dir()}/Downloads"
+        dest_dir = f"{GLib.get_home_dir()}/.cache/obexd"
         # Ensure the destination directory exists
         os.makedirs(dest_dir, exist_ok=True)
+        # obexd can only write to its own cache directory due to daemon security
+        # restrictions. We return a path there, then copy to ~/Downloads after.
         dest_path = f"{dest_dir}/{name}"
+        final_path = f"{GLib.get_home_dir()}/Downloads/{name}"
 
         if self.auto_accept:
             # Receive Files mode: accept immediately without prompting
@@ -261,11 +260,26 @@ class QuickshellObexAgent(dbus.service.Object):
             sz = (f"{size/1048576:.1f} MB" if size > 1048576
                   else f"{size//1024} KB" if size > 1024
                   else f"{size} B") if size else ""
-            emit({"type": "file_auto_accepted", "mac": mac, "name": device_name,
-                  "filename": name, "size": sz})
+            # Store for post-transfer file finalization
+            self._pending_file_moves[transfer_path_str] = {
+                "obexd_path": dest_path,
+                "final_path": final_path,
+                "name": name, "mac": mac, "device_name": device_name,
+                "expected_size": size}
+            self._accepted_transfers.add(transfer_path_str)  # Auto-accepted = accepted
+            self._last_authorize_path = transfer_path_str
+            emit({"type": "file_receiving", "mac": mac, "name": device_name,
+                  "filename": name, "size": sz, "transfer": transfer_path_str})
         else:
             # Prompt mode: hold the D-Bus reply and ask QML via notification toast
             self._pending_transfers[transfer_path_str] = (reply_handler, error_handler, dest_path)
+            # Store for post-transfer file finalization
+            self._pending_file_moves[transfer_path_str] = {
+                "obexd_path": dest_path,
+                "final_path": final_path,
+                "name": name, "mac": mac, "device_name": device_name,
+                "expected_size": size}
+            self._last_authorize_path = transfer_path_str
             emit({"type": "file_request", "mac": mac, "name": device_name,
                   "filename": name, "size": size, "transfer": transfer_path_str})
 
@@ -275,14 +289,123 @@ class QuickshellObexAgent(dbus.service.Object):
             return False
         reply_h, error_h, default_dest = p
         if accept:
+            # Mark as explicitly accepted so Cancel() doesn't report it
+            self._accepted_transfers.add(transfer_path)
             reply_h(dbus.String(dest or default_dest))
         else:
             error_h(dbus.DBusException("org.bluez.obex.Error.Rejected"))
         return True
 
+    def _finalize_transfer(self, transfer_path_str):
+        """Copy a completed OBEX transfer from ~/.cache/obexd/ to ~/Downloads/.
+
+        Runs in a background thread to avoid blocking the GLib main loop
+        (which handles D-Bus callbacks for other transfers).
+        """
+        emit({"type": "error", "msg": f"_finalize_transfer called for: {transfer_path_str}"})
+        # Guard against double-finalization (race from session monitor)
+        if transfer_path_str not in self._pending_file_moves:
+            emit({"type": "error", "msg": f"_finalize_transfer: {transfer_path_str} not in pending, skipping"})
+            return
+        info = self._pending_file_moves.pop(transfer_path_str, None)
+        if not info:
+            emit({"type": "error", "msg": f"_finalize_transfer: info is None for {transfer_path_str}, skipping"})
+            return
+        # Clean up accepted set
+        self._accepted_transfers.discard(transfer_path_str)
+        obexd_path = info.get("obexd_path", "")
+        final_path = info.get("final_path", "")
+        name = info.get("name", "unknown")
+        expected_size = info.get("expected_size", 0)
+
+        emit({"type": "error", "msg": f"Finalizing: name={name} obexd={obexd_path} final={final_path}"})
+
+        # Wait for obexd to finish writing the file in its cache
+        for attempt in range(40):  # up to 20 seconds
+            time.sleep(0.5)
+            exists = os.path.exists(obexd_path)
+            sz = os.path.getsize(obexd_path) if exists else -1
+            if attempt % 8 == 0:  # Log every 4 seconds
+                emit({"type": "error", "msg": f"  attempt {attempt}: exists={exists} size={sz}"})
+            if exists:
+                if expected_size > 0 and sz >= expected_size:
+                    time.sleep(0.5)  # brief flush wait
+                    emit({"type": "error", "msg": f"  File reached expected size {sz} >= {expected_size}"})
+                    break
+                elif expected_size == 0 and sz > 0:
+                    # No expected size — wait for stability
+                    stable = 0
+                    for _ in range(6):
+                        time.sleep(0.5)
+                        new_sz = os.path.getsize(obexd_path)
+                        if new_sz == sz and sz > 0:
+                            stable += 1
+                        else:
+                            sz = new_sz
+                            stable = 0
+                    emit({"type": "error", "msg": f"  File stabilized at size {sz}"})
+                    break
+
+        if not os.path.exists(obexd_path):
+            emit({"type": "error", "msg": f"OBEX cache file not found: {obexd_path}"})
+            # List what IS in the cache dir
+            try:
+                cached = os.listdir(os.path.dirname(obexd_path))
+                emit({"type": "error", "msg": f"Cache dir contents: {cached}"})
+            except Exception:
+                pass
+            return
+
+        obexd_size = os.path.getsize(obexd_path)
+        emit({"type": "error", "msg": f"OBEX cache file size: {obexd_size} bytes"})
+        if obexd_size == 0:
+            emit({"type": "error", "msg": f"OBEX cache file is empty: {name}"})
+            return
+
+        # Handle filename collisions in Downloads
+        dest_dir = os.path.dirname(final_path)
+        os.makedirs(dest_dir, exist_ok=True)
+        base, ext = os.path.splitext(name)
+        actual_path = final_path
+        counter = 1
+        while os.path.exists(actual_path):
+            actual_path = f"{dest_dir}/{base}({counter}){ext}"
+            counter += 1
+
+        emit({"type": "error", "msg": f"Copying {obexd_path} -> {actual_path}"})
+        try:
+            shutil.copy2(obexd_path, actual_path)
+            saved_size = os.path.getsize(actual_path)
+            if saved_size == 0:
+                os.unlink(actual_path)
+                emit({"type": "error", "msg": f"Failed to save file (empty copy): {name}"})
+                return
+            sz_str = (f"{saved_size/1048576:.1f} MB" if saved_size > 1048576
+                      else f"{saved_size//1024} KB" if saved_size > 1024
+                      else f"{saved_size} B")
+            emit({"type": "file_saved", "mac": info.get("mac", ""),
+                  "name": info.get("device_name", ""),
+                  "filename": os.path.basename(actual_path), "size": sz_str})
+            emit({"type": "error", "msg": f"SUCCESS: saved {actual_path} ({sz_str})"})
+        except Exception as e:
+            emit({"type": "error", "msg": f"Failed to save file: {e}"})
+
     @dbus.service.method(OBEX_AGENT_IFACE, in_signature="", out_signature="")
     def Cancel(self):
-        emit({"type":"file_cancelled"})
+        # Cancel is called when the remote side aborts or the transfer errors out.
+        # If the last transfer we were authorizing was already accepted (either
+        # via auto_accept or manual accept), don't emit "cancelled" — the
+        # session monitor will handle the file move instead.
+        tp = self._last_authorize_path
+        was_accepted = tp and tp in self._accepted_transfers
+        # Clean up pending state for this transfer
+        if tp:
+            self._pending_file_moves.pop(tp, None)
+            self._pending_transfers.pop(tp, None)
+            self._accepted_transfers.discard(tp)
+            self._last_authorize_path = None
+        if not was_accepted:
+            emit({"type":"file_cancelled"})
 
     @dbus.service.method(OBEX_AGENT_IFACE, in_signature="", out_signature="")
     def Release(self):
@@ -386,6 +509,9 @@ def stdin_reader(loop, bt_agent, obex_agent):
                             obex_agent.respond_transfer(parts[1], True)
                         elif cmd == "reject_file" and len(parts) >= 2:
                             obex_agent.respond_transfer(parts[1], False)
+                        elif cmd == "file_transfer_completed" and len(parts) >= 2:
+                            # Called by QML when OBEX session is removed (transfer done)
+                            obex_agent._move_obex_file(parts[1])
                         elif cmd == "set_auto_accept" and len(parts) >= 2:
                             obex_agent.auto_accept = (parts[1] == "1")
                             emit({"type": "auto_accept",
@@ -492,6 +618,71 @@ def main():
     t = threading.Thread(
         target=stdin_reader, args=(loop, bt_agent, obex_agent), daemon=True)
     t.start()
+
+    # ── OBEX cache directory monitor ───────────────────────────────────────
+    def obex_cache_monitor():
+        """Watch ~/.cache/obexd/ for new files and copy them to ~/Downloads/.
+
+        Android often sends multiple files in a single OBEX session, so
+        AuthorizePush is only called once.  Instead of tracking individual
+        transfers, we watch the cache directory for new files.
+        """
+        cache_dir = f"{GLib.get_home_dir()}/.cache/obexd"
+        dest_dir = f"{GLib.get_home_dir()}/Downloads"
+        os.makedirs(cache_dir, exist_ok=True)
+        os.makedirs(dest_dir, exist_ok=True)
+
+        # Build initial set of known files
+        try:
+            obex_agent._known_cache_files = set(os.listdir(cache_dir))
+        except Exception:
+            obex_agent._known_cache_files = set()
+
+        while True:
+            time.sleep(1.0)
+            try:
+                current_files = set(os.listdir(cache_dir))
+            except Exception:
+                continue
+
+            # Find new files that appeared since last check
+            new_files = current_files - obex_agent._known_cache_files
+            for filename in new_files:
+                cache_path = os.path.join(cache_dir, filename)
+                # Skip if it's a directory or doesn't exist yet
+                if not os.path.isfile(cache_path):
+                    continue
+                # Wait for the file to be fully written
+                time.sleep(0.5)
+                try:
+                    file_size = os.path.getsize(cache_path)
+                except OSError:
+                    continue
+
+                # Handle filename collisions in Downloads
+                dest_path = os.path.join(dest_dir, filename)
+                base, ext = os.path.splitext(filename)
+                counter = 1
+                while os.path.exists(dest_path):
+                    dest_path = os.path.join(dest_dir, f"{base}({counter}){ext}")
+                    counter += 1
+
+                try:
+                    shutil.copy2(cache_path, dest_path)
+                    saved_size = os.path.getsize(dest_path)
+                    sz_str = (f"{saved_size/1048576:.1f} MB" if saved_size > 1048576
+                              else f"{saved_size//1024} KB" if saved_size > 1024
+                              else f"{saved_size} B")
+                    emit({"type": "file_saved", "mac": "",
+                          "name": "Bluetooth",
+                          "filename": os.path.basename(dest_path), "size": sz_str})
+                except Exception as e:
+                    emit({"type": "error", "msg": f"Failed to save {filename}: {e}"})
+
+            obex_agent._known_cache_files = current_files
+
+    monitor_thread = threading.Thread(target=obex_cache_monitor, daemon=True)
+    monitor_thread.start()
     try:
         loop.run()
     except KeyboardInterrupt:

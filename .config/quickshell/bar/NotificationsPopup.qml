@@ -311,9 +311,14 @@ Item {
                                     font.family:Config.fontFamily; font.weight:Font.Medium }
                                 MouseArea { id:faA; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
                                     onClicked: {
-                                        NotificationsState.btAgentSend("accept_file "+notif.promptTransfer)
-                                        NotificationsState.dismissNotification(notif.id)
-                                        NotificationsState.addNotification({summary:"File Received",body:notif.promptFilename+" saved to Downloads",icon:"bluetooth",urgency:1,category:"bt"})
+                                        if(!notif) return
+                                        var fname = notif.promptFilename || "file"
+                                        var fsize = notif.promptSize || ""
+                                        var transfer = notif.promptTransfer || ""
+                                        var nid = notif.id
+                                        NotificationsState.btAgentSend("accept_file "+transfer)
+                                        NotificationsState.dismissNotification(nid)
+                                        NotificationsState.addNotification({summary:"Receiving file…",body:fname+(fsize?" ("+fsize+")":""),icon:"bluetooth",urgency:1,category:"bt"})
                                     } } }
                             Rectangle { height:32; implicitWidth:80; radius:8
                                 color:faR.containsMouse ? Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.85) : Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.15)
@@ -321,7 +326,7 @@ Item {
                                 Behavior on color{ColorAnimation{duration:100}}
                                 Text { anchors.centerIn:parent; text:"Decline"; color:faR.containsMouse?Theme.cOnPrim:Theme.cErr; font.pixelSize:11 }
                                 MouseArea { id:faR; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
-                                    onClicked: { NotificationsState.btAgentSend("reject_file "+notif.promptTransfer); NotificationsState.dismissNotification(notif.id) } } }
+                                    onClicked: { if(!notif) return; NotificationsState.btAgentSend("reject_file "+notif.promptTransfer); NotificationsState.dismissNotification(notif.id) } } }
                             Text { visible:(notif.promptSize||"")!==""; text:notif.promptSize||""; color:Theme.cOnSurfVar; font.pixelSize:10 } }
 
                         // Action buttons

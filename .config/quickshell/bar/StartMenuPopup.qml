@@ -537,7 +537,7 @@ PanelWindow {
                                             Behavior on color { ColorAnimation { duration: 100 } }
                                             RowLayout { id: trLbl; anchors.centerIn: parent; spacing: 4
                                                 Text {
-                                                    text: trustRect._isTrusted ? "󱈘" : "󰒃" //󰒄
+                                                    text: trustRect._isTrusted ? "󱈘" : "󱖡" //󰒃 󰒄
                                                     font.pixelSize: 11; font.family: Config.fontFamily
                                                     color: trustRect._isTrusted ? Theme.cErr : Theme.cPrimary
                                                 }
@@ -560,7 +560,7 @@ PanelWindow {
                                             Behavior on color { ColorAnimation { duration: 100 } }
                                             RowLayout { id: sfLbl; anchors.centerIn: parent; spacing: 4
                                                 Text { text: "󰏢"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
-                                                Text { text: "Send File"; font.pixelSize: 10; color: Theme.cOnSurfVar }
+                                                //Text { text: "Send File"; font.pixelSize: 10; color: Theme.cOnSurfVar }
                                             }
                                             MouseArea { id: sfh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                                 onClicked: StartMenuState.btSendFile(btDelegate.modelData.mac) }

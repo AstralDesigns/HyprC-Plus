@@ -181,6 +181,7 @@ Item {
     property string netConnectedSSID: ""
     property var    btTrusted: ({})
     property bool   btDiscoverable: false
+    property bool   _btAutoReconnDone: false
 
     // ── BT pairing agent state ────────────────────────────────────────────────
     // NotificationsState owns the bt-agent process and FIFO at /tmp/qs_bt_cmd.
@@ -252,16 +253,7 @@ Item {
                     sm.btSetTrust(d.mac, true)
                 }
             })
-            if (!btStatusProc._autoReconnectDone && sm.btPowered) {
-                btStatusProc._autoReconnectDone = true
-                const disconnected = sm.btDevices.filter(function(x) { return !x.connected })
-                if (disconnected.length > 0) {
-                    btAutoReconnProc._macs = disconnected.map(function(x) { return x.mac })
-                    if (!btAutoReconnProc.running) btAutoReconnProc.running = true
-                }
-            }
         }
-        property bool _autoReconnectDone: false
         Component.onCompleted: running = true
     }
 
@@ -290,6 +282,20 @@ Item {
                 const o = Object.assign({}, sm.btTrusted); o[mac] = false; sm.btTrusted = o
             }
         }}
+        onExited: {
+            // Auto-reconnect to trusted, disconnected devices — but only once,
+            // and ONLY to already-trusted devices (not devices mid-pairing).
+            if (!sm._btAutoReconnDone && sm.btPowered) {
+                sm._btAutoReconnDone = true
+                const trustedDisconnected = sm.btDevices.filter(function(x) {
+                    return !x.connected && sm.btTrusted[x.mac] === true
+                })
+                if (trustedDisconnected.length > 0) {
+                    btAutoReconnProc._macs = trustedDisconnected.map(function(x) { return x.mac })
+                    if (!btAutoReconnProc.running) btAutoReconnProc.running = true
+                }
+            }
+        }
     }
 
     Process { id: btTrustSetProc; property string _cmd: ""

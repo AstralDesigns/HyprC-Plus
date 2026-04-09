@@ -32,7 +32,20 @@ QtObject {
         running: true
         onTriggered: _saveSettings()
     }
-    
+
+    // QSettings INI backend stores booleans as "true"/"false" strings.
+    // On read they come back as strings — coerce them to proper bools.
+    function _toBool(v) {
+        if (v === true || v === 1) return true
+        if (v === false || v === 0) return false
+        if (typeof v === "string") {
+            const s = v.toLowerCase().trim()
+            if (s === "true" || s === "1" || s === "yes") return true
+            if (s === "false" || s === "0" || s === "no") return false
+        }
+        return !!v  // fallback
+    }
+
     function _loadSettings() {
         // cavaGradientEndColor is now computed from cavaEndMode/cavaEndVar — no seed needed
         // Tab 1: General
@@ -61,7 +74,7 @@ QtObject {
         v = _settings.value("infoGlyphSize"); if (v !== undefined && v !== null) infoGlyphSize = v
         v = _settings.value("mediaPlayPauseSize"); if (v !== undefined && v !== null) mediaPlayPauseSize = v
         v = _settings.value("mediaThumbSize"); if (v !== undefined && v !== null) mediaThumbSize = v
-        v = _settings.value("batteryRadialVisible"); if (v !== undefined && v !== null) batteryRadialVisible = v
+        v = _settings.value("batteryRadialVisible"); if (v !== undefined && v !== null) batteryRadialVisible = _toBool(v)
         v = _settings.value("batteryRadialSize"); if (v !== undefined && v !== null) batteryRadialSize = v
         v = _settings.value("batteryRadialWidth"); if (v !== undefined && v !== null) batteryRadialWidth = v
         v = _settings.value("trayIconSz"); if (v !== undefined && v !== null) trayIconSz = v
@@ -75,7 +88,7 @@ QtObject {
         v = _settings.value("wsPadRight"); if (v !== undefined && v !== null) wsPadRight = v
         v = _settings.value("wsPadTop"); if (v !== undefined && v !== null) wsPadTop = v
         v = _settings.value("wsPadBottom"); if (v !== undefined && v !== null) wsPadBottom = v
-        v = _settings.value("wsSeparators"); if (v !== undefined && v !== null) wsSeparators = v
+        v = _settings.value("wsSeparators"); if (v !== undefined && v !== null) wsSeparators = _toBool(v)
         v = _settings.value("wsSeparatorSize"); if (v !== undefined && v !== null) wsSeparatorSize = v
         v = _settings.value("wsSeparatorPadLeft"); if (v !== undefined && v !== null) wsSeparatorPadLeft = v
         v = _settings.value("wsSeparatorPadRight"); if (v !== undefined && v !== null) wsSeparatorPadRight = v
@@ -96,11 +109,11 @@ QtObject {
         v = _settings.value("cavaWidth"); if (v !== undefined && v !== null) cavaWidth = v
         v = _settings.value("cavaBarSpacing"); if (v !== undefined && v !== null) cavaBarSpacing = v
         v = _settings.value("cavaStyle"); if (v !== undefined && v !== null) cavaStyle = v
-        v = _settings.value("cavaTransparentWhenInactive"); if (v !== undefined && v !== null) cavaTransparentWhenInactive = v
+        v = _settings.value("cavaTransparentWhenInactive"); if (v !== undefined && v !== null) cavaTransparentWhenInactive = _toBool(v)
         v = _settings.value("cavaActiveOpacity"); if (v !== undefined && v !== null) cavaActiveOpacity = v
         v = _settings.value("cavaInactiveOpacity"); if (v !== undefined && v !== null) cavaInactiveOpacity = v
-        v = _settings.value("cavaAutoHide"); if (v !== undefined && v !== null) cavaAutoHide = v
-        v = _settings.value("cavaGradientEnabled"); if (v !== undefined && v !== null) cavaGradientEnabled = v
+        v = _settings.value("cavaAutoHide"); if (v !== undefined && v !== null) cavaAutoHide = _toBool(v)
+        v = _settings.value("cavaGradientEnabled"); if (v !== undefined && v !== null) cavaGradientEnabled = _toBool(v)
         v = _settings.value("cavaStartMode"); if (v !== undefined && v !== null) cavaStartMode = v
         v = _settings.value("cavaEndMode");   if (v !== undefined && v !== null) cavaEndMode   = v
         v = _settings.value("cavaStartVar");  if (v !== undefined && v !== null) cavaStartVar  = v
@@ -118,21 +131,21 @@ QtObject {
         v = _settings.value("distroBgOpacity"); if (v !== undefined && v !== null) distroBgOpacity = v
         v = _settings.value("activeWindowBgOpacity"); if (v !== undefined && v !== null) activeWindowBgOpacity = v
         v = _settings.value("activeWindowMinWidth"); if (v !== undefined && v !== null) activeWindowMinWidth = v
-        v = _settings.value("showCava"); if (v !== undefined && v !== null) showCava = v
-        v = _settings.value("showWeather"); if (v !== undefined && v !== null) showWeather = v
-        v = _settings.value("showBattery"); if (v !== undefined && v !== null) showBattery = v
-        v = _settings.value("showMediaPlayer"); if (v !== undefined && v !== null) showMediaPlayer = v
-        v = _settings.value("showIdleInhibitor"); if (v !== undefined && v !== null) showIdleInhibitor = v
-        v = _settings.value("showRofi"); if (v !== undefined && v !== null) showRofi = v
-        v = _settings.value("showUpdates"); if (v !== undefined && v !== null) showUpdates = v
-        v = _settings.value("showPowerProfiles"); if (v !== undefined && v !== null) showPowerProfiles = v
-        v = _settings.value("showOverview"); if (v !== undefined && v !== null) showOverview = v
-        v = _settings.value("showNotifications"); if (v !== undefined && v !== null) showNotifications = v
-        v = _settings.value("showWallpaper"); if (v !== undefined && v !== null) showWallpaper = v
-        v = _settings.value("showTray"); if (v !== undefined && v !== null) showTray = v
-        v = _settings.value("showBluetooth"); if (v !== undefined && v !== null) showBluetooth = v
+        v = _settings.value("showCava"); if (v !== undefined && v !== null) showCava = _toBool(v)
+        v = _settings.value("showWeather"); if (v !== undefined && v !== null) showWeather = _toBool(v)
+        v = _settings.value("showBattery"); if (v !== undefined && v !== null) showBattery = _toBool(v)
+        v = _settings.value("showMediaPlayer"); if (v !== undefined && v !== null) showMediaPlayer = _toBool(v)
+        v = _settings.value("showIdleInhibitor"); if (v !== undefined && v !== null) showIdleInhibitor = _toBool(v)
+        v = _settings.value("showRofi"); if (v !== undefined && v !== null) showRofi = _toBool(v)
+        v = _settings.value("showUpdates"); if (v !== undefined && v !== null) showUpdates = _toBool(v)
+        v = _settings.value("showPowerProfiles"); if (v !== undefined && v !== null) showPowerProfiles = _toBool(v)
+        v = _settings.value("showOverview"); if (v !== undefined && v !== null) showOverview = _toBool(v)
+        v = _settings.value("showNotifications"); if (v !== undefined && v !== null) showNotifications = _toBool(v)
+        v = _settings.value("showWallpaper"); if (v !== undefined && v !== null) showWallpaper = _toBool(v)
+        v = _settings.value("showTray"); if (v !== undefined && v !== null) showTray = _toBool(v)
+        v = _settings.value("showBluetooth"); if (v !== undefined && v !== null) showBluetooth = _toBool(v)
         //v = _settings.value("showWindow"); if (v !== undefined && v !== null) showWindow = v
-        v = _settings.value("showDistro"); if (v !== undefined && v !== null) showDistro = v
+        v = _settings.value("showDistro"); if (v !== undefined && v !== null) showDistro = _toBool(v)
         // ── Launcher (GJS app-launcher) ───────────────────────────────────
         v = _settings.value("launcherSearchWidth");    if (v !== undefined && v !== null) launcherSearchWidth    = v
         v = _settings.value("launcherIconSize");       if (v !== undefined && v !== null) launcherIconSize       = v

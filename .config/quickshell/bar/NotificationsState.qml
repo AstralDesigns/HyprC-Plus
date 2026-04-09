@@ -196,13 +196,14 @@ Item {
     //  BLUETOOTH AGENT
     // ═════════════════════════════════════════════════════════════════════
     property bool btAgentReady: false
-    property bool btReceiving:  false   // driven SOLELY by auto_accept events from bt-agent.py
+    property bool btReceiving:  false   // mirrors auto_accept mode in bt-agent.py
 
     function btToggleReceive() {
         const target = !ns.btReceiving
+        // Optimistically update — the auto_accept event from bt-agent will
+        // confirm this. If the agent isn't ready, we'll resync on agent_ready.
+        ns.btReceiving = target
         ns.btAgentSend("set_auto_accept " + (target ? "1" : "0"))
-        // Don't update btReceiving here — the auto_accept event from bt-agent
-        // will confirm and set the authoritative state.
     }
 
     // ── BT agent startup ────────────────────────────────────────────────────
@@ -303,8 +304,19 @@ Item {
                 icon: "bluetooth", urgency: 1, category: "bt" })
             break
         case "file_auto_accepted":
-            // Receive Files mode: bt-agent accepted automatically, just show a toast
-            ns.addNotification({ summary: "File Received",
+            // This event is now deprecated — use file_receiving instead
+            break
+        case "file_receiving":
+            // A file transfer has started (either auto-accepted or manually accepted)
+            // The actual file will be moved by the OBEX session monitor → file_saved event
+            ns.addNotification({ summary: "Receiving file…",
+                body: (ev.name || ev.mac) + " → " + (ev.filename || "file") +
+                      (ev.size ? " (" + ev.size + ")" : ""),
+                icon: "bluetooth", urgency: 1, category: "bt" })
+            break
+        case "file_saved":
+            // OBEX session monitor completed the file move to ~/Downloads
+            ns.addNotification({ summary: "File received",
                 body: (ev.name || ev.mac) + " → " + (ev.filename || "file") +
                       (ev.size ? " (" + ev.size + ")" : "") + " saved to Downloads",
                 icon: "bluetooth", urgency: 1, category: "bt" })
