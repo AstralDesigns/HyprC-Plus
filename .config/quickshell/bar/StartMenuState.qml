@@ -559,8 +559,14 @@ Item {
             const ss     = s.replace(/'/g, "'\\''")
             recProc._cmd =
                 "mkdir -p '" + sfo + "'; " +
-                "setsid -f bash -c \"[ -x '" + ss + "' ] && '" + ss + "' || " +
-                "wf-recorder -f '" + sf2 + "'\" &>/dev/null &"
+                "MONITOR=$(pactl get-default-sink 2>/dev/null || pactl info 2>/dev/null | grep 'Default Sink' | cut -d: -f2 | xargs); " +
+                "if [ -n \"$MONITOR\" ]; then MONITOR=\"${MONITOR}.monitor\"; " +
+                "else MONITOR=$(pactl list sources short 2>/dev/null | grep 'monitor' | head -1 | awk '{print $2}'); fi; " +
+                "if [ -n \"$MONITOR\" ]; then " +
+                "  wf-recorder -g -a --audio=\"$MONITOR\" -f '" + sf2 + "' $(slurp) &>/dev/null & " +
+                "else " +
+                "  wf-recorder -g -f '" + sf2 + "' $(slurp) &>/dev/null & " +
+                "fi"
             if(!recProc.running) recProc.running=true
         }
     }
