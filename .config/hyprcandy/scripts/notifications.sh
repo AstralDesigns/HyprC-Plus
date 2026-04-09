@@ -1,18 +1,16 @@
 #!/bin/bash
+# Toggle notification history via the bar's in-process NotificationsState.
 
 source "$HOME/.config/hyprcandy/scripts/qs-theme-env.sh"
 qs_export_theme_env
 
-# If the notifications instance is already running, just toggle it.
-# If not, start it and then toggle open.
-if pgrep -f "qs -c notifications" > /dev/null; then
-    qs ipc -c notifications call notifications toggle
+if pgrep -f "qs -c bar" > /dev/null; then
+    qs ipc -c bar --newest call bar toggleNotifications
 else
-    qs -c notifications &
-    # Wait for the IPC socket to be ready before calling toggle
+    qs -c bar &
     for i in $(seq 1 20); do
         sleep 0.1
-        if qs ipc -c notifications call notifications toggle 2>/dev/null; then
+        if qs ipc -c bar --newest call bar toggleNotifications 2>/dev/null; then
             break
         fi
     done
