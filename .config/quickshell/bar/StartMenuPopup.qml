@@ -15,6 +15,7 @@ import Quickshell.Hyprland
 PanelWindow {
     id: startMenuPanel
     visible: StartMenuState.menuVisible
+    exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "quickshell:startmenu"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
@@ -22,6 +23,8 @@ PanelWindow {
     readonly property bool  _barAtBottom: Config.barPosition === "bottom"
     readonly property real  _panelMargin: Config.outerMarginSide * 2
     readonly property real  _panelRadius: Config.barMode === "island" ? Config.islandRadius : Config.barRadius
+    property real _barGap:      Config.outerMarginTop + Config.barHeight + 6
+    property real _barGapBot:   Config.outerMarginBottom + Config.barHeight + 6
 
     anchors {
         top:    !_barAtBottom
@@ -29,8 +32,8 @@ PanelWindow {
         right:   true
     }
     margins {
-        top:    6
-        bottom: 6
+        top:    _barAtBottom ? 0 : _barGap
+        bottom: _barAtBottom ? _barGapBot : 0
         right:  _panelMargin
     }
     implicitWidth: 340

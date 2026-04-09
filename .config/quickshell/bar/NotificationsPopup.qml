@@ -381,6 +381,7 @@ Item {
     PanelWindow {
         id: historyWindow
         visible: NotificationsState.historyVisible
+        exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "quickshell:notifications:history"
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
@@ -388,9 +389,19 @@ Item {
         readonly property bool  _barAtBottom: Config.barPosition === "bottom"
         readonly property real  _panelMargin: Config.outerMarginSide * 2
         readonly property real  _panelRadius: Config.barMode === "island" ? Config.islandRadius : Config.barRadius
+	property real _barGap:      Config.outerMarginTop + Config.barHeight + 6
+        property real _barGapBot:   Config.outerMarginBottom + Config.barHeight + 6
 
-        anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true }
-        margins { top: 6; bottom: 6; left: _panelMargin }
+    	anchors {
+            top:    !_barAtBottom
+            bottom:  _barAtBottom
+            left:   true
+    	}
+    	margins {
+            top:    _barAtBottom ? 0 : _barGap
+            bottom: _barAtBottom ? _barGapBot : 0
+            left:  _panelMargin
+    	}
         implicitWidth:  380
         implicitHeight: Math.min(histScrollContent.height + histHeader.implicitHeight + histDivider.height + 42, 720)
         color: "transparent"
