@@ -69,7 +69,7 @@ const ICON_SIZE = APP_ICON_SIZE;
 const GLYPH_START      = '󱗼';   //  Linux / start
 const GLYPH_INDICATOR  = '\u{F09DF}';  //  active-window dot
 const GLYPH_TRASH_EMPTY = '󰩺';   //  nf-md-trash_can_outline — no files in trash
-const GLYPH_TRASH_FULL  = '󰩹';   //  nf-md-trash_can         — files present in trash
+const GLYPH_TRASH_FULL  = '󰛌';   //  nf-md-delete_empty         — files present in trash
 // Hyprland logo glyph (nf-linux-hyprland, NerdFonts >= 3.2)
 const GLYPH_FALLBACK  = '󱙝';   //  shown when app has no icon
 

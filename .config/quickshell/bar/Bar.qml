@@ -39,7 +39,7 @@ PanelWindow {
     implicitHeight: _isHorizontal ? Config.barHeight : 0
 
     exclusionMode: ExclusionMode.Normal
-    exclusiveZone: Config.barHeight + Config.outerMarginTop + Config.outerMarginBottom
+    exclusiveZone: Config.barHeight + (_isTop ? Config.outerMarginBottom : _isBottom ? Config.outerMarginTop : 0)
     WlrLayershell.layer: WlrLayer.Bottom
 
     // ── Bar state file ──────────────────────────────────────────────────
