@@ -16,7 +16,7 @@ declare -A menu_options=(
     [" Emojis"]="$SETTINGS/emojipicker.sh"
     [" Glyphs"]="$SETTINGS/glyphpicker.sh"
     ["󰮏 Update"]="$HYPRSCRIPTS/update.sh"
-    ["󰑐 Reinstall"]="$HYPRSCRIPTS/reinstall.sh"
+    #["󰑐 Reinstall"]="$HYPRSCRIPTS/reinstall.sh"
 )
 
 # Create the menu list
