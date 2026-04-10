@@ -95,24 +95,79 @@ Item {
     property bool networkExpanded: false
     property var networkList: []
     property string networkStatus: ""; property string networkSSID: ""
+    property string netDevice: ""          // active interface name (wlan0, eth0, …)
+    property bool   netIsWifi:     false   // derived: device matches wlan/wifi/wlp
+    property bool   netIsEthernet: false   // derived: device matches eth/enp/ens/eno
+    property bool   netRadioEnabled: true  // wifi radio on/off (wifi only)
     property bool netConnecting_: false
     property string netConnectTarget: ""; property bool netPasswordVisible: false
+    // SSID of the network whose password row is currently open, and the
+    // text typed into it — both live in State so networkList refreshes
+    // don't destroy either the open row or the partially-typed password.
+    property string netPasswordSSID: ""
+    property string netPasswordText: ""
 
+    // Status proc — picks up wifi first, falls back to ethernet if no wifi iface found
     Process { id: netStatusProc
-        command:["bash","-c","nmcli --escape no -t -f DEVICE,STATE,CONNECTION dev | awk -F: 'NR==1||/wlan|wifi|wlp/{print;exit}'"]
+        command:["bash","-c",
+            // Print wifi line if present, otherwise first ethernet line
+            "nmcli --escape no -t -f DEVICE,STATE,CONNECTION dev | " +
+            "awk -F: '/wlan|wifi|wlp/{found=1;print;exit} !found&&/eth|enp|ens|eno/{eth=$0} " +
+            "END{if(!found&&eth)print eth}'"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
             const idx1=l.indexOf(":"), idx2=l.indexOf(":",idx1+1)
             if(idx1>0&&idx2>0){
-                sm.networkStatus=l.substring(idx1+1,idx2)
-                sm.networkSSID=l.substring(idx2+1)
+                const dev = l.substring(0,idx1)
+                sm.netDevice      = dev
+                sm.networkStatus  = l.substring(idx1+1,idx2)
+                sm.networkSSID    = l.substring(idx2+1)
+                const dl = dev.toLowerCase()
+                sm.netIsWifi      = /wlan|wifi|wlp/.test(dl)
+                sm.netIsEthernet  = /^(eth|enp|ens|eno)/.test(dl)
             }
         }}
+        onExited: {
+            // After device status, also poll wifi radio state (harmless on ethernet boxes)
+            if (!netRadioProc.running) netRadioProc.running = true
+            // Refresh the network list whenever status settles and the panel is
+            // expanded — keeps active/saved flags consistent with what netStatusProc
+            // just learned (header and list agree), including after a connect.
+            if (sm.networkExpanded && !sm._forgetInFlight && !netScanProc.running)
+                netScanProc.running = true
+        }
         Component.onCompleted: running=true
     }
     Timer { interval:8000; repeat:true; running:true; onTriggered: if(!netStatusProc.running) netStatusProc.running=true }
 
+    // Wi-Fi radio on/off toggle
+    Process { id: netRadioProc
+        command:["bash","-c","nmcli radio wifi 2>/dev/null"]
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
+            sm.netRadioEnabled = l.trim() === "enabled"
+        }}
+    }
+    Process { id: netRadioSetProc; property string _cmd:""
+        command:["bash","-c",netRadioSetProc._cmd]
+        onExited: { if(!netStatusProc.running) netStatusProc.running=true }
+    }
+    function toggleNetRadio() {
+        netRadioSetProc._cmd = sm.netRadioEnabled
+            ? "nmcli radio wifi off"
+            : "nmcli radio wifi on"
+        if(!netRadioSetProc.running) netRadioSetProc.running=true
+    }
+
     property var _netBuf: []
     property var _savedNets: []
+    property bool _forgetPending: false
+    // True while a forget delete+saved-rebuild cycle is in flight.
+    // Any code path that wants to start netScanProc must check this first;
+    // netSavedProc.onRunningChanged will fire the deferred scan when it finishes.
+    property bool _forgetInFlight: false
+    // True when a successful connect has asked netSavedProc to rebuild so the
+    // newly-created NM profile is in _savedNets before the follow-up scan runs.
+    property bool _connSavedPending: false
+
     Process { id: netSavedProc
         command: ["bash", "-c", "nmcli --escape no -t -f NAME con show 2>/dev/null"]
         running: true
@@ -121,7 +176,20 @@ Item {
         }}
         onRunningChanged: {
             sm.netSavedProcRunning = running
-            if (running) sm._savedNets = []
+            if (running) { sm._savedNets = [] }
+            else {
+                if (sm._forgetPending) {
+                    sm._forgetPending  = false
+                    sm._forgetInFlight = false
+                    if (!netScanProc.running) netScanProc.running = true
+                } else if (sm._connSavedPending) {
+                    sm._connSavedPending = false
+                    // _savedNets now includes the profile NM just created, so
+                    // the scan will correctly mark the network as saved:true.
+                    if (sm.networkExpanded && !netScanProc.running)
+                        netScanProc.running = true
+                }
+            }
         }
     }
     // netRescanProc: asks the driver for a fresh scan, then kicks netScanProc.
@@ -130,7 +198,7 @@ Item {
         command: ["bash", "-c", "nmcli dev wifi rescan 2>/dev/null; true"]
         onRunningChanged: {
             if (running) { sm.netScanProcRunning = true; sm._netBuf = [] }
-            else if (!netScanProc.running) netScanProc.running = true
+            else if (!sm._forgetInFlight && !netScanProc.running) netScanProc.running = true
         }
     }
     Process { id: netScanProc
@@ -154,18 +222,99 @@ Item {
         command:["bash","-c",netConnProc._cmd]
         onExited: function(code) {
             sm.netConnecting_=false
-            if (code === 0) { sm.netConnectedSSID = netConnProc._lastSSID; netConnFeedbackTimer.restart() }
-            if(!netStatusProc.running) netStatusProc.running=true
+            sm.netPasswordSSID = ""
+            sm.netPasswordText = ""
+            if (code === 0) {
+                sm.netConnectedSSID = netConnProc._lastSSID
+                netConnFeedbackTimer.restart()
+                // Kick status so the header updates. netStatusProc.onExited will
+                // then trigger the list scan once NM has settled — avoids reading
+                // a stale IN-USE marker from nmcli dev wifi list which lags 1-2s.
+                if (!netStatusProc.running) netStatusProc.running = true
+                // Belt-and-suspenders: second scan after a short settling delay
+                // for cases where dev wifi list still lags behind netStatusProc.
+                netPostConnTimer.restart()
+            } else {
+                if (!netStatusProc.running) netStatusProc.running = true
+            }
         }
     }
     Timer { id: netConnFeedbackTimer; interval: 2500; repeat: false
         onTriggered: sm.netConnectedSSID = "" }
+    // Fires 1.4 s after a successful connect — by then the NM profile exists and
+    // nmcli dev wifi list reliably reflects IN-USE, so rebuilding _savedNets first
+    // then scanning gives a list where the network shows both active AND saved:true.
+    Timer { id: netPostConnTimer; interval: 1400; repeat: false
+        onTriggered: {
+            if (!sm._forgetInFlight) {
+                sm._connSavedPending = true
+                if (!netSavedProc.running) netSavedProc.running = true
+            }
+        }
+    }
     function connectNetwork(ssid, password){
         const esc=ssid.replace(/'/g,"'\\''")
         if(password) netConnProc._cmd="nmcli device wifi connect '"+esc+"' password '"+password.replace(/'/g,"'\\''")+"'"
         else netConnProc._cmd="nmcli connection up '"+esc+"' 2>/dev/null || nmcli device wifi connect '"+esc+"'"
         sm.netConnecting_=true; sm.netConnectTarget=ssid; netConnProc._lastSSID=ssid
         if(!netConnProc.running) netConnProc.running=true
+    }
+
+    // Disconnect the active connection on the wifi interface
+    Process { id: netDisconnProc; property string _cmd:""
+        command:["bash","-c",netDisconnProc._cmd]
+        onExited: {
+            if(!netStatusProc.running) netStatusProc.running=true
+            // Guard: don't race a scan against an in-flight forget/saved-rebuild cycle.
+            if(!sm._forgetInFlight && !netScanProc.running) netScanProc.running=true
+        }
+    }
+    function disconnectNetwork() {
+        const dev = sm.netDevice || ""
+        if (!dev) return
+        netDisconnProc._cmd = "nmcli device disconnect '" + dev.replace(/'/g,"'\\\\''")+"' 2>/dev/null; true"
+        if(!netDisconnProc.running) netDisconnProc.running=true
+    }
+
+    // Forget a saved connection profile — removes it from NM so it won't auto-reconnect
+    Process { id: netForgetProc; property string _cmd:""
+        command:["bash","-c",netForgetProc._cmd]
+        onExited: {
+            // Chain: rebuild _savedNets first via _forgetPending, then netScanProc.
+            // _forgetInFlight blocks every other netScanProc trigger until the chain
+            // completes, so no concurrent scan can read a stale _savedNets and restore
+            // saved:true for the forgotten network.
+            sm._forgetPending = true
+            if (netSavedProc.running) {
+                // Already running — it will see _forgetPending=true when it finishes.
+            } else {
+                netSavedProc.running = true
+            }
+            if (!netStatusProc.running) netStatusProc.running = true
+        }
+    }
+    function forgetNetwork(ssid) {
+        // 1. Raise the in-flight flag immediately — blocks all concurrent scan triggers.
+        sm._forgetInFlight = true
+        sm.netPasswordSSID = ""
+        sm.netPasswordText = ""
+
+        // 2. Remove from in-memory _savedNets immediately.
+        sm._savedNets = sm._savedNets.filter(function(n) { return n !== ssid })
+
+        // 3. Patch networkList instantly for immediate UI feedback:
+        //    saved:false  → hides Forget button
+        //    active:false → hides Disconnect button
+        //    secure preserved so clicking the row triggers password re-entry
+        sm.networkList = sm.networkList.map(function(n) {
+            if (n.ssid !== ssid) return n
+            return { ssid: n.ssid, signal: n.signal, secure: n.secure, saved: false, active: false }
+        })
+
+        // 4. Fire nmcli delete async — same single-quote escaping as connectNetwork.
+        const esc = ssid.replace(/'/g, "'\\''")
+        netForgetProc._cmd = "nmcli connection delete '" + esc + "' 2>/dev/null; true"
+        if (!netForgetProc.running) netForgetProc.running = true
     }
 
     // ── Bluetooth ─────────────────────────────────────────────────────────────

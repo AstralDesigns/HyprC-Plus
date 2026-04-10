@@ -164,12 +164,29 @@ PanelWindow {
             ColumnLayout { Layout.fillWidth: true; spacing: 4
                 // Header row
                 RowLayout { Layout.fillWidth: true; spacing: 8
-                    Text { text: "󰤨"; font.pixelSize: 15; font.family: Config.fontFamily
-                        color: StartMenuState.networkStatus === "connected" ? Theme.cPrimary : Theme.cOnSurfVar }
-                    ColumnLayout { Layout.fillWidth: true; spacing: 0
-                        Text { text: StartMenuState.networkSSID || "Not connected"; color: Theme.cOnSurf; font.pixelSize: 12; elide: Text.ElideRight }
-                        Text { text: StartMenuState.networkStatus; color: Theme.cOnSurfVar; font.pixelSize: 10; opacity: 0.7
-                            visible: StartMenuState.networkStatus !== "" }
+                    // Network icon — wifi: borderless toggle like BT; ethernet/none: static glyph
+                    Text {
+                        font.pixelSize: 15; font.family: Config.fontFamily
+                        text: !StartMenuState.netIsWifi && !StartMenuState.netIsEthernet ? "󰤭"
+                            : StartMenuState.netIsEthernet ? "󰈀"
+                            : StartMenuState.netRadioEnabled ? "󰤨" : "󰤮"
+                        color: StartMenuState.netIsWifi
+                            ? (StartMenuState.netRadioEnabled ? Theme.cPrimary : Theme.cOnSurfVar)
+                            : (StartMenuState.networkStatus === "connected" ? Theme.cPrimary : Theme.cOnSurfVar)
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                        MouseArea {
+                            anchors.fill: parent; hoverEnabled: true
+                            cursorShape: StartMenuState.netIsWifi ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            enabled: StartMenuState.netIsWifi
+                            onClicked: StartMenuState.toggleNetRadio()
+                        }
+                    }
+                    // Status text only — SSID is visible in the list with its own indicators
+                    Text {
+                        Layout.fillWidth: true
+                        text: StartMenuState.networkStatus || (StartMenuState.netRadioEnabled ? "No network" : "Wi-Fi off")
+                        color: Theme.cOnSurfVar; font.pixelSize: 10; opacity: 0.75
+                        elide: Text.ElideRight
                     }
                     Rectangle {
                         width: 24; height: 24; radius: 6
@@ -252,48 +269,152 @@ PanelWindow {
                         delegate: Column {
                             id: netDelegate
                             required property var modelData
-                            property bool _showPass: false
+                            // _showPass is derived from State so it survives networkList refreshes.
+                            readonly property bool _showPass:
+                                StartMenuState.netPasswordSSID === modelData.ssid
                             width: parent.width; spacing: 2
 
                             Rectangle {
+                                id: netRow
                                 width: parent.width; height: 34; radius: 8
-                                color: nh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                color: rowHover.containsMouse
+                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                     : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.5)
                                 Behavior on color { ColorAnimation { duration: 100 } }
                                 border.width: netDelegate.modelData.active ? 1 : 0
                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.5)
-                                RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 6
-                                    Text {
-                                        text: netDelegate.modelData.signal > 70 ? "󰤨" : netDelegate.modelData.signal > 40 ? "󰤥"
-                                            : netDelegate.modelData.signal > 20 ? "󰤢" : "󰤟"
-                                        font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cOnSurfVar
-                                    }
-                                    Text { Layout.fillWidth: true; text: netDelegate.modelData.ssid
-                                        color: Theme.cOnSurf; font.pixelSize: 11; elide: Text.ElideRight }
-                                    Text { text: "󰒃"; font.pixelSize: 10; font.family: Config.fontFamily
-                                        color: Theme.cOnSurfVar; opacity: 0.5; visible: netDelegate.modelData.secure }
-                                    Text {
-                                        text: StartMenuState.netConnecting_ && StartMenuState.netConnectTarget === netDelegate.modelData.ssid ? "󰒖" : ""
-                                        font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cPrimary
-                                        RotationAnimator on rotation { from: 0; to: 360; duration: 800; loops: Animation.Infinite
-                                            running: StartMenuState.netConnecting_ && StartMenuState.netConnectTarget === netDelegate.modelData.ssid }
-                                    }
-                                    Text { text: "󰄬"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cPrimary
-                                        visible: StartMenuState.netConnectedSSID === netDelegate.modelData.ssid
-                                        opacity: StartMenuState.netConnectedSSID === netDelegate.modelData.ssid ? 1.0 : 0.0
-                                        Behavior on opacity { NumberAnimation { duration: 400 } } }
-                                }
-                                MouseArea { id: nh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
+
+                                MouseArea {
+                                    id: rowHover
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: netDelegate.modelData.active
+                                        ? Qt.ArrowCursor : Qt.PointingHandCursor
+                                    onClicked: function(mouse) {
                                         if (netDelegate.modelData.active) return
+                                        if (StartMenuState.netConnecting_ &&
+                                            StartMenuState.netConnectTarget === netDelegate.modelData.ssid) return
                                         if (netDelegate.modelData.saved || !netDelegate.modelData.secure)
                                             StartMenuState.connectNetwork(netDelegate.modelData.ssid, "")
                                         else
-                                            netDelegate._showPass = !netDelegate._showPass
+                                            StartMenuState.netPasswordSSID =
+                                                netDelegate._showPass ? "" : netDelegate.modelData.ssid
+                                    }
+                                }
+
+                                // Inline row: signal + SSID + indicators + action buttons
+                                RowLayout {
+                                    anchors {
+                                        left: parent.left; right: parent.right
+                                        verticalCenter: parent.verticalCenter
+                                        leftMargin: 8; rightMargin: 6
+                                    }
+                                    spacing: 6
+
+                                    Text {
+                                        text: netDelegate.modelData.signal > 70 ? "󰤨"
+                                            : netDelegate.modelData.signal > 40 ? "󰤥"
+                                            : netDelegate.modelData.signal > 20 ? "󰤢" : "󰤟"
+                                        font.pixelSize: 12; font.family: Config.fontFamily
+                                        color: netDelegate.modelData.active ? Theme.cPrimary : Theme.cOnSurfVar
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: netDelegate.modelData.ssid
+                                        color: netDelegate.modelData.active ? Theme.cPrimary : Theme.cOnSurf
+                                        font.pixelSize: 11; font.weight: netDelegate.modelData.active ? Font.Medium : Font.Normal
+                                        elide: Text.ElideRight
+                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                    }
+                                    // Lock icon (secured + not active)
+                                    Text {
+                                        text: "󰒃"; font.pixelSize: 10; font.family: Config.fontFamily
+                                        color: Theme.cOnSurfVar; opacity: 0.5
+                                        visible: netDelegate.modelData.secure && !netDelegate.modelData.active
+                                    }
+                                    // Connecting spinner
+                                    Text {
+                                        text: "󰒖"; font.pixelSize: 11; font.family: Config.fontFamily
+                                        color: Theme.cPrimary
+                                        visible: StartMenuState.netConnecting_ &&
+                                                 StartMenuState.netConnectTarget === netDelegate.modelData.ssid
+                                        RotationAnimator on rotation {
+                                            from: 0; to: 360; duration: 800; loops: Animation.Infinite
+                                            running: StartMenuState.netConnecting_ &&
+                                                     StartMenuState.netConnectTarget === netDelegate.modelData.ssid
+                                        }
+                                    }
+                                    // Just-connected checkmark
+                                    Text {
+                                        text: "󰄬"; font.pixelSize: 12; font.family: Config.fontFamily
+                                        color: Theme.cPrimary
+                                        visible: StartMenuState.netConnectedSSID === netDelegate.modelData.ssid
+                                        opacity: StartMenuState.netConnectedSSID === netDelegate.modelData.ssid ? 1.0 : 0.0
+                                        Behavior on opacity { NumberAnimation { duration: 400 } }
+                                    }
+                                    // Disconnect — active network only
+                                    Rectangle {
+                                        visible: netDelegate.modelData.active
+                                        height: 20; radius: 5
+                                        implicitWidth: visible ? dcLbl.implicitWidth + 14 : 0
+                                        color: dcMA.containsMouse
+                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                            : "transparent"
+                                        border.width: 1
+                                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b,
+                                                              dcMA.containsMouse ? 0.55 : 0.28)
+                                        Behavior on color        { ColorAnimation { duration: 100 } }
+                                        Behavior on border.color { ColorAnimation { duration: 100 } }
+                                        Text {
+                                            id: dcLbl; anchors.centerIn: parent
+                                            text: "Disconnect"; font.pixelSize: 9
+                                            font.family: Config.labelFont
+                                            color: dcMA.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
+                                            Behavior on color { ColorAnimation { duration: 100 } }
+                                        }
+                                        MouseArea {
+                                            id: dcMA; anchors.fill: parent; hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                StartMenuState.disconnectNetwork()
+                                                StartMenuState.netPasswordSSID = ""
+                                            }
+                                        }
+                                    }
+                                    // Forget — any saved network (connected or not)
+                                    Rectangle {
+                                        visible: netDelegate.modelData.saved
+                                        height: 20; radius: 5
+                                        implicitWidth: visible ? fgLbl.implicitWidth + 14 : 0
+                                        color: fgMA.containsMouse
+                                            ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.16)
+                                            : "transparent"
+                                        border.width: 1
+                                        border.color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b,
+                                                              fgMA.containsMouse ? 0.55 : 0.28)
+                                        Behavior on color        { ColorAnimation { duration: 100 } }
+                                        Behavior on border.color { ColorAnimation { duration: 100 } }
+                                        Text {
+                                            id: fgLbl; anchors.centerIn: parent
+                                            text: "Forget"; font.pixelSize: 9
+                                            font.family: Config.labelFont
+                                            color: fgMA.containsMouse ? Theme.cErr : Theme.cOnSurfVar
+                                            Behavior on color { ColorAnimation { duration: 100 } }
+                                        }
+                                        MouseArea {
+                                            id: fgMA; anchors.fill: parent; hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                StartMenuState.forgetNetwork(netDelegate.modelData.ssid)
+                                                // netPasswordSSID cleared inside forgetNetwork()
+                                            }
+                                        }
                                     }
                                 }
                             }
 
+                            // ── Password entry (unsaved secure networks) ─────────────
                             Row {
                                 visible: netDelegate._showPass; width: parent.width; spacing: 4
                                 Rectangle {
@@ -305,16 +426,19 @@ PanelWindow {
                                             id: pwIn; Layout.fillWidth: true
                                             echoMode: StartMenuState.netPasswordVisible ? TextInput.Normal : TextInput.Password
                                             color: Theme.cOnSurf; font.pixelSize: 11
+                                            // Bind to State so typed text survives networkList refreshes.
+                                            text: StartMenuState.netPasswordText
+                                            onTextChanged: StartMenuState.netPasswordText = text
                                             onAccepted: {
                                                 StartMenuState.connectNetwork(netDelegate.modelData.ssid, text)
-                                                netDelegate._showPass = false
+                                                StartMenuState.netPasswordSSID = ""
                                             }
                                         }
                                         Text {
                                             text: pwIn.text === "" ? "Password" : ""
                                             color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.5)
                                             font.pixelSize: 11; font.italic: true
-                                            anchors.verticalCenter: pwIn.verticalCenter
+                                            Layout.alignment: Qt.AlignVCenter
                                             visible: pwIn.text === "" && !pwIn.activeFocus
                                         }
                                         Text {
@@ -329,8 +453,8 @@ PanelWindow {
                                     width: 30; height: 30; radius: 8; color: Theme.cPrimary
                                     Text { anchors.centerIn: parent; text: "󰌑"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cOnPrim }
                                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: {
-                                        StartMenuState.connectNetwork(netDelegate.modelData.ssid, pwIn.text)
-                                        netDelegate._showPass = false
+                                        StartMenuState.connectNetwork(netDelegate.modelData.ssid, StartMenuState.netPasswordText)
+                                        StartMenuState.netPasswordSSID = ""
                                     }}
                                 }
                             }

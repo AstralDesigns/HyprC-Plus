@@ -42,6 +42,125 @@ PanelWindow {
     exclusiveZone: Config.barHeight + (_isTop ? Config.outerMarginBottom : _isBottom ? Config.outerMarginTop : 0)
     WlrLayershell.layer: WlrLayer.Bottom
 
+    // ── Auto-hide — reads ~/.config/hyprcandy/hyprcandy-bar.conf ───────────
+    //
+    // When [bar] autohide=true:
+    //   • A HoverHandler on this PanelWindow tracks pointer presence.
+    //   • While the pointer is ON the bar the hide timer is stopped/reset.
+    //   • When the pointer LEAVES the hide timer starts; on expiry the bar
+    //     hides (visible = false) and the thin hotspot PanelWindow appears.
+    //   • The hotspot is a 2 px strip at the same edge, WlrLayer.Top,
+    //     exclusiveZone -1 (no screen reservation). Its HoverHandler fires
+    //     on pointer entry and restores the bar.
+    //   • Fullscreen guard: if the focused window on this monitor is
+    //     fullscreen the bar stays hidden and the hotspot stays invisible
+    //     too (nothing should pull focus away from a fullscreen app).
+
+    property bool   _ahEnabled:  false   // parsed from conf
+    property int    _ahDelaySec: 5       // parsed from conf
+    property bool   _ahHidden:   false   // current hide state
+
+    // Conf file watcher — re-parses whenever the file changes on disk
+    FileView {
+        id: _ahConfView
+        path:         Quickshell.env("HOME") + "/.config/hyprcandy/hyprcandy-bar.conf"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            const txt = text()
+            // Parse [bar] section: autohide= and autohide_delay=
+            const ahMatch    = txt.match(/\[bar\][^\[]*autohide\s*=\s*(true|false)/i)
+            const delayMatch = txt.match(/\[bar\][^\[]*autohide_delay\s*=\s*(\d+)/i)
+            bar._ahEnabled  = ahMatch  ? ahMatch[1].toLowerCase()  === "true" : false
+            bar._ahDelaySec = delayMatch ? parseInt(delayMatch[1]) : 5
+            // If auto-hide was just turned off, ensure bar is visible
+            if (!bar._ahEnabled && bar._ahHidden) {
+                bar._ahHidden = false
+                bar.visible   = true
+            }
+            if (bar._ahEnabled) _ahHideTimer.restart()
+        }
+        Component.onCompleted: reload()
+    }
+
+    // Hide timer — fires after the pointer has been outside the bar
+    // for _ahDelaySec seconds.
+    Timer {
+        id: _ahHideTimer
+        interval:  bar._ahDelaySec * 1000
+        repeat:    false
+        running:   false
+        onTriggered: {
+            // Do not hide if the focused window on this monitor is fullscreen
+            const mon = bar._monitor
+            if (mon && mon.activeWindow && mon.activeWindow.fullscreen) return
+            bar._ahHidden = true
+            bar.visible   = false
+        }
+    }
+
+    // HoverHandler on the bar itself.
+    // onHoveredChanged fires synchronously when the pointer enters or leaves.
+    HoverHandler {
+        id: _barHover
+        onHoveredChanged: {
+            if (!bar._ahEnabled) return
+            if (hovered) {
+                // Pointer entered — cancel pending hide, ensure bar visible
+                _ahHideTimer.stop()
+                if (bar._ahHidden) {
+                    bar._ahHidden = false
+                    bar.visible   = true
+                }
+            } else {
+                // Pointer left — start the hide countdown
+                _ahHideTimer.restart()
+            }
+        }
+    }
+
+    // Hotspot window — 2 px strip anchored to the same screen edge as the
+    // bar, always on WlrLayer.Top, zero exclusive zone.  Only visible when
+    // the bar is auto-hidden AND the focused window is not fullscreen.
+    PanelWindow {
+        id: _ahHotspot
+
+        readonly property bool _fullscreen: {
+            const mon = bar._monitor
+            return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
+        }
+
+        visible: bar._ahEnabled && bar._ahHidden && !_fullscreen
+
+        WlrLayershell.layer:     WlrLayer.Top
+        WlrLayershell.namespace: "quickshell:bar-autohide-hotspot"
+        exclusionMode:           ExclusionMode.Ignore
+        exclusiveZone:           0
+        color:                   "transparent"
+
+        // Mirror the bar's edge anchoring exactly
+        anchors {
+            top:    bar._isTop    || (bar._isLeft || bar._isRight)
+            bottom: bar._isBottom || (bar._isLeft || bar._isRight)
+            left:   bar._isLeft   || (bar._isTop  || bar._isBottom)
+            right:  bar._isRight  || (bar._isTop  || bar._isBottom)
+        }
+
+        // 2 px thick in the perpendicular axis, full-width along the edge
+        implicitWidth:  bar._isHorizontal ? 0 : 2
+        implicitHeight: bar._isHorizontal ? 2 : 0
+
+        HoverHandler {
+            onHoveredChanged: {
+                if (hovered && bar._ahEnabled) {
+                    bar._ahHidden = false
+                    bar.visible   = true
+                    _ahHideTimer.stop()
+                }
+            }
+        }
+    }
+
     // ── Bar state file ──────────────────────────────────────────────────
     // Written to ~/.config/hyprcandy/qs_bar_state.json at startup and on
     // geometry changes so startmenu/notifications can track bar geometry.
@@ -137,22 +256,12 @@ PanelWindow {
         default property alias content: innerRow.data
         property bool   visible_:  true
         property real   bgOverride: -1
-        //  bgType selects which Tab 6 · Background color/opacity to use.
-        //  ""            → uses Theme.cOnSecondary (legacy default)
-        //  "workspace"   → Config.wsBgColor / wsBgOpacity
-        //  "grouped"     → Config.groupedBgColor / groupedBgOpacity
-        //  "ungrouped"   → Config.ungroupedBgColor / ungroupedBgOpacity
-        //  "media"       → Config.mediaBgColor / mediaBgOpacity
-        //  "cava"        → Config.cavaBgColor / cavaBgOpacity
-        //  "distro"      → Config.distroBgColor / distroBgOpacity
-        //  "activewindow"→ Config.activeWindowBgColor / activeWindowBgOpacity
         property string bgType: ""
         visible: visible_ && innerRow.implicitWidth > 0
 
         implicitWidth:  innerRow.implicitWidth
         implicitHeight: Config.moduleHeight
 
-        // Resolve effective bg color from bgType (fallback to cOnSecondary)
         readonly property color _effectiveBgColor: {
             switch (bgType) {
                 case "workspace":    return Config.wsBgColor
@@ -168,7 +277,6 @@ PanelWindow {
             }
         }
 
-        // Resolve effective bg opacity (-1 = fall through to global)
         readonly property real _effectiveBgOpacity: {
             let raw = -1
             switch (bgType) {
@@ -182,14 +290,13 @@ PanelWindow {
                 case "tray":         raw = Config.trayBgOpacity; break
                 case "activewindow": raw = Config.activeWindowBgOpacity; break
             }
-            if (raw > -0.5) return raw   // 0.0 = truly transparent; only -1 sentinel falls through
+            if (raw > -0.5) return raw
             return bgOverride > -0.5 ? bgOverride
                 : (Config.barMode === "bar" ? Config.islandBgOpacityBar : Config.islandBgOpacityIsland)
         }
 
         readonly property real _bgOpacity: _effectiveBgOpacity
 
-        // Pill border + background fill
         Rectangle {
             anchors.fill: parent
             radius: Config.islandRadius
@@ -199,7 +306,6 @@ PanelWindow {
                                   Config.islandBorderAlpha)
             clip: true
 
-            // Flat fill — shown when islandBgStyle is "flat" (default bar-mode look)
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
                 visible: Config.islandBgStyle === "flat"
@@ -207,7 +313,6 @@ PanelWindow {
                                isl._effectiveBgColor.b, isl._bgOpacity)
                 Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
             }
-            // Gradient fill — shown when islandBgStyle is "gradient" (island-mode look)
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
                 visible: Config.islandBgStyle === "gradient"
@@ -225,7 +330,6 @@ PanelWindow {
             id: innerRow
             anchors.centerIn: parent
             spacing: Config.groupedSpacing
-            // No extra padding — each module already includes modPadH in its own implicitWidth
         }
     }
 
@@ -237,50 +341,29 @@ PanelWindow {
     }
 
     // ── Root layout ─────────────────────────────────────────────────────────
-    //  Horizontal: RowLayout with left-group | expanding spacers | center | spacers | right-group
-    //  outerMarginSide shrinks the whole panel → spacers compress → sections move together.
     Item {
         id: barLayout
-        // Anchor to barBg so all rows are positioned relative to the visible
-        // bar rectangle (already inset by outerMarginSide), not the raw PanelWindow.
         anchors {
             left:   barBg.left
             right:  barBg.right
             top:    barBg.top
             bottom: barBg.bottom
         }
-        // ── Respected spacing: 4 px gap between left/center/right rects ──────
-        //  Computes how much space the left row may use before it would overlap
-        //  the center row by less than 4 px. The media-info text shrinks into
-        //  that budget via the mediaMaxWidth property passed to MediaPlayer.
         readonly property int _minGap: 4
-        // Tracks whether any MediaPlayer is active (Playing or Paused)
-        // Used by cava auto-hide logic.
         property bool _mediaActive: MediaPlayerState.active
-        // Left group natural width (without media text — just controls + disc)
-        // Right group natural width
-        // Available width for left group = center.x - leftEdge - minGap
         readonly property real _leftEdge:   Config.islandSpacing + Config.barEdgePaddingLeft
         readonly property real _rightEdge:  Config.islandSpacing + Config.barEdgePaddingRight
-        // Center row x position (horizontalCenter of barLayout)
         readonly property real _centerX:    width / 2
-        // Max x the left row's right edge can reach
         readonly property real _leftMaxRight: _centerX - _minGap
-        // Max x the right row's left edge can start
         readonly property real _rightMinLeft: _centerX + _minGap
-        // Exposed to MediaPlayer via property; MediaPlayer caps its implicitWidth
-        // to this value so the text shrinks before overlapping the center.
-        // -1 means unconstrained.
         readonly property real mediaMaxWidth: {
             const leftRowNaturalW = leftGroup.implicitWidth
             const leftRowX = _leftEdge
             const leftRowRight = leftRowX + leftRowNaturalW
             if (leftRowRight <= _leftMaxRight) return -1
-            // How much to trim: leftRowNaturalW - (leftMaxRight - leftRowX)
             const budget = _leftMaxRight - leftRowX
             return Math.max(0, budget)
         }
-        // Same logic for right group
         readonly property real rightMaxWidth: {
             const rightRowNaturalW = rightGroup.implicitWidth
             const rightRowX = width - _rightEdge - rightRowNaturalW
@@ -289,12 +372,6 @@ PanelWindow {
             return Math.max(0, budget)
         }
 
-        // ════════════════════════ HORIZONTAL BAR ═══════════════════════════
-        // Three absolutely-positioned rows:
-        //   LEFT  — anchored to left  + outerMarginSide (= same edge gap as right)
-        //   RIGHT — anchored to right + outerMarginSide
-        //   CENTER— anchored to horizontalCenter of parent (always truly centered)
-        // As outerMarginSide grows, left/right rows move inward; center stays put.
         // ── LEFT GROUP ─────────────────────────────────────────────────────────
         Row {
             id: leftGroup
@@ -321,14 +398,13 @@ PanelWindow {
                 visible_: Config.showMediaPlayer
                 Modules.MediaPlayer {
                     id: mp1
-                    // Shrink media info when left group would overlap center
                     mediaMaxW: barLayout.mediaMaxWidth
-                    property bool mediaActive: _active
+                    property bool mediaActive: MediaPlayerState.active
                 }
             }
         }
 
-        // ── CENTER GROUP (always truly centered) ───────────────────────────────────────────
+        // ── CENTER GROUP ───────────────────────────────────────────────────────
         Row {
             visible: bar._isHorizontal && Config.barMode !== "tri"
             anchors.centerIn: parent
@@ -345,7 +421,8 @@ PanelWindow {
             Island { bgType: "ungrouped"; Modules.DateDisplay {} }
             Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaRight; side: "right" } }
         }
-        // ── RIGHT GROUP ────────────────────────────────────────────────────────────
+
+        // ── RIGHT GROUP ────────────────────────────────────────────────────────
         Row {
             id: rightGroup
             visible: bar._isHorizontal && Config.barMode !== "tri"
@@ -372,7 +449,7 @@ PanelWindow {
                     implicitHeight: Config.moduleHeight
                     Text {
                         id: _rofiIcon; anchors.centerIn: parent
-                        text: ""; color: Config.glyphColor
+                        text: ""; color: Config.glyphColor
                         font.family: Config.fontFamily; font.pixelSize: Config.fontSize
                     }
                     ToolTip.visible: false; ToolTip.text: ""; ToolTip.delay: 500
@@ -389,24 +466,11 @@ PanelWindow {
                 visible_: Config.showTray
                 Modules.SystemTray {
                     rootWindow: bar
-                    // Shrink tray when right group would overlap center
                     trayMaxW: barLayout.rightMaxWidth
                 }
             }
             Island { bgType: "activewindow"; visible_: Config.showWindow; Modules.ActiveWindow {} }
         }
-        // ════════════════════════ TRI-ISLANDS MODEE ════════════════════════
-        // Three separate bar-background rectangles, one per group (left / center /
-        // right). Each rect uses the same barBg styling (blurBackground fill +
-        // border + barRadius) so the three bars share a unified look while being
-        // physically separated. Spacing between them uses outerMarginSide so they
-        // sit the same distance apart as islands do in island mode.
-        //
-        // The left bar is left-anchored, the right bar is right-anchored, and the
-        // center bar is centered — exactly mirroring the normal island layout but
-        // each group now has its own enclosing bar background.
-        //
-        // Internal module layout is unchanged: same Island pills inside each bar.
 
         // ── TRI LEFT BAR ──────────────────────────────────────────────────
         Rectangle {
@@ -465,7 +529,6 @@ PanelWindow {
                     visible_: Config.showMediaPlayer
                     Modules.MediaPlayer {
                         id: mp2
-                        // Tri-mode: shrink media if left bar approaches center bar
                         mediaMaxW: {
                             const gap = 4
                             const leftRight = triLeft.x + triLeft.width
@@ -594,7 +657,7 @@ PanelWindow {
                         implicitHeight: Config.moduleHeight
                         Text {
                             id: _triRofiIcon; anchors.centerIn: parent
-                            text: ""; color: Config.glyphColor
+                            text: "󰓐"; color: Config.glyphColor
                             font.family: Config.fontFamily; font.pixelSize: Config.fontSize
                         }
                         ToolTip.visible: false; ToolTip.text: ""; ToolTip.delay: 500
@@ -613,7 +676,6 @@ PanelWindow {
                     visible_: Config.showTray
                     Modules.SystemTray {
                         rootWindow: bar
-                        // Tri-mode: shrink tray if right bar approaches center bar
                         trayMaxW: {
                             const gap = 4
                             const centerRight = triCenter.x + triCenter.width
@@ -627,8 +689,8 @@ PanelWindow {
                 Island { bgType: "activewindow"; visible_: Config.showWindow; Modules.ActiveWindow {} }
             }
         }
-        // ════════════════════════ VERTICAL BAR ════════════════════════════
-        // Vertical bars use Column layout with the same islands rotated
+
+        // ── VERTICAL BAR ──────────────────────────────────────────────────
         Column {
             visible: !bar._isHorizontal
             anchors {
@@ -638,21 +700,10 @@ PanelWindow {
             spacing: Config.islandSpacing
             padding: Config.outerMarginEdge
 
-            // Top group: workspaces stacked
-            Island {
-                Modules.Workspaces { vertical: true }
-            }
-
-            // Spacer
+            Island { Modules.Workspaces { vertical: true } }
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
-
-            // Center: clock
             Island { Modules.Clock {} }
-
-            // Spacer
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
-
-            // Bottom group: tray + power
             Island { bgType: "tray"; visible_: Config.showTray; Modules.SystemTray { rootWindow: bar } }
             Island { bgType: "startmenu"; Modules.PowerButton {} }
         }

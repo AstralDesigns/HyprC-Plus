@@ -56,6 +56,12 @@ PanelWindow {
     property string _dockBorderRVal:    "20"
     property string _dockIconSizeVal:   "24"
     property string _dockStartIconVal:  ""
+    // Auto-hide + layer state — read from hyprcandy-bar.conf on CC open
+    property bool   _barAhEnabled:  false
+    property string _barAhDelay:    "5"
+    property bool   _dockAhEnabled: false
+    property string _dockAhDelay:   "5"
+    property string _dockLayerVal:  "top"
 
     // ── Rofi current values ───────────────────────────────────────────────
     property string _rofiBorderVal:  "2"
@@ -282,6 +288,39 @@ PanelWindow {
             _dockStartIconVal = (ls[5] !== undefined && ls[5]) ? ls[5] : ""
         }
     }
+    // ── Shared conf writer for hyprcandy-bar.conf ────────────────────────────
+    // All auto-hide and layer writes funnel through this single Process.
+    // The caller sets _cmd then starts the process.
+    Process {
+        id: _confWriteProc
+        property string _cmd: ""
+        command: ["bash", "-c", _confWriteProc._cmd]
+        onExited: running = false
+    }
+
+    // ── Read hyprcandy-bar.conf on CC open ────────────────────────────────────
+    Process {
+        id: _confReadProc
+        command: ["bash", "-c",
+            "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+            "[ -f \"$f\" ] || exit 0; " +
+            "awk '/^\\[bar\\]/{s=1;next} /^\\[/{s=0} s&&/^autohide=/{print \"BAR_AH=\"$0} s&&/^autohide_delay=/{print \"BAR_DELAY=\"$0}' \"$f\"; " +
+            "awk '/^\\[dock\\]/{s=1;next} /^\\[/{s=0} s&&/^autohide=/{print \"DOCK_AH=\"$0} s&&/^autohide_delay=/{print \"DOCK_DELAY=\"$0} s&&/^layer=/{print \"DOCK_LAYER=\"$0}' \"$f\""]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "
+"
+            onRead: function(l) {
+                const kv = l.trim()
+                if      (kv.startsWith("BAR_AH=autohide="))        ccWin._barAhEnabled  = kv.slice(16) === "true"
+                else if (kv.startsWith("BAR_DELAY=autohide_delay="))ccWin._barAhDelay    = kv.slice(25)
+                else if (kv.startsWith("DOCK_AH=autohide="))        ccWin._dockAhEnabled = kv.slice(17) === "true"
+                else if (kv.startsWith("DOCK_DELAY=autohide_delay="))ccWin._dockAhDelay   = kv.slice(26)
+                else if (kv.startsWith("DOCK_LAYER=layer="))         ccWin._dockLayerVal  = kv.slice(17)
+            }
+        }
+    }
+
     Process {
         id: _rofiValReader
         command: ["bash", "-c",
@@ -1595,6 +1634,42 @@ PanelWindow {
                                         CCToggle { label:"System Tray";    value:Config.showTray;           onToggled:function(v){Config.showTray=v} }
                                         CCToggle { label:"Distro Icon";    value:Config.showDistro;         onToggled:function(v){Config.showDistro=v} }
 
+                                        Item { height: 6 }
+                                        CCSection { text: "Bar Auto-Hide" }
+
+                                        CCToggle {
+                                            id: _barAhToggle
+                                            label: "Auto-Hide Bar"
+                                            value: _barAhEnabled
+                                            onToggled: function(v) {
+                                                _barAhEnabled = v
+                                                _confWriteProc._cmd =
+                                                    "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+                                                    "mkdir -p \"$(dirname $f)\"; " +
+                                                    "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\n' > \"$f\"; " +
+                                                    "sed -i '/^\\[bar\\]/,/^\\[/{s/^autohide=.*/autohide=" + (v ? "true" : "false") + "/}' \"$f\""
+                                                if (!_confWriteProc.running) _confWriteProc.running = true
+                                            }
+                                        }
+
+                                        CCEntryRow {
+                                            label: "Delay (s)"
+                                            value: _barAhDelay
+                                            opacity: _barAhEnabled ? 1.0 : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            onApplied: function(val) {
+                                                const n = parseInt(val)
+                                                if (isNaN(n) || n < 1 || n > 300) return
+                                                _barAhDelay = n.toString()
+                                                _confWriteProc._cmd =
+                                                    "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+                                                    "mkdir -p \"$(dirname $f)\"; " +
+                                                    "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\n' > \"$f\"; " +
+                                                    "sed -i '/^\\[bar\\]/,/^\\[/{s/^autohide_delay=.*/autohide_delay=" + n + "/}' \"$f\""
+                                                if (!_confWriteProc.running) _confWriteProc.running = true
+                                            }
+                                        }
+
                                         Item { height: 10 }
                                     }
                                 }
@@ -2333,6 +2408,60 @@ PanelWindow {
                             width: parent.width; spacing: 5
                             CCSection { text: "󰞒 Dock" }
 
+                            CCSection { text: "Layer" }
+                            CCSegmented {
+                                label: "Dock Layer"
+                                options: ["top", "overlay"]
+                                current: _dockLayerVal
+                                onPicked: function(v) {
+                                    _dockLayerVal = v
+                                    _confWriteProc._cmd =
+                                        "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+                                        "mkdir -p \"$(dirname $f)\"; " +
+                                        "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\n' > \"$f\"; " +
+                                        "sed -i '/^\\[dock\\]/,/^\\[/{s/^layer=.*/layer=" + v + "/}' \"$f\"; " +
+                                        "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
+                                    if (!_confWriteProc.running) _confWriteProc.running = true
+                                }
+                            }
+
+                            CCSection { text: "Dock Auto-Hide" }
+
+                            CCToggle {
+                                id: _dockAhToggle
+                                label: "Auto-Hide Dock"
+                                value: _dockAhEnabled
+                                onToggled: function(v) {
+                                    _dockAhEnabled = v
+                                    _confWriteProc._cmd =
+                                        "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+                                        "mkdir -p \"$(dirname $f)\"; " +
+                                        "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\n' > \"$f\"; " +
+                                        "sed -i '/^\\[dock\\]/,/^\\[/{s/^autohide=.*/autohide=" + (v ? "true" : "false") + "/}' \"$f\"; " +
+                                        "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
+                                    if (!_confWriteProc.running) _confWriteProc.running = true
+                                }
+                            }
+
+                            CCEntryRow {
+                                label: "Delay (s)"
+                                value: _dockAhDelay
+                                opacity: _dockAhEnabled ? 1.0 : 0.4
+                                Behavior on opacity { NumberAnimation { duration: 120 } }
+                                onApplied: function(val) {
+                                    const n = parseInt(val)
+                                    if (isNaN(n) || n < 1 || n > 300) return
+                                    _dockAhDelay = n.toString()
+                                    _confWriteProc._cmd =
+                                        "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+                                        "mkdir -p \"$(dirname $f)\"; " +
+                                        "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\n' > \"$f\"; " +
+                                        "sed -i '/^\\[dock\\]/,/^\\[/{s/^autohide_delay=.*/autohide_delay=" + n + "/}' \"$f\"; " +
+                                        "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
+                                    if (!_confWriteProc.running) _confWriteProc.running = true
+                                }
+                            }
+
                             // Cycle position — calls dock-cycle.sh which setsid-detaches from QS
                             CCPillBtn {
                                 text: "󰶘 Cycle Position"
@@ -2450,12 +2579,13 @@ PanelWindow {
                             Timer {
                                 interval: 100; running: true; repeat: false
                                 onTriggered: {
-                                    _dockReadSpacing.running = true
-                                    _dockReadPadding.running = true
-                                    _dockReadBorderW.running = true
-                                    _dockReadBorderR.running = true
+                                    _dockReadSpacing.running  = true
+                                    _dockReadPadding.running  = true
+                                    _dockReadBorderW.running  = true
+                                    _dockReadBorderR.running  = true
                                     _dockReadIconSize.running = true
                                     _dockReadStartIcon.running = true
+                                    _confReadProc.running     = true
                                 }
                             }
 
