@@ -64,8 +64,9 @@ fi
 
 if [[ "$1" == "suspend" ]]; then
   echo ":: Suspend"
-  sleep 1
-  systemctl suspend
+  touch /tmp/.qs-candylock-sleep
+  qs -c candylock
+  rm -f /tmp/.qs-candylock-sleep
 fi
 
 if [[ "$1" == "hibernate" ]]; then

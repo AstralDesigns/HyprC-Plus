@@ -419,6 +419,13 @@ ShellRoot {
     // ── Player controls ───────────────────────────────────────────────────────
     // Fix: set command directly on each call instead of relying on a bound property.
     Process { id:ctlProc; running:false; onExited: running=false }
+    Process {
+        id: suspendIfFlagged
+        command: ["/bin/bash", "-c",
+            "f=/tmp/.qs-candylock-sleep; [ -f \"$f\" ] && rm -f \"$f\" && systemctl suspend"]
+        running: false
+        onExited: running = false
+    }
     function playerAction(cmd) {
         let argv
         if(cmd === "shuffle") {
@@ -436,7 +443,10 @@ ShellRoot {
     }
 
     // ── Session lock ──────────────────────────────────────────────────────────
-    WlSessionLock { id:sessionLock; locked:true
+    WlSessionLock { id:sessionLock
+        locked: false
+        Component.onCompleted: locked = true
+        onLockedChanged: if (locked) suspendIfFlagged.running = true
         WlSessionLockSurface {
             Rectangle {
                 id:mainRect; anchors.fill:parent; color:root.cBg; focus:true
