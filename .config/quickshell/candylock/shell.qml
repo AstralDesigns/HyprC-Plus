@@ -1055,6 +1055,30 @@ ShellRoot {
                         id: pwrRowInner
                         anchors.centerIn: parent
                         spacing: 4
+                        
+                        // ── Logout ───────────────────────────────────────────
+                        Item {
+                            width: 44; height: 44
+                            Rectangle {
+                                anchors.fill: parent; radius: 22
+                                color:        _maOut.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.20) : "transparent"
+                                border.width: 1
+                                border.color: _maOut.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.45) : "transparent"
+                                Behavior on color       { ColorAnimation { duration: 130 } }
+                                Behavior on border.color{ ColorAnimation { duration: 130 } }
+                            }
+                            Text {
+                                anchors.centerIn: parent; text: "󰗼"
+                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
+                                color: root.cSecondary; opacity: _maOut.containsMouse ? 1.0 : 0.72
+                                Behavior on opacity { NumberAnimation { duration: 130 } }
+                            }
+                            MouseArea {
+                                id: _maOut; anchors.fill: parent
+                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: { pwrProc.command = ["loginctl","terminate-user",Quickshell.env("USER")]; pwrProc.running = true }
+                            }
+                        }
 
                         // ── Suspend ──────────────────────────────────────────
                         Item {
@@ -1149,30 +1173,6 @@ ShellRoot {
                                 id: _maShut; anchors.fill: parent
                                 hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                 onClicked: { pwrProc.command = ["systemctl","poweroff"]; pwrProc.running = true }
-                            }
-                        }
-
-                        // ── Logout ───────────────────────────────────────────
-                        Item {
-                            width: 44; height: 44
-                            Rectangle {
-                                anchors.fill: parent; radius: 22
-                                color:        _maOut.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.20) : "transparent"
-                                border.width: 1
-                                border.color: _maOut.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.45) : "transparent"
-                                Behavior on color       { ColorAnimation { duration: 130 } }
-                                Behavior on border.color{ ColorAnimation { duration: 130 } }
-                            }
-                            Text {
-                                anchors.centerIn: parent; text: "󰗼"
-                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cSecondary; opacity: _maOut.containsMouse ? 1.0 : 0.72
-                                Behavior on opacity { NumberAnimation { duration: 130 } }
-                            }
-                            MouseArea {
-                                id: _maOut; anchors.fill: parent
-                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: { pwrProc.command = ["loginctl","terminate-user",Quickshell.env("USER")]; pwrProc.running = true }
                             }
                         }
                     }
