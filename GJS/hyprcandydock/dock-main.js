@@ -82,6 +82,7 @@ const DOCK_CONFIG_PATH      = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', '
 // Absolute path so the toggle script is found regardless of working-directory
 // (exec-once in hyprland.conf sets cwd to '/', not the dock folder).
 const LAUNCHER_TOGGLE_PATH  = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'toggle-app-launcher.sh']);
+const HYPRCANDY_CONF_PATH   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hyprcandy-bar.conf']);
 
 let cssProviders = [];          // Static providers cleared/re-added on theme change
 let dynamicConfigProvider = null; // Persistent provider for config-driven values — never cleared
@@ -282,6 +283,33 @@ function applyMarginsToLayerShell(win) {
     Gtk4LayerShell.set_margin(win, Gtk4LayerShell.Edge.RIGHT,  cfg.marginRight);
 }
 
+
+// --- Read hyprcandy-bar.conf [dock] section ---------------------------
+// Returns { autoHide, autoHideDelay (ms), layer } with safe defaults.
+function readHyprCandyConf() {
+    const defaults = { autoHide: false, autoHideDelay: 5000, layer: 'top' };
+    try {
+        const [ok, bytes] = GLib.file_get_contents(HYPRCANDY_CONF_PATH);
+        if (!ok) return defaults;
+        const txt = new TextDecoder().decode(bytes);
+        // Extract [dock] section (up to the next [section] or end of file)
+        const dockMatch = txt.match(/\[dock\]([\s\S]*?)(?=\n\[|$)/i);
+        if (!dockMatch) return defaults;
+        const section = dockMatch[1];
+        const ahMatch    = section.match(/^\s*autohide\s*=\s*(true|false)/im);
+        const delayMatch = section.match(/^\s*autohide_delay\s*=\s*(\d+)/im);
+        const layerMatch = section.match(/^\s*layer\s*=\s*(top|overlay)/im);
+        return {
+            autoHide:      ahMatch    ? ahMatch[1].toLowerCase() === 'true' : false,
+            autoHideDelay: delayMatch ? parseInt(delayMatch[1]) * 1000       : 5000,
+            layer:         layerMatch ? layerMatch[1].toLowerCase()          : 'top',
+        };
+    } catch (e) {
+        log('[dock] conf read error: ' + e.message);
+        return defaults;
+    }
+}
+
 // Full hot-reload: config values → CSS + layer-shell + exclusive zone.
 // Triggered by SIGUSR2 (kill -12 <pid>) — sent by candy-utils after editing config.js.
 //
@@ -298,6 +326,30 @@ function hotReload() {
     const display = Gdk.Display.get_default();
     if (display) _injectGlyphSizeCSS(display);
     applyMarginsToLayerShell(dockWindow);
+
+    // Apply layer (top/overlay) from hyprcandy-bar.conf
+    {
+        const conf = readHyprCandyConf();
+        const newLayer = conf.layer === 'overlay'
+            ? Gtk4LayerShell.Layer.OVERLAY
+            : Gtk4LayerShell.Layer.TOP;
+        Gtk4LayerShell.set_layer(dockWindow, newLayer);
+        log('[dock] hot-reload: layer = ' + conf.layer);
+
+        // Update auto-hide settings; the EventControllerMotion on dockWindow
+        // reads these module-level vars each time leave fires.
+        _ahEnabled  = conf.autoHide;
+        _ahDelaySec = conf.autoHideDelay;
+        if (!_ahEnabled) {
+            _ahCancelTimer();
+            if (dockWindow) { dockWindow.set_visible(true); if (_ahHotspot) _ahHotspot.set_visible(false); }
+        } else {
+            // Autohide enabled — start timer immediately; pointer may already be away
+            _ahStartTimer();
+        }
+        log('[dock] hot-reload: autohide=' + _ahEnabled + ' delay=' + _ahDelaySec + 'ms');
+    }
+
     if (dockWindow) {
         // Update start icon glyph if it changed
         if (dockWindow._startIconLabel) {
@@ -320,6 +372,8 @@ function hotReload() {
             log('[dock] hot-reload: pinned apps refreshed from disk');
         }
     }
+    // Refresh hotspot anchors in case dock position changed
+    if (_ahHotspot) _ahHotspot._refreshAnchors();
     log('[dock] hot-reload complete');
 }
 
@@ -631,6 +685,31 @@ const HyprCandyDock = GObject.registerClass({
         this._addTrashButton();
 
         this.show();
+
+        // Keep the window object alive when hidden (set_visible(false))
+        // so auto-hide can present() it again without rebuilding the dock.
+        this.set_hide_on_close(true);
+
+        // Auto-hide: attach EventControllerMotion so GTK4 notifies us when
+        // the pointer enters or leaves the dock surface (no polling needed).
+        {
+            const motion = new Gtk.EventControllerMotion();
+            motion.connect('enter', () => {
+                if (!_ahEnabled) return;
+                // Pointer entered — cancel any pending hide
+                _ahCancelTimer();
+                // Re-show if we were hidden (shouldn't happen often, but safe)
+                if (!this.get_visible()) {
+                    this.set_visible(true);
+                    if (_ahHotspot) _ahHotspot.set_visible(false);
+                }
+            });
+            motion.connect('leave', () => {
+                if (!_ahEnabled) return;
+                _ahStartTimer();
+            });
+            this.add_controller(motion);
+        }
 
         // Schedule exclusive zone update after the first GTK layout pass.
         // At this point get_allocated_height() returns the real surface size.
@@ -1422,6 +1501,98 @@ const HyprCandyDock = GObject.registerClass({
     }
 });
 
+// --- Auto-hide state -------------------------------------------------
+// Set by readHyprCandyConf() on startup and on every SIGUSR2 hot-reload.
+let _ahEnabled    = false;
+let _ahDelaySec   = 5000;     // ms
+let _ahTimerId    = 0;        // GLib timeout source id, 0 = not running
+
+function _ahCancelTimer() {
+    if (_ahTimerId) {
+        GLib.source_remove(_ahTimerId);
+        _ahTimerId = 0;
+    }
+}
+
+function _ahStartTimer() {
+    _ahCancelTimer();
+    _ahTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, _ahDelaySec, () => {
+        _ahTimerId = 0;
+        if (!_ahEnabled || !dockWindow) return GLib.SOURCE_REMOVE;
+        // Fullscreen guard — skip hide if hyprctl reports an active fullscreen window
+        try {
+            const [, out] = GLib.spawn_command_line_sync('hyprctl -j activewindow');
+            const json = new TextDecoder().decode(out);
+            if (/"fullscreen"\s*:\s*true/.test(json)) return GLib.SOURCE_REMOVE;
+        } catch (_) {}
+        dockWindow.set_visible(false);
+        if (_ahHotspot) _ahHotspot.set_visible(true);
+        return GLib.SOURCE_REMOVE;
+    });
+}
+
+let _ahHotspot = null;   // HotspotWindow instance, created after dockWindow
+
+// --- Hotspot Window (auto-hide re-show strip) -------------------------
+// A 2 px tall/wide layer surface anchored to the same edge as the dock.
+// It is visible only while the dock is hidden and auto-hide is active.
+// EventControllerMotion.enter re-shows the dock and hides the hotspot.
+const HotspotWindow = GObject.registerClass({
+    GTypeName: 'HyprCandyDockHotspot',
+}, class HotspotWindow extends Gtk.ApplicationWindow {
+    _init(application) {
+        super._init({
+            application: application,
+            title:       'HyprCandy Dock Hotspot',
+            decorated:   false,
+            resizable:   false,
+        });
+
+        Gtk4LayerShell.init_for_window(this);
+        Gtk4LayerShell.set_namespace(this, 'hyprcandy-dock-hotspot');
+        Gtk4LayerShell.set_layer(this, Gtk4LayerShell.Layer.TOP);
+        Gtk4LayerShell.set_exclusive_zone(this, 0);
+
+        // Anchor same edge as the dock (read from DockConfig at creation time;
+        // _refreshAnchors() is also called by hotReload() to track position changes)
+        this._refreshAnchors();
+
+        // Invisible surface — just needs to receive pointer events
+        this.set_default_size(1, 1);
+
+        // Re-show dock when pointer enters the hotspot strip
+        const motion = new Gtk.EventControllerMotion();
+        motion.connect('enter', () => {
+            if (!_ahEnabled || !dockWindow) return;
+            dockWindow.set_visible(true);
+            dockWindow.present();
+            this.set_visible(false);
+        });
+        this.add_controller(motion);
+
+        // Start hidden; shown by _ahStartTimer() when the dock hides
+        this.set_visible(false);
+    }
+
+    _refreshAnchors() {
+        const pos = DockConfig.position;
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.BOTTOM, pos === 'bottom');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.TOP,    pos === 'top');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.LEFT,   pos === 'left'  || pos === 'bottom' || pos === 'top');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.RIGHT,  pos === 'right' || pos === 'bottom' || pos === 'top');
+        // 2 px thick perpendicular to the edge, full-width along it
+        if (pos === 'bottom' || pos === 'top') {
+            Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.BOTTOM, 0);
+            Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP,    0);
+            this.set_default_size(1, 2);
+        } else {
+            Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT,  0);
+            Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT, 0);
+            this.set_default_size(2, 1);
+        }
+    }
+});
+
 // --- Application ------------------------------------------------------
 const DockApplication = GObject.registerClass({
     GTypeName: 'HyprCandyDockApplication',
@@ -1436,6 +1607,23 @@ const DockApplication = GObject.registerClass({
         // Create dock
         dockWindow = new HyprCandyDock(this);
         this.add_window(dockWindow);
+
+        // Initialise auto-hide conf values (hotReload() will update them later)
+        {
+            const conf = readHyprCandyConf();
+            _ahEnabled  = conf.autoHide;
+            _ahDelaySec = conf.autoHideDelay;
+            // Apply initial layer from conf
+            Gtk4LayerShell.set_layer(dockWindow, conf.layer === 'overlay'
+                ? Gtk4LayerShell.Layer.OVERLAY : Gtk4LayerShell.Layer.TOP);
+            log('[dock] startup: autohide=' + _ahEnabled + ' layer=' + conf.layer);
+        }
+
+        // Hotspot window — 2 px strip, same edge as the dock, Layer.TOP,
+        // exclusiveZone=0.  Shown only when dock is hidden.  Its own
+        // EventControllerMotion re-shows the dock when the pointer enters.
+        _ahHotspot = new HotspotWindow(this);
+        this.add_window(_ahHotspot);
     }
 });
 

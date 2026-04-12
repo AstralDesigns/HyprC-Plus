@@ -56,31 +56,35 @@ PanelWindow {
     //     fullscreen the bar stays hidden and the hotspot stays invisible
     //     too (nothing should pull focus away from a fullscreen app).
 
-    property bool   _ahEnabled:  false   // parsed from conf
-    property int    _ahDelaySec: 5       // parsed from conf
-    property bool   _ahHidden:   false   // current hide state
+    // ── Bar auto-hide — driven directly by Config.barAutoHide ─────────────
+    //  Config.qml is the source of truth.  The CC writes Config.barAutoHide
+    //  and Config.barAutoHideDelay; no file-watching or bash processes needed.
+    //  Config._settings persists the values across Quickshell restarts.
+    property bool _ahEnabled:  false
+    property int  _ahDelaySec: 5
+    property bool _ahHidden:   false
 
-    // Conf file watcher — re-parses whenever the file changes on disk
-    FileView {
-        id: _ahConfView
-        path:         Quickshell.env("HOME") + "/.config/hyprcandy/hyprcandy-bar.conf"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            const txt = text()
-            // Parse [bar] section: autohide= and autohide_delay=
-            const ahMatch    = txt.match(/\[bar\][^\[]*autohide\s*=\s*(true|false)/i)
-            const delayMatch = txt.match(/\[bar\][^\[]*autohide_delay\s*=\s*(\d+)/i)
-            bar._ahEnabled  = ahMatch  ? ahMatch[1].toLowerCase()  === "true" : false
-            bar._ahDelaySec = delayMatch ? parseInt(delayMatch[1]) : 5
-            // If auto-hide was just turned off, ensure bar is visible
-            if (!bar._ahEnabled && bar._ahHidden) {
-                bar._ahHidden = false
-                bar.visible   = true
+    // Sync from Config on startup and react to live changes from CC
+    Connections {
+        target: Config
+        function onBarAutoHideChanged() {
+            bar._ahEnabled = Config.barAutoHide
+            if (bar._ahEnabled) {
+                if (!bar._ahHidden) _ahHideTimer.restart()
+            } else {
+                _ahHideTimer.stop()
+                if (bar._ahHidden) { bar._ahHidden = false; bar.visible = true }
             }
-            if (bar._ahEnabled) _ahHideTimer.restart()
         }
-        Component.onCompleted: reload()
+        function onBarAutoHideDelayChanged() {
+            bar._ahDelaySec = Config.barAutoHideDelay
+        }
+    }
+    Component.onCompleted: {
+        bar._ahEnabled  = Config.barAutoHide
+        bar._ahDelaySec = Config.barAutoHideDelay
+        if (bar._ahEnabled) _ahHideTimer.restart()
+        barStateTimer.start()
     }
 
     // Hide timer — fires after the pointer has been outside the bar
@@ -196,8 +200,6 @@ PanelWindow {
         })
         barStateProc.running = true
     }
-
-    Component.onCompleted: barStateTimer.start()
 
     Connections {
         target: Config

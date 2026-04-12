@@ -162,6 +162,13 @@ QtObject {
         v = _settings.value("launcherListRadius");     if (v !== undefined && v !== null) launcherListRadius     = v
         v = _settings.value("launcherInnerBorderWidth");if(v !== undefined && v !== null) launcherInnerBorderWidth=v
         v = _settings.value("launcherInnerPadding");   if (v !== undefined && v !== null) launcherInnerPadding   = v
+        // Bar autohide + dock runtime state
+        v = _settings.value("barAutoHide");      if (v !== undefined && v !== null) barAutoHide      = _toBool(v)
+        v = _settings.value("barAutoHideDelay"); if (v !== undefined && v !== null) barAutoHideDelay = parseInt(v) || 5
+        v = _settings.value("dockAutoHide");     if (v !== undefined && v !== null) dockAutoHide     = _toBool(v)
+        v = _settings.value("dockAutoHideDelay");if (v !== undefined && v !== null) dockAutoHideDelay= parseInt(v) || 5
+        v = _settings.value("dockLayer");        if (v !== undefined && v !== null) dockLayer        = v
+        v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v) || 6
     }
 
     function _saveSettings() {
@@ -278,6 +285,13 @@ QtObject {
         _settings.setValue("launcherListRadius",      launcherListRadius)
         _settings.setValue("launcherInnerBorderWidth",launcherInnerBorderWidth)
         _settings.setValue("launcherInnerPadding",    launcherInnerPadding)
+        // Bar autohide + dock runtime state
+        _settings.setValue("barAutoHide",      barAutoHide)
+        _settings.setValue("barAutoHideDelay", barAutoHideDelay)
+        _settings.setValue("dockAutoHide",     dockAutoHide)
+        _settings.setValue("dockAutoHideDelay",dockAutoHideDelay)
+        _settings.setValue("dockLayer",        dockLayer)
+        _settings.setValue("dockMargin",       dockMargin)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -735,6 +749,24 @@ QtObject {
     // ═══════════════════════════════════════════════════════════════════════
     //  Behaviour / intervals
     // ═══════════════════════════════════════════════════════════════════════
+
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Bar auto-hide  (source of truth for QS bar; also written to
+    //  hyprcandy-bar.conf so the GJS dock process can read the same file)
+    // ═══════════════════════════════════════════════════════════════════════
+    property bool barAutoHide:      false
+    property int  barAutoHideDelay: 5       // seconds
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Dock runtime state (source of truth for CC display; GJS dock reads
+    //  hyprcandy-bar.conf directly, but CC persists state here so the
+    //  toggles show the correct value when the CC reopens)
+    // ═══════════════════════════════════════════════════════════════════════
+    property bool   dockAutoHide:      false
+    property int    dockAutoHideDelay: 5       // seconds
+    property string dockLayer:         "top"   // "top" | "overlay"
+    property int    dockMargin:        6       // px — screen-edge gap
 
     readonly property bool wsScrollSwitch:  true
     readonly property int  weatherInterval: 300    // seconds
