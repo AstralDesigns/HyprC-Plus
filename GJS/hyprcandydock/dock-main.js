@@ -1607,7 +1607,7 @@ const HotspotWindow = GObject.registerClass({
         Gtk4LayerShell.set_namespace(this, 'hyprcandy-dock-hotspot');
         const hotspotCss = new Gtk.CssProvider();
         hotspotCss.load_from_data(
-            'window.background { background-color: @blur_background; border: none; box-shadow: none; }', -1);
+            'window.background { background-color: @blur; border: none; box-shadow: none; }', -1);
         this.get_style_context().add_provider(hotspotCss,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 10);
         Gtk4LayerShell.set_layer(this, Gtk4LayerShell.Layer.TOP);
