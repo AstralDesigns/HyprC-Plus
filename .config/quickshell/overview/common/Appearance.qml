@@ -1,0 +1,257 @@
+pragma Singleton
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import Quickshell
+import Quickshell.Io
+import "functions"
+import "." as Common
+
+Singleton {
+    id: root
+    property QtObject m3colors: Common.Config.options.appearance.useMatugenColors
+                                 ? matugenColors
+                                 : defaultColors
+
+    // ── Matugen color strings (updated live by FileView below) ────────────────
+    property string _m3primary:                  "#E5B6F2"
+    property string _m3onPrimary:                "#452152"
+    property string _m3primaryContainer:         "#5D386A"
+    property string _m3onPrimaryContainer:       "#F9D8FF"
+    property string _m3secondary:                "#D5C0D7"
+    property string _m3onSecondary:              "#392C3D"
+    property string _m3secondaryContainer:       "#534457"
+    property string _m3onSecondaryContainer:     "#F2DCF3"
+    property string _m3background:               "#161217"
+    property string _m3onBackground:             "#EAE0E7"
+    property string _m3surface:                  "#161217"
+    property string _m3surfaceContainerLow:      "#1F1A1F"
+    property string _m3surfaceContainer:         "#231E23"
+    property string _m3surfaceContainerHigh:     "#2D282E"
+    property string _m3surfaceContainerHighest:  "#383339"
+    property string _m3onSurface:                "#EAE0E7"
+    property string _m3surfaceVariant:           "#4C444D"
+    property string _m3onSurfaceVariant:         "#CFC3CD"
+    property string _m3inversePrimary:           "#7B3FA0"
+    property string _m3inverseSurface:           "#EAE0E7"
+    property string _m3inverseOnSurface:         "#342F34"
+    property string _m3outline:                  "#988E97"
+    property string _m3outlineVariant:           "#4C444D"
+    property string _m3shadow:                   "#000000"
+
+    function parseColors(text) {
+        const re = /property color (\w+): "(#[0-9a-fA-F]+)"/g
+        let m
+        while ((m = re.exec(text)) !== null) {
+            const key = m[1], val = m[2]
+            switch (key) {
+                case "m3primary":                root._m3primary = val; break
+                case "m3onPrimary":              root._m3onPrimary = val; break
+                case "m3primaryContainer":       root._m3primaryContainer = val; break
+                case "m3onPrimaryContainer":     root._m3onPrimaryContainer = val; break
+                case "m3secondary":              root._m3secondary = val; break
+                case "m3onSecondary":            root._m3onSecondary = val; break
+                case "m3secondaryContainer":     root._m3secondaryContainer = val; break
+                case "m3onSecondaryContainer":   root._m3onSecondaryContainer = val; break
+                case "m3background":             root._m3background = val; break
+                case "m3onBackground":           root._m3onBackground = val; break
+                case "m3surface":                root._m3surface = val; break
+                case "m3surfaceContainerLow":    root._m3surfaceContainerLow = val; break
+                case "m3surfaceContainer":       root._m3surfaceContainer = val; break
+                case "m3surfaceContainerHigh":   root._m3surfaceContainerHigh = val; break
+                case "m3surfaceContainerHighest":root._m3surfaceContainerHighest = val; break
+                case "m3onSurface":              root._m3onSurface = val; break
+                case "m3surfaceVariant":         root._m3surfaceVariant = val; break
+                case "m3onSurfaceVariant":       root._m3onSurfaceVariant = val; break
+                case "m3inversePrimary":         root._m3inversePrimary = val; break
+                case "m3inverseSurface":         root._m3inverseSurface = val; break
+                case "m3inverseOnSurface":       root._m3inverseOnSurface = val; break
+                case "m3outline":                root._m3outline = val; break
+                case "m3outlineVariant":         root._m3outlineVariant = val; break
+                case "m3shadow":                 root._m3shadow = val; break
+            }
+        }
+    }
+
+    FileView {
+        path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) +
+              "/quickshell/overview/Appearance.colors.qml"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseColors(text())
+    }
+
+    property QtObject matugenColors: QtObject {
+        property bool darkmode: true
+        property color m3primary:                Qt.color(root._m3primary)
+        property color m3onPrimary:              Qt.color(root._m3onPrimary)
+        property color m3primaryContainer:       Qt.color(root._m3primaryContainer)
+        property color m3onPrimaryContainer:     Qt.color(root._m3onPrimaryContainer)
+        property color m3secondary:              Qt.color(root._m3secondary)
+        property color m3onSecondary:            Qt.color(root._m3onSecondary)
+        property color m3onSecondaryTransparent: Qt.rgba(
+            Qt.color(root._m3onSecondary).r,
+            Qt.color(root._m3onSecondary).g,
+            Qt.color(root._m3onSecondary).b, 0.4)
+        property color m3secondaryContainer:     Qt.color(root._m3secondaryContainer)
+        property color m3onSecondaryContainer:   Qt.color(root._m3onSecondaryContainer)
+        property color m3background:             Qt.color(root._m3background)
+        property color m3onBackground:           Qt.color(root._m3onBackground)
+        property color m3surface:                Qt.color(root._m3surface)
+        property color m3surfaceContainerLow:    Qt.color(root._m3surfaceContainerLow)
+        property color m3surfaceContainer:       Qt.color(root._m3surfaceContainer)
+        property color m3surfaceContainerHigh:   Qt.color(root._m3surfaceContainerHigh)
+        property color m3surfaceContainerHighest:Qt.color(root._m3surfaceContainerHighest)
+        property color m3onSurface:              Qt.color(root._m3onSurface)
+        property color m3surfaceVariant:         Qt.color(root._m3surfaceVariant)
+        property color m3onSurfaceVariant:       Qt.color(root._m3onSurfaceVariant)
+        property color m3inversePrimary:         Qt.color(root._m3inversePrimary)
+        property color m3inverseSurface:         Qt.color(root._m3inverseSurface)
+        property color m3inverseOnSurface:       Qt.color(root._m3inverseOnSurface)
+        property color m3outline:                Qt.color(root._m3outline)
+        property color m3outlineVariant:         Qt.color(root._m3outlineVariant)
+        property color m3shadow:                 Qt.color(root._m3shadow)
+    }
+    property QtObject animation
+    property QtObject animationCurves
+    property QtObject colors
+    property QtObject rounding
+    property QtObject font
+    property QtObject sizes
+
+    property QtObject defaultColors: QtObject {
+        property bool darkmode: true
+        property color m3primary: "#E5B6F2"
+        property color m3onPrimary: "#452152"
+        property color m3primaryContainer: "#5D386A"
+        property color m3onPrimaryContainer: "#F9D8FF"
+        property color m3secondary: "#D5C0D7"
+        property color m3onSecondary: "#392C3D"
+        property color m3onSecondaryTransparent: Qt.rgba(0x39/255, 0x2C/255, 0x3D/255, 0.4)
+        property color m3secondaryContainer: "#534457"
+        property color m3onSecondaryContainer: "#F2DCF3"
+        property color m3background: "#161217"
+        property color m3onBackground: "#EAE0E7"
+        property color m3surface: "#161217"
+        property color m3surfaceContainerLow: "#1F1A1F"
+        property color m3surfaceContainer: "#231E23"
+        property color m3surfaceContainerHigh: "#2D282E"
+        property color m3surfaceContainerHighest: "#383339"
+        property color m3onSurface: "#EAE0E7"
+        property color m3surfaceVariant: "#4C444D"
+        property color m3onSurfaceVariant: "#CFC3CD"
+        property color m3inversePrimary: "#7B3FA0"
+        property color m3inverseSurface: "#EAE0E7"
+        property color m3inverseOnSurface: "#342F34"
+        property color m3outline: "#988E97"
+        property color m3outlineVariant: "#4C444D"
+        property color m3shadow: "#000000"
+    }
+
+    colors: QtObject {
+        property color colSubtext: m3colors.m3outline
+        property color colLayer0: m3colors.m3background
+        property color colOnLayer0: m3colors.m3onBackground
+        property color colLayer0Border: ColorUtils.mix(root.m3colors.m3outlineVariant, colLayer0, 0.4)
+        property color colLayer1: m3colors.m3surfaceContainerLow
+        property color colOnLayer1: m3colors.m3onSurfaceVariant
+        property color colOnLayer1Inactive: ColorUtils.mix(colOnLayer1, colLayer1, 0.45)
+        property color colLayer1Hover: ColorUtils.mix(colLayer1, colOnLayer1, 0.92)
+        property color colLayer1Active: ColorUtils.mix(colLayer1, colOnLayer1, 0.85)
+        property color colLayer2: m3colors.m3surfaceContainer
+        property color colOnLayer2: m3colors.m3onSurface
+        property color colLayer2Hover: ColorUtils.mix(colLayer2, colOnLayer2, 0.90)
+        property color colLayer2Active: ColorUtils.mix(colLayer2, colOnLayer2, 0.80)
+        property color colPrimary: m3colors.m3primary
+        property color colOnPrimary: m3colors.m3onPrimary
+        property color colSecondary: m3colors.m3secondary
+        property color colSecondaryContainer: m3colors.m3secondaryContainer
+        property color colOnSecondaryContainer: m3colors.m3onSecondaryContainer
+        property color colTooltip: m3colors.m3onSecondary
+        property color colOnTooltip: m3colors.m3primary
+        property color colShadow: ColorUtils.transparentize(m3colors.m3shadow, 0.7)
+        property color colOutline: m3colors.m3outline
+        property color colOverviewBg: m3colors.m3onSecondaryTransparent ?? Qt.rgba(0x39/255, 0x2C/255, 0x3D/255, 0.4)
+        property color colOverviewRowBg: m3colors.m3inversePrimary ?? "#7B3FA0"
+        property color colOverviewText: m3colors.m3primary ?? "#E5B6F2"
+    }
+
+    rounding: QtObject {
+        property int unsharpen: 2
+        property int verysmall: 8
+        property int small: 12
+        property int normal: 17
+        property int large: 23
+        property int full: 9999
+        property int screenRounding: large
+        property int windowRounding: 18
+    }
+
+    font: QtObject {
+        property QtObject family: QtObject {
+            property string main: "sans-serif"
+            property string title: "sans-serif"
+            property string expressive: "sans-serif"
+        }
+        property QtObject pixelSize: QtObject {
+            property int smaller: 12
+            property int small: 15
+            property int normal: 16
+            property int larger: 19
+            property int huge: 22
+        }
+    }
+
+    animationCurves: QtObject {
+        readonly property list<real> expressiveDefaultSpatial: [0.38, 1.21, 0.22, 1.00, 1, 1]
+        readonly property list<real> expressiveEffects: [0.34, 0.80, 0.34, 1.00, 1, 1]
+        readonly property list<real> emphasizedDecel: [0.05, 0.7, 0.1, 1, 1, 1]
+        readonly property real expressiveDefaultSpatialDuration: 500
+        readonly property real expressiveEffectsDuration: 200
+    }
+
+    animation: QtObject {
+        property QtObject elementMove: QtObject {
+            property int duration: animationCurves.expressiveDefaultSpatialDuration
+            property int type: Easing.BezierSpline
+            property list<real> bezierCurve: animationCurves.expressiveDefaultSpatial
+            property Component numberAnimation: Component {
+                NumberAnimation {
+                    duration: root.animation.elementMove.duration
+                    easing.type: root.animation.elementMove.type
+                    easing.bezierCurve: root.animation.elementMove.bezierCurve
+                }
+            }
+        }
+
+        property QtObject elementMoveEnter: QtObject {
+            property int duration: 400
+            property int type: Easing.BezierSpline
+            property list<real> bezierCurve: animationCurves.emphasizedDecel
+            property Component numberAnimation: Component {
+                NumberAnimation {
+                    duration: root.animation.elementMoveEnter.duration
+                    easing.type: root.animation.elementMoveEnter.type
+                    easing.bezierCurve: root.animation.elementMoveEnter.bezierCurve
+                }
+            }
+        }
+
+        property QtObject elementMoveFast: QtObject {
+            property int duration: animationCurves.expressiveEffectsDuration
+            property int type: Easing.BezierSpline
+            property list<real> bezierCurve: animationCurves.expressiveEffects
+            property Component numberAnimation: Component {
+                NumberAnimation {
+                    duration: root.animation.elementMoveFast.duration
+                    easing.type: root.animation.elementMoveFast.type
+                    easing.bezierCurve: root.animation.elementMoveFast.bezierCurve
+                }
+            }
+        }
+    }
+
+    sizes: QtObject {
+        property real elevationMargin: 10
+    }
+}
