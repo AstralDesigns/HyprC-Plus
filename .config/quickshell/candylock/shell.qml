@@ -419,6 +419,7 @@ ShellRoot {
     // ── Player controls ───────────────────────────────────────────────────────
     // Fix: set command directly on each call instead of relying on a bound property.
     Process { id:ctlProc; running:false; onExited: running=false }
+    Process { id:pwrProc;  running:false; onExited: running=false }
     Process {
         id: suspendIfFlagged
         command: ["/bin/bash", "-c",
@@ -463,7 +464,9 @@ ShellRoot {
 
                 Item {
                     id:centerPanel
-                    anchors.centerIn:parent
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter:   parent.verticalCenter
+                    anchors.verticalCenterOffset: -36
                     width:660
                     height:panelCol.implicitHeight+56
 
@@ -994,6 +997,182 @@ ShellRoot {
                                         }
                                     }
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // ── Power buttons row — floats centered below main panel ────────
+                Item {
+                    id: powerRow
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top:             centerPanel.bottom
+                    anchors.topMargin:       18
+                    width:  pwrRowInner.implicitWidth  + 32
+                    height: pwrRowInner.implicitHeight + 20
+
+                    // Frosted pill backdrop
+                    // Pill mask for clipping blur + tint
+                    Rectangle {
+                        id: pwrMask
+                        anchors.fill: parent; radius: height / 2
+                        color: "white"; visible: false; layer.enabled: true
+                    }
+
+                    // Blurred wallpaper slice (same technique as centerPanel)
+                    Item {
+                        anchors.fill: parent
+                        layer.enabled: wallImg.visible
+                        layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
+                        layer.smooth: true
+                        AnimatedImage {
+                            x: -powerRow.x; y: -powerRow.y
+                            width: mainRect.width; height: mainRect.height
+                            source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
+                            fillMode: Image.PreserveAspectCrop; smooth: true; playing: true; cache: true
+                            visible: root.wallpaperPath !== ""
+                        }
+                    }
+
+                    // inversePrimary tint overlay
+                    Rectangle {
+                        anchors.fill: parent; radius: height / 2
+                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.62)
+                        border.width: 1
+                        border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.18)
+                    }
+
+                    // Clip pill so blur doesn't leak outside rounded corners
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled:      true
+                        maskSource:       pwrMask
+                        maskThresholdMin: 0.5
+                        maskSpreadAtMin:  1.0
+                    }
+
+                    Row {
+                        id: pwrRowInner
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        // ── Suspend ──────────────────────────────────────────
+                        Item {
+                            width: 44; height: 44
+                            Rectangle {
+                                anchors.fill: parent; radius: 22
+                                color:        _maSusp.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20) : "transparent"
+                                border.width: 1
+                                border.color: _maSusp.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45) : "transparent"
+                                Behavior on color       { ColorAnimation { duration: 130 } }
+                                Behavior on border.color{ ColorAnimation { duration: 130 } }
+                            }
+                            Text {
+                                anchors.centerIn: parent; text: "󰒲"
+                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
+                                color: root.cPrimary; opacity: _maSusp.containsMouse ? 1.0 : 0.72
+                                Behavior on opacity { NumberAnimation { duration: 130 } }
+                            }
+                            MouseArea {
+                                id: _maSusp; anchors.fill: parent
+                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: { pwrProc.command = ["systemctl","suspend"]; pwrProc.running = true }
+                            }
+                        }
+
+                        // ── Hibernate ────────────────────────────────────────
+                        Item {
+                            width: 44; height: 44
+                            Rectangle {
+                                anchors.fill: parent; radius: 22
+                                color:        _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20) : "transparent"
+                                border.width: 1
+                                border.color: _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45) : "transparent"
+                                Behavior on color       { ColorAnimation { duration: 130 } }
+                                Behavior on border.color{ ColorAnimation { duration: 130 } }
+                            }
+                            Text {
+                                anchors.centerIn: parent; text: "󰈉"
+                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
+                                color: root.cPrimary; opacity: _maHib.containsMouse ? 1.0 : 0.72
+                                Behavior on opacity { NumberAnimation { duration: 130 } }
+                            }
+                            MouseArea {
+                                id: _maHib; anchors.fill: parent
+                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: { pwrProc.command = ["systemctl","hibernate"]; pwrProc.running = true }
+                            }
+                        }
+
+                        // ── Reboot ───────────────────────────────────────────
+                        Item {
+                            width: 44; height: 44
+                            Rectangle {
+                                anchors.fill: parent; radius: 22
+                                color:        _maRebt.containsMouse ? Qt.rgba(root.cTertiary.r,root.cTertiary.g,root.cTertiary.b,0.20) : "transparent"
+                                border.width: 1
+                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cTertiary.r,root.cTertiary.g,root.cTertiary.b,0.45) : "transparent"
+                                Behavior on color       { ColorAnimation { duration: 130 } }
+                                Behavior on border.color{ ColorAnimation { duration: 130 } }
+                            }
+                            Text {
+                                anchors.centerIn: parent; text: "󰑙"
+                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
+                                color: root.cTertiary; opacity: _maRebt.containsMouse ? 1.0 : 0.72
+                                Behavior on opacity { NumberAnimation { duration: 130 } }
+                            }
+                            MouseArea {
+                                id: _maRebt; anchors.fill: parent
+                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: { pwrProc.command = ["systemctl","reboot"]; pwrProc.running = true }
+                            }
+                        }
+
+                        // ── Shutdown ─────────────────────────────────────────
+                        Item {
+                            width: 44; height: 44
+                            Rectangle {
+                                anchors.fill: parent; radius: 22
+                                color:        _maShut.containsMouse ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.20) : "transparent"
+                                border.width: 1
+                                border.color: _maShut.containsMouse ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.45) : "transparent"
+                                Behavior on color       { ColorAnimation { duration: 130 } }
+                                Behavior on border.color{ ColorAnimation { duration: 130 } }
+                            }
+                            Text {
+                                anchors.centerIn: parent; text: "󰐥"
+                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
+                                color: root.cErr; opacity: _maShut.containsMouse ? 1.0 : 0.72
+                                Behavior on opacity { NumberAnimation { duration: 130 } }
+                            }
+                            MouseArea {
+                                id: _maShut; anchors.fill: parent
+                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: { pwrProc.command = ["systemctl","poweroff"]; pwrProc.running = true }
+                            }
+                        }
+
+                        // ── Logout ───────────────────────────────────────────
+                        Item {
+                            width: 44; height: 44
+                            Rectangle {
+                                anchors.fill: parent; radius: 22
+                                color:        _maOut.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.20) : "transparent"
+                                border.width: 1
+                                border.color: _maOut.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.45) : "transparent"
+                                Behavior on color       { ColorAnimation { duration: 130 } }
+                                Behavior on border.color{ ColorAnimation { duration: 130 } }
+                            }
+                            Text {
+                                anchors.centerIn: parent; text: "󰍃"
+                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
+                                color: root.cSecondary; opacity: _maOut.containsMouse ? 1.0 : 0.72
+                                Behavior on opacity { NumberAnimation { duration: 130 } }
+                            }
+                            MouseArea {
+                                id: _maOut; anchors.fill: parent
+                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: { pwrProc.command = ["loginctl","terminate-user",Quickshell.env("USER")]; pwrProc.running = true }
                             }
                         }
                     }
