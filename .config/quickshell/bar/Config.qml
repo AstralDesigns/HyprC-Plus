@@ -167,7 +167,6 @@ QtObject {
         v = _settings.value("barAutoHideDelay"); if (v !== undefined && v !== null) barAutoHideDelay = parseInt(v) || 5
         v = _settings.value("dockAutoHide");     if (v !== undefined && v !== null) dockAutoHide     = _toBool(v)
         v = _settings.value("dockAutoHideDelay");if (v !== undefined && v !== null) dockAutoHideDelay= parseInt(v) || 5
-        v = _settings.value("dockLayer");        if (v !== undefined && v !== null) dockLayer        = v
         v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v) || 6
     }
 
@@ -290,7 +289,6 @@ QtObject {
         _settings.setValue("barAutoHideDelay", barAutoHideDelay)
         _settings.setValue("dockAutoHide",     dockAutoHide)
         _settings.setValue("dockAutoHideDelay",dockAutoHideDelay)
-        _settings.setValue("dockLayer",        dockLayer)
         _settings.setValue("dockMargin",       dockMargin)
     }
 
@@ -765,7 +763,6 @@ QtObject {
     // ═══════════════════════════════════════════════════════════════════════
     property bool   dockAutoHide:      false
     property int    dockAutoHideDelay: 5       // seconds
-    property string dockLayer:         "top"   // "top" | "overlay"
     property int    dockMargin:        6       // px — screen-edge gap
 
     readonly property bool wsScrollSwitch:  true

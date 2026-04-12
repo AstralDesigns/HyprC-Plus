@@ -62,7 +62,6 @@ PanelWindow {
     property string _barAhDelay:    Config.barAutoHideDelay.toString()
     property bool   _dockAhEnabled: Config.dockAutoHide
     property string _dockAhDelay:   Config.dockAutoHideDelay.toString()
-    property string _dockLayerVal:  Config.dockLayer
     property int    _dockMarginVal: Config.dockMargin
 
     // ── Rofi current values ───────────────────────────────────────────────
@@ -319,7 +318,7 @@ PanelWindow {
             "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
             "[ -f \"$f\" ] || exit 0; " +
             "awk '/^\\[bar\\]/{s=1;next} /^\\[/{s=0} s&&/^autohide=/{print \"BAR_AH=\"$0} s&&/^autohide_delay=/{print \"BAR_DELAY=\"$0}' \"$f\"; " +
-            "awk '/^\\[dock\\]/{s=1;next} /^\\[/{s=0} s&&/^autohide=/{print \"DOCK_AH=\"$0} s&&/^autohide_delay=/{print \"DOCK_DELAY=\"$0} s&&/^layer=/{print \"DOCK_LAYER=\"$0} s&&/^margin_from_edge=/{print \"DOCK_MARGIN=\"$0}' \"$f\""]
+            "awk '/^\\[dock\\]/{s=1;next} /^\\[/{s=0} s&&/^autohide=/{print \"DOCK_AH=\"$0} s&&/^autohide_delay=/{print \"DOCK_DELAY=\"$0} s&&/^margin_from_edge=/{print \"DOCK_MARGIN=\"$0}' \"$f\""]
         running: false
         stdout: SplitParser {
             splitMarker: "
@@ -329,7 +328,6 @@ PanelWindow {
                 // Bar autohide is now owned by Config.qml — skip BAR_* keys
                 if      (kv.startsWith("DOCK_AH=autohide="))         { ccWin._dockAhEnabled = kv.slice(17) === "true";  Config.dockAutoHide      = ccWin._dockAhEnabled }
                 else if (kv.startsWith("DOCK_DELAY=autohide_delay=")) { ccWin._dockAhDelay   = kv.slice(26);            Config.dockAutoHideDelay = parseInt(kv.slice(26)) || 5 }
-                else if (kv.startsWith("DOCK_LAYER=layer="))          { ccWin._dockLayerVal  = kv.slice(17);            Config.dockLayer         = ccWin._dockLayerVal }
                 else if (kv.startsWith("DOCK_MARGIN=margin_from_edge=")){ ccWin._dockMarginVal = parseInt(kv.slice(29)) || 6; Config.dockMargin = ccWin._dockMarginVal }
             }
         }
@@ -2410,36 +2408,6 @@ PanelWindow {
                         ColumnLayout {
                             width: parent.width; spacing: 5
                             CCSection { text: "󰞒 Dock" }
-
-                            CCSection { text: "Layer" }
-                            CCSegmented {
-                                label: "Dock Layer"
-                                options: ["top", "overlay"]
-                                current: _dockLayerVal
-                                onPicked: function(v) {
-                                    _dockLayerVal = v
-                                    Config.dockLayer = v
-                                    // Layer change requires dock restart (set_layer on mapped window unreliable)
-                                    _dockRestartProc._cmd =
-                                        "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
-                                        "mkdir -p \"$(dirname $f)\"; " +
-                                        "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
-                                        "grep -q '^layer=' \"$f\" || sed -i '/^\\[dock\\]/a layer=top' \"$f\"; " +
-                                        "sed -i '/^\\[dock\\]/,/^\\[/{s/^layer=.*/layer=" + v + "/}' \"$f\"; " +
-                                        "D=\"$HOME/.hyprcandy/GJS/hyprcandydock\"; " +
-                                        "pkill -f 'gjs dock-main.js' 2>/dev/null; sleep 0.25; " +
-                                        "IDX=$(cat \"$D/dock.pos\" 2>/dev/null || echo 0); " +
-                                        "case $IDX in 1) F=-r;; 2) F=-t;; 3) F=-l;; *) F=-b;; esac; " +
-                                        "setsid \"$D/launch-modular.sh\" $F </dev/null >/dev/null 2>&1 &"
-                                    if (!_dockRestartProc.running) _dockRestartProc.running = true
-                                }
-                            }
-                            Process {
-                                id: _dockRestartProc
-                                property string _cmd: ""
-                                command: ["bash", "-c", _dockRestartProc._cmd]
-                                onExited: running = false
-                            }
 
                             CCSection { text: "Screen Margin" }
                             CCSlider {
