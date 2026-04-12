@@ -1129,6 +1129,7 @@ const HyprCandyDock = GObject.registerClass({
         // event routing so all future right-clicks route to the first button that
         // ever showed a popover.  idle_add lets GTK finish cleanup first.
         mainPopover.connect('closed', () => {
+            _ahPopoverClosed();
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
                 try { mainPopover.unparent(); } catch(_) {}
                 return GLib.SOURCE_REMOVE;
@@ -1272,11 +1273,19 @@ const HyprCandyDock = GObject.registerClass({
                 // Close any previously open side popover first so Wayland's
                 // single-grab-chain constraint is never violated.
                 const hoverCtrl = new Gtk.EventControllerMotion();
+                // Track open/closed for autohide suppression.
+                // Use a per-instance flag so rapid hover in/out doesn't
+                // double-increment if popup() is called while already open.
+                let _sideOpen = false;
+                sidePopover.connect('closed', () => {
+                    if (_sideOpen) { _sideOpen = false; _ahPopoverClosed(); }
+                });
                 hoverCtrl.connect('enter', () => {
                     if (openSidePopover && openSidePopover !== sidePopover) {
                         openSidePopover.popdown();
                     }
                     openSidePopover = sidePopover;
+                    if (!_sideOpen) { _sideOpen = true; _ahPopoverOpened(); }
                     sidePopover.popup();
                 });
                 focusBtn.add_controller(hoverCtrl);
@@ -1389,6 +1398,7 @@ const HyprCandyDock = GObject.registerClass({
         menuBox.append(pinBtn);
 
         mainPopover.set_child(menuBox);
+        _ahPopoverOpened();
         mainPopover.popup();
     }
 
@@ -1415,6 +1425,7 @@ const HyprCandyDock = GObject.registerClass({
         popover.add_css_class('dock-popover');
         popover.set_offset(mainOffX, mainOffY);
         popover.connect('closed', () => {
+            _ahPopoverClosed();
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
                 try { popover.unparent(); } catch(_) {}
                 return GLib.SOURCE_REMOVE;
@@ -1442,6 +1453,7 @@ const HyprCandyDock = GObject.registerClass({
         menuBox.append(settingsBtn);
 
         popover.set_child(menuBox);
+        _ahPopoverOpened();
         popover.popup();
     }
 
@@ -1519,9 +1531,12 @@ const HyprCandyDock = GObject.registerClass({
 
 // --- Auto-hide state -------------------------------------------------
 // Set by readHyprCandyConf() on startup and on every SIGUSR2 hot-reload.
-let _ahEnabled    = false;
-let _ahDelaySec   = 5000;     // ms
-let _ahTimerId    = 0;        // GLib timeout source id, 0 = not running
+let _ahEnabled      = false;
+let _ahDelaySec     = 5000;     // ms
+let _ahTimerId      = 0;        // GLib timeout source id, 0 = not running
+let _ahPopoverCount = 0;        // number of popovers currently open; dock stays
+                                // visible while this is > 0 (pointer-leave from
+                                // dock into a popover must not trigger hide)
 
 function _ahCancelTimer() {
     if (_ahTimerId) {
@@ -1530,11 +1545,32 @@ function _ahCancelTimer() {
     }
 }
 
+// Call when a dock popover opens so autohide is suppressed.
+function _ahPopoverOpened() {
+    _ahPopoverCount++;
+    _ahCancelTimer();
+}
+
+// Call when a dock popover closes.  When the last one closes, restart the
+// hide timer so autohide resumes naturally after the user is done.
+function _ahPopoverClosed() {
+    _ahPopoverCount = Math.max(0, _ahPopoverCount - 1);
+    if (_ahPopoverCount === 0 && _ahEnabled) {
+        _ahStartTimer();
+    }
+}
+
 function _ahStartTimer() {
+    // Don't start a hide timer while any popover is open — the pointer-leave
+    // event fires when the cursor moves from the dock surface into the popover
+    // (popovers are separate toplevels in GTK4), but the dock must stay visible.
+    if (_ahPopoverCount > 0) return;
     _ahCancelTimer();
     _ahTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, _ahDelaySec, () => {
         _ahTimerId = 0;
         if (!_ahEnabled || !dockWindow) return GLib.SOURCE_REMOVE;
+        // Popover guard — a popover may have opened between timer start and fire
+        if (_ahPopoverCount > 0) return GLib.SOURCE_REMOVE;
         // Fullscreen guard — skip hide if hyprctl reports an active fullscreen window
         try {
             const [, out] = GLib.spawn_command_line_sync('hyprctl -j activewindow');
