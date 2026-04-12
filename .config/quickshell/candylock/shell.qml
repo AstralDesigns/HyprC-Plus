@@ -1164,7 +1164,7 @@ ShellRoot {
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
-                                anchors.centerIn: parent; text: "󰍃"
+                                anchors.centerIn: parent; text: "󰗼"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
                                 color: root.cSecondary; opacity: _maOut.containsMouse ? 1.0 : 0.72
                                 Behavior on opacity { NumberAnimation { duration: 130 } }

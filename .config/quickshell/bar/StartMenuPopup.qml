@@ -740,8 +740,8 @@ PanelWindow {
                 Repeater {
                     model: [
                         { i: "", l: "Lock",    cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh lock" },
-                        { i: "", l: "Reboot",  cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh reboot" },
-                        { i: "󰤄", l: "Sleep",   cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh suspend" },
+                        { i: "󰑙", l: "Reboot",  cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh reboot" },
+                        { i: "󰒲", l: "Sleep",   cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh suspend" },
                         { i: "", l: "Shutdown", cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh shutdown" },
                     ]
                     delegate: Rectangle {
