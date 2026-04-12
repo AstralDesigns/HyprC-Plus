@@ -420,6 +420,18 @@ ShellRoot {
     // Fix: set command directly on each call instead of relying on a bound property.
     Process { id:ctlProc; running:false; onExited: running=false }
     Process { id:pwrProc;  running:false; onExited: running=false }
+    property bool _hibernateAvailable: false
+    Process {
+        id: _hibCheckProc
+        // systemd exposes hibernate as a sleep state only when swap/hibernation is configured
+        command: ["bash","-c","grep -qw hibernate /sys/power/state 2>/dev/null && echo yes || echo no"]
+        running: true
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) { root._hibernateAvailable = line.trim() === "yes" }
+        }
+        onExited: running = false
+    }
     Process {
         id: suspendIfFlagged
         command: ["/bin/bash", "-c",
@@ -1055,46 +1067,21 @@ ShellRoot {
                         id: pwrRowInner
                         anchors.centerIn: parent
                         spacing: 4
-                        
-                        // ── Logout ───────────────────────────────────────────
-                        Item {
-                            width: 44; height: 44
-                            Rectangle {
-                                anchors.fill: parent; radius: 22
-                                color:        _maOut.containsMouse ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.20) : "transparent"
-                                border.width: 1
-                                border.color: _maOut.containsMouse ? Qt.rgba(root.cErr.r,root.cErr.g,root.cErr.b,0.45) : "transparent"
-                                Behavior on color       { ColorAnimation { duration: 130 } }
-                                Behavior on border.color{ ColorAnimation { duration: 130 } }
-                            }
-                            Text {
-                                anchors.centerIn: parent; text: "󰗼"
-                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cErr; opacity: _maOut.containsMouse ? 1.0 : 0.72
-                                Behavior on opacity { NumberAnimation { duration: 130 } }
-                            }
-                            MouseArea {
-                                id: _maOut; anchors.fill: parent
-                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: { pwrProc.command = ["loginctl","terminate-user",Quickshell.env("USER")]; pwrProc.running = true }
-                            }
-                        }
-
                         // ── Suspend ──────────────────────────────────────────
                         Item {
                             width: 44; height: 44
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maSusp.containsMouse ? Qt.rgba(root.cTertiary.r,root.cTertiary.g,root.cTertiary.b,0.20) : "transparent"
+                                color:        _maSusp.containsMouse ? Qt.rgba(root.cSecondaryFixedDim.r,root.cSecondaryFixedDim.g,root.cSecondaryFixedDim.b,0.20) : "transparent"
                                 border.width: 1
-                                border.color: _maSusp.containsMouse ? Qt.rgba(root.cTertiary.r,root.cTertiary.g,root.cTertiary.b,0.45) : "transparent"
+                                border.color: _maSusp.containsMouse ? Qt.rgba(root.cSecondaryFixedDim.r,root.cSecondaryFixedDim.g,root.cSecondaryFixedDim.b,0.45) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰒲"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cTertiary; opacity: _maSusp.containsMouse ? 1.0 : 0.72
+                                color: root.cSecondaryFixedDim; opacity: _maSusp.containsMouse ? 1.0 : 0.72
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
@@ -1104,9 +1091,10 @@ ShellRoot {
                             }
                         }
 
-                        // ── Hibernate ────────────────────────────────────────
+                        // ── Hibernate (only shown when available on this OS) ──
                         Item {
                             width: 44; height: 44
+                            visible: root._hibernateAvailable
                             Rectangle {
                                 anchors.fill: parent; radius: 22
                                 color:        _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20) : "transparent"
