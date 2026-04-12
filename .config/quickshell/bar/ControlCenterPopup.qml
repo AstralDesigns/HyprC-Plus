@@ -294,12 +294,22 @@ PanelWindow {
     }
     // ── Shared conf writer for hyprcandy-bar.conf ────────────────────────────
     // All auto-hide and layer writes funnel through this single Process.
-    // The caller sets _cmd then starts the process.
+    // The caller sets _cmd then starts the process.  If a write is already
+    // in-flight, _pendingCmd captures the latest command; it is launched
+    // immediately when the current run finishes so no slider value is lost.
     Process {
         id: _confWriteProc
         property string _cmd: ""
+        property string _pendingCmd: ""
         command: ["bash", "-c", _confWriteProc._cmd]
-        onExited: running = false
+        onExited: {
+            running = false
+            if (_pendingCmd !== "") {
+                _cmd = _pendingCmd
+                _pendingCmd = ""
+                running = true
+            }
+        }
     }
 
     // ── Read hyprcandy-bar.conf on CC open ────────────────────────────────────
@@ -2439,14 +2449,19 @@ PanelWindow {
                                 onMoved: function(v) {
                                     _dockMarginVal = v
                                     Config.dockMargin = v
-                                    _confWriteProc._cmd =
+                                    const cmd =
                                         "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
                                         "mkdir -p \"$(dirname $f)\"; " +
                                         "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
                                         "grep -q '^margin_from_edge=' \"$f\" || sed -i '/^\\[dock\\]/a margin_from_edge=6' \"$f\"; " +
                                         "sed -i '/^\\[dock\\]/,/^\\[/{s/^margin_from_edge=.*/margin_from_edge=" + v + "/}' \"$f\"; " +
                                         "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
-                                    if (!_confWriteProc.running) _confWriteProc.running = true
+                                    if (_confWriteProc.running) {
+                                        _confWriteProc._pendingCmd = cmd
+                                    } else {
+                                        _confWriteProc._cmd = cmd
+                                        _confWriteProc.running = true
+                                    }
                                 }
                             }
 
@@ -2459,14 +2474,19 @@ PanelWindow {
                                 onToggled: function(v) {
                                     _dockAhEnabled = v
                                     Config.dockAutoHide = v
-                                    _confWriteProc._cmd =
+                                    const cmd =
                                         "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
                                         "mkdir -p \"$(dirname $f)\"; " +
                                         "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
                                         "grep -q '^autohide=' \"$f\" || sed -i '/^\\[dock\\]/a autohide=false' \"$f\"; " +
                                         "sed -i '/^\\[dock\\]/,/^\\[/{s/^autohide=.*/autohide=" + (v ? "true" : "false") + "/}' \"$f\"; " +
                                         "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
-                                    if (!_confWriteProc.running) _confWriteProc.running = true
+                                    if (_confWriteProc.running) {
+                                        _confWriteProc._pendingCmd = cmd
+                                    } else {
+                                        _confWriteProc._cmd = cmd
+                                        _confWriteProc.running = true
+                                    }
                                 }
                             }
 
@@ -2479,14 +2499,19 @@ PanelWindow {
                                 onMoved: function(v) {
                                     _dockAhDelay = v.toString()
                                     Config.dockAutoHideDelay = v
-                                    _confWriteProc._cmd =
+                                    const cmd =
                                         "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
                                         "mkdir -p \"$(dirname $f)\"; " +
                                         "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
                                         "grep -q '^autohide_delay=' \"$f\" || sed -i '/^\\[dock\\]/a autohide_delay=5' \"$f\"; " +
                                         "sed -i '/^\\[dock\\]/,/^\\[/{s/^autohide_delay=.*/autohide_delay=" + v + "/}' \"$f\"; " +
                                         "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
-                                    if (!_confWriteProc.running) _confWriteProc.running = true
+                                    if (_confWriteProc.running) {
+                                        _confWriteProc._pendingCmd = cmd
+                                    } else {
+                                        _confWriteProc._cmd = cmd
+                                        _confWriteProc.running = true
+                                    }
                                 }
                             }
 

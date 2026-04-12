@@ -285,9 +285,9 @@ function applyMarginsToLayerShell(win) {
 
 
 // --- Read hyprcandy-bar.conf [dock] section ---------------------------
-// Returns { autoHide, autoHideDelay (ms), layer } with safe defaults.
+// Returns { autoHide, autoHideDelay (ms), layer, marginFromEdge } with safe defaults.
 function readHyprCandyConf() {
-    const defaults = { autoHide: false, autoHideDelay: 5000, layer: 'top' };
+    const defaults = { autoHide: false, autoHideDelay: 5000, layer: 'top', marginFromEdge: null };
     try {
         const [ok, bytes] = GLib.file_get_contents(HYPRCANDY_CONF_PATH);
         if (!ok) return defaults;
@@ -296,13 +296,15 @@ function readHyprCandyConf() {
         const dockMatch = txt.match(/\[dock\]([\s\S]*?)(?=\n\[|$)/i);
         if (!dockMatch) return defaults;
         const section = dockMatch[1];
-        const ahMatch    = section.match(/^\s*autohide\s*=\s*(true|false)/im);
-        const delayMatch = section.match(/^\s*autohide_delay\s*=\s*(\d+)/im);
-        const layerMatch = section.match(/^\s*layer\s*=\s*(top|overlay)/im);
+        const ahMatch     = section.match(/^\s*autohide\s*=\s*(true|false)/im);
+        const delayMatch  = section.match(/^\s*autohide_delay\s*=\s*(\d+)/im);
+        const layerMatch  = section.match(/^\s*layer\s*=\s*(top|overlay)/im);
+        const marginMatch = section.match(/^\s*margin_from_edge\s*=\s*(\d+)/im);
         return {
-            autoHide:      ahMatch    ? ahMatch[1].toLowerCase() === 'true' : false,
-            autoHideDelay: delayMatch ? parseInt(delayMatch[1]) * 1000       : 5000,
-            layer:         layerMatch ? layerMatch[1].toLowerCase()          : 'top',
+            autoHide:       ahMatch     ? ahMatch[1].toLowerCase() === 'true' : false,
+            autoHideDelay:  delayMatch  ? parseInt(delayMatch[1]) * 1000       : 5000,
+            layer:          layerMatch  ? layerMatch[1].toLowerCase()          : 'top',
+            marginFromEdge: marginMatch ? parseInt(marginMatch[1])             : null,
         };
     } catch (e) {
         log('[dock] conf read error: ' + e.message);
@@ -325,9 +327,8 @@ function hotReload() {
     if (!reloadConfigFromFile()) return;
     const display = Gdk.Display.get_default();
     if (display) _injectGlyphSizeCSS(display);
-    applyMarginsToLayerShell(dockWindow);
 
-    // Apply layer (top/overlay) from hyprcandy-bar.conf
+    // Apply layer (top/overlay) and margin_from_edge from hyprcandy-bar.conf
     {
         const conf = readHyprCandyConf();
         const newLayer = conf.layer === 'overlay'
@@ -335,6 +336,17 @@ function hotReload() {
             : Gtk4LayerShell.Layer.TOP;
         Gtk4LayerShell.set_layer(dockWindow, newLayer);
         log('[dock] hot-reload: layer = ' + conf.layer);
+
+        // Apply margin_from_edge → the anchored-edge margin for the current position.
+        // This overrides the positionOverride value that reloadConfigFromFile() applied.
+        if (conf.marginFromEdge !== null) {
+            const pos = DockConfig.position;
+            if      (pos === 'bottom') DockConfig.marginBottom = conf.marginFromEdge;
+            else if (pos === 'top')    DockConfig.marginTop    = conf.marginFromEdge;
+            else if (pos === 'left')   DockConfig.marginLeft   = conf.marginFromEdge;
+            else if (pos === 'right')  DockConfig.marginRight  = conf.marginFromEdge;
+            log('[dock] hot-reload: margin_from_edge = ' + conf.marginFromEdge + ' (position: ' + pos + ')');
+        }
 
         // Update auto-hide settings; the EventControllerMotion on dockWindow
         // reads these module-level vars each time leave fires.
@@ -349,6 +361,10 @@ function hotReload() {
         }
         log('[dock] hot-reload: autohide=' + _ahEnabled + ' delay=' + _ahDelaySec + 'ms');
     }
+
+    // Apply all four margins to the layer shell after DockConfig has been
+    // updated by both reloadConfigFromFile() and margin_from_edge above.
+    applyMarginsToLayerShell(dockWindow);
 
     if (dockWindow) {
         // Update start icon glyph if it changed
@@ -1526,7 +1542,10 @@ function _ahStartTimer() {
             if (/"fullscreen"\s*:\s*true/.test(json)) return GLib.SOURCE_REMOVE;
         } catch (_) {}
         dockWindow.set_visible(false);
-        if (_ahHotspot) _ahHotspot.set_visible(true);
+        if (_ahHotspot) {
+            _ahHotspot._applySize();
+            _ahHotspot.set_visible(true);
+        }
         return GLib.SOURCE_REMOVE;
     });
 }
@@ -1553,12 +1572,19 @@ const HotspotWindow = GObject.registerClass({
         Gtk4LayerShell.set_layer(this, Gtk4LayerShell.Layer.TOP);
         Gtk4LayerShell.set_exclusive_zone(this, 0);
 
+        // Size the hotspot surface by querying the monitor geometry directly
+        // rather than relying on GTK anchor-stretch, which is unreliable inside
+        // Gtk.ApplicationWindow's internal frame hierarchy.  _refreshAnchors()
+        // calls _applySize() which sets an explicit size_request matching the
+        // monitor's along-edge dimension so pointer events cover the full strip.
+        const fill = new Gtk.DrawingArea();
+        fill.set_hexpand(true);
+        fill.set_vexpand(true);
+        this.set_child(fill);
+
         // Anchor same edge as the dock (read from DockConfig at creation time;
         // _refreshAnchors() is also called by hotReload() to track position changes)
         this._refreshAnchors();
-
-        // Invisible surface — just needs to receive pointer events
-        this.set_default_size(1, 1);
 
         // Re-show dock when pointer enters the hotspot strip
         const motion = new Gtk.EventControllerMotion();
@@ -1580,15 +1606,61 @@ const HotspotWindow = GObject.registerClass({
         Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.TOP,    pos === 'top');
         Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.LEFT,   pos === 'left'  || pos === 'bottom' || pos === 'top');
         Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.RIGHT,  pos === 'right' || pos === 'bottom' || pos === 'top');
-        // 2 px thick perpendicular to the edge, full-width along it
-        if (pos === 'bottom' || pos === 'top') {
-            Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.BOTTOM, 0);
-            Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP,    0);
-            this.set_default_size(1, 2);
+
+        // Always zero all four margins so a previous position's values don't bleed in.
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.BOTTOM, 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP,    0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT,   0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT,  0);
+
+        // Use an explicit size_request derived from the monitor geometry so
+        // pointer events cover the entire edge.  GTK4 anchor-stretching inside
+        // Gtk.ApplicationWindow is unreliable (the internal frame widget does
+        // not propagate expands to the Wayland surface commit), causing the
+        // hotspot to only respond near the left/top corner.  Querying the
+        // monitor and calling set_size_request bypasses that entirely.
+        this._applySize();
+    }
+
+    _applySize() {
+        const pos = DockConfig.position;
+        const isHoriz = (pos === 'bottom' || pos === 'top');
+
+        // Thickness: fill the screen-edge gap so the cursor triggers re-show
+        // without having to travel to the raw pixel edge.
+        const thickness = isHoriz
+            ? Math.max(4, pos === 'bottom' ? DockConfig.marginBottom : DockConfig.marginTop)
+            : Math.max(4, pos === 'left'   ? DockConfig.marginLeft   : DockConfig.marginRight);
+
+        // Along-edge dimension: query the monitor so we set an exact pixel size.
+        // Fall back to a large sentinel (4096) if the display isn't ready yet;
+        // _applySize() is called again after show() in _ahStartTimer so it will
+        // correct itself once the surface is mapped.
+        let along = isHoriz ? 4096 : 4096;
+        try {
+            const display = Gdk.Display.get_default();
+            if (display) {
+                // get_monitors() returns a Gio.ListModel in GTK4
+                const monitors = display.get_monitors();
+                const n = monitors.get_n_items();
+                if (n > 0) {
+                    // Use the first monitor; for multi-monitor setups this matches
+                    // the monitor the dock is on (layer-shell assigns to primary by default)
+                    const mon = monitors.get_item(0);
+                    const geo = mon.get_geometry();
+                    along = isHoriz ? geo.width : geo.height;
+                }
+            }
+        } catch (e) {
+            log('[dock] hotspot _applySize: monitor query failed: ' + e.message);
+        }
+
+        if (isHoriz) {
+            this.set_size_request(along, thickness);
+            this.set_default_size(along, thickness);
         } else {
-            Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT,  0);
-            Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT, 0);
-            this.set_default_size(2, 1);
+            this.set_size_request(thickness, along);
+            this.set_default_size(thickness, along);
         }
     }
 });
@@ -1617,13 +1689,33 @@ const DockApplication = GObject.registerClass({
             Gtk4LayerShell.set_layer(dockWindow, conf.layer === 'overlay'
                 ? Gtk4LayerShell.Layer.OVERLAY : Gtk4LayerShell.Layer.TOP);
             log('[dock] startup: autohide=' + _ahEnabled + ' layer=' + conf.layer);
+
+            // Apply margin_from_edge to the anchored-edge margin so the saved
+            // CC slider value takes effect immediately on launch.
+            if (conf.marginFromEdge !== null) {
+                const pos = DockConfig.position;
+                if      (pos === 'bottom') DockConfig.marginBottom = conf.marginFromEdge;
+                else if (pos === 'top')    DockConfig.marginTop    = conf.marginFromEdge;
+                else if (pos === 'left')   DockConfig.marginLeft   = conf.marginFromEdge;
+                else if (pos === 'right')  DockConfig.marginRight  = conf.marginFromEdge;
+                applyMarginsToLayerShell(dockWindow);
+                log('[dock] startup: margin_from_edge = ' + conf.marginFromEdge + ' (position: ' + pos + ')');
+            }
         }
 
-        // Hotspot window — 2 px strip, same edge as the dock, Layer.TOP,
+        // Hotspot window — strip at the same edge as the dock, Layer.TOP,
         // exclusiveZone=0.  Shown only when dock is hidden.  Its own
         // EventControllerMotion re-shows the dock when the pointer enters.
         _ahHotspot = new HotspotWindow(this);
         this.add_window(_ahHotspot);
+
+        // If autohide was enabled in the saved conf, start the hide timer
+        // immediately so the dock behaves correctly on a fresh session
+        // without requiring a SIGUSR2 hot-reload to activate it.
+        if (_ahEnabled) {
+            log('[dock] startup: autohide active — starting hide timer');
+            _ahStartTimer();
+        }
     }
 });
 
