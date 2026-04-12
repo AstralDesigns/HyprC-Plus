@@ -451,7 +451,7 @@ PanelWindow {
                     implicitHeight: Config.moduleHeight
                     Text {
                         id: _rofiIcon; anchors.centerIn: parent
-                        text: ""; color: Config.glyphColor
+                        text: "󰓐"; color: Config.glyphColor
                         font.family: Config.fontFamily; font.pixelSize: Config.fontSize
                     }
                     ToolTip.visible: false; ToolTip.text: ""; ToolTip.delay: 500
