@@ -1019,7 +1019,7 @@ ShellRoot {
                     id: powerRow
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top:             centerPanel.bottom
-                    anchors.topMargin:       18
+                    anchors.topMargin:       10
                     width:  pwrRowInner.implicitWidth  + 32
                     height: pwrRowInner.implicitHeight + 20
 
