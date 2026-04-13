@@ -2712,10 +2712,10 @@ PanelWindow {
                                 }
                             }
 
-                            CCSection { text: "Window Size — Horizontal Dock" }
+                            CCSection { text: "Window Size — Horizontal Dock App Launcher" }
                             CCSlider {
                                 label: "Width"
-                                from: 320; to: 900; stepSize: 10
+                                from: 320; to: 2000; stepSize: 5
                                 value: Config.launcherFrameWidth
                                 onMoved: function(v) {
                                     Config.launcherFrameWidth = Math.round(v)
@@ -2726,7 +2726,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Height"
-                                from: 300; to: 900; stepSize: 10
+                                from: 300; to: 2000; stepSize: 5
                                 value: Config.launcherFrameHeight
                                 onMoved: function(v) {
                                     Config.launcherFrameHeight = Math.round(v)
@@ -2736,10 +2736,10 @@ PanelWindow {
                                 }
                             }
 
-                            CCSection { text: "Window Size — Vertical Dock" }
+                            CCSection { text: "Window Size — Vertical Dock App Launcher" }
                             CCSlider {
                                 label: "Width"
-                                from: 240; to: 700; stepSize: 10
+                                from: 240; to: 2000; stepSize: 5
                                 value: Config.launcherFrameWidthVert
                                 onMoved: function(v) {
                                     Config.launcherFrameWidthVert = Math.round(v)
@@ -2750,7 +2750,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Height"
-                                from: 300; to: 1000; stepSize: 10
+                                from: 300; to: 2000; stepSize: 5
                                 value: Config.launcherFrameHeightVert
                                 onMoved: function(v) {
                                     Config.launcherFrameHeightVert = Math.round(v)
