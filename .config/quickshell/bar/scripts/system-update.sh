@@ -69,7 +69,9 @@ prompt_reboot() {
             ;;
         *)
             print_status "󰜉 Rebooting system..."
-            sudo reboot
+            terminate_clients
+  	    sleep 2
+            systemctl reboot
             ;;
     esac
 }
