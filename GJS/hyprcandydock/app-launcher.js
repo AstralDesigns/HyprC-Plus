@@ -1641,10 +1641,7 @@ const AppLauncherWindow = GObject.registerClass({
     _showGroupHeaderMenu(groupName, parentWidget) {
         const pos = this._dockPos;
         let popPos;
-        if      (pos === 'bottom') popPos = Gtk.PositionType.TOP;
-        else if (pos === 'top'   ) popPos = Gtk.PositionType.BOTTOM;
-        else if (pos === 'left'  ) popPos = Gtk.PositionType.RIGHT;
-        else                       popPos = Gtk.PositionType.LEFT;
+        popPos = Gtk.PositionType.TOP; // bottom, top, left,right
 
         const pop = new Gtk.Popover();
         pop.set_parent(this);

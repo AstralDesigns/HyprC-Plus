@@ -267,7 +267,7 @@ def _fetch_art_circle(art_url: str) -> str:
              "(", "+clone", "-alpha", "extract",
              "-fill", "black", "-colorize", "100",
              "-fill", "white", "-draw", "circle 48,48 48,0", ")",
-             "-compose", "CopyOpacity", "-composite",
+             "-alpha", "off", "-compose", "CopyOpacity", "-composite",
              "-strip", dest_path],
             timeout=8, capture_output=True
         )

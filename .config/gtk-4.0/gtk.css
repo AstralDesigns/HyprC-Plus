@@ -8,9 +8,9 @@
 @define-color warning_fg_color rgba(0, 0, 0, 0.8);
 @define-color error_bg_color @red_4;
 @define-color error_fg_color @primary;
-@define-color accent_color #e2b778;
-@define-color accent_fg_color #120d05;
-@define-color accent_bg_color #e2b778;
+@define-color accent_color #e5b67b;
+@define-color accent_fg_color #130d06;
+@define-color accent_bg_color #e5b67b;
 @define-color window_bg_color @on_secondary;
 @define-color window_fg_color @primary;
 @define-color view_bg_color @window_bg_color;
@@ -50,7 +50,7 @@ windowcontrols>button>image { /* GTK4 */
   color: @inverse_primary;
   min-width: 1px;
   min-height: 1px;
-  border-radius: 100 %;
+  border-radius: 100%;
   padding: 0;
   margin: 0 5px;
   opacity: 1;
@@ -60,7 +60,7 @@ button.titlebutton { /* GTK3 */
   color: transparent;
   min-width: 1px;
   min-height: 1px;
-  border-radius: 100 %;
+  border-radius: 100%;
   padding: 0;
   margin: 0 5px;
   opacity: 1;
@@ -72,8 +72,8 @@ button.titlebutton.close,
   background: @primary;
 }
 
-button.titlebutton.close: hover,
-  windowcontrols > button.close: hover > image {
+button.titlebutton.close:hover,
+  windowcontrols > button.close:hover > image {
   color: @inverse_primary;
   background: @primary;
   opacity: 0.5;
@@ -85,8 +85,8 @@ windowcontrols>button.maximize>image {
   border: 1px solid #3e9948;
 }
 
-button.titlebutton.maximize: hover,
-windowcontrols>button.maximize: hover>image {
+button.titlebutton.maximize:hover,
+windowcontrols>button.maximize:hover>image {
   color: #0b650d;
   opacity: 0.5;
 }
@@ -97,8 +97,8 @@ windowcontrols>button.minimize>image {
   border: 1px solid #dd9d30;
 }
 
-button.titlebutton.minimize: hover,
-windowcontrols>button.minimize: hover>image {
+button.titlebutton.minimize:hover,
+windowcontrols>button.minimize:hover>image {
   color: #9a5711;
   opacity: 0.5;
 }

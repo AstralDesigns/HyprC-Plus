@@ -297,22 +297,11 @@ class QuickshellObexAgent(dbus.service.Object):
         return True
 
     def _finalize_transfer(self, transfer_path_str):
-        """Dispatch the actual file copy to a background thread so we don't
-        block the GLib main loop.  Also registers the obexd path in
-        _known_cache_files so the cache-directory monitor skips it.
-        """
-        info = self._pending_file_moves.get(transfer_path_str)
-        if info:
-            # Pre-register so the cache monitor won't race-copy the same file
-            obexd_name = os.path.basename(info.get("obexd_path", ""))
-            if obexd_name:
-                self._known_cache_files.add(obexd_name)
-        t = threading.Thread(
-            target=self._finalize_transfer_worker,
-            args=(transfer_path_str,), daemon=True)
-        t.start()
+        """Copy a completed OBEX transfer from ~/.cache/obexd/ to ~/Downloads/.
 
-    def _finalize_transfer_worker(self, transfer_path_str):
+        Runs in a background thread to avoid blocking the GLib main loop
+        (which handles D-Bus callbacks for other transfers).
+        """
         emit({"type": "error", "msg": f"_finalize_transfer called for: {transfer_path_str}"})
         # Guard against double-finalization (race from session monitor)
         if transfer_path_str not in self._pending_file_moves:
@@ -522,7 +511,7 @@ def stdin_reader(loop, bt_agent, obex_agent):
                             obex_agent.respond_transfer(parts[1], False)
                         elif cmd == "file_transfer_completed" and len(parts) >= 2:
                             # Called by QML when OBEX session is removed (transfer done)
-                            obex_agent._finalize_transfer(parts[1])
+                            obex_agent._move_obex_file(parts[1])
                         elif cmd == "set_auto_accept" and len(parts) >= 2:
                             obex_agent.auto_accept = (parts[1] == "1")
                             emit({"type": "auto_accept",
@@ -634,19 +623,16 @@ def main():
     def obex_cache_monitor():
         """Watch ~/.cache/obexd/ for new files and copy them to ~/Downloads/.
 
-        Android often sends multiple files in a single OBEX session so
-        AuthorizePush may only be called once.  We watch the cache directory
-        for new files that _finalize_transfer hasn't already claimed.
-
-        Waits for each file's size to stabilise before copying so we never
-        produce a truncated copy of a large photo or video.
+        Android often sends multiple files in a single OBEX session, so
+        AuthorizePush is only called once.  Instead of tracking individual
+        transfers, we watch the cache directory for new files.
         """
         cache_dir = f"{GLib.get_home_dir()}/.cache/obexd"
         dest_dir = f"{GLib.get_home_dir()}/Downloads"
         os.makedirs(cache_dir, exist_ok=True)
         os.makedirs(dest_dir, exist_ok=True)
 
-        # Build initial set of known files so we don't re-copy pre-existing ones
+        # Build initial set of known files
         try:
             obex_agent._known_cache_files = set(os.listdir(cache_dir))
         except Exception:
@@ -659,44 +645,22 @@ def main():
             except Exception:
                 continue
 
+            # Find new files that appeared since last check
             new_files = current_files - obex_agent._known_cache_files
-            # Update known set immediately so the next loop tick won't re-process
-            obex_agent._known_cache_files = current_files
-
             for filename in new_files:
                 cache_path = os.path.join(cache_dir, filename)
+                # Skip if it's a directory or doesn't exist yet
                 if not os.path.isfile(cache_path):
                     continue
-
-                # Wait for the file size to stabilise — obexd may still be writing
-                prev_size = -1
-                stable_ticks = 0
-                for _ in range(60):   # max 30 s
-                    time.sleep(0.5)
-                    try:
-                        cur_size = os.path.getsize(cache_path)
-                    except OSError:
-                        cur_size = -1
-                    if cur_size > 0 and cur_size == prev_size:
-                        stable_ticks += 1
-                        if stable_ticks >= 3:   # stable for 1.5 s
-                            break
-                    else:
-                        stable_ticks = 0
-                    prev_size = cur_size
-
-                if not os.path.isfile(cache_path) or os.path.getsize(cache_path) == 0:
+                # Wait for the file to be fully written
+                time.sleep(0.5)
+                try:
+                    file_size = os.path.getsize(cache_path)
+                except OSError:
                     continue
 
-                # Skip if _finalize_transfer has already claimed this file
-                # (it adds the basename to _known_cache_files before starting its thread)
-                # We re-check here after the stability wait because _finalize_transfer
-                # may have run and copied the file during our sleep.
-                dest_check = os.path.join(dest_dir, filename)
-                if os.path.isfile(dest_check):
-                    continue
-
-                dest_path = dest_check
+                # Handle filename collisions in Downloads
+                dest_path = os.path.join(dest_dir, filename)
                 base, ext = os.path.splitext(filename)
                 counter = 1
                 while os.path.exists(dest_path):
@@ -706,10 +670,6 @@ def main():
                 try:
                     shutil.copy2(cache_path, dest_path)
                     saved_size = os.path.getsize(dest_path)
-                    if saved_size == 0:
-                        os.unlink(dest_path)
-                        emit({"type": "error", "msg": f"cache_monitor: empty copy for {filename}"})
-                        continue
                     sz_str = (f"{saved_size/1048576:.1f} MB" if saved_size > 1048576
                               else f"{saved_size//1024} KB" if saved_size > 1024
                               else f"{saved_size} B")
@@ -717,7 +677,9 @@ def main():
                           "name": "Bluetooth",
                           "filename": os.path.basename(dest_path), "size": sz_str})
                 except Exception as e:
-                    emit({"type": "error", "msg": f"cache_monitor copy failed for {filename}: {e}"})
+                    emit({"type": "error", "msg": f"Failed to save {filename}: {e}"})
+
+            obex_agent._known_cache_files = current_files
 
     monitor_thread = threading.Thread(target=obex_cache_monitor, daemon=True)
     monitor_thread.start()
