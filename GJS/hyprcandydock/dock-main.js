@@ -82,6 +82,7 @@ const DOCK_CONFIG_PATH      = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', '
 // Absolute path so the toggle script is found regardless of working-directory
 // (exec-once in hyprland.conf sets cwd to '/', not the dock folder).
 const LAUNCHER_TOGGLE_PATH  = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'toggle-app-launcher.sh']);
+const LAUNCHER_STATE_PATH   = GLib.build_filenamev([HOME, '.cache', 'hyprcandy', 'launcher.state']);
 const HYPRCANDY_CONF_PATH   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hyprcandy-bar.conf']);
 
 let cssProviders = [];          // Static providers cleared/re-added on theme change
@@ -90,6 +91,8 @@ let dockWindow = null;
 
 let _colorMonitor    = null;  // Gio.FileMonitor for gtk-4.0/colors.css
 let _colorReloadTimer = 0;    // GLib timeout source ID (debounce)
+let _launcherMonitor  = null; // Gio.FileMonitor for launcher.state
+let _launcherOpen     = false; // true while launcher window is visible
 
 function loadCSS() {
     const display = Gdk.Display.get_default();
@@ -440,6 +443,7 @@ function teardownColorMonitor() {
         _colorMonitor.cancel();
         _colorMonitor = null;
     }
+    teardownLauncherMonitor();
 }
 
 // --- Drag and Drop Manager --------------------------------------------
@@ -1586,6 +1590,51 @@ function _ahStartTimer() {
     });
 }
 
+// --- Launcher state-file monitor --------------------------------------
+// app-launcher.js writes "open\n" / "closed\n" to LAUNCHER_STATE_PATH
+// on every visibility change.  We watch that file with Gio.FileMonitor
+// and hook into the same _ahPopoverOpened / _ahPopoverClosed mechanism
+// used by right-click popovers so autohide is suppressed while the
+// launcher is on screen.
+function setupLauncherMonitor() {
+    if (_launcherMonitor) return;
+    try {
+        const f = Gio.File.new_for_path(LAUNCHER_STATE_PATH);
+        _launcherMonitor = f.monitor_file(Gio.FileMonitorFlags.NONE, null);
+        _launcherMonitor.connect('changed', (_mon, _file, _other, ev) => {
+            if (ev !== Gio.FileMonitorEvent.CHANGES_DONE_HINT &&
+                ev !== Gio.FileMonitorEvent.CREATED &&
+                ev !== Gio.FileMonitorEvent.CHANGED) return;
+            try {
+                const [ok, bytes] = GLib.file_get_contents(LAUNCHER_STATE_PATH);
+                if (!ok) return;
+                const state = new TextDecoder().decode(bytes).trim();
+                const nowOpen = state === 'open';
+                if (nowOpen && !_launcherOpen) {
+                    _launcherOpen = true;
+                    _ahPopoverOpened();
+                } else if (!nowOpen && _launcherOpen) {
+                    _launcherOpen = false;
+                    _ahPopoverClosed();
+                }
+            } catch (_) {}
+        });
+    } catch (e) {
+        log('[dock] launcher monitor setup failed: ' + e.message);
+    }
+}
+
+function teardownLauncherMonitor() {
+    if (_launcherMonitor) {
+        _launcherMonitor.cancel();
+        _launcherMonitor = null;
+    }
+    if (_launcherOpen) {
+        _launcherOpen = false;
+        _ahPopoverClosed();
+    }
+}
+
 let _ahHotspot = null;   // HotspotWindow instance, created after dockWindow
 
 // --- Hotspot Window (auto-hide re-show strip) -------------------------
@@ -1757,6 +1806,11 @@ const DockApplication = GObject.registerClass({
             log('[dock] startup: autohide active — starting hide timer');
             _ahStartTimer();
         }
+
+        // Always start the launcher state-file monitor so autohide is
+        // suppressed whenever the app-launcher window is visible, regardless
+        // of whether autohide was enabled at startup (it can be toggled live).
+        setupLauncherMonitor();
     }
 });
 

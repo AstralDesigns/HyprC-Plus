@@ -2149,6 +2149,18 @@ const AppLauncherWindow = GObject.registerClass({
         // SIGUSR1 hide, and the bgWin click handler above.
         this.connect('notify::visible', () => {
             if (this._bgWin) this._bgWin.set_visible(this.get_visible());
+            // Write launcher state so dock-main.js can suppress autohide
+            // while the launcher is visible.
+            try {
+                const stateDir  = GLib.build_filenamev([HOME, '.cache', 'hyprcandy']);
+                const statePath = GLib.build_filenamev([stateDir, 'launcher.state']);
+                GLib.mkdir_with_parents(stateDir, 0o755);
+                const content  = this.get_visible() ? 'open\n' : 'closed\n';
+                const bytes    = new TextEncoder().encode(content);
+                GLib.file_set_contents(statePath, bytes);
+            } catch (e) {
+                // Non-fatal — dock autohide guard is best-effort
+            }
         });
 
         // ── 2. Empty-space-click-to-close (BUBBLE-phase gesture) ─────────

@@ -16,6 +16,12 @@ PanelWindow {
         menu: TrayMenuState.menu
     }
 
+    // ── Sub-menu opener: bound to whichever hasChildren entry is hovered ─────
+    QsMenuOpener {
+        id: subMenuOpener
+        menu: null   // set dynamically when a hasChildren row is hovered
+    }
+
     // ── Layer shell config ─────────────────────────────────────────────────
     // Horizontal strip anchored to the top of the screen, appearing below the bar.
     anchors { top: true; left: true; right: true }
@@ -23,16 +29,115 @@ PanelWindow {
 
     exclusionMode: ExclusionMode.Ignore
 
-    implicitHeight: menuRect.implicitHeight + 8
+    implicitHeight: Math.max(menuRect.implicitHeight, subPopRect.visible ? subPopRect.implicitHeight : 0) + 8
 
     // ── Dismiss on click outside ───────────────────────────────────────────
     MouseArea {
         anchors.fill: parent
         z: -1
-        onClicked: TrayMenuState.close()
+        onClicked: {
+            subMenuOpener.menu = null
+            TrayMenuState.close()
+        }
     }
 
-    // ── Popup rectangle ────────────────────────────────────────────────────
+    // ── Sub-popover rectangle (opens to the LEFT of the main menu) ─────────
+    // Tray is on the right side of the bar, so the sub-menu expands leftward
+    // to stay on screen for both top and bottom bar positions.
+    Rectangle {
+        id: subPopRect
+
+        visible: subMenuOpener.menu !== null && subMenuOpener.children.count > 0
+        y: menuRect.y + _subAnchorY
+
+        // Open to the left of the main menu; clamp so it never goes off the left edge
+        readonly property real _rawX: menuRect.x - implicitWidth - 6
+        readonly property real _clampedX: Math.max(8, _rawX)
+        x: _clampedX
+        Component.onCompleted: x = Qt.binding(() => _clampedX)
+
+        property real _subAnchorY: 0   // set by the hovered main-menu row
+
+        implicitWidth:  Math.max(140, subMenuCol.implicitWidth + 24)
+        implicitHeight: subMenuCol.implicitHeight + 20
+
+        color:        Theme.cOnSecondary
+        radius:       20
+        border.width: 1
+        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+
+        Column {
+            id: subMenuCol
+            anchors {
+                fill:         parent
+                topMargin:    10
+                bottomMargin: 10
+                leftMargin:   12
+                rightMargin:  12
+            }
+            spacing: 2
+
+            Repeater {
+                model: subMenuOpener.children
+
+                delegate: Item {
+                    id: subEntryRoot
+                    required property var modelData
+                    required property int index
+
+                    implicitWidth: modelData.isSeparator ? 60 : (subItemLabel.implicitWidth + 16)
+                    height: modelData.isSeparator ? 9 : 30
+
+                    Rectangle {
+                        visible:          subEntryRoot.modelData.isSeparator
+                        anchors.centerIn: parent
+                        width:  parent.width - 8
+                        height: 1
+                        color:  Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.8)
+                    }
+
+                    Rectangle {
+                        visible:      !subEntryRoot.modelData.isSeparator
+                        anchors.fill: parent
+                        radius:       8
+                        opacity:      subEntryRoot.modelData.enabled ? 1.0 : 0.4
+                        color:        subItemHover.containsMouse
+                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                            : "transparent"
+                        Behavior on color { ColorAnimation { duration: 80 } }
+
+                        Text {
+                            id: subItemLabel
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.left:           parent.left
+                            anchors.leftMargin:     8
+                            anchors.right:          parent.right
+                            anchors.rightMargin:    4
+                            text:           subEntryRoot.modelData.text
+                            color:          Theme.cPrimary
+                            font.family:    Config.labelFont
+                            font.pixelSize: Config.labelFontSize
+                            elide:          Text.ElideRight
+                        }
+
+                        MouseArea {
+                            id: subItemHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled:      subEntryRoot.modelData.enabled
+                            onClicked: {
+                                subEntryRoot.modelData.triggered()
+                                subMenuOpener.menu = null
+                                Qt.callLater(function() { TrayMenuState.close() })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Main popup rectangle ───────────────────────────────────────────────
     Rectangle {
         id: menuRect
 
@@ -134,12 +239,19 @@ PanelWindow {
                             anchors.fill: parent
                             hoverEnabled: true
                             enabled:      entryRoot.modelData.enabled
+                            onEntered: {
+                                if (entryRoot.modelData.hasChildren) {
+                                    subMenuOpener.menu = entryRoot.modelData.menu
+                                    subPopRect._subAnchorY = entryRoot.mapToItem(menuRect, 0, 0).y
+                                } else {
+                                    subMenuOpener.menu = null
+                                }
+                            }
                             onClicked: {
-                                // triggered() emits the QsMenuEntry signal from QML;
-                                // connected C++ slots then dispatch the DBus Event.
-                                // sendTriggered() is isMethodConstant=true (non-JS-invokable).
-                                entryRoot.modelData.triggered()
-                                Qt.callLater(function() { TrayMenuState.close() })
+                                if (!entryRoot.modelData.hasChildren) {
+                                    entryRoot.modelData.triggered()
+                                    Qt.callLater(function() { TrayMenuState.close() })
+                                }
                             }
                         }
                     }

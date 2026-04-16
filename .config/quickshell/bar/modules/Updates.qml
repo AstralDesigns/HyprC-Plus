@@ -75,7 +75,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: {
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: function(mouse) {
             const cx = root.mapToItem(null, root.width / 2, 0).x
             UpdatesPopupState.toggle(cx, root._tooltip, root._hasUpdates)
         }

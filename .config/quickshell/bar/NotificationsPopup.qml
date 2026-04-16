@@ -529,7 +529,7 @@ Item {
                                 anchors{left:parent.left;right:parent.right;top:parent.top;margins:10}
                                 spacing:4
                                 RowLayout{Layout.fillWidth:true;spacing:8
-                                    Rectangle{width:6;height:6;radius:3;anchors.verticalCenter:parent.verticalCenter
+                                    Rectangle{width:6;height:6;radius:3;Layout.alignment:Qt.AlignVCenter
                                         color:notif.urgency>=2?Theme.cErr:notif.category==="bt"?Theme.cPrimary:Qt.rgba(Theme.cOnSurfVar.r,Theme.cOnSurfVar.g,Theme.cOnSurfVar.b,0.5)}
                                     Item{width:20;height:20
                                         Image{id:hcIcImg
@@ -547,9 +547,9 @@ Item {
                                         Text{visible:notif.appName!==""&&notif.summary!=="";text:notif.appName;color:Theme.cOnSurfVar;font.pixelSize:9;opacity:0.7}
                                     }
                                     Text{text:{const d=new Date(notif.timestamp),now=new Date();const dm=Math.floor((now-d)/60000);if(dm<1)return"now";if(dm<60)return dm+"m";const dh=Math.floor(dm/60);if(dh<24)return dh+"h";return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
-                                        color:Theme.cOnSurfVar;font.pixelSize:9;opacity:0.65;anchors.verticalCenter:parent.verticalCenter}
+                                        color:Theme.cOnSurfVar;font.pixelSize:9;opacity:0.65;Layout.alignment:Qt.AlignVCenter}
                                     Text{visible:(notif.body||"")!==""||((notif.actions||[]).length>0)
-                                        text:_exp?"󰅃":"󰅀";font.pixelSize:10;font.family:Config.fontFamily;color:Theme.cOnSurfVar;opacity:0.8;anchors.verticalCenter:parent.verticalCenter
+                                        text:_exp?"󰅃":"󰅀";font.pixelSize:10;font.family:Config.fontFamily;color:Theme.cOnSurfVar;opacity:0.8;Layout.alignment:Qt.AlignVCenter
                                         MouseArea{anchors.fill:parent;anchors.margins:-4;cursorShape:Qt.PointingHandCursor;onClicked:_exp=!_exp}}
                                     Rectangle{width:18;height:18;radius:5;color:hcDH.containsMouse?Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.9):"transparent";Behavior on color{ColorAnimation{duration:80}}
                                         Text{anchors.centerIn:parent;text:"×";font.pixelSize:9;color:Theme.cOnSurfVar;opacity:0.7}

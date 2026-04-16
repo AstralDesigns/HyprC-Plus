@@ -64,6 +64,23 @@ PanelWindow {
     property int  _ahDelaySec: 5
     property bool _ahHidden:   false
 
+    // Guard: bar stays visible while any panel (CC, notifications, start-menu, tray menu) is open.
+    readonly property bool anyPanelOpen: ControlCenterState.visible
+                                       || NotificationsState.historyVisible
+                                       || StartMenuState.menuVisible
+                                       || TrayMenuState.visible
+                                       || UpdatesPopupState.visible
+
+    onAnyPanelOpenChanged: {
+        if (!bar._ahEnabled) return
+        if (bar.anyPanelOpen) {
+            _ahHideTimer.stop()
+            if (bar._ahHidden) { bar._ahHidden = false; bar.visible = true }
+        } else {
+            _ahHideTimer.restart()
+        }
+    }
+
     // Sync from Config on startup and react to live changes from CC
     Connections {
         target: Config
@@ -117,8 +134,8 @@ PanelWindow {
                     bar.visible   = true
                 }
             } else {
-                // Pointer left — start the hide countdown
-                _ahHideTimer.restart()
+                // Pointer left — start the hide countdown only when no panels are open
+                if (!bar.anyPanelOpen) _ahHideTimer.restart()
             }
         }
     }
