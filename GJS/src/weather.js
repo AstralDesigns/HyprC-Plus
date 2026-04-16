@@ -22,8 +22,11 @@ function weatherInfo(code, isDay, hum) {
     if (code===2) return {t:'Partly Cloudy', i:isDay?'󰖕':'󰼱'};
     if (code===3) return hum>=85?{t:'Overcast (Rainy)',i:isDay?'':''}:{t:'Overcast',i:isDay?'󰼰':'󰖑'};
     if (code===45||code===48) return {t:'Fog',i:isDay?'':''};
-    if (code>=51&&code<=55) return {t:'Drizzle',i:'󰖗'};
-    if (code===56||code===57) return {t:'Freezing Drizzle',i:'󰖒'};
+    if (code>=51) return {t:'Light Drizzle',i:'󰖗'};
+    if (code>=53) return {t:'Moderate Drizzle',i:'󰖗'};
+    if (code>=55) return {t:'Dense Drizzle',i:'󰖖'};
+    if (code===56) return {t:'Light Freezing Drizzle',i:'󰖒'};
+    if (code===57) return {t:'Dense Freezing Drizzle',i:'󰖒'};
     if (code===61) return {t:'Slight Rain',i:'󰖗'};
     if (code===63) return {t:'Moderate Rain',i:'󰖖'};
     if (code===65) return {t:'Heavy Rain',i:'󰙾'};
