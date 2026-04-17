@@ -79,7 +79,7 @@ ShellRoot {
 
     FileView {
         id: colorFile
-        path: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.cache")) +
+        path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) +
               "/quickshell/wallpaper/MatugenColors.qml"
         watchChanges: true
         onFileChanged: reload()          // re-read when matugen rewrites the file
