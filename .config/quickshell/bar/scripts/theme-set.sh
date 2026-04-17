@@ -20,6 +20,7 @@ SCHEME="${1:-scheme-content}"
 
 # ── Light ─────────────────────────────────────────────────────────────────────
 if [ "$SCHEME" = "light" ]; then
+    sed -i 's/wal -i "$bg_path" -n --cols16 darken/wal -l -i "$bg_path" -n --cols16 lighten/g' "$WI"
     sed -i 's/-m dark/-m light/g' "$WI"
 
     # GTK3
@@ -31,6 +32,7 @@ if [ "$SCHEME" = "light" ]; then
 
 # ── Dark — Fidelity / Monochrome ──────────────────────────────────────────────
 elif [ "$SCHEME" = "scheme-monochrome" ]; then
+    sed -i 's/wal -l -i "$bg_path" -n --cols16 lighten/wal -i "$bg_path" -n --cols16 darken/g' "$WI"
     sed -i 's/-m light/-m dark/g' "$WI"
     sed -i "s/--type scheme-[^ ]*/--type ${SCHEME}/" "$WI"
 
@@ -45,6 +47,7 @@ elif [ "$SCHEME" = "scheme-monochrome" ]; then
 
 # ── Dark — all other schemes (scheme-content, scheme-expressive, scheme-neutral, …) ──
 else
+    sed -i 's/wal -l -i "$bg_path" -n --cols16 lighten/wal -i "$bg_path" -n --cols16 darken/g' "$WI"
     sed -i 's/-m light/-m dark/g' "$WI"
     sed -i "s/--type scheme-[^ ]*/--type ${SCHEME}/" "$WI"
 

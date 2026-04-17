@@ -30,7 +30,7 @@
             "format": "{5} {2}"
         },
         {
-            "key": "│ {#39}{icon} distro  {#keys}││ ",
+            "key": "│ {#32}{icon} distro  {#keys}││ ",
             "type": "os"
         },
         {
@@ -38,7 +38,7 @@
             "type": "kernel"
         },
         {
-            "key": "│ {#38}󱫐 wm      {#keys}││ ",
+            "key": "│ {#36}󱫐 wm      {#keys}││ ",
             "type": "wm"
         },
         /*{
@@ -54,7 +54,7 @@
             "type": "terminal"
         },
         {
-            "key": "│ {#33} shell   {#keys}││ ",
+            "key": "│ {#38} shell   {#keys}││ ",
             "type": "shell"
         },
         /*{
@@ -62,11 +62,11 @@
             "type": "packages"
         },*/
         {
-            "key": "│ {#32}󰉉 disk    {#keys}││ ",
+            "key": "│ {#33}󰉉 disk    {#keys}││ ",
             "type": "disk"
         },
         {
-            "key": "│ {#33} memory  {#keys}││ ",
+            "key": "│ {#38} memory  {#keys}││ ",
             "type": "memory"
         },
         {
@@ -74,7 +74,7 @@
             "type": "swap"
         },
         {
-            "key": "│ {#38}󰅐 os age  {#keys}││ ",
+            "key": "│ {#36}󰅐 os age  {#keys}││ ",
             "type": "disk",
             "folders": "/",
             "format": "{days} days"
@@ -84,7 +84,7 @@
             "type": "uptime"
         },
         {
-            "key": "│ {#39}󰍛 cpu     {#keys}││ ",
+            "key": "│ {#32}󰍛 cpu     {#keys}││ ",
             "type": "cpu",
             "showPeCoreCount": true
         },
@@ -102,10 +102,10 @@
             "type": "custom"
         },
         {
-            "key": "│ {#33} colors  {#keys}││                ",
+            "key": "│ {#39} colors  {#keys}││               ",
             "type": "custom",
             "size": 12,
-            "format": "\u001b[31m \u001b[32m \u001b[33m \u001b[34m \u001b[90m \u001b[36m \u001b[37m \u001b[38m \u001b[39m"
+            "format": "\u001b[31m \u001b[32m \u001b[33m \u001b[34m \u001b[35m \u001b[90m \u001b[36m \u001b[37m \u001b[38m \u001b[39m"
         },
         {
             "key": "╰───────────╯╰───────────────────────────────────────────────────╯",
