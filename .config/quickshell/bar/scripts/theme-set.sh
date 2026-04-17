@@ -30,7 +30,7 @@ if [ "$SCHEME" = "light" ]; then
     sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @inverse_primary;/'  "$G4"
 
 # ── Dark — Fidelity / Monochrome ──────────────────────────────────────────────
-elif [ "$SCHEME" = "scheme-fidelity" ] || [ "$SCHEME" = "scheme-monochrome" ]; then
+elif [ "$SCHEME" = "scheme-monochrome" ]; then
     sed -i 's/-m light/-m dark/g' "$WI"
     sed -i "s/--type scheme-[^ ]*/--type ${SCHEME}/" "$WI"
 
