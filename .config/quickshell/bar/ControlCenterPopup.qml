@@ -546,16 +546,17 @@ PanelWindow {
                                      Math.max(500, _screenH * 0.78))
 
     // Anchor to bar edge (top or bottom) and center horizontally.
-    // We no longer anchor left+right so the layer surface only wraps the popup.
+    // Anchor to bar edge (top or bottom); span full width for click-outside dismiss.
     anchors {
         top:    !_barAtBottom
         bottom:  _barAtBottom
+        left:    true
+        right:   true
     }
     margins {
         top:    _barAtBottom ? 0 : _barGap
         bottom: _barAtBottom ? _barGapBot : 0
     }
-    implicitWidth:  _panelW
     implicitHeight: _panelH
 
     exclusionMode: ExclusionMode.Ignore
@@ -601,12 +602,20 @@ PanelWindow {
         property string inactiveBorderVar:   "$background"
     }
 
+    // Click-outside dismiss
+    MouseArea {
+        anchors.fill: parent
+        z: -1
+        onClicked: ControlCenterState.close()
+    }
 
     // ── The panel itself ───────────────────────────────────────────────────
     Rectangle {
         id: panel
-        // Fill the PanelWindow (which is now explicitly sized to wrap the popup)
-        anchors.fill: parent
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.bottom: parent.bottom
+        width: ccWin._panelW
 
         radius: 20
         color:  Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,

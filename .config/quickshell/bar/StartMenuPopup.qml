@@ -29,6 +29,7 @@ PanelWindow {
     anchors {
         top:    !_barAtBottom
         bottom:  _barAtBottom
+        left:    true
         right:   true
     }
     margins {
@@ -36,13 +37,20 @@ PanelWindow {
         bottom: _barAtBottom ? _barGapBot : 0
         right:  _panelMargin
     }
-    implicitWidth: 340
     implicitHeight: mainCol.implicitHeight + 32
     color: "transparent"
 
+    // Click-outside dismiss
+    MouseArea {
+        anchors.fill: parent
+        z: -1
+        onClicked: StartMenuState.menuVisible = false
+    }
+
     Rectangle {
         id: panelRect
-        anchors.fill: parent
+        anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
+        width: 340
         color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.40)
         radius: startMenuPanel._panelRadius
         focus: true
@@ -110,17 +118,6 @@ PanelWindow {
                     Text { anchors.centerIn: parent; text: "󰹑"; font.pixelSize: 15; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                     MouseArea { id: ssh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: StartMenuState.takeScreenshot() }
-                }
-                Item { Layout.fillWidth: true }
-                // Close
-                Rectangle {
-                    Layout.rightMargin: 4
-                    height: 24; width: 24; radius: 8
-                    color: clsH.containsMouse ? Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.9) : "transparent"
-                    Behavior on color { ColorAnimation { duration: 100 } }
-                    Text { anchors.centerIn: parent; text: "×"; font.pixelSize: 12; color: Theme.cOnSurfVar }
-                    MouseArea { id: clsH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: StartMenuState.menuVisible = false }
                 }
             }
 

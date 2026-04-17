@@ -396,15 +396,22 @@ Item {
             top:    !_barAtBottom
             bottom:  _barAtBottom
             left:   true
+            right:  true
     	}
     	margins {
             top:    _barAtBottom ? 0 : _barGap
             bottom: _barAtBottom ? _barGapBot : 0
             left:  _panelMargin
     	}
-        implicitWidth:  380
         implicitHeight: Math.min(histScrollContent.height + histHeader.implicitHeight + histDivider.height + 42, 720)
         color: "transparent"
+
+        // Click-outside dismiss
+        MouseArea {
+            anchors.fill: parent
+            z: -1
+            onClicked: NotificationsState.historyVisible = false
+        }
 
         Connections {
             target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
@@ -414,7 +421,8 @@ Item {
 
         Rectangle {
             id: histPanel
-            anchors.fill: parent
+            anchors { top: parent.top; left: parent.left; bottom: parent.bottom }
+            width: 380
             color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.40)
             radius: historyWindow._panelRadius
             border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
@@ -422,6 +430,13 @@ Item {
             transformOrigin: Item.TopLeft
             Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
             Keys.onEscapePressed: NotificationsState.historyVisible = false
+            focus: true
+            Connections {
+                target: NotificationsState
+                function onHistoryVisibleChanged() {
+                    if (NotificationsState.historyVisible) histPanel.forceActiveFocus()
+                }
+            }
 
             // Header
             RowLayout {
@@ -457,12 +472,6 @@ Item {
                     Text { id:clrLbl; anchors.centerIn:parent; text:"Clear all"; color:clrH.containsMouse?Theme.cErr:Theme.cOnSurfVar; font.pixelSize:11
                         Behavior on color{ColorAnimation{duration:100}} }
                     MouseArea { id:clrH; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor; onClicked:NotificationsState.clearHistory() } }
-                Rectangle { height:24; width:24; radius:8
-                    color:clsH.containsMouse?Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.9):"transparent"
-                    Behavior on color{ColorAnimation{duration:100}}
-                    Text { anchors.centerIn:parent; text:"×"; font.pixelSize:12; color:Theme.cOnSurfVar }
-                    MouseArea { id:clsH; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
-                        onClicked:NotificationsState.historyVisible=false } }
             }
 
             Rectangle { id:histDivider
