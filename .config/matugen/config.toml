@@ -23,10 +23,10 @@ input_path = '~/.config/matugen/templates/colors.css'
 output_path = '~/.config/gtk-4.0/colors.css'
 post_hook = '~/.config/hyprcandy/scripts/reload.sh'
 
-[templates.ghostty]
-input_path = '~/.config/matugen/templates/ghostty'
-output_path = '~/.config/ghostty/themes/Matugen'
-post_hook = 'pkill -SIGUSR2 ghostty'
+#[templates.ghostty]
+#input_path = '~/.config/matugen/templates/ghostty'
+#output_path = '~/.config/ghostty/themes/Matugen'
+#post_hook = 'pkill -SIGUSR2 ghostty'
 
 #[templates.kitty]
 #input_path = '~/.config/matugen/templates/kitty-colors.conf'
