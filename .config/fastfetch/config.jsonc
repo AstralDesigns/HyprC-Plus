@@ -20,12 +20,12 @@
             "type": "custom"
         },
         {
-            "key": "│ {#31} admin   {#keys}││ ",
+            "key": "│ {#36} admin   {#keys}││ ",
             "type": "title",
             "format": " {host-name}"
         },
         {
-            "key": "│ {#31}󰇄 device  {#keys}││ ",
+            "key": "│ {#36}󰇄 device  {#keys}││ ",
             "type": "host",
             "format": "{5} {2}"
         },
@@ -38,7 +38,7 @@
             "type": "kernel"
         },
         {
-            "key": "│ {#36}󱫐 wm      {#keys}││ ",
+            "key": "│ {#31}󱫐 wm      {#keys}││ ",
             "type": "wm"
         },
         /*{
@@ -74,7 +74,7 @@
             "type": "swap"
         },
         {
-            "key": "│ {#36}󰅐 os age  {#keys}││ ",
+            "key": "│ {#31}󰅐 os age  {#keys}││ ",
             "type": "disk",
             "folders": "/",
             "format": "{days} days"
@@ -89,7 +89,7 @@
             "showPeCoreCount": true
         },
         {
-            "key": "│ {#31}󰇺 gpu     {#keys}││ ",
+            "key": "│ {#36}󰇺 gpu     {#keys}││ ",
             "type": "gpu",
             "format": "{2} {3}"
         },
