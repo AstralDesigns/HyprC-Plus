@@ -601,6 +601,11 @@ PanelWindow {
         property string activeBorderVar:     "$source_color"
         property string inactiveBorderVar:   "$background"
     }
+    Settings {
+        id: ccThemeSettings
+        category: "cc-theme-v1"
+        property string currentTheme: "scheme-content"
+    }
 
     // Click-outside dismiss
     MouseArea {
@@ -2348,22 +2353,17 @@ PanelWindow {
                             id: _themeTab
                             width: parent.width; spacing: 5
                             CCSection { text: "󰔎 Matugen Themes" }
-                            // Current theme state
-                            property string _currentTheme: "scheme-content"
-                            Component.onCompleted: {
-                                _themeRead.running = true
-                            }
 
                             // ── Light Mode button alone at top ─────────────────────────────────
                             CCSection { text: "Light Mode" }
                             RowLayout { Layout.fillWidth:true; spacing:5
                                 CCPillBtn {
                                     text:"☀ Light"
-                                    active: parent.parent._currentTheme === "light"
+                                    active: ccThemeSettings.currentTheme === "light"
                                     onClicked: {
                                         _themeProc.command = [scriptDir+"/theme-set.sh", "light"]
                                         _themeProc.running = true
-                                        parent.parent._currentTheme = "light"
+                                        ccThemeSettings.currentTheme = "light"
                                     }
                                 }
                             }
@@ -2386,16 +2386,22 @@ PanelWindow {
                                     delegate: CCPillBtn {
                                         required property var modelData
                                         text: modelData.name
-                                        active: parent.parent.parent._currentTheme === modelData.scheme
+                                        active: ccThemeSettings.currentTheme === modelData.scheme
                                         onClicked: {
                                             _themeProc.command = [scriptDir+"/theme-set.sh", modelData.scheme]
                                             _themeProc.running = true
-                                            parent.parent.parent._currentTheme = modelData.scheme
+                                            ccThemeSettings.currentTheme = modelData.scheme
                                         }
                                     }
                                 }
                             }
-                            Process { id:_themeProc; running:false }
+                            // Re-read matugen-state after the script exits to catch any
+                            // discrepancy between what we set and what the script actually wrote.
+                            Process {
+                                id: _themeProc
+                                running: false
+                                onExited: { running = false; _themeRead.running = true }
+                            }
                             Process {
                                 id: _themeRead
                                 command: ["bash", "-c", "cat \"$HOME/.config/hyprcandy/matugen-state\" 2>/dev/null || echo scheme-content"]
@@ -2404,7 +2410,7 @@ PanelWindow {
                                     splitMarker: "\n"
                                     onRead: function(l) {
                                         const v = l.trim()
-                                        if (v) _themeTab._currentTheme = v
+                                        if (v) ccThemeSettings.currentTheme = v
                                     }
                                 }
                             }
