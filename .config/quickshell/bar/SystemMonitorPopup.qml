@@ -473,7 +473,7 @@ PanelWindow {
                     value:    smWin._swap; glyph: "󰾴"; label: "Swap"
                     valStr:   Math.round(smWin._swap * 100) + "%"
                     sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
-                    arcColor: Theme.cSecondaryContainer
+                    arcColor: Theme.cTertiaryContainer
                 }
 
                 // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
