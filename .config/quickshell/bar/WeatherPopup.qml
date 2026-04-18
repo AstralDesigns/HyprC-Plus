@@ -74,23 +74,27 @@ PanelWindow {
 
     function _cond(code, isDay, hum) {
         const d = isDay !== 0
-        if (code === 0)  return { i: d?"󰖙":"󰖔",  t:"Clear Sky" }
-        if (code <= 2)   return { i: d?"󰖕":"󰼱",  t:"Partly Cloudy" }
-        if (code === 3)  return hum >= 85 ? { i:d?"":"",  t:"Overcast (Rainy)" }
-                                          : { i:d?"󰼰":"󰖑", t:"Overcast" }
-        if (code <= 48)  return { i:d?"":"",   t:"Fog" }
-        if (code <= 55)  return { i:"󰖗", t:"Drizzle" }
-        if (code <= 57)  return { i:"󰖒", t:"Freezing Drizzle" }
-        if (code <= 63)  return { i:"󰖗", t:"Rain" }
-        if (code <= 65)  return { i:"󰖖", t:"Heavy Rain" }
-        if (code <= 67)  return { i:"󰙿", t:"Freezing Rain" }
-        if (code <= 75)  return { i:"󰜗", t:"Snow" }
-        if (code === 77) return { i:"󰖘", t:"Snow Grains" }
-        if (code <= 82)  return { i:"󰖖", t:"Rain Showers" }
-        if (code <= 86)  return { i:"󰼶", t:"Snow Showers" }
-        if (code === 95) return { i:"󰖓", t:"Thunderstorm" }
-        if (code <= 99)  return { i:"󰖓", t:"Thunderstorm + Hail" }
-        return { i:"󰖐", t:"Unknown" }
+        if (code===0) return {t:'Clear Sky', i:isDay?'󰖙':'󰖔'};
+    	if (code===1) return {t:'Mainly Clear', i:isDay?'󰖕':'󰼱'};
+    	if (code===2) return {t:'Partly Cloudy', i:isDay?'󰖕':'󰼱'};
+    	if (code===3) return hum>=85?{t:'Overcast (Rainy)',i:isDay?'':''}:{t:'Overcast',i:isDay?'󰼰':'󰖑'};
+    	if (code===45||code===48) return {t:'Fog',i:isDay?'':''};
+    	if (code>=51) return {t:'Light Drizzle',i:'󰖗'};
+    	if (code>=53) return {t:'Moderate Drizzle',i:'󰖗'};
+    	if (code>=55) return {t:'Dense Drizzle',i:'󰖖'};
+    	if (code===56) return {t:'Light Freezing Drizzle',i:'󰖒'};
+    	if (code===57) return {t:'Dense Freezing Drizzle',i:'󰖒'};
+    	if (code===61) return {t:'Slight Rain',i:'󰖗'};
+    	if (code===63) return {t:'Moderate Rain',i:'󰖖'};
+    	if (code===65) return {t:'Heavy Rain',i:'󰙾'};
+    	if (code===66||code===67) return {t:'Freezing Rain',i:'󰙿'};
+    	if (code>=71&&code<=75) return {t:code===71?'Light Snow':code===73?'Moderate Snow':'Heavy Snow',i:'󰜗'};
+    	if (code===77) return {t:'Snow Grains',i:'󰖘'};
+    	if (code>=80&&code<=82) return {t:'Rain Showers',i:'󰙾'};
+    	if (code===85||code===86) return {t:'Snow Showers',i:'󰼶'};
+    	if (code===95) return {t:'Thunderstorm',i:'󰖓'};
+    	if (code===96||code===99) return {t:'Thunderstorm + Hail',i:'󰖓'};
+    	return {t:'Unknown',i:'󰖐'}
     }
 
     function _applyData(d) {
