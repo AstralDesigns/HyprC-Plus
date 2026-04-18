@@ -55,6 +55,8 @@ ShellRoot {
     Loader { active: TrayMenuState.visible;      source: "TrayMenuPopup.qml" }
     UpdatesPopup {}
     Loader { active: ControlCenterState.visible;  source: "ControlCenterPopup.qml" }
+    Loader { active: WeatherPopupState.visible;        source: "WeatherPopup.qml"        }
+    Loader { active: SystemMonitorPopupState.visible;  source: "SystemMonitorPopup.qml"  }
     Loader { active: NotificationsState.historyVisible || NotificationsState.notifications.length > 0; source: "NotificationsPopup.qml" }
     Loader { active: StartMenuState.menuVisible;    source: "StartMenuPopup.qml"    }
 

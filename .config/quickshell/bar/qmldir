@@ -17,6 +17,8 @@ singleton CalendarPopupState 1.0 CalendarPopupState.qml
 singleton TrayMenuState 1.0 TrayMenuState.qml
 singleton UpdatesPopupState 1.0 UpdatesPopupState.qml
 singleton WeatherState 1.0 WeatherState.qml
+singleton WeatherPopupState 1.0 WeatherPopupState.qml
+singleton SystemMonitorPopupState 1.0 SystemMonitorPopupState.qml
 singleton DistroState 1.0 DistroState.qml
 Bar 1.0 Bar.qml
 CalendarPopup 1.0 CalendarPopup.qml
@@ -32,6 +34,8 @@ UpdatesPopup 1.0 UpdatesPopup.qml
 singleton PowerLauncherState 1.0 PowerLauncherState.qml
 singleton ControlCenterState 1.0 ControlCenterState.qml
 ControlCenterPopup 1.0 ControlCenterPopup.qml
+WeatherPopup 1.0 WeatherPopup.qml
+SystemMonitorPopup 1.0 SystemMonitorPopup.qml
 NotificationsPopup 1.0 NotificationsPopup.qml
 StartMenuPopup 1.0 StartMenuPopup.qml
 SliderBg 1.0 SliderBg.qml

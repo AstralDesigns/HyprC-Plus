@@ -60,8 +60,6 @@ Item {
     opacity: ma.containsMouse ? 0.7 : 1.0
     Behavior on opacity { NumberAnimation { duration: 80 } }
 
-    Process { id: weatherWidgetProc; command: [Config.candyDir + "/GJS/toggle-weather-widget.sh"]; running: false }
-
     MouseArea {
         id: ma
         anchors.fill: parent
@@ -69,8 +67,8 @@ Item {
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         onClicked: function(ev) {
-            if (ev.button !== Qt.RightButton && !weatherWidgetProc.running)
-                weatherWidgetProc.running = true
+            if (ev.button !== Qt.RightButton)
+                WeatherPopupState.toggle()
         }
         onWheel: function(ev) {
             if (ev.angleDelta.y > 0) toggleCProc.running = true
