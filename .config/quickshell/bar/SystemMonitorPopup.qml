@@ -19,22 +19,6 @@ import Quickshell.Io
 //            Heuristics: Intel 00:02.0 → iGPU; AMD APU codenames → iGPU.
 //            GPUBUSY lines use a dedicated separator (§) to avoid colon
 //            collisions in GPU names from lspci.
-//
-//  Disks   : Shows /, /home, /boot* from internal devices (deduped by device
-//            to collapse btrfs subvolumes). Also shows all mounts under
-//            /media, /run/media, /mnt (external/removable), deduped by device.
-//            Skips tmpfs, devtmpfs, squashfs, overlay, efivarfs.
-//
-//  Fixes vs prior version
-//    • GPUBUSY separator changed → § so GPU names with colons parse correctly
-//    • iGPU now always shown (alongside dGPU, not hidden by it)
-//    • awk quoting fixed → UPTIME/LOAD lines now emit correctly
-//    • Thermal ZONE separator uses | to avoid colon collisions in zone types
-//    • df uses -b (bytes) + awk post-processing to avoid case ambiguity in K/k
-//    • Battery: _hasBat initialised from BAT: lines every poll cycle, not just
-//      once at startup — works even when batDetectProc races
-//    • External drives deduplicated by device (handles btrfs subvolumes)
-//    • All internal mount dedup also by device, not just by mount path
 // ─────────────────────────────────────────────────────────────────────────────
 
 PanelWindow {
@@ -85,7 +69,6 @@ PanelWindow {
     property bool   _hasBat:    false
     property real   _batPct:    0
     property string _batStatus: ""
-    property var    _disks:     []
     property real   _rxRate:    0
     property real   _txRate:    0
     property var    _prevNet:   null
@@ -110,14 +93,6 @@ PanelWindow {
         const h = Math.floor((sec % 86400) / 3600)
         const m = Math.floor((sec % 3600) / 60)
         return d > 0 ? d+"d "+h+"h "+m+"m" : h > 0 ? h+"h "+m+"m" : m+"m"
-    }
-    function _fmtDisk(bytes) {
-        const b = parseInt(bytes) || 0
-        if (b >= 1099511627776) return (b / 1099511627776).toFixed(1) + " TB"
-        if (b >= 1073741824)    return (b / 1073741824).toFixed(1) + " GB"
-        if (b >= 1048576)       return (b / 1048576).toFixed(0) + " MB"
-        if (b >= 1024)          return (b / 1024).toFixed(0) + " KB"
-        return b + " B"
     }
 
     // ── Poller ────────────────────────────────────────────────────────────
@@ -153,9 +128,12 @@ PanelWindow {
             " card=$(echo \"$dp\" | grep -oE 'card[0-9]+');" +
             " drv=$(readlink -f \"$dp\" 2>/dev/null | grep -oE '[^/]+$');" +
             " echo \"$drv\" | grep -qE '^(amdgpu|radeon|i915|xe)$' || continue;" +
+            // Always read address from the dedicated file (gives full DBSF like 0000:00:02.0)
             " pci=$(cat /sys/class/drm/$card/device/address 2>/dev/null);" +
             " pname=$(cat /sys/class/drm/$card/device/product_name 2>/dev/null);" +
-            " [ -z \"$pname\" ] && pname=$(lspci -D -s \"$pci\" 2>/dev/null | sed 's/.*: //');" +
+            // Use card's own PCI address for lspci lookup — never fall back to head -1
+            // which would give the wrong GPU's name to every card.
+            " if [ -z \"$pname\" ] && [ -n \"$pci\" ]; then pname=$(lspci -D -s \"$pci\" 2>/dev/null | sed 's/.*: //'); fi;" +
             " [ -z \"$pname\" ] && pname=$drv;" +
             " busy=$(cat /sys/class/drm/$card/device/gpu_busy_percent 2>/dev/null);" +
             " if [ -z \"$busy\" ]; then" +
@@ -172,18 +150,19 @@ PanelWindow {
             "   [ -n \"$raw\" ] && gtemp=$raw && break;" +
             " done;" +
             // iGPU heuristics
+            // Intel: i915/xe driver is always iGPU (Arc dGPUs use i915 too but
+            // report a PCI function of 00:02.0 only for integrated; Arc cards land
+            // on different bus addresses — detect Arc explicitly as dGPU).
             " is_igpu=0;" +
-            " (echo \"$drv\" | grep -qE '^(i915|xe)$' && echo \"$pci\" | grep -q ':00:02.0') && is_igpu=1;" +
-            " echo \"$pname\" | grep -qiE 'Radeon Graphics|RENOIR|CEZANNE|REMBRANDT|RAPHAEL|PHOENIX|BARCELO|MENDOCINO|HAWK.?POINT|STRIX.?POINT|780M|760M|740M|VEGA' && is_igpu=1;" +
+            " if echo \"$drv\" | grep -qE '^(i915|xe)$'; then" +
+            "   is_igpu=1;" +
+            "   echo \"$pname\" | grep -qiE '\\bArc\\b|\\bAlchemist\\b|\\bBattlemage\\b' && is_igpu=0;" +
+            " fi;" +
+            // AMD: APU codenames and integrated Radeon branding → iGPU
+            " echo \"$pname\" | grep -qiE 'Radeon Graphics|RENOIR|CEZANNE|REMBRANDT|RAPHAEL|PHOENIX|BARCELO|MENDOCINO|HAWK.?POINT|STRIX.?POINT|780M|760M|740M|VEGA|Radeon RX Vega [0-9]' && is_igpu=1;" +
             // Emit with § separator: drv§pname§busy§is_igpu§gtemp
             " printf 'GPUBUSY:%s§%s§%s§%s§%s\\n' \"$drv\" \"$pname\" \"$busy\" \"$is_igpu\" \"$gtemp\";" +
             " done;" +
-            // ── Disks (bytes for unambiguous parsing) ──
-            // Use -b for byte counts, post-processed via awk to emit clean DISK lines
-            "df -b --output=source,target,pcent,used,size" +
-            " -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs 2>/dev/null" +
-            " | tail -n +2" +
-            " | awk '{gsub(/%/,\"\",$3); printf \"DISK:%s|%s|%s|%s|%s\\n\",$1,$2,$3,$4,$5}';" +
             // ── Battery ──
             "for b in /sys/class/power_supply/BAT* /sys/class/power_supply/bat*; do" +
             " [ -d \"$b\" ] || continue;" +
@@ -214,7 +193,6 @@ PanelWindow {
         let mi = {}
         let tempBest = 0, tempOk = false
         let gpus  = []
-        let disks = []
         let foundBat = false
 
         for (const l of lines) {
@@ -273,28 +251,20 @@ PanelWindow {
                 const pct     = parseInt(p[2]) || 0
                 const isIgpu  = p[3] === "1"
                 const temp    = Math.round(parseInt(p[4]) / 1000) || 0
-                const name    = rawName
-                    .replace(/Advanced Micro Devices[^,]*/i, "")
-                    .replace(/AMD\s*/i, "")
+                // Clean verbose vendor prefixes from lspci names.
+                // IMPORTANT: apply cleaning only to rawName; the fallback drv
+                // (e.g. 'amdgpu') must NOT be cleaned — regexes like /\bAMD/i
+                // would match 'amd' inside 'amdgpu' and corrupt it to 'gpu'.
+                const cleanedName = rawName
+                    .replace(/Advanced Micro Devices[^,]*,?\s*/i, "")
+                    .replace(/\bAMD\s+/i, "")           // 'AMD Radeon' → 'Radeon'; won't match 'amdgpu'
                     .replace(/ATI(\s+Technologies\s+Inc\.?)?\s*/i, "")
-                    .replace(/Intel(\s+Corporation)?\s*/i, "")
-                    .replace(/\[|\]/g, "").trim().slice(0, 14) || drv.slice(0, 14) || "GPU"
+                    .replace(/Intel\s+Corporation\s*/i, "")
+                    .replace(/\bIntel\s+/i, "")          // requires trailing space — won't match mid-word
+                    .replace(/\[([^\]]+)\]/g, "$1")
+                    .replace(/\s+/g, " ").trim()
+                const name = (cleanedName.slice(0, 14) || drv.slice(0, 14) || "GPU")
                 gpus.push({ name, pct, temp, type: drv, isIgpu })
-                continue
-            }
-
-            // ── Disks (format: DISK:source|mount|pct|used_bytes|size_bytes) ──
-            if (l.startsWith("DISK:")) {
-                const inner = l.slice(5)
-                const p     = inner.split("|")
-                if (p.length < 5) continue
-                disks.push({
-                    device: p[0],
-                    mount:  p[1],
-                    pct:    parseInt(p[2]) || 0,
-                    used:   _fmtDisk(parseInt(p[3])),
-                    size:   _fmtDisk(parseInt(p[4]))
-                })
                 continue
             }
 
@@ -340,45 +310,6 @@ PanelWindow {
         _swap      = _swapTotal > 0 ? _swapUsed / _swapTotal : 0
         _swapOk    = _swapTotal > 0
         _temp = tempBest; _tempOk = tempOk
-
-        // ── Disk filter ────────────────────────────────────────────────────
-        // Internal: show /, /home, /boot* — deduplicated by device so btrfs
-        // subvolumes sharing a device only appear once (canonical mount wins).
-        const internalWanted = ["/", "/home", "/boot", "/boot/efi", "/boot/esp"]
-        // External prefixes — anything mounted here is shown (removable/USB/etc)
-        const extPfx = ["/media/", "/run/media/", "/mnt/"]
-        const isExt  = m => extPfx.some(p => m.startsWith(p))
-
-        // Build canonical-mount preference: '/' > '/home' > '/boot' > longer paths
-        const mountPriority = m => {
-            const idx = internalWanted.indexOf(m)
-            return idx >= 0 ? idx : internalWanted.length
-        }
-
-        // Dedup internal by device — keep lowest-priority (most canonical) mount
-        const internalByDev = {}
-        for (const d of disks) {
-            if (!internalWanted.includes(d.mount)) continue
-            const existing = internalByDev[d.device]
-            if (!existing || mountPriority(d.mount) < mountPriority(existing.mount))
-                internalByDev[d.device] = d
-        }
-        // Sort by wanted order
-        const internalResult = Object.values(internalByDev)
-        internalResult.sort((a, b) => mountPriority(a.mount) - mountPriority(b.mount))
-
-        // Dedup external by device — first seen wins
-        const seenExtDev = {}
-        const externalResult = []
-        for (const d of disks) {
-            if (!isExt(d.mount)) continue
-            if (!seenExtDev[d.device]) {
-                seenExtDev[d.device] = true
-                externalResult.push(d)
-            }
-        }
-
-        _disks = internalResult.concat(externalResult)
 
         // ── GPU filter: show ALL GPUs (both iGPU and dGPU) ───────────────
         // iGPU is only hidden when a dGPU is present AND user is on a system
@@ -495,19 +426,19 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true
                 Text {
-                    text: "󰻠  System Monitor"; color: Theme.cOnSurf
-                    font.pixelSize: 14; font.weight: Font.Medium; font.family: Config.fontFamily
+                    text: "󰻠  System Monitor"; color: Theme.cPrimary
+                    font.pixelSize: 13; font.weight: Font.Medium; font.family: Config.fontFamily
                 }
                 Item { Layout.fillWidth: true }
                 Rectangle {
-                    width: 26; height: 26; radius: 99; color: "transparent"
+                    width: 26; height: 26; radius: 99; color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.2)
                     MouseArea {
                         anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: SystemMonitorPopupState.close()
                         Text {
                             anchors.centerIn: parent; text: "󰅙"
-                            color: parent.containsMouse ? Theme.cOnSurf : Theme.cOnSurfVar
-                            font.pixelSize: 15; font.family: Config.fontFamily
+                            color: parent.containsMouse ? Theme.cPrimary : Theme.cPrimary
+                            font.pixelSize: 13; font.family: Config.fontFamily
                             Behavior on color { ColorAnimation { duration: 100 } }
                         }
                     }
@@ -551,7 +482,7 @@ PanelWindow {
                     delegate: ArcGauge {
                         required property var modelData
                         value:    modelData.pct / 100
-                        glyph:    modelData.isIgpu ? "󰟽" : "󰢮"
+                        glyph:    modelData.isIgpu ? "󱤓" : "󰢮"
                         label:    (modelData.isIgpu ? "iGPU" : "dGPU") + (smWin._gpus.length > 1 ? "" : "")
                         valStr:   modelData.pct + "%"
                         sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
@@ -565,35 +496,13 @@ PanelWindow {
                     value:    smWin._batPct / 100
                     glyph:    smWin._batPct > 80 ? "󰁹" : smWin._batPct > 60 ? "󰂀"
                               : smWin._batPct > 40 ? "󰁾" : smWin._batPct > 20 ? "󰁼" : "󰁺"
-                    label:    smWin._batStatus === "Full"      ? "Battery ✓"
-                              : smWin._batStatus === "Charging" ? "Battery ⚡" : "Battery"
+                    label:    smWin._batStatus === "Full"      ? "Battery "
+                              : smWin._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
                     valStr:   smWin._batPct + "%"
                     sub:      smWin._batStatus
                     arcColor: smWin._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
                               : smWin._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
                               : Theme.cPrimary
-                }
-
-                // Disks — internal (/,/home,/boot*) + external (/media,/run/media,/mnt)
-                // Btrfs subvolumes are deduplicated by block device at parse time.
-                Repeater {
-                    model: smWin._disks
-                    delegate: ArcGauge {
-                        required property var modelData
-                        value:    modelData.pct / 100
-                        glyph:    "󰋊"
-                        label:    modelData.mount === "/"         ? "root"
-                                  : modelData.mount === "/home"     ? "home"
-                                  : modelData.mount === "/boot"     ? "boot"
-                                  : modelData.mount === "/boot/efi" ? "efi"
-                                  : modelData.mount === "/boot/esp" ? "esp"
-                                  : modelData.mount.split("/").pop() || modelData.mount
-                        valStr:   modelData.pct + "%"
-                        sub:      modelData.used + "/" + modelData.size
-                        arcColor: modelData.pct >= 90 ? Qt.rgba(1.0, 0.3, 0.3, 1)
-                                  : modelData.pct >= 75 ? Qt.rgba(1.0, 0.7, 0.2, 1)
-                                  : Theme.cSecondary
-                    }
                 }
             }
 

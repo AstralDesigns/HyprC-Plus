@@ -287,7 +287,7 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true; spacing: 6
                 Text {
-                    text: "󰖐  Weather"; color: Theme.cOnSurf
+                    text: "󰖐  Weather"; color: Theme.cPrimary
                     font.pixelSize: 13; font.weight: Font.Medium; font.family: Config.fontFamily
                 }
                 Item { Layout.fillWidth: true }
