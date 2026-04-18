@@ -67,6 +67,12 @@ PanelWindow {
     property var _fcHi:    []
     property var _fcLo:    []
 
+    // Hourly forecast — next 12 hours from current time
+    property var _hrTimes: []
+    property var _hrIcons: []
+    property var _hrTemps: []
+    property var _hrPrec:  []    // precipitation probability %
+
     // ── Helpers ───────────────────────────────────────────────────────────
     function _unitSuffix() { return _metric ? "°C" : "°F" }
     function _cvtTemp(c)   { return _metric ? Math.round(c) : Math.round(c * 9/5 + 32) }
@@ -119,6 +125,29 @@ PanelWindow {
                 lo.push(_cvtTemp(d.daily.temperature_2m_min[i]) + _unitSuffix())
             }
             _fcDays = dn; _fcIcons = ic; _fcHi = hi; _fcLo = lo
+        }
+        if (d.hourly) {
+            // Find the index of the current hour in the hourly time array
+            const now = new Date()
+            const nowH = now.getFullYear() + "-" +
+                String(now.getMonth()+1).padStart(2,"0") + "-" +
+                String(now.getDate()).padStart(2,"0") + "T" +
+                String(now.getHours()).padStart(2,"0") + ":00"
+            const times = d.hourly.time || []
+            let startIdx = times.findIndex(t => t >= nowH)
+            if (startIdx < 0) startIdx = 0
+            const ht=[]; const hi2=[]; const htp=[]; const hpr=[]
+            for (let i = startIdx; i < Math.min(startIdx + 12, times.length); i++) {
+                const tStr = times[i].slice(11, 16)  // "HH:MM"
+                const h = parseInt(times[i].slice(11, 13))
+                const ampm = h === 0 ? "12am" : h < 12 ? h+"am" : h === 12 ? "12pm" : (h-12)+"pm"
+                ht.push(ampm)
+                const isD = (d.hourly.is_day || [])[i] ?? 1
+                hi2.push(_cond((d.hourly.weather_code || [])[i] || 0, isD, 0).i)
+                htp.push(_cvtTemp((d.hourly.temperature_2m || [])[i] || 0) + _unitSuffix())
+                hpr.push(((d.hourly.precipitation_probability || [])[i] || 0) + "%")
+            }
+            _hrTimes = ht; _hrIcons = hi2; _hrTemps = htp; _hrPrec = hpr
         }
     }
 
@@ -206,6 +235,7 @@ PanelWindow {
             _url = "https://api.open-meteo.com/v1/forecast" +
                 "?latitude=" + wxWin._lat + "&longitude=" + wxWin._lon +
                 "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,precipitation" +
+                "&hourly=temperature_2m,weather_code,precipitation_probability,is_day" +
                 "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
                 "&forecast_days=7&timezone=auto"
             if (!running) running = true
@@ -381,6 +411,58 @@ PanelWindow {
                                 spacing: 0
                                 Text { text: modelData.label; color: Theme.cOnSurfVar; font.pixelSize: 9;  font.family: Config.labelFont }
                                 Text { text: modelData.val;   color: Theme.cOnSurf;    font.pixelSize: 12; font.weight: Font.Medium; font.family: Config.labelFont }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28) }
+
+            // Hourly forecast — next 12 hours
+            Item {
+                Layout.fillWidth: true
+                visible: wxWin._hrTimes.length > 0
+                implicitHeight: visible ? hrRow.implicitHeight : 0
+                RowLayout {
+                    id: hrRow
+                    anchors { left: parent.left; right: parent.right }
+                    spacing: 0
+                    Repeater {
+                        model: wxWin._hrTimes.length
+                        delegate: Item {
+                            required property int index
+                            Layout.fillWidth: true
+                            implicitHeight: hrCol.implicitHeight
+                            Column {
+                                id: hrCol
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                spacing: 2
+                                Text {
+                                    text: wxWin._hrTimes[index] || "--"
+                                    color: index === 0 ? Theme.cPrimary : Theme.cOnSurfVar
+                                    font.pixelSize: 8; font.family: Config.labelFont
+                                    horizontalAlignment: Text.AlignHCenter
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
+                                Text {
+                                    text: wxWin._hrIcons[index] || "󰖐"
+                                    color: Theme.cPrimary; font.pixelSize: 14; font.family: Config.fontFamily
+                                    horizontalAlignment: Text.AlignHCenter
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
+                                Text {
+                                    text: wxWin._hrTemps[index] || "--"
+                                    color: Theme.cOnSurf; font.pixelSize: 9; font.weight: Font.Medium; font.family: Config.labelFont
+                                    horizontalAlignment: Text.AlignHCenter
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
+                                Text {
+                                    text: wxWin._hrPrec[index] || "0%"
+                                    color: Theme.cSecondary; font.pixelSize: 8; font.family: Config.labelFont
+                                    horizontalAlignment: Text.AlignHCenter
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                }
                             }
                         }
                     }

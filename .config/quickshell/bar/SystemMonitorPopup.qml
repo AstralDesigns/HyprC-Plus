@@ -466,14 +466,14 @@ PanelWindow {
                     value:    smWin._tempOk ? Math.min(smWin._temp / 100, 1) : 0
                     glyph:    "󰔏"; label: "Temp"
                     valStr:   smWin._tempOk ? Math.round(smWin._temp) + "°" : "N/A"
-                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cPrimaryFixedDim
+                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cTertiary
                 }
                 ArcGauge {
                     visible:  smWin._swapOk
                     value:    smWin._swap; glyph: "󰾴"; label: "Swap"
                     valStr:   Math.round(smWin._swap * 100) + "%"
                     sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
-                    arcColor: Theme.cTertiaryContainer
+                    arcColor: Theme.cPrimaryContainer
                 }
 
                 // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
@@ -486,7 +486,7 @@ PanelWindow {
                         label:    (modelData.isIgpu ? "iGPU" : "dGPU") + (smWin._gpus.length > 1 ? "" : "")
                         valStr:   modelData.pct + "%"
                         sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
-                        arcColor: modelData.isIgpu ? Theme.cTertiaryContainer : Theme.cTertiary
+                        arcColor: modelData.isIgpu ? Theme.cSecondary : Theme.cTertiaryContainer
                     }
                 }
 
