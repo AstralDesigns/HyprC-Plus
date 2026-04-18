@@ -5,13 +5,12 @@ import ".."
 
 Item {
     Layout.alignment: Qt.AlignVCenter
-    implicitWidth: distroText.implicitWidth + 12
-    implicitHeight: Theme.barHeight
+    implicitWidth: distroText.implicitWidth + Config.btnPadLeft + Config.btnPadRight
+    implicitHeight: Config.moduleHeight
 
     Text {
         id: distroText
         anchors.centerIn: parent
-        anchors.horizontalCenterOffset: 6
         text: DistroState.icon
         color: Theme.text
         font.family: Theme.fontFamily

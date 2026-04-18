@@ -121,14 +121,14 @@ QtObject {
         v = _settings.value("cavaStartCustomColor"); if (v !== undefined && v !== null) _cavaStartCustomColor = v
         v = _settings.value("cavaEndCustomColor");   if (v !== undefined && v !== null) _cavaEndCustomColor   = v
         v = _settings.value("cavaGlyphCustomColor"); if (v !== undefined && v !== null) _cavaGlyphCustomColor = v
-        v = _settings.value("wsBgOpacity"); if (v !== undefined && v !== null) wsBgOpacity = v
-        v = _settings.value("groupedBgOpacity"); if (v !== undefined && v !== null) groupedBgOpacity = v
-        v = _settings.value("ungroupedBgOpacity"); if (v !== undefined && v !== null) ungroupedBgOpacity = v
-        v = _settings.value("trayBgOpacity"); if (v !== undefined && v !== null) trayBgOpacity = v
-        v = _settings.value("startMenuBgOpacity"); if (v !== undefined && v !== null) startMenuBgOpacity = v
-        v = _settings.value("mediaBgOpacity"); if (v !== undefined && v !== null) mediaBgOpacity = v
-        v = _settings.value("cavaBgOpacity"); if (v !== undefined && v !== null) cavaBgOpacity = v
-        v = _settings.value("distroBgOpacity"); if (v !== undefined && v !== null) distroBgOpacity = v
+        v = _settings.value("wsBgOpacity"); if (v !== undefined && v !== null) wsBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("groupedBgOpacity"); if (v !== undefined && v !== null) groupedBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("ungroupedBgOpacity"); if (v !== undefined && v !== null) ungroupedBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("trayBgOpacity"); if (v !== undefined && v !== null) trayBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("startMenuBgOpacity"); if (v !== undefined && v !== null) startMenuBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("mediaBgOpacity"); if (v !== undefined && v !== null) mediaBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("cavaBgOpacity"); if (v !== undefined && v !== null) cavaBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("distroBgOpacity"); if (v !== undefined && v !== null) distroBgOpacity = Math.max(0, parseFloat(v))
         v = _settings.value("activeWindowBgOpacity"); if (v !== undefined && v !== null) activeWindowBgOpacity = v
         v = _settings.value("activeWindowMinWidth"); if (v !== undefined && v !== null) activeWindowMinWidth = v
         v = _settings.value("showCava"); if (v !== undefined && v !== null) showCava = _toBool(v)
@@ -697,28 +697,28 @@ QtObject {
     //  opacity = 1  → full color.
 
     property color wsBgColor:   Theme.cOnSecondary
-    property real  wsBgOpacity: -1   // -1 = global
+    property real  wsBgOpacity: 0
 
     property color groupedBgColor:   Theme.cOnSecondary
-    property real  groupedBgOpacity: -1
+    property real  groupedBgOpacity: 0
 
     property color ungroupedBgColor:   Theme.cOnSecondary
-    property real  ungroupedBgOpacity: -1
+    property real  ungroupedBgOpacity: 0
 
     property color trayBgColor:   Theme.cOnSecondary
-    property real  trayBgOpacity: -1
+    property real  trayBgOpacity: 0
 
     property color startMenuBgColor:   Theme.cOnSecondary
-    property real  startMenuBgOpacity: -1   // -1 = use ungroupedBgOpacity; independent Start/Power-btn BG opacity
+    property real  startMenuBgOpacity: 0
 
     property color mediaBgColor:   Theme.cOnSecondary
-    property real  mediaBgOpacity: -1
+    property real  mediaBgOpacity: 0
 
     property color cavaBgColor:   Theme.cOnSecondary
-    property real  cavaBgOpacity: -1
+    property real  cavaBgOpacity: 0
 
     property color distroBgColor:   Theme.cOnSecondary
-    property real  distroBgOpacity: -1   // -1 = global; independent distro/CC-button BG opacity
+    property real  distroBgOpacity: 0
 
     property color activeWindowBgColor:   Theme.cOnSecondary
     property real  activeWindowBgOpacity: 0

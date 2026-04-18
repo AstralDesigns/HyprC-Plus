@@ -65,7 +65,7 @@ Item {
         }
     }
     Timer {
-        interval: 30000; running: true; repeat: true; triggeredOnStart: true
+        interval: 1000; running: true; repeat: true; triggeredOnStart: true
         onTriggered: if (!batProc.running) batProc.running = true
     }
 

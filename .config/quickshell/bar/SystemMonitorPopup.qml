@@ -496,7 +496,7 @@ PanelWindow {
                     value:    smWin._batPct / 100
                     glyph:    smWin._batPct > 80 ? "󰁹" : smWin._batPct > 60 ? "󰂀"
                               : smWin._batPct > 40 ? "󰁾" : smWin._batPct > 20 ? "󰁼" : "󰁺"
-                    label:    smWin._batStatus === "Full"      ? "Battery "
+                    label:    smWin._batStatus === "Full"      ? "Battery "
                               : smWin._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
                     valStr:   smWin._batPct + "%"
                     sub:      smWin._batStatus

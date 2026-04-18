@@ -319,14 +319,14 @@ PanelWindow {
                     }
                 }
                 Rectangle {
-                    width: 24; height: 24; radius: 99; color: "transparent"
+                    width: 24; height: 24; radius: 99; color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.2)
                     MouseArea {
                         anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                         onClicked: WeatherPopupState.close()
                         Text {
                             anchors.centerIn: parent; text: "󰅙"
-                            color: parent.containsMouse ? Theme.cOnSurf : Theme.cOnSurfVar
-                            font.pixelSize: 14; font.family: Config.fontFamily
+                            color: parent.containsMouse ? Theme.cPrimary : Theme.cPrimary
+                            font.pixelSize: 13; font.family: Config.fontFamily
                             Behavior on color { ColorAnimation { duration: 100 } }
                         }
                     }

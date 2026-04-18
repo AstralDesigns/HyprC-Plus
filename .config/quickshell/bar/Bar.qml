@@ -297,21 +297,19 @@ PanelWindow {
         }
 
         readonly property real _effectiveBgOpacity: {
-            let raw = -1
             switch (bgType) {
-                case "workspace":    raw = Config.wsBgOpacity; break
-                case "grouped":      raw = Config.groupedBgOpacity; break
-                case "ungrouped":    raw = Config.ungroupedBgOpacity; break
-                case "startmenu":    raw = Config.startMenuBgOpacity; break
-                case "media":        raw = Config.mediaBgOpacity; break
-                case "cava":         raw = Config.cavaBgOpacity; break
-                case "distro":       raw = Config.distroBgOpacity; break
-                case "tray":         raw = Config.trayBgOpacity; break
-                case "activewindow": raw = Config.activeWindowBgOpacity; break
+                case "workspace":    return Config.wsBgOpacity
+                case "grouped":      return Config.groupedBgOpacity
+                case "ungrouped":    return Config.ungroupedBgOpacity
+                case "startmenu":    return Config.startMenuBgOpacity
+                case "media":        return Config.mediaBgOpacity
+                case "cava":         return Config.cavaBgOpacity
+                case "distro":       return Config.distroBgOpacity
+                case "tray":         return Config.trayBgOpacity
+                case "activewindow": return Config.activeWindowBgOpacity
+                default:             return bgOverride > -0.5 ? bgOverride
+                    : (Config.barMode === "bar" ? Config.islandBgOpacityBar : Config.islandBgOpacityIsland)
             }
-            if (raw > -0.5) return raw
-            return bgOverride > -0.5 ? bgOverride
-                : (Config.barMode === "bar" ? Config.islandBgOpacityBar : Config.islandBgOpacityIsland)
         }
 
         readonly property real _bgOpacity: _effectiveBgOpacity
@@ -434,7 +432,7 @@ PanelWindow {
             Island {
                 bgType: "distro"
                 visible_: Config.showDistro
-                bgOverride: Config.ccTransparentBg ? 0.0 : (Config.distroBgOpacity >= 0 ? Config.distroBgOpacity : -1)
+                bgOverride: Config.ccTransparentBg ? 0.0 : -1
                 Modules.ControlCenter {}
             }
             Island { bgType: "ungrouped"; Modules.DateDisplay {} }
@@ -608,7 +606,7 @@ PanelWindow {
                 Island {
                     bgType: "distro"
                     visible_: Config.showDistro
-                    bgOverride: Config.ccTransparentBg ? 0.0 : (Config.distroBgOpacity >= 0 ? Config.distroBgOpacity : -1)
+                    bgOverride: Config.ccTransparentBg ? 0.0 : -1
                     Modules.ControlCenter {}
                 }
                 Island { bgType: "ungrouped"; Modules.DateDisplay {} }
