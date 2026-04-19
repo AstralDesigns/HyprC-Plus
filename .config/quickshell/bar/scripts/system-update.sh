@@ -59,7 +59,7 @@ clean_cache() {
 
 prompt_reboot() {
     echo
-    print_warning "A reboot is recommended to ensure all changes take effect properly."
+    print_status "A reboot is recommended to ensure all changes take effect properly."
     echo
     echo -e "${YELLOW}󰜉 Would you like to reboot now? (n/Y)${NC}"
     read -r reboot_choice
