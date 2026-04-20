@@ -927,7 +927,7 @@ ShellRoot {
                                                 color: root.cOnSurfVar; opacity: 0.35
                                             }
                                             RotationAnimator on rotation {
-                                                from:0; to:360; duration:100000
+                                                from:0; to:360; duration:12000
                                                 loops:Animation.Infinite
                                                 running: root.mediaStatus === "Playing"
                                             }

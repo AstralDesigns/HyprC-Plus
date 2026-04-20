@@ -512,7 +512,7 @@ function createMediaBox() {
     const thumb = {
         pixbuf: null,
         angle: 0,
-        speed: 0.10,
+        speed: 1.2,
         timerId: 0,
         playing: false,
         isPlaceholder: true,
@@ -566,7 +566,7 @@ function createMediaBox() {
 
     function _cavaReadLine() {
         if (!_cavaOn || !_cavaStream) return;
-        _cavaStream.read_line_async(GLib.PRIORITY_DEFAULT, null, (s, res) => {
+        _cavaStream.read_line_async(GLib.PRIORITY_HIGH, null, (s, res) => {
             if (!_cavaOn) return;
             try {
                 const [line] = s.read_line_finish_utf8(res);
@@ -612,7 +612,7 @@ function createMediaBox() {
     function _scheduleRetry() {
         if (_cavaOn || _cavaRetryTimer) return;
         _cavaRetryCount++;
-        _cavaRetryTimer = GLib.timeout_add(GLib.PRIORITY_LOW, _cavaRetryDelay(), () => {
+        _cavaRetryTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, _cavaRetryDelay(), () => {
             _cavaRetryTimer = 0;
             _startCava();
             return GLib.SOURCE_REMOVE;
@@ -759,9 +759,8 @@ function createMediaBox() {
     function thumbStartRotation() {
         if (thumb.timerId) return;
         thumb.playing = true;
-        // PRIORITY_LOW + 50ms (20fps): rotation is cosmetically smooth at this
-        // speed (0.10 deg/frame ≈ 2°/s) and no longer starves cava at DEFAULT.
-        thumb.timerId = GLib.timeout_add(GLib.PRIORITY_LOW, 50, () => {
+        // PRIORITY_HIGH + 16ms (60fps): smooth rotation at 2 deg/frame = 120°/s
+        thumb.timerId = GLib.timeout_add(GLib.PRIORITY_HIGH, 16, () => {
             if (!thumb.playing) { thumb.timerId = 0; return GLib.SOURCE_REMOVE; }
             thumb.angle = (thumb.angle + thumb.speed) % 360;
             thumbDa.queue_draw();
@@ -1463,19 +1462,19 @@ function createMediaBox() {
         if (_bgTimerId && _bgInterval === wantMs) return;  // already correct, no-op
         if (_bgTimerId) { GLib.source_remove(_bgTimerId); _bgTimerId = 0; }
         _bgInterval = wantMs;
-        _bgTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, wantMs, () => {
+        _bgTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, wantMs, () => {
             phase += PHASE_STEP;
             bgDrawingArea.queue_draw();
             return GLib.SOURCE_CONTINUE;
         });
     }
 
-    // Dedicated GC + color-refresh timer — fixed 2s regardless of animation fps.
+    // Dedicated GC + color-refresh timer — fixed 1s regardless of animation fps.
     // Decoupled from bg fps so it fires reliably even when bg is at 2fps idle.
     let _gcTimerId = 0;
     function _startGcTimer() {
         if (_gcTimerId) return;
-        _gcTimerId = GLib.timeout_add(GLib.PRIORITY_LOW, 2000, () => {
+        _gcTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
             _resolveBgColors(mediaPlayerBox);
             imports.system.gc();
             return GLib.SOURCE_CONTINUE;
@@ -1560,16 +1559,16 @@ function createMediaBox() {
         // Position poll: 1 s
         if (_posPollTimer === 0) {
             _doPositionPoll();
-            _posPollTimer = GLib.timeout_add(GLib.PRIORITY_LOW, 1000, () => {
+            _posPollTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
                 _doPositionPoll();
                 return GLib.SOURCE_CONTINUE;
             });
         }
 
-        // Metadata + player list: 4 s (also fires immediately for first load)
+        // Metadata + player list: 1 s (also fires immediately for first load)
         if (_metaPollTimer === 0) {
             updatePlayerAsync(() => updateTrackInfoAsync());
-            _metaPollTimer = GLib.timeout_add(GLib.PRIORITY_LOW, 4000, () => {
+            _metaPollTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1000, () => {
                 updatePlayerAsync(() => updateTrackInfoAsync());
                 return GLib.SOURCE_CONTINUE;
             });
