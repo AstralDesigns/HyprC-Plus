@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Effects
 import Quickshell.Io
 import ".."
 
@@ -30,9 +31,7 @@ Item {
     Item {
         id: padContainer
         anchors.centerIn: parent
-        implicitWidth:  MediaPlayerState.active
-                        ? mediaRow.implicitWidth + Config.mediaPadLeft + Config.mediaPadRight + Config.modulePadH
-                        : gjsToggleItem.implicitWidth
+        implicitWidth:  mediaRow.implicitWidth + Config.mediaPadLeft + Config.mediaPadRight + Config.modulePadH
         implicitHeight: Config.moduleHeight
 
         Row {
@@ -42,8 +41,7 @@ Item {
 
             // ── GJS toggle button ─────────────────────────────────────────
             Item {
-                id: gjsToggleItem
-                implicitWidth:  gjsIcon.implicitWidth + Config.btnPadLeft + Config.btnPadRight
+                implicitWidth:  gjsIcon.implicitWidth + Config.modPadH * 2
                 implicitHeight: Config.moduleHeight
                 Text {
                     id: gjsIcon; anchors.centerIn: parent
@@ -77,18 +75,33 @@ Item {
                     id: trackRow; anchors.centerIn: parent; spacing: 5
 
                     // ── Spinning disc ─────────────────────────────────────
-                    Item {
+                    Rectangle {
                         id: discContainer
                         width: MediaPlayerState.thumbSize; height: MediaPlayerState.thumbSize
+                        radius: width / 2
                         anchors.verticalCenter: parent.verticalCenter
+                        color: "transparent"
+                        layer.enabled: true
+                        layer.smooth: true
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: discMask
+                            maskThresholdMin: 0.5
+                            maskSpreadAtMin: 1.0
+                        }
+                        Rectangle {
+                            id: discMask; anchors.fill: parent
+                            radius: width / 2; color: "white"; opacity: 0; layer.enabled: true
+                        }
 
-                        Text {
+                        // Circular background for placeholder state — declared first so
+                        // it renders behind the glyph Text
+                        Rectangle {
                             visible: MediaPlayerState.artPath === ""
-                            anchors.centerIn: parent
-                            text: Config.mediaToggleGlyph
-                            color: Config.glyphColor
-                            font.family: Config.fontFamily
-                            font.pixelSize: MediaPlayerState.thumbSize - 2
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: Qt.rgba(Theme.cSurfMid.r, Theme.cSurfMid.g,
+                                           Theme.cSurfMid.b, 0.85)
                         }
 
                         Image {
@@ -97,6 +110,15 @@ Item {
                             source: MediaPlayerState.artPath !== "" ? ("file://" + MediaPlayerState.artPath.split("?")[0]) : ""
                             fillMode: Image.PreserveAspectCrop
                             smooth: true; cache: false; asynchronous: true
+                        }
+
+                        Text {
+                            visible: MediaPlayerState.artPath === ""
+                            anchors.centerIn: parent
+                            text: Config.mediaToggleGlyph
+                            color: Config.glyphColor
+                            font.family: Config.fontFamily
+                            font.pixelSize: MediaPlayerState.thumbSize - 2
                         }
 
                         RotationAnimator on rotation {

@@ -70,7 +70,7 @@ Item {
                 "[ -f \"$SRC\" ] || { curl -sf --max-time 8 \"$SRC\" -o /tmp/qs_art_raw.png 2>/dev/null && SRC=/tmp/qs_art_raw.png; }; " +
                 "magick \"$SRC\" -resize ${S}x${S}^ -gravity center -extent ${S}x${S} " +
                 "  \\( +clone -alpha extract -fill black -colorize 100 " +
-                "     -fill white -draw \"circle $R,$R $R,0\" \\) " +
+                "     -fill white -draw \"roundrectangle 0,0 $((S-1)),$((S-1)) $R,$R\" \\) " +
                 "-alpha off -compose CopyOpacity -composite -strip \"$DST\""
             if (!running) running = true
         }

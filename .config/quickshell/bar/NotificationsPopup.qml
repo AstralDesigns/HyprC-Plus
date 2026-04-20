@@ -542,9 +542,12 @@ Item {
                                         color:notif.urgency>=2?Theme.cErr:notif.category==="bt"?Theme.cPrimary:Qt.rgba(Theme.cOnSurfVar.r,Theme.cOnSurfVar.g,Theme.cOnSurfVar.b,0.5)}
                                     Item{width:20;height:20
                                         Image{id:hcIcImg
-                                            anchors{fill:parent;margins:1}
+                                            anchors{fill:parent;margins:notif.category==="media.playing"?0:1}
                                             source:{const ic=notif.icon||"";if(ic.startsWith("/")||ic.startsWith("file://"))return"";return notif.iconPath?"file://"+notif.iconPath:""}
-                                            fillMode:Image.PreserveAspectFit;smooth:true;visible:status===Image.Ready}
+                                            fillMode:notif.category==="media.playing"?Image.PreserveAspectCrop:Image.PreserveAspectFit;smooth:true;mipmap:true;visible:status===Image.Ready
+                                            layer.enabled:notif.category==="media.playing"
+                                            layer.effect:MultiEffect{maskEnabled:true;maskSource:hcArtMask;maskThresholdMin:0.5;maskSpreadAtMin:1.0}
+                                            Rectangle{id:hcArtMask;anchors.fill:parent;radius:width/2;color:"white";opacity:0;layer.enabled:true}}
                                         Text{anchors.centerIn:parent;visible:!hcIcImg.visible;text:NotificationsState.iconGlyph(notif);font.pixelSize:12;font.family:Config.fontFamily;color:notif.urgency>=2?Theme.cErr:Theme.cOnSurfVar}
                                     }
                                     ColumnLayout{Layout.fillWidth:true;spacing:0
