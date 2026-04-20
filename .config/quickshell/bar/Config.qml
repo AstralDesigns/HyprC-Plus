@@ -2,6 +2,7 @@ pragma Singleton
 
 import QtQuick
 import QtCore
+import Quickshell.Io
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Config.qml — Single source of truth for all bar behaviour and appearance.
@@ -655,6 +656,71 @@ QtObject {
 
     // Fraction of glyph height at which start→end color splits (0.0–1.0, default 0.5)
     property real  cavaGradientSplit:       0.5
+
+    // ── Persist cava color settings to [cc-cava-colors-v1] in hyprcandy-bar.conf ──
+    // Mirrors the same pattern used by the border scripts. Runs after load completes
+    // (guarded by _cavaConfWriteReady) so initial property-setting doesn't trigger writes.
+    property bool _cavaConfWriteReady: false
+    property Timer _cavaConfWriteReadyTimer: Timer {
+        interval: 500; repeat: false; running: true
+        onTriggered: cfg._cavaConfWriteReady = true
+    }
+
+    // Shared bash helper — ensures [cc-cava-colors-v1] section and all 6 keys exist,
+    // then overwrites them atomically.
+    function _writeCavaColorConf() {
+        if (!_cavaConfWriteReady) return
+        // Determine the active variable strings to write (matching legacy field names)
+        const sMode = cavaStartMode
+        const eMode = cavaEndMode
+        const sVar  = sMode === "pywal" ? cavaStartPywalVar
+                    : sMode === "matugen" ? cavaStartVar
+                    : (_cavaStartCustomColor.toString ? _cavaStartCustomColor.toString() : "#000000")
+        const eVar  = eMode === "pywal" ? cavaEndPywalVar
+                    : eMode === "matugen" ? cavaEndVar
+                    : (_cavaEndCustomColor.toString ? _cavaEndCustomColor.toString() : "#000000")
+        const gMode = sMode   // glyph tracks start
+        const gVar  = sVar
+
+        const f = "$HOME/.config/hyprcandy/hyprcandy-bar.conf"
+        const section = "cc-cava-colors-v1"
+        // Build a single bash command that upserts the section and all 6 keys
+        const cmd = [
+            "bash", "-c",
+            `f="${f}"; ` +
+            `mkdir -p "$(dirname "$f")"; ` +
+            // Create file if missing
+            `[ -f "$f" ] || touch "$f"; ` +
+            // Ensure section header exists
+            `grep -q '^\\[${section}\\]' "$f" || printf '\\n[${section}]\\n' >> "$f"; ` +
+            // Upsert each key inside the section (sed range: from section header to next [)
+            `_upsert() { local k=$1 v=$2; ` +
+            `  grep -q "^$k=" "$f" ` +
+            `    && sed -i "/^\\[${section}\\]/,/^\\[/{s|^$k=.*|$k=$v|}" "$f" ` +
+            `    || sed -i "/^\\[${section}\\]/a $k=$v" "$f"; }; ` +
+            `_upsert startMode "${sMode}"; ` +
+            `_upsert startVar "${sVar}"; ` +
+            `_upsert endMode "${eMode}"; ` +
+            `_upsert endVar "${eVar}"; ` +
+            `_upsert glyphMode "${gMode}"; ` +
+            `_upsert glyphVar "${gVar}"`
+        ]
+        _cavaConfWriter.command = cmd
+        _cavaConfWriter.running = true
+    }
+
+    property var _cavaConfWriter: Process {
+        running: false
+        onExited: running = false
+    }
+
+    // Watchers — fire _writeCavaColorConf whenever any relevant property changes
+    onCavaStartModeChanged:     Qt.callLater(_writeCavaColorConf)
+    onCavaEndModeChanged:       Qt.callLater(_writeCavaColorConf)
+    onCavaStartVarChanged:      Qt.callLater(_writeCavaColorConf)
+    onCavaEndVarChanged:        Qt.callLater(_writeCavaColorConf)
+    onCavaStartPywalVarChanged: Qt.callLater(_writeCavaColorConf)
+    onCavaEndPywalVarChanged:   Qt.callLater(_writeCavaColorConf)
 
     // ═══════════════════════════════════════════════════════════════════════
     //  Application Launcher (GJS dock app launcher)
