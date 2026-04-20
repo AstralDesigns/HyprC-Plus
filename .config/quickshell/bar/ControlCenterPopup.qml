@@ -104,14 +104,18 @@ PanelWindow {
     property color _activeBorderColor:   Theme.cPrimary
     property color _inactiveBorderColor: Theme.cOnSecondary
     
-    // Border color mode: "matugen" (uses $variable) or "custom" (uses hex color)
-    property string _activeBorderMode: "matugen"   // "matugen" | "custom"
-    property string _inactiveBorderMode: "matugen" // "matugen" | "custom"
+    // Border color mode: "matugen" | "custom" | "pywal"
+    property string _activeBorderMode: "matugen"
+    property string _inactiveBorderMode: "matugen"
     
     // Selected matugen variables for borders
     property string _activeBorderVar: "$source_color"
     property string _inactiveBorderVar: "$background"
-    
+
+    // Selected pywal variables for borders
+    property string _activeBorderPywalVar: "$color4"
+    property string _inactiveBorderPywalVar: "$color0"
+
     // Available matugen border variables
     readonly property var _matugenBorderVars: [
         {label: "$source_color", var: "$source_color"},
@@ -130,6 +134,77 @@ PanelWindow {
         {label: "$surface_container", var: "$surface_container"},
         {label: "$outline", var: "$outline"}
     ]
+
+    // Available pywal border variables (color0–color15 + foreground/background)
+    readonly property var _pywalBorderVars: [
+        {label: "$color0",      var: "$color0"},
+        {label: "$color1",      var: "$color1"},
+        {label: "$color2",      var: "$color2"},
+        {label: "$color3",      var: "$color3"},
+        {label: "$color4",      var: "$color4"},
+        {label: "$color5",      var: "$color5"},
+        {label: "$color6",      var: "$color6"},
+        {label: "$color7",      var: "$color7"},
+        {label: "$color8",      var: "$color8"},
+        {label: "$color9",      var: "$color9"},
+        {label: "$color10",     var: "$color10"},
+        {label: "$color11",     var: "$color11"},
+        {label: "$color12",     var: "$color12"},
+        {label: "$color13",     var: "$color13"},
+        {label: "$color14",     var: "$color14"},
+        {label: "$color15",     var: "$color15"},
+        {label: "$foreground",  var: "$foreground"},
+        {label: "$background",  var: "$background"}
+    ]
+
+    // Helper: resolve a pywal $varname to a live color via Theme.walColors
+    // (Theme.walColors is a JS object populated from ~/.cache/wal/colors-hyprland.conf)
+    function _resolvePywalColor(varName) {
+        if (typeof Theme.walColors === "object" && Theme.walColors !== null) {
+            const key = varName.replace(/^\$/, "")
+            const val = Theme.walColors[key]
+            if (val) return val
+        }
+        return Theme.cPrimary
+    }
+
+    // Helper: resolve a matugen $varname to live Theme color (mirrors Config._cavaThemeColor)
+    function _cavaThemeColorLocal(varName) {
+        switch (varName) {
+            case "$source_color":           return Theme.cPrimary
+            case "$primary":                return Theme.cPrimary
+            case "$on_primary":             return Theme.cOnPrimary
+            case "$primary_container":      return Theme.cPrimaryContainer
+            case "$on_primary_container":   return Theme.cOnPrimaryContainer
+            case "$primary_fixed":          return Theme.cPrimaryFixed
+            case "$primary_fixed_dim":      return Theme.cPrimaryFixedDim
+            case "$inverse_primary":        return Theme.cInversePrimary
+            case "$secondary":              return Theme.cSecondary
+            case "$on_secondary":           return Theme.cOnSecondary
+            case "$secondary_container":    return Theme.cSecondaryContainer
+            case "$secondary_fixed_dim":    return Theme.cPrimaryFixedDim
+            case "$tertiary":               return Theme.cTertiary
+            case "$on_tertiary":            return Theme.cOnSurf
+            case "$tertiary_container":     return Theme.cTertiaryContainer
+            case "$tertiary_fixed_dim":     return Theme.cTertiary
+            case "$background":             return Theme.cBackground
+            case "$on_background":          return Theme.cOnBackground
+            case "$surface":                return Theme.cSurface
+            case "$surface_variant":        return Theme.cSurfVariant
+            case "$surface_container":      return Theme.cSurfMid
+            case "$surface_container_low":  return Theme.cSurfLow
+            case "$surface_container_high": return Theme.cSurfHi
+            case "$on_surface":             return Theme.cOnSurf
+            case "$on_surface_variant":     return Theme.cOnSurfVar
+            case "$inverse_surface":        return Theme.cInverseSurface
+            case "$outline":                return Theme.cOutline
+            case "$outline_variant":        return Theme.cOutVar
+            case "$error":                  return Theme.cErr
+            case "$scrim":                  return Theme.cScrim
+            case "$shadow":                 return Theme.cShadow
+            default:                        return Theme.cPrimary
+        }
+    }
 
     // Resolve a "$varname" string → the matching Theme color
     // Used by the cava color pickers to apply matugen vars to Config properties
@@ -195,6 +270,10 @@ PanelWindow {
                 ccWin._activeBorderVar = ccBorderColorSettings.activeBorderVar
             if (ccBorderColorSettings.inactiveBorderVar !== "")
                 ccWin._inactiveBorderVar = ccBorderColorSettings.inactiveBorderVar
+            if (ccBorderColorSettings.activeBorderPywalVar !== "")
+                ccWin._activeBorderPywalVar = ccBorderColorSettings.activeBorderPywalVar
+            if (ccBorderColorSettings.inactiveBorderPywalVar !== "")
+                ccWin._inactiveBorderPywalVar = ccBorderColorSettings.inactiveBorderPywalVar
             if (ccBorderColorSettings.activeBorderColor !== "")
                 ccWin._activeBorderColor = ccBorderColorSettings.activeBorderColor
             if (ccBorderColorSettings.inactiveBorderColor !== "")
@@ -213,19 +292,27 @@ PanelWindow {
             if (lines.length > 4) _gapsOuterEntryVal = lines[4] || "0"
             if (lines.length > 5) _borderWEntryVal   = lines[5] || "0"
             if (lines.length > 6) _borderREntryVal   = lines[6] || "0"
-            // Parse border colors — detect matugen variables or hex colors
+            // Parse border colors — detect matugen/pywal variables or hex colors
             if (lines.length > 7) {
                 const activeVal = lines[7] ? lines[7].trim() : ""
                 if (activeVal.length > 0) {
-                    if (activeVal.startsWith("$")) {
+                    if (activeVal.startsWith("$color") || activeVal === "$foreground" || activeVal === "$background" && lines[7].indexOf("color") < 0) {
+                        // Pywal variable detected (color0-color15, foreground, background from wal)
+                        const isPywal = /^\$(color\d+|foreground)$/.test(activeVal)
+                        if (isPywal) {
+                            ccWin._activeBorderMode = "pywal"
+                            ccWin._activeBorderPywalVar = activeVal
+                        } else if (activeVal.startsWith("$")) {
+                            ccWin._activeBorderMode = "matugen"
+                            ccWin._activeBorderVar = activeVal
+                        }
+                    } else if (activeVal.startsWith("$")) {
                         // Matugen variable detected
                         ccWin._activeBorderMode = "matugen"
                         ccWin._activeBorderVar = activeVal
                     } else {
                         // Hex color detected
                         ccWin._activeBorderMode = "custom"
-                        ccWin._activeBorderColor = "#" + activeVal.replace(/^#+/, "").replace(/^0x/, "").substring(activeVal.startsWith("0xff") ? 2 : 0)
-                        // Normalize to #AARRGGBB or #RRGGBB
                         const hex = activeVal.replace(/^#+/, "").replace(/^0x/, "")
                         if (hex.startsWith("ff") && hex.length === 8) {
                             ccWin._activeBorderColor = "#" + hex.substring(2)
@@ -240,7 +327,11 @@ PanelWindow {
             if (lines.length > 8) {
                 const inactiveVal = lines[8] ? lines[8].trim() : ""
                 if (inactiveVal.length > 0) {
-                    if (inactiveVal.startsWith("$")) {
+                    const isPywal = /^\$(color\d+|foreground)$/.test(inactiveVal)
+                    if (isPywal) {
+                        ccWin._inactiveBorderMode = "pywal"
+                        ccWin._inactiveBorderPywalVar = inactiveVal
+                    } else if (inactiveVal.startsWith("$")) {
                         // Matugen variable detected
                         ccWin._inactiveBorderMode = "matugen"
                         ccWin._inactiveBorderVar = inactiveVal
@@ -594,12 +685,14 @@ PanelWindow {
     Settings {
         id: ccBorderColorSettings
         category: "cc-border-colors-v1"
-        property string activeBorderColor:   ""
-        property string inactiveBorderColor: ""
-        property string activeBorderMode:    "matugen"  // "matugen" | "custom"
-        property string inactiveBorderMode:  "matugen"  // "matugen" | "custom"
-        property string activeBorderVar:     "$source_color"
-        property string inactiveBorderVar:   "$background"
+        property string activeBorderColor:        ""
+        property string inactiveBorderColor:      ""
+        property string activeBorderMode:         "matugen"  // "matugen" | "custom" | "pywal"
+        property string inactiveBorderMode:       "matugen"  // "matugen" | "custom" | "pywal"
+        property string activeBorderVar:          "$source_color"
+        property string inactiveBorderVar:        "$background"
+        property string activeBorderPywalVar:     "$color4"
+        property string inactiveBorderPywalVar:   "$color0"
     }
     Settings {
         id: ccThemeSettings
@@ -1426,60 +1519,187 @@ PanelWindow {
                                                 text: Config.cavaGradientEnabled ? "Start Color" : "Bar Color"
                                                 color: Theme.cPrimary
                                                 font.family: Config.labelFont; font.pixelSize: 13
-                                                Layout.preferredWidth: 130
+                                                Layout.preferredWidth: 90
                                             }
-                                            CCPillBtn {
-                                                text: Config.cavaStartMode === "matugen" ? "󰋉 Variable" : " Custom"
-                                                active: true
-                                                onClicked: {
-                                                    Config.cavaStartMode = Config.cavaStartMode === "matugen" ? "custom" : "matugen"
+                                            // Three-button mode selector
+                                            Rectangle {
+                                                Layout.preferredWidth: 216; height: 28; radius: 9
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                               Theme.cInversePrimary.b, 0.12)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                                Row {
+                                                    anchors.fill: parent; anchors.margins: 2; spacing: 2
+                                                    Repeater {
+                                                        model: ["custom", "matugen", "pywal"]
+                                                        delegate: Rectangle {
+                                                            required property string modelData
+                                                            property bool _sel: Config.cavaStartMode === modelData
+                                                            width: (parent.width - 4) / 3; height: parent.height; radius: 7
+                                                            color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                                  Theme.cInversePrimary.b, 0.82) : "transparent"
+                                                            border.width: _sel ? 1 : 0
+                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                            Text {
+                                                                anchors.centerIn: parent
+                                                                text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                                color: Theme.cPrimary
+                                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                                font.weight: _sel ? 600 : 400
+                                                            }
+                                                            MouseArea {
+                                                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                onClicked: { Config.cavaStartMode = modelData }
+                                                            }
+                                                            Behavior on color { ColorAnimation { duration: 120 } }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                         Item {
                                             Layout.fillWidth: true
-                                            implicitHeight: _cavaStartVarLoader.active
-                                                ? (_cavaStartVarLoader.item ? _cavaStartVarLoader.item.height : 0)
-                                                : (_cavaStartColorLoader.item ? _cavaStartColorLoader.item.height : 0)
+                                            implicitHeight: {
+                                                if (Config.cavaStartMode === "matugen")
+                                                    return _cavaStartMatugenLoader.item ? _cavaStartMatugenLoader.item.height : 0
+                                                if (Config.cavaStartMode === "pywal")
+                                                    return _cavaStartPywalLoader.item ? _cavaStartPywalLoader.item.height : 0
+                                                return _cavaStartCustomLoader.item ? _cavaStartCustomLoader.item.height : 0
+                                            }
+                                            // Matugen color swatches
                                             Loader {
-                                                id: _cavaStartVarLoader
+                                                id: _cavaStartMatugenLoader
                                                 anchors { left: parent.left; right: parent.right; top: parent.top }
                                                 active: Config.cavaStartMode === "matugen"
                                                 sourceComponent: ColumnLayout {
-                                                    spacing: 6
+                                                    spacing: 4
                                                     Text {
-                                                        text: "  Variable:"
+                                                        text: "  Matugen color:"
                                                         color: Theme.cOnSurfVar
                                                         font.family: Config.labelFont; font.pixelSize: 11
                                                     }
                                                     Flow {
-                                                        Layout.fillWidth: true; spacing: 6
+                                                        Layout.fillWidth: true; spacing: 5
                                                         Repeater {
                                                             model: ccWin._matugenBorderVars
-                                                            delegate: CCPillBtn {
+                                                            delegate: Item {
                                                                 required property var modelData
-                                                                text: modelData.label.replace("$", "")
-                                                                active: Config.cavaStartVar === modelData.var
-                                                                onClicked: { Config.cavaStartVar = modelData.var }
+                                                                width: 28; height: 28
+                                                                Rectangle {
+                                                                    anchors.fill: parent; radius: 6
+                                                                    color: ccWin._cavaThemeColorLocal(modelData.var)
+                                                                    border.width: Config.cavaStartVar === modelData.var ? 2 : 1
+                                                                    border.color: Config.cavaStartVar === modelData.var
+                                                                        ? Theme.cPrimary
+                                                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                    ToolTip.visible: _csMatHover.containsMouse
+                                                                    ToolTip.text: modelData.var
+                                                                    ToolTip.delay: 400
+                                                                    MouseArea {
+                                                                        id: _csMatHover
+                                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                        hoverEnabled: true
+                                                                        onClicked: { Config.cavaStartVar = modelData.var }
+                                                                    }
+                                                                    Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                                }
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
+                                            // Pywal color swatches
                                             Loader {
-                                                id: _cavaStartColorLoader
+                                                id: _cavaStartPywalLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.cavaStartMode === "pywal"
+                                                sourceComponent: ColumnLayout {
+                                                    spacing: 4
+                                                    Text {
+                                                        text: "  Pywal color:"
+                                                        color: Theme.cOnSurfVar
+                                                        font.family: Config.labelFont; font.pixelSize: 11
+                                                    }
+                                                    Flow {
+                                                        Layout.fillWidth: true; spacing: 5
+                                                        Repeater {
+                                                            model: ccWin._pywalBorderVars
+                                                            delegate: Item {
+                                                                required property var modelData
+                                                                width: 28; height: 28
+                                                                Rectangle {
+                                                                    anchors.fill: parent; radius: 6
+                                                                    color: ccWin._resolvePywalColor(modelData.var)
+                                                                    border.width: Config.cavaStartPywalVar === modelData.var ? 2 : 1
+                                                                    border.color: Config.cavaStartPywalVar === modelData.var
+                                                                        ? Theme.cPrimary
+                                                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                    ToolTip.visible: _csPywalHover.containsMouse
+                                                                    ToolTip.text: modelData.var
+                                                                    ToolTip.delay: 400
+                                                                    MouseArea {
+                                                                        id: _csPywalHover
+                                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                        hoverEnabled: true
+                                                                        onClicked: { Config.cavaStartPywalVar = modelData.var }
+                                                                    }
+                                                                    Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // Custom color picker + hex entry
+                                            Loader {
+                                                id: _cavaStartCustomLoader
                                                 anchors { left: parent.left; right: parent.right; top: parent.top }
                                                 active: Config.cavaStartMode === "custom"
-                                                sourceComponent: CCColorPicker {
-                                                    label: "Custom Color"
-                                                    currentColor: Config.cavaGradientEnabled
-                                                        ? Config.cavaGradientStartColor
-                                                        : Config.cavaGlyphColor
-                                                    onColorPicked: function(c) {
-                                                        // Write to the private custom slot — leaves the computed
-                                                        // cavaGradientStartColor/cavaGlyphColor bindings intact
-                                                        Config._cavaStartCustomColor = c
-                                                        Config._cavaGlyphCustomColor = c
+                                                sourceComponent: ColumnLayout {
+                                                    spacing: 4
+                                                    CCColorPicker {
+                                                        label: "Color Swatches"
+                                                        currentColor: Config.cavaGradientEnabled
+                                                            ? Config.cavaGradientStartColor
+                                                            : Config.cavaGlyphColor
+                                                        onColorPicked: function(c) {
+                                                            Config._cavaStartCustomColor = c
+                                                            Config._cavaGlyphCustomColor = c
+                                                        }
+                                                    }
+                                                    RowLayout {
+                                                        Layout.fillWidth: true; spacing: 8
+                                                        Text {
+                                                            text: "Hex value:"
+                                                            color: Theme.cOnSurfVar
+                                                            font.family: Config.labelFont; font.pixelSize: 11
+                                                            Layout.preferredWidth: 70
+                                                        }
+                                                        Rectangle {
+                                                            Layout.fillWidth: true; height: 28; radius: 7
+                                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
+                                                            border.width: 1
+                                                            border.color: _csHexInput.activeFocus
+                                                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                            Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                            TextInput {
+                                                                id: _csHexInput
+                                                                anchors { fill: parent; margins: 6 }
+                                                                text: (Config.cavaGradientEnabled ? Config.cavaGradientStartColor : Config.cavaGlyphColor).toString().toUpperCase()
+                                                                color: Theme.cPrimary
+                                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                                verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                                onAccepted: {
+                                                                    let raw = text.trim().replace(/^#+/, "")
+                                                                    if (/^[0-9a-fA-F]{6}$/.test(raw)) {
+                                                                        const c = "#" + raw
+                                                                        Config._cavaStartCustomColor = c
+                                                                        Config._cavaGlyphCustomColor = c
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -1495,63 +1715,195 @@ PanelWindow {
                                                 text: "End Color"
                                                 color: Theme.cPrimary
                                                 font.family: Config.labelFont; font.pixelSize: 13
-                                                Layout.preferredWidth: 130
+                                                Layout.preferredWidth: 90
                                             }
-                                            CCPillBtn {
-                                                text: Config.cavaEndMode === "matugen" ? "󰋉 Variable" : " Custom"
-                                                active: true
-                                                enabled: Config.cavaGradientEnabled
-                                                onClicked: {
-                                                    if (!Config.cavaGradientEnabled) return
-                                                    Config.cavaEndMode = Config.cavaEndMode === "matugen" ? "custom" : "matugen"
+                                            // Three-button mode selector
+                                            Rectangle {
+                                                Layout.preferredWidth: 216; height: 28; radius: 9
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                               Theme.cInversePrimary.b, 0.12)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                                Row {
+                                                    anchors.fill: parent; anchors.margins: 2; spacing: 2
+                                                    Repeater {
+                                                        model: ["custom", "matugen", "pywal"]
+                                                        delegate: Rectangle {
+                                                            required property string modelData
+                                                            property bool _sel: Config.cavaEndMode === modelData
+                                                            width: (parent.width - 4) / 3; height: parent.height; radius: 7
+                                                            color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                                  Theme.cInversePrimary.b, 0.82) : "transparent"
+                                                            border.width: _sel ? 1 : 0
+                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                            enabled: Config.cavaGradientEnabled
+                                                            Text {
+                                                                anchors.centerIn: parent
+                                                                text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                                color: Theme.cPrimary
+                                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                                font.weight: _sel ? 600 : 400
+                                                            }
+                                                            MouseArea {
+                                                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                onClicked: {
+                                                                    if (!Config.cavaGradientEnabled) return
+                                                                    Config.cavaEndMode = modelData
+                                                                }
+                                                            }
+                                                            Behavior on color { ColorAnimation { duration: 120 } }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
                                         Item {
                                             Layout.fillWidth: true
                                             opacity: Config.cavaGradientEnabled ? 1.0 : 0.4
-                                            implicitHeight: _cavaEndVarLoader.active
-                                                ? (_cavaEndVarLoader.item ? _cavaEndVarLoader.item.height : 0)
-                                                : (_cavaEndColorLoader.item ? _cavaEndColorLoader.item.height : 0)
+                                            implicitHeight: {
+                                                if (Config.cavaEndMode === "matugen")
+                                                    return _cavaEndMatugenLoader.item ? _cavaEndMatugenLoader.item.height : 0
+                                                if (Config.cavaEndMode === "pywal")
+                                                    return _cavaEndPywalLoader.item ? _cavaEndPywalLoader.item.height : 0
+                                                return _cavaEndCustomLoader.item ? _cavaEndCustomLoader.item.height : 0
+                                            }
+                                            // Matugen color swatches
                                             Loader {
-                                                id: _cavaEndVarLoader
+                                                id: _cavaEndMatugenLoader
                                                 anchors { left: parent.left; right: parent.right; top: parent.top }
                                                 active: Config.cavaEndMode === "matugen"
                                                 sourceComponent: ColumnLayout {
-                                                    spacing: 6
+                                                    spacing: 4
                                                     Text {
-                                                        text: "  Variable:"
+                                                        text: "  Matugen color:"
                                                         color: Theme.cOnSurfVar
                                                         font.family: Config.labelFont; font.pixelSize: 11
                                                     }
                                                     Flow {
-                                                        Layout.fillWidth: true; spacing: 6
+                                                        Layout.fillWidth: true; spacing: 5
                                                         Repeater {
                                                             model: ccWin._matugenBorderVars
-                                                            delegate: CCPillBtn {
+                                                            delegate: Item {
                                                                 required property var modelData
-                                                                text: modelData.label.replace("$", "")
-                                                                active: Config.cavaEndVar === modelData.var
-                                                                onClicked: {
-                                                                    if (!Config.cavaGradientEnabled) return
-                                                                    Config.cavaEndVar = modelData.var
+                                                                width: 28; height: 28
+                                                                Rectangle {
+                                                                    anchors.fill: parent; radius: 6
+                                                                    color: ccWin._cavaThemeColorLocal(modelData.var)
+                                                                    border.width: Config.cavaEndVar === modelData.var ? 2 : 1
+                                                                    border.color: Config.cavaEndVar === modelData.var
+                                                                        ? Theme.cPrimary
+                                                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                    ToolTip.visible: _ceMatHover.containsMouse
+                                                                    ToolTip.text: modelData.var
+                                                                    ToolTip.delay: 400
+                                                                    MouseArea {
+                                                                        id: _ceMatHover
+                                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                        hoverEnabled: true
+                                                                        onClicked: {
+                                                                            if (!Config.cavaGradientEnabled) return
+                                                                            Config.cavaEndVar = modelData.var
+                                                                        }
+                                                                    }
+                                                                    Behavior on border.width { NumberAnimation { duration: 100 } }
                                                                 }
                                                             }
                                                         }
                                                     }
                                                 }
                                             }
+                                            // Pywal color swatches
                                             Loader {
-                                                id: _cavaEndColorLoader
+                                                id: _cavaEndPywalLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.cavaEndMode === "pywal"
+                                                sourceComponent: ColumnLayout {
+                                                    spacing: 4
+                                                    Text {
+                                                        text: "  Pywal color:"
+                                                        color: Theme.cOnSurfVar
+                                                        font.family: Config.labelFont; font.pixelSize: 11
+                                                    }
+                                                    Flow {
+                                                        Layout.fillWidth: true; spacing: 5
+                                                        Repeater {
+                                                            model: ccWin._pywalBorderVars
+                                                            delegate: Item {
+                                                                required property var modelData
+                                                                width: 28; height: 28
+                                                                Rectangle {
+                                                                    anchors.fill: parent; radius: 6
+                                                                    color: ccWin._resolvePywalColor(modelData.var)
+                                                                    border.width: Config.cavaEndPywalVar === modelData.var ? 2 : 1
+                                                                    border.color: Config.cavaEndPywalVar === modelData.var
+                                                                        ? Theme.cPrimary
+                                                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                    ToolTip.visible: _cePywalHover.containsMouse
+                                                                    ToolTip.text: modelData.var
+                                                                    ToolTip.delay: 400
+                                                                    MouseArea {
+                                                                        id: _cePywalHover
+                                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                        hoverEnabled: true
+                                                                        onClicked: {
+                                                                            if (!Config.cavaGradientEnabled) return
+                                                                            Config.cavaEndPywalVar = modelData.var
+                                                                        }
+                                                                    }
+                                                                    Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // Custom color picker + hex entry
+                                            Loader {
+                                                id: _cavaEndCustomLoader
                                                 anchors { left: parent.left; right: parent.right; top: parent.top }
                                                 active: Config.cavaEndMode === "custom"
-                                                sourceComponent: CCColorPicker {
-                                                    label: "Custom Color"
-                                                    pickerEnabled: Config.cavaGradientEnabled
-                                                    currentColor: Config.cavaGradientEndColor
-                                                    onColorPicked: function(c) {
-                                                        if (Config.cavaGradientEnabled)
-                                                            Config._cavaEndCustomColor = c
+                                                sourceComponent: ColumnLayout {
+                                                    spacing: 4
+                                                    CCColorPicker {
+                                                        label: "Color Swatches"
+                                                        pickerEnabled: Config.cavaGradientEnabled
+                                                        currentColor: Config.cavaGradientEndColor
+                                                        onColorPicked: function(c) {
+                                                            if (Config.cavaGradientEnabled)
+                                                                Config._cavaEndCustomColor = c
+                                                        }
+                                                    }
+                                                    RowLayout {
+                                                        Layout.fillWidth: true; spacing: 8
+                                                        Text {
+                                                            text: "Hex value:"
+                                                            color: Theme.cOnSurfVar
+                                                            font.family: Config.labelFont; font.pixelSize: 11
+                                                            Layout.preferredWidth: 70
+                                                        }
+                                                        Rectangle {
+                                                            Layout.fillWidth: true; height: 28; radius: 7
+                                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
+                                                            border.width: 1
+                                                            border.color: _ceHexInput.activeFocus
+                                                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                            Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                            TextInput {
+                                                                id: _ceHexInput
+                                                                anchors { fill: parent; margins: 6 }
+                                                                text: Config.cavaGradientEndColor.toString().toUpperCase()
+                                                                color: Theme.cPrimary
+                                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                                verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                                onAccepted: {
+                                                                    let raw = text.trim().replace(/^#+/, "")
+                                                                    if (/^[0-9a-fA-F]{6}$/.test(raw) && Config.cavaGradientEnabled) {
+                                                                        Config._cavaEndCustomColor = "#" + raw
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2168,89 +2520,234 @@ PanelWindow {
                             CCSection { text: "Border Colors" }
                             Text {
                                 Layout.fillWidth: true
-                                text: "Use matugen variables (auto-updates with wallpaper) or custom hex colors"
+                                text: "Use matugen variables, pywal colors (auto-updates with wallpaper) or enter custom hex colors"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
                                 font.family: Config.labelFont; font.pixelSize: 11
                                 wrapMode: Text.Wrap
                             }
 
-                            // Active Border Configuration
+                            // ── Active Border ────────────────────────────────────────
                             RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
+                                Layout.fillWidth: true; spacing: 8
                                 Text {
                                     text: "Active Border"
                                     color: Theme.cPrimary
                                     font.family: Config.labelFont; font.pixelSize: 13
-                                    Layout.preferredWidth: 130
+                                    Layout.preferredWidth: 100
                                 }
-                                // Mode toggle
-                                CCPillBtn {
-                                    text: ccWin._activeBorderMode === "matugen" ? "󰋉 Variable" : " Custom"
-                                    active: true
-                                    onClicked: {
-                                        ccWin._activeBorderMode = ccWin._activeBorderMode === "matugen" ? "custom" : "matugen"
-                                        ccBorderColorSettings.activeBorderMode = ccWin._activeBorderMode
-                                        if (ccWin._activeBorderMode === "matugen") {
-                                            _activeBorderApply.command = [scriptDir + "/hyprland-border-active-set.sh", ccWin._activeBorderVar]
-                                            _activeBorderApply.running = true
+                                // Three-button mode selector: Custom | Matugen | Pywal
+                                Rectangle {
+                                    Layout.preferredWidth: 216; height: 28; radius: 9
+                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                   Theme.cInversePrimary.b, 0.12)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                    Row {
+                                        anchors.fill: parent; anchors.margins: 2; spacing: 2
+                                        Repeater {
+                                            model: ["custom", "matugen", "pywal"]
+                                            delegate: Rectangle {
+                                                required property string modelData
+                                                property bool _sel: ccWin._activeBorderMode === modelData
+                                                width: (parent.width - 4) / 3; height: parent.height; radius: 7
+                                                color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                      Theme.cInversePrimary.b, 0.82) : "transparent"
+                                                border.width: _sel ? 1 : 0
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    font.weight: _sel ? 600 : 400
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        ccWin._activeBorderMode = modelData
+                                                        ccBorderColorSettings.activeBorderMode = modelData
+                                                        if (modelData === "matugen") {
+                                                            _activeBorderApply.command = [scriptDir + "/hyprland-border-active-set.sh", ccWin._activeBorderVar]
+                                                            _activeBorderApply.running = true
+                                                        } else if (modelData === "pywal") {
+                                                            _activeBorderApply.command = [scriptDir + "/hyprland-border-active-set.sh", ccWin._activeBorderPywalVar]
+                                                            _activeBorderApply.running = true
+                                                        }
+                                                    }
+                                                }
+                                                Behavior on color { ColorAnimation { duration: 120 } }
+                                            }
                                         }
                                     }
                                 }
                             }
-                            
-                            // Active Border selector container (variable pills OR color picker)
+
+                            // Active border content area — switches based on mode
                             Item {
                                 Layout.fillWidth: true
-                                implicitHeight: _activeVarLoader.active ? (_activeVarLoader.item ? _activeVarLoader.item.height : 0)
-                                                : (_activeColorLoader.item ? _activeColorLoader.item.height : 0)
+                                implicitHeight: {
+                                    if (ccWin._activeBorderMode === "matugen")
+                                        return _activeMatugenLoader.item ? _activeMatugenLoader.item.height : 0
+                                    if (ccWin._activeBorderMode === "pywal")
+                                        return _activePywalLoader.item ? _activePywalLoader.item.height : 0
+                                    return _activeCustomLoader.item ? _activeCustomLoader.item.height : 0
+                                }
+
+                                // Matugen color swatches
                                 Loader {
-                                    id: _activeVarLoader
+                                    id: _activeMatugenLoader
                                     anchors { left: parent.left; right: parent.right; top: parent.top }
                                     active: ccWin._activeBorderMode === "matugen"
                                     sourceComponent: ColumnLayout {
-                                        spacing: 6
+                                        spacing: 4
                                         Text {
-                                            text: "  Variable:"
+                                            text: "  Matugen color:"
                                             color: Theme.cOnSurfVar
                                             font.family: Config.labelFont; font.pixelSize: 11
                                         }
                                         Flow {
-                                            Layout.fillWidth: true
-                                            spacing: 6
+                                            Layout.fillWidth: true; spacing: 5
                                             Repeater {
                                                 model: ccWin._matugenBorderVars
-                                                delegate: CCPillBtn {
+                                                delegate: Item {
                                                     required property var modelData
-                                                    text: modelData.label.replace("$", "")
-                                                    active: ccWin._activeBorderVar === modelData.var
-                                                    onClicked: {
-                                                        ccWin._activeBorderVar = modelData.var
-                                                        ccBorderColorSettings.activeBorderVar = modelData.var
-                                                        _activeBorderApply.command = [scriptDir + "/hyprland-border-active-set.sh", modelData.var]
-                                                        _activeBorderApply.running = true
+                                                    width: 28; height: 28
+                                                    Rectangle {
+                                                        anchors.fill: parent; radius: 6
+                                                        color: ccWin._cavaThemeColorLocal(modelData.var)
+                                                        border.width: ccWin._activeBorderVar === modelData.var ? 2 : 1
+                                                        border.color: ccWin._activeBorderVar === modelData.var
+                                                            ? Theme.cPrimary
+                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                        ToolTip.visible: _matAHover.containsMouse
+                                                        ToolTip.text: modelData.var
+                                                        ToolTip.delay: 400
+                                                        MouseArea {
+                                                            id: _matAHover
+                                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                            hoverEnabled: true
+                                                            onClicked: {
+                                                                ccWin._activeBorderVar = modelData.var
+                                                                ccBorderColorSettings.activeBorderVar = modelData.var
+                                                                _activeBorderApply.command = [scriptDir + "/hyprland-border-active-set.sh", modelData.var]
+                                                                _activeBorderApply.running = true
+                                                            }
+                                                        }
+                                                        Behavior on border.width { NumberAnimation { duration: 100 } }
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 }
+
+                                // Pywal color swatches
                                 Loader {
-                                    id: _activeColorLoader
+                                    id: _activePywalLoader
+                                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                                    active: ccWin._activeBorderMode === "pywal"
+                                    sourceComponent: ColumnLayout {
+                                        spacing: 4
+                                        Text {
+                                            text: "  Pywal color:"
+                                            color: Theme.cOnSurfVar
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                        }
+                                        Flow {
+                                            Layout.fillWidth: true; spacing: 5
+                                            Repeater {
+                                                model: ccWin._pywalBorderVars
+                                                delegate: Item {
+                                                    required property var modelData
+                                                    width: 28; height: 28
+                                                    Rectangle {
+                                                        anchors.fill: parent; radius: 6
+                                                        color: ccWin._resolvePywalColor(modelData.var)
+                                                        border.width: ccWin._activeBorderPywalVar === modelData.var ? 2 : 1
+                                                        border.color: ccWin._activeBorderPywalVar === modelData.var
+                                                            ? Theme.cPrimary
+                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                        ToolTip.visible: _pywalAHover.containsMouse
+                                                        ToolTip.text: modelData.var
+                                                        ToolTip.delay: 400
+                                                        MouseArea {
+                                                            id: _pywalAHover
+                                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                            hoverEnabled: true
+                                                            onClicked: {
+                                                                ccWin._activeBorderPywalVar = modelData.var
+                                                                ccBorderColorSettings.activeBorderPywalVar = modelData.var
+                                                                _activeBorderApply.command = [scriptDir + "/hyprland-border-active-set.sh", modelData.var]
+                                                                _activeBorderApply.running = true
+                                                            }
+                                                        }
+                                                        Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Custom hex color picker + manual entry
+                                Loader {
+                                    id: _activeCustomLoader
                                     anchors { left: parent.left; right: parent.right; top: parent.top }
                                     active: ccWin._activeBorderMode === "custom"
-                                    sourceComponent: CCColorPicker {
-                                        label: "Custom Color"
-                                        currentColor: ccWin._activeBorderColor
-                                        onColorPicked: function(c) {
-                                            ccWin._activeBorderColor = c
-                                            ccBorderColorSettings.activeBorderColor = c.toString()
-                                            const hex = c.toString().replace("#", "").substring(0, 6)
-                                            _activeBorderWrite.command = ["bash", "-c",
-                                                'f="$HOME/.config/hypr/hyprviz.conf"; ' +
-                                                'sed -i "s|^\\s*col\\.active_border\\s*=.*|col.active_border = 0xff' + hex + '|g" "$f"; ' +
-                                                'hyprctl reload 2>/dev/null || true']
-                                            _activeBorderWrite.running = true
+                                    sourceComponent: ColumnLayout {
+                                        spacing: 4
+                                        CCColorPicker {
+                                            label: "Color Swatches"
+                                            currentColor: ccWin._activeBorderColor
+                                            onColorPicked: function(c) {
+                                                ccWin._activeBorderColor = c
+                                                ccBorderColorSettings.activeBorderColor = c.toString()
+                                                const hex = c.toString().replace("#", "").substring(0, 6)
+                                                _activeBorderWrite.command = ["bash", "-c",
+                                                    'f="$HOME/.config/hypr/hyprviz.conf"; ' +
+                                                    'sed -i "s|^\\s*col\\.active_border\\s*=.*|col.active_border = 0xff' + hex + '|g" "$f"; ' +
+                                                    'hyprctl reload 2>/dev/null || true']
+                                                _activeBorderWrite.running = true
+                                            }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Hex value:"
+                                                color: Theme.cOnSurfVar
+                                                font.family: Config.labelFont; font.pixelSize: 11
+                                                Layout.preferredWidth: 70
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
+                                                border.width: 1
+                                                border.color: _activeHexInput.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: _activeHexInput
+                                                    anchors { fill: parent; margins: 6 }
+                                                    text: ccWin._activeBorderColor.toString().toUpperCase()
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onAccepted: {
+                                                        let raw = text.trim().replace(/^#+/, "")
+                                                        if (/^[0-9a-fA-F]{6}$/.test(raw)) {
+                                                            const c = "#" + raw
+                                                            ccWin._activeBorderColor = c
+                                                            ccBorderColorSettings.activeBorderColor = c
+                                                            _activeBorderWrite.command = ["bash", "-c",
+                                                                'f="$HOME/.config/hypr/hyprviz.conf"; ' +
+                                                                'sed -i "s|^\\s*col\\.active_border\\s*=.*|col.active_border = 0xff' + raw + '|g" "$f"; ' +
+                                                                'hyprctl reload 2>/dev/null || true']
+                                                            _activeBorderWrite.running = true
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -2260,83 +2757,228 @@ PanelWindow {
 
                             Item { height: 8 }
 
-                            // Inactive Border Configuration
+                            // ── Inactive Border ─────────────────────────────────────
                             RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 8
+                                Layout.fillWidth: true; spacing: 8
                                 Text {
                                     text: "Inactive Border"
                                     color: Theme.cPrimary
                                     font.family: Config.labelFont; font.pixelSize: 13
-                                    Layout.preferredWidth: 130
+                                    Layout.preferredWidth: 100
                                 }
-                                // Mode toggle
-                                CCPillBtn {
-                                    text: ccWin._inactiveBorderMode === "matugen" ? "󰋉 Variable" : " Custom"
-                                    active: true
-                                    onClicked: {
-                                        ccWin._inactiveBorderMode = ccWin._inactiveBorderMode === "matugen" ? "custom" : "matugen"
-                                        ccBorderColorSettings.inactiveBorderMode = ccWin._inactiveBorderMode
-                                        if (ccWin._inactiveBorderMode === "matugen") {
-                                            _inactiveBorderApply.command = [scriptDir + "/hyprland-border-inactive-set.sh", ccWin._inactiveBorderVar]
-                                            _inactiveBorderApply.running = true
+                                // Three-button mode selector: Custom | Matugen | Pywal
+                                Rectangle {
+                                    Layout.preferredWidth: 216; height: 28; radius: 9
+                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                   Theme.cInversePrimary.b, 0.12)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                    Row {
+                                        anchors.fill: parent; anchors.margins: 2; spacing: 2
+                                        Repeater {
+                                            model: ["custom", "matugen", "pywal"]
+                                            delegate: Rectangle {
+                                                required property string modelData
+                                                property bool _sel: ccWin._inactiveBorderMode === modelData
+                                                width: (parent.width - 4) / 3; height: parent.height; radius: 7
+                                                color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                      Theme.cInversePrimary.b, 0.82) : "transparent"
+                                                border.width: _sel ? 1 : 0
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    font.weight: _sel ? 600 : 400
+                                                }
+                                                MouseArea {
+                                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        ccWin._inactiveBorderMode = modelData
+                                                        ccBorderColorSettings.inactiveBorderMode = modelData
+                                                        if (modelData === "matugen") {
+                                                            _inactiveBorderApply.command = [scriptDir + "/hyprland-border-inactive-set.sh", ccWin._inactiveBorderVar]
+                                                            _inactiveBorderApply.running = true
+                                                        } else if (modelData === "pywal") {
+                                                            _inactiveBorderApply.command = [scriptDir + "/hyprland-border-inactive-set.sh", ccWin._inactiveBorderPywalVar]
+                                                            _inactiveBorderApply.running = true
+                                                        }
+                                                    }
+                                                }
+                                                Behavior on color { ColorAnimation { duration: 120 } }
+                                            }
                                         }
                                     }
                                 }
                             }
-                            
-                            // Inactive Border selector container (variable pills OR color picker)
+
+                            // Inactive border content area
                             Item {
                                 Layout.fillWidth: true
-                                implicitHeight: _inactiveVarLoader.active ? (_inactiveVarLoader.item ? _inactiveVarLoader.item.height : 0)
-                                                : (_inactiveColorLoader.item ? _inactiveColorLoader.item.height : 0)
+                                implicitHeight: {
+                                    if (ccWin._inactiveBorderMode === "matugen")
+                                        return _inactiveMatugenLoader.item ? _inactiveMatugenLoader.item.height : 0
+                                    if (ccWin._inactiveBorderMode === "pywal")
+                                        return _inactivePywalLoader.item ? _inactivePywalLoader.item.height : 0
+                                    return _inactiveCustomLoader.item ? _inactiveCustomLoader.item.height : 0
+                                }
+
+                                // Matugen color swatches
                                 Loader {
-                                    id: _inactiveVarLoader
+                                    id: _inactiveMatugenLoader
                                     anchors { left: parent.left; right: parent.right; top: parent.top }
                                     active: ccWin._inactiveBorderMode === "matugen"
                                     sourceComponent: ColumnLayout {
-                                        spacing: 6
+                                        spacing: 4
                                         Text {
-                                            text: "  Variable:"
+                                            text: "  Matugen color:"
                                             color: Theme.cOnSurfVar
                                             font.family: Config.labelFont; font.pixelSize: 11
                                         }
                                         Flow {
-                                            Layout.fillWidth: true
-                                            spacing: 6
+                                            Layout.fillWidth: true; spacing: 5
                                             Repeater {
                                                 model: ccWin._matugenBorderVars
-                                                delegate: CCPillBtn {
+                                                delegate: Item {
                                                     required property var modelData
-                                                    text: modelData.label.replace("$", "")
-                                                    active: ccWin._inactiveBorderVar === modelData.var
-                                                    onClicked: {
-                                                        ccWin._inactiveBorderVar = modelData.var
-                                                        ccBorderColorSettings.inactiveBorderVar = modelData.var
-                                                        _inactiveBorderApply.command = [scriptDir + "/hyprland-border-inactive-set.sh", modelData.var]
-                                                        _inactiveBorderApply.running = true
+                                                    width: 28; height: 28
+                                                    Rectangle {
+                                                        anchors.fill: parent; radius: 6
+                                                        color: ccWin._cavaThemeColorLocal(modelData.var)
+                                                        border.width: ccWin._inactiveBorderVar === modelData.var ? 2 : 1
+                                                        border.color: ccWin._inactiveBorderVar === modelData.var
+                                                            ? Theme.cPrimary
+                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                        ToolTip.visible: _matIHover.containsMouse
+                                                        ToolTip.text: modelData.var
+                                                        ToolTip.delay: 400
+                                                        MouseArea {
+                                                            id: _matIHover
+                                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                            hoverEnabled: true
+                                                            onClicked: {
+                                                                ccWin._inactiveBorderVar = modelData.var
+                                                                ccBorderColorSettings.inactiveBorderVar = modelData.var
+                                                                _inactiveBorderApply.command = [scriptDir + "/hyprland-border-inactive-set.sh", modelData.var]
+                                                                _inactiveBorderApply.running = true
+                                                            }
+                                                        }
+                                                        Behavior on border.width { NumberAnimation { duration: 100 } }
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 }
+
+                                // Pywal color swatches
                                 Loader {
-                                    id: _inactiveColorLoader
+                                    id: _inactivePywalLoader
+                                    anchors { left: parent.left; right: parent.right; top: parent.top }
+                                    active: ccWin._inactiveBorderMode === "pywal"
+                                    sourceComponent: ColumnLayout {
+                                        spacing: 4
+                                        Text {
+                                            text: "  Pywal color:"
+                                            color: Theme.cOnSurfVar
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                        }
+                                        Flow {
+                                            Layout.fillWidth: true; spacing: 5
+                                            Repeater {
+                                                model: ccWin._pywalBorderVars
+                                                delegate: Item {
+                                                    required property var modelData
+                                                    width: 28; height: 28
+                                                    Rectangle {
+                                                        anchors.fill: parent; radius: 6
+                                                        color: ccWin._resolvePywalColor(modelData.var)
+                                                        border.width: ccWin._inactiveBorderPywalVar === modelData.var ? 2 : 1
+                                                        border.color: ccWin._inactiveBorderPywalVar === modelData.var
+                                                            ? Theme.cPrimary
+                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                        ToolTip.visible: _pywalIHover.containsMouse
+                                                        ToolTip.text: modelData.var
+                                                        ToolTip.delay: 400
+                                                        MouseArea {
+                                                            id: _pywalIHover
+                                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                            hoverEnabled: true
+                                                            onClicked: {
+                                                                ccWin._inactiveBorderPywalVar = modelData.var
+                                                                ccBorderColorSettings.inactiveBorderPywalVar = modelData.var
+                                                                _inactiveBorderApply.command = [scriptDir + "/hyprland-border-inactive-set.sh", modelData.var]
+                                                                _inactiveBorderApply.running = true
+                                                            }
+                                                        }
+                                                        Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Custom hex color picker + manual entry
+                                Loader {
+                                    id: _inactiveCustomLoader
                                     anchors { left: parent.left; right: parent.right; top: parent.top }
                                     active: ccWin._inactiveBorderMode === "custom"
-                                    sourceComponent: CCColorPicker {
-                                        label: "Custom Color"
-                                        currentColor: ccWin._inactiveBorderColor
-                                        onColorPicked: function(c) {
-                                            ccWin._inactiveBorderColor = c
-                                            ccBorderColorSettings.inactiveBorderColor = c.toString()
-                                            const hex = c.toString().replace("#", "").substring(0, 6)
-                                            _inactiveBorderWrite.command = ["bash", "-c",
-                                                'f="$HOME/.config/hypr/hyprviz.conf"; ' +
-                                                'sed -i "s|^\\s*col\\.inactive_border\\s*=.*|col.inactive_border = 0xff' + hex + '|g" "$f"; ' +
-                                                'hyprctl reload 2>/dev/null || true']
-                                            _inactiveBorderWrite.running = true
+                                    sourceComponent: ColumnLayout {
+                                        spacing: 4
+                                        CCColorPicker {
+                                            label: "Color Swatches"
+                                            currentColor: ccWin._inactiveBorderColor
+                                            onColorPicked: function(c) {
+                                                ccWin._inactiveBorderColor = c
+                                                ccBorderColorSettings.inactiveBorderColor = c.toString()
+                                                const hex = c.toString().replace("#", "").substring(0, 6)
+                                                _inactiveBorderWrite.command = ["bash", "-c",
+                                                    'f="$HOME/.config/hypr/hyprviz.conf"; ' +
+                                                    'sed -i "s|^\\s*col\\.inactive_border\\s*=.*|col.inactive_border = 0xff' + hex + '|g" "$f"; ' +
+                                                    'hyprctl reload 2>/dev/null || true']
+                                                _inactiveBorderWrite.running = true
+                                            }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Hex value:"
+                                                color: Theme.cOnSurfVar
+                                                font.family: Config.labelFont; font.pixelSize: 11
+                                                Layout.preferredWidth: 70
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
+                                                border.width: 1
+                                                border.color: _inactiveHexInput.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: _inactiveHexInput
+                                                    anchors { fill: parent; margins: 6 }
+                                                    text: ccWin._inactiveBorderColor.toString().toUpperCase()
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onAccepted: {
+                                                        let raw = text.trim().replace(/^#+/, "")
+                                                        if (/^[0-9a-fA-F]{6}$/.test(raw)) {
+                                                            const c = "#" + raw
+                                                            ccWin._inactiveBorderColor = c
+                                                            ccBorderColorSettings.inactiveBorderColor = c
+                                                            _inactiveBorderWrite.command = ["bash", "-c",
+                                                                'f="$HOME/.config/hypr/hyprviz.conf"; ' +
+                                                                'sed -i "s|^\\s*col\\.inactive_border\\s*=.*|col.inactive_border = 0xff' + raw + '|g" "$f"; ' +
+                                                                'hyprctl reload 2>/dev/null || true']
+                                                            _inactiveBorderWrite.running = true
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

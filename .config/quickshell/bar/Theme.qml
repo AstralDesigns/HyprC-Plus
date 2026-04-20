@@ -129,6 +129,36 @@ QtObject {
     readonly property int borderRadius:  14
     readonly property int modulePadding: 8
 
+    // ── Pywal colors (from ~/.cache/wal/colors-hyprland.conf) ────────────────
+    // walColors is a JS object: { color0: "#rrggbb", color1: ..., foreground: ..., background: ... }
+    // It is re-parsed whenever the pywal file changes (wal runs on wallpaper change).
+    property var walColors: ({})
+
+    property var _pywalColorFile: FileView {
+        path: root._home + "/.cache/wal/colors-hyprland.conf"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root._applyPywalColors(text())
+        Component.onCompleted: reload()
+    }
+
+    // Parse ~/.cache/wal/colors-hyprland.conf
+    // Format: $color0 = rgba(r,g,b,a)  or  $foreground = rgba(...)
+    function _applyPywalColors(t) {
+        if (!t || t.length === 0) return
+        const result = {}
+        const re = /^\$(\w+)\s*=\s*rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,[\d.]+\s*\)/gm
+        let m
+        while ((m = re.exec(t)) !== null) {
+            const key = m[1]
+            const r = parseInt(m[2]).toString(16).padStart(2, "0")
+            const g = parseInt(m[3]).toString(16).padStart(2, "0")
+            const b = parseInt(m[4]).toString(16).padStart(2, "0")
+            result[key] = "#" + r + g + b
+        }
+        walColors = result
+    }
+
     // ── Live file watcher ─────────────────────────────────────────────────
     // HOME resolved via StandardPaths — no Process needed, no startup-path warning.
     readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation)

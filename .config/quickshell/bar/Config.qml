@@ -118,6 +118,8 @@ QtObject {
         v = _settings.value("cavaEndMode");   if (v !== undefined && v !== null) cavaEndMode   = v
         v = _settings.value("cavaStartVar");  if (v !== undefined && v !== null) cavaStartVar  = v
         v = _settings.value("cavaEndVar");    if (v !== undefined && v !== null) cavaEndVar    = v
+        v = _settings.value("cavaStartPywalVar"); if (v !== undefined && v !== null) cavaStartPywalVar = v
+        v = _settings.value("cavaEndPywalVar");   if (v !== undefined && v !== null) cavaEndPywalVar   = v
         v = _settings.value("cavaStartCustomColor"); if (v !== undefined && v !== null) _cavaStartCustomColor = v
         v = _settings.value("cavaEndCustomColor");   if (v !== undefined && v !== null) _cavaEndCustomColor   = v
         v = _settings.value("cavaGlyphCustomColor"); if (v !== undefined && v !== null) _cavaGlyphCustomColor = v
@@ -240,6 +242,8 @@ QtObject {
         _settings.setValue("cavaEndMode",          cavaEndMode)
         _settings.setValue("cavaStartVar",         cavaStartVar)
         _settings.setValue("cavaEndVar",           cavaEndVar)
+        _settings.setValue("cavaStartPywalVar",    cavaStartPywalVar)
+        _settings.setValue("cavaEndPywalVar",      cavaEndPywalVar)
         _settings.setValue("cavaStartCustomColor", _cavaStartCustomColor)
         _settings.setValue("cavaEndCustomColor",   _cavaEndCustomColor)
         _settings.setValue("cavaGlyphCustomColor", _cavaGlyphCustomColor)
@@ -566,15 +570,15 @@ QtObject {
     //  not waiting for the CC to open.  The computed color properties below
     //  re-evaluate automatically whenever Theme updates (wallpaper change).
 
-    // Mode + selected variable for each color slot
-    property string cavaStartMode: "matugen"   // "matugen" | "custom"
-    property string cavaEndMode:   "matugen"   // "matugen" | "custom"
-    property string cavaStartVar:  "$primary"  // selected matugen variable
-    property string cavaEndVar:    "$scrim"    // selected matugen variable
+    // Mode + selected variable for each color slot ("matugen" | "custom" | "pywal")
+    property string cavaStartMode:      "matugen"
+    property string cavaEndMode:        "matugen"
+    property string cavaStartVar:       "$primary"     // selected matugen variable
+    property string cavaEndVar:         "$scrim"       // selected matugen variable
+    property string cavaStartPywalVar:  "$color4"      // selected pywal variable
+    property string cavaEndPywalVar:    "$color1"      // selected pywal variable
 
-    // Resolve a "$varname" → the live Theme.cXxx color.
-    // Called inside the computed color bindings below so they are reactive:
-    // whenever Theme updates, Qt re-evaluates these expressions automatically.
+    // Resolve a matugen "$varname" → the live Theme.cXxx color.
     function _cavaThemeColor(varName) {
         switch (varName) {
             case "$source_color":           return Theme.cPrimary
@@ -612,25 +616,41 @@ QtObject {
         }
     }
 
-    // Computed color properties — reactive to both mode/var changes AND Theme updates.
-    // In matugen mode: expression references Theme.cXxx through _cavaThemeColor(),
-    // so Qt's binding system tracks the dependency and re-evaluates on wallpaper change.
-    // In custom mode: a static color value is stored directly (set by CC picker).
+    // Resolve a pywal "$varname" → color from Theme.walColors map.
+    function _cavaPywalColor(varName) {
+        if (typeof Theme.walColors === "object" && Theme.walColors !== null) {
+            const key = varName.replace(/^\$/, "")
+            const val = Theme.walColors[key]
+            if (val) return val
+        }
+        return Theme.cPrimary
+    }
+
+    // Computed color properties — reactive to mode/var changes AND Theme updates.
+    // matugen mode: references Theme.cXxx via _cavaThemeColor() — fully reactive.
+    // pywal mode: references Theme.walColors via _cavaPywalColor() — reactive on wallpaper.
+    // custom mode: static color stored directly (set by CC picker or hex entry).
     property color cavaGlyphColor: cavaStartMode === "matugen"
         ? _cavaThemeColor(cavaStartVar)
-        : _cavaGlyphCustomColor
+        : cavaStartMode === "pywal"
+            ? _cavaPywalColor(cavaStartPywalVar)
+            : _cavaGlyphCustomColor
     property color _cavaGlyphCustomColor: Theme.cPrimary   // overwritten by CC custom pick
 
     property bool  cavaGradientEnabled:    false
 
     property color cavaGradientStartColor: cavaStartMode === "matugen"
         ? _cavaThemeColor(cavaStartVar)
-        : _cavaStartCustomColor
+        : cavaStartMode === "pywal"
+            ? _cavaPywalColor(cavaStartPywalVar)
+            : _cavaStartCustomColor
     property color _cavaStartCustomColor: Theme.cPrimary   // overwritten by CC custom pick
 
     property color cavaGradientEndColor: cavaEndMode === "matugen"
         ? _cavaThemeColor(cavaEndVar)
-        : _cavaEndCustomColor
+        : cavaEndMode === "pywal"
+            ? _cavaPywalColor(cavaEndPywalVar)
+            : _cavaEndCustomColor
     property color _cavaEndCustomColor: Theme.cScrim       // overwritten by CC custom pick
 
     // Fraction of glyph height at which start→end color splits (0.0–1.0, default 0.5)
