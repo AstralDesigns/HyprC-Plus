@@ -56,12 +56,12 @@ emit_fail() {
 
 # ── Store folder absent ────────────────────────────────────────────────────────
 if [ ! -d "$HC_STORE" ]; then
-    emit_update "HCPlus store not found — run Apply to set up and sync dotfiles." "true"
+    emit_update "HCPlus store not found — run 󰇚 to set up and sync dotfiles." "true"
     exit 0
 fi
 
 if [ ! -d "$HC_STORE/.git" ]; then
-    emit_update "HCPlus store is not a git repo — run Apply to re-initialise." "true"
+    emit_update "HCPlus store is not a git repo — run 󰇚 to re-initialise." "true"
     exit 0
 fi
 
@@ -78,7 +78,7 @@ if echo "$pull_out" | grep -q "Already up to date"; then
     emit_uptodate
 else
     # Pull brought in new commits — count changed files from the summary line
-    changed=$(echo "$pull_out" | grep -E '^\s+[0-9]+ file' | grep -oE '[0-9]+ file' | head -1)
-    [ -z "$changed" ] && changed="changes available"
-    emit_update "HC+ dotfile updates pulled (${changed}) — apply to sync."
+    changed=$(echo "$pull_out" | grep -E '^\s+[0-9]+' | grep -oE '[0-9]+' | head -1)
+    [ -z "$changed" ] && changed="?"
+    emit_update "HC+ changed files (${changed}) — 󰇚 to sync."
 fi
