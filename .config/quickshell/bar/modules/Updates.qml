@@ -156,13 +156,49 @@ Item {
                 const hasUp = !!d.hasUpdates
                 const noSt  = !!d.noStore
                 const tip   = d.tooltip || ""
-                root._hcHasUpdates = hasUp
-                UpdatesPopupState.updateHC(hasUp, tip, noSt)
+                if (hasUp) {
+                    // Real updates found — always apply
+                    root._hcHasUpdates = true
+                    UpdatesPopupState.updateHC(hasUp, tip, noSt)
+                } else {
+                    // Script reported up-to-date. This is either:
+                    //   a) emit_uptodate re-catting the state file (user hasn't
+                    //      updated yet) — state file present, don't clear icon
+                    //   b) genuine up-to-date after user ran the update and
+                    //      _hcStateCleanup deleted the state file — clear icon
+                    // Distinguish by checking state file existence.
+                    hcStateExistCheck.tip    = tip
+                    hcStateExistCheck.noSt   = noSt
+                    hcStateExistCheck.running = true
+                }
             } catch(e) {
                 // leave previous state
             }
             // Clear after parse so a future stale buffer can't bleed through
             root._hcBuffer = ""
+        }
+    }
+
+    // ── HC state file existence check ────────────────────────────────────────
+    // Runs after hcCheckProc reports hasUpdates:false to determine whether
+    // that false came from emit_uptodate re-catting a persisted state (file
+    // present → keep icon) or from a genuine post-update clean scan (file
+    // absent → clear icon).
+    Process {
+        id: hcStateExistCheck
+        property string tip:  ""
+        property bool   noSt: false
+        command: ["bash", "-c", "test -f '" + root._hcStatePath + "'"]
+        running: false
+        onExited: function(code) {
+            if (code === 0) {
+                // State file still present — persisted update, keep icon lit
+                // (do nothing; _hcHasUpdates already true from prior detection)
+            } else {
+                // State file gone — user completed the update, clear icon
+                root._hcHasUpdates = false
+                UpdatesPopupState.updateHC(false, hcStateExistCheck.tip, hcStateExistCheck.noSt)
+            }
         }
     }
 
