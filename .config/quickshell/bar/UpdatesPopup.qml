@@ -27,7 +27,7 @@ PanelWindow {
                Math.max(0, win.width - implicitWidth - 8))
         y: 4
 
-        implicitWidth:  Math.max(200, col.implicitWidth + 32)
+        implicitWidth:  Math.max(220, col.implicitWidth + 32)
         implicitHeight: col.implicitHeight + 24
 
         color:        Theme.cOnSecondary
@@ -44,7 +44,11 @@ PanelWindow {
             }
             spacing: 8
 
-            // ── Header ─────────────────────────────────────────────────
+            // ════════════════════════════════════════════════════════════════
+            // SECTION 1 — System Updates
+            // ════════════════════════════════════════════════════════════════
+
+            // ── Sys Header ──────────────────────────────────────────────────
             Row {
                 spacing: 6
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -52,70 +56,161 @@ PanelWindow {
                 Text {
                     text: UpdatesPopupState.hasUpdates ? "󰏖" : "󰏗"
                     color: UpdatesPopupState.hasUpdates ? Theme.cPrimary : Theme.cOnSurfVar
-                    font.family: Config.fontFamily
+                    font.family:    Config.fontFamily
                     font.pixelSize: Config.fontSize + 2
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
-                    text: UpdatesPopupState.hasUpdates ? "Updates available" : "System up to date"
+                    text: UpdatesPopupState.hasUpdates ? "Updates Available" : "System Up To Date"
                     color: Theme.cPrimary
-                    font.family: Config.labelFont
+                    font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1
-                    font.weight: Font.Medium
+                    font.weight:    Font.Medium
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
 
-            // ── Divider ────────────────────────────────────────────────
+            // ── Sys divider ──────────────────────────────────────────────────
             Rectangle {
                 width: parent.width; height: 1
                 color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
             }
 
-            // ── Package list / status text ──────────────────────────────
+            // ── Sys tooltip text (hidden when up-to-date) ────────────────────
             Text {
                 width: parent.width
-                text: UpdatesPopupState.text || "System is up to date"
+                visible: UpdatesPopupState.hasUpdates
+                height:  UpdatesPopupState.hasUpdates ? implicitHeight : 0
+                text:  UpdatesPopupState.text || ""
                 color: Theme.cOnSurfVar
-                font.family: Config.labelFont
+                font.family:    Config.labelFont
                 font.pixelSize: Config.labelFontSize
                 wrapMode: Text.WordWrap
                 lineHeight: 1.4
+                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             }
 
-            // ── Update button (only visible when updates available) ─────
+            // ── Sys apply button ─────────────────────────────────────────────
             Rectangle {
-                width: parent.width
+                width:  parent.width
                 height: UpdatesPopupState.hasUpdates ? 36 : 0
                 radius: 10
-                color: updateHover.containsMouse
+                color: sysUpdateHover.containsMouse
                     ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
                     : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
                 visible: UpdatesPopupState.hasUpdates
+                clip: true
                 Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-                Behavior on color { ColorAnimation { duration: 120 } }
+                Behavior on color  { ColorAnimation   { duration: 120 } }
 
                 Text {
                     anchors.centerIn: parent
-                    text: _updateRunProc.running ? "󰑓  Running ..." : "󰑓  Apply Updates"
+                    text:  _sysUpdateProc.running ? "󰑓  Running …" : "󰑓  Apply System Updates"
                     color: Theme.cPrimary
-                    font.family: Config.labelFont
+                    font.family:    Config.labelFont
                     font.pixelSize: 13
                 }
-
                 MouseArea {
-                    id: updateHover
+                    id: sysUpdateHover
                     anchors.fill: parent
                     hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: _updateRunProc.running = true
+                    cursorShape:  Qt.PointingHandCursor
+                    onClicked:    if (!_sysUpdateProc.running) _sysUpdateProc.running = true
+                }
+            }
+
+            // ════════════════════════════════════════════════════════════════
+            // Separator between sections
+            // ════════════════════════════════════════════════════════════════
+            Rectangle {
+                width: parent.width; height: 1
+                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.5)
+            }
+            Rectangle {
+                width: parent.width; height: 1
+                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.15)
+            }
+
+            // ════════════════════════════════════════════════════════════════
+            // SECTION 2 — HyprCandy Plus Updates
+            // ════════════════════════════════════════════════════════════════
+
+            // ── HC Header ───────────────────────────────────────────────────
+            Row {
+                spacing: 6
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                Text {
+                    text: UpdatesPopupState.hcHasUpdates ? "󰏖" : "󰏗"
+                    color: UpdatesPopupState.hcHasUpdates ? Theme.cTertiary : Theme.cOnSurfVar
+                    font.family:    Config.fontFamily
+                    font.pixelSize: Config.fontSize + 2
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    text: UpdatesPopupState.hcHasUpdates ? "HC+ Updates Available" : "HCPlus Is Up To Date"
+                    color: UpdatesPopupState.hcHasUpdates ? Theme.cTertiary : Theme.cOnSurfVar
+                    font.family:    Config.labelFont
+                    font.pixelSize: Config.labelFontSize + 1
+                    font.weight:    Font.Medium
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            // ── HC divider ───────────────────────────────────────────────────
+            Rectangle {
+                width: parent.width; height: 1
+                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+            }
+
+            // ── HC tooltip text (hidden when up-to-date) ─────────────────────
+            Text {
+                width: parent.width
+                visible: UpdatesPopupState.hcHasUpdates
+                height:  UpdatesPopupState.hcHasUpdates ? implicitHeight : 0
+                text:  UpdatesPopupState.hcTooltip || ""
+                color: Theme.cOnSurfVar
+                font.family:    Config.labelFont
+                font.pixelSize: Config.labelFontSize
+                wrapMode: Text.WordWrap
+                lineHeight: 1.4
+                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+            }
+
+            // ── HC apply button ──────────────────────────────────────────────
+            Rectangle {
+                width:  parent.width
+                height: UpdatesPopupState.hcHasUpdates ? 36 : 0
+                radius: 10
+                color: hcUpdateHover.containsMouse
+                    ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.25)
+                    : Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.12)
+                visible: UpdatesPopupState.hcHasUpdates
+                clip: true
+                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                Behavior on color  { ColorAnimation   { duration: 120 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text:  _hcUpdateProc.running ? "󰑓  Running …" : "󰑓  Apply HC+ Updates"
+                    color: Theme.cTertiary
+                    font.family:    Config.labelFont
+                    font.pixelSize: 13
+                }
+                MouseArea {
+                    id: hcUpdateHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape:  Qt.PointingHandCursor
+                    onClicked:    if (!_hcUpdateProc.running) _hcUpdateProc.running = true
                 }
             }
         }
     }
 
+    // ── System update process ─────────────────────────────────────────────────
     Process {
-        id: _updateRunProc
+        id: _sysUpdateProc
         command: [
             "kitty",
             "--class", "floating-installer",
@@ -127,6 +222,27 @@ PanelWindow {
         onExited: {
             running = false
             UpdatesPopupState.close()
+        }
+    }
+
+    // ── HyprCandy Plus update process ────────────────────────────────────────
+    // Launches the main update.sh in an independent kitty window.
+    // The popup can be toggled/closed without interrupting the terminal.
+    Process {
+        id: _hcUpdateProc
+        command: [
+            "kitty",
+            "--class", "floating-installer",
+            "--title", "   HC+ Update",
+            "--override", "initial_window_width=900",
+            "--override", "initial_window_height=600",
+            "-e", "bash", "-ic",
+            Quickshell.env("HOME") + "/.config/hypr/scripts/update.sh"
+        ]
+        running: false
+        onExited: {
+            running = false
+            // Don't auto-close popup — user may want to check sys section too
         }
     }
 }
