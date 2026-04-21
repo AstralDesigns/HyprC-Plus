@@ -50,7 +50,7 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 Text {
-                    text: UpdatesPopupState.hasUpdates ? "" : "󰏗"
+                    text: UpdatesPopupState.hasUpdates ? "󰏖" : "󰏗"
                     color: UpdatesPopupState.hasUpdates ? Theme.cPrimary : Theme.cOnSurfVar
                     font.family: Config.fontFamily
                     font.pixelSize: Config.fontSize + 2
