@@ -691,9 +691,9 @@ Item {
                 "magick \"${FILE}[0]\"  -resize '640x360>' \"$THUMB\" 2>/dev/null || true; " +
                 "BASE=$(basename \"$FILE\"); " +
                 "if [ -f \"$THUMB\" ]; then " +
-                "  notify-send -a Recorder -i \"$THUMB\" '\uf70b Recording Saved' \"$BASE\"; " +
+                "  notify-send -a Recorder -i \"$THUMB\" '\󰻂 Recording Saved' \"$BASE\"; " +
                 "else " +
-                "  notify-send -a Recorder -i media-record '\uf70b Recording Saved' \"$BASE\"; " +
+                "  notify-send -a Recorder -i media-record '\󰻂 Recording Saved' \"$BASE\"; " +
                 "fi"
             if(!recNotifyProc.running) recNotifyProc.running=true
         } else {
