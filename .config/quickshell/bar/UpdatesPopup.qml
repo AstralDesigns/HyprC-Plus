@@ -105,7 +105,7 @@ PanelWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text:  _sysUpdateProc.running ? "󰑓  Running …" : "󰑓  Apply System Updates"
+                    text:  _sysUpdateProc.running ? "󰑓  Running …" : "󰇚 System Updates"
                     color: Theme.cPrimary
                     font.family:    Config.labelFont
                     font.pixelSize: 13
@@ -188,7 +188,7 @@ PanelWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text:  _hcUpdateProc.running ? "󰑓  Running …" : "󰑓  Apply HC+ Updates"
+                    text:  _hcUpdateProc.running ? "󰑓  Running …" : "󰇚 HC+ Updates"
                     color: Theme.cTertiary
                     font.family:    Config.labelFont
                     font.pixelSize: 13
