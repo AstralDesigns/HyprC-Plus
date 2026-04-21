@@ -173,7 +173,7 @@ elif [ "$aur_helper" == "paru" ]; then
 fi
 
 if [ $total_updates -eq 0 ]; then
-  echo "{\"text\":\"󰸟\", \"tooltip\":\"Packages are up to date\"}"
+  echo "{\"text\":\"󰏗\", \"tooltip\":\"Packages are up to date\"}"
 else
-  echo "{\"text\":\"\", \"tooltip\":\"${tooltip//\"/\\\"}\"}"
+  echo "{\"text\":\"󰏖\", \"tooltip\":\"${tooltip//\"/\\\"}\"}"
 fi
