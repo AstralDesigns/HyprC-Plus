@@ -66,11 +66,11 @@ if [ ! -d "$HC_STORE/.git" ]; then
 fi
 
 # ── Pull ──────────────────────────────────────────────────────────────────────
-pull_out=$(git -C "$HC_STORE" pull 2>&1)
+pull_out=$(git -C "$HC_STORE" pull 2>/dev/null)
 pull_exit=$?
 
 if [ $pull_exit -ne 0 ]; then
-    emit_fail "$pull_out"
+    emit_fail "git pull failed — check network or repo state"
     exit 0
 fi
 

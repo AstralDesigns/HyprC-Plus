@@ -40,31 +40,6 @@ Item {
         onTriggered: root._loaderIdx = (root._loaderIdx + 1) % root._loaderFrames.length
     }
 
-    // ── Restore persisted HC state on startup ─────────────────────────────────
-    // Read ~/.config/hyprcandy/hc-update-state.json written by hc-update-check.sh
-    // so a bar restart or session restart remembers the last known HC+ update status.
-    FileView {
-        id: hcStateFile
-        path: root._hcStatePath
-        // onLoaded fires once the file has been read
-        onLoaded: {
-            const t = (hcStateFile.text || "").trim()
-            if (!t) return
-            try {
-                const d = JSON.parse(t)
-                const hasUp = !!d.hasUpdates
-                const noSt  = !!d.noStore
-                const tip   = d.tooltip || ""
-                // Only restore an "updates available" state — don't restore
-                // an "up to date" state because that's the safe default anyway.
-                if (hasUp) {
-                    root._hcHasUpdates = hasUp
-                    UpdatesPopupState.updateHC(hasUp, tip, noSt)
-                }
-            } catch(e) { /* malformed file, ignore */ }
-        }
-    }
-
     // ── Rescan sentinel watcher ─────────────────────────────────────────────
     // system-update.sh and Candy_Update.sh both touch
     // ~/.config/hyprcandy/qs-rescan-updates when the user declines
@@ -133,7 +108,7 @@ Item {
     // ── HC update check ───────────────────────────────────────────────────────
     Process {
         id: hcCheckProc
-        command: [Config.scriptsDir + "/hc-update-check.sh"]
+        command: [Quickshell.env("HOME") + "/.config/hyprcandy/scripts/hc-update-check.sh"]
 
         // Only track checking state here — buffer is cleared at run start
         // separately so onExited always sees the last populated buffer
@@ -144,7 +119,9 @@ Item {
             splitMarker: "\n"
             onRead: function(l) {
                 const t = l.trim()
-                if (t) root._hcBuffer = t
+                // Only accept lines that look like our JSON output —
+                // guards against any stray git progress lines leaking through
+                if (t && t.startsWith("{")) root._hcBuffer = t
             }
         }
 
