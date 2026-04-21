@@ -1569,11 +1569,11 @@ PanelWindow {
                                                 active: Config.cavaStartMode === "matugen"
                                                 sourceComponent: ColumnLayout {
                                                     spacing: 4
-                                                    Text {
-                                                        text: "  Matugen color:"
-                                                        color: Theme.cOnSurfVar
-                                                        font.family: Config.labelFont; font.pixelSize: 11
-                                                    }
+                                                    //Text {
+                                                        //text: "  Matugen color:"
+                                                        //color: Theme.cOnSurfVar
+                                                        //font.family: Config.labelFont; font.pixelSize: 11
+                                                    //}
                                                     Flow {
                                                         Layout.fillWidth: true; spacing: 5
                                                         Repeater {
@@ -1611,11 +1611,11 @@ PanelWindow {
                                                 active: Config.cavaStartMode === "pywal"
                                                 sourceComponent: ColumnLayout {
                                                     spacing: 4
-                                                    Text {
-                                                        text: "  Pywal color:"
-                                                        color: Theme.cOnSurfVar
-                                                        font.family: Config.labelFont; font.pixelSize: 11
-                                                    }
+                                                    //Text {
+                                                        //text: "  Pywal color:"
+                                                        //color: Theme.cOnSurfVar
+                                                        //font.family: Config.labelFont; font.pixelSize: 11
+                                                    //}
                                                     Flow {
                                                         Layout.fillWidth: true; spacing: 5
                                                         Repeater {
@@ -1713,11 +1713,11 @@ PanelWindow {
                                                 active: Config.cavaEndMode === "matugen"
                                                 sourceComponent: ColumnLayout {
                                                     spacing: 4
-                                                    Text {
-                                                        text: "  Matugen color:"
-                                                        color: Theme.cOnSurfVar
-                                                        font.family: Config.labelFont; font.pixelSize: 11
-                                                    }
+                                                    //Text {
+                                                        //text: "  Matugen color:"
+                                                        //color: Theme.cOnSurfVar
+                                                        //font.family: Config.labelFont; font.pixelSize: 11
+                                                    //}
                                                     Flow {
                                                         Layout.fillWidth: true; spacing: 5
                                                         Repeater {
@@ -1758,11 +1758,11 @@ PanelWindow {
                                                 active: Config.cavaEndMode === "pywal"
                                                 sourceComponent: ColumnLayout {
                                                     spacing: 4
-                                                    Text {
-                                                        text: "  Pywal color:"
-                                                        color: Theme.cOnSurfVar
-                                                        font.family: Config.labelFont; font.pixelSize: 11
-                                                    }
+                                                    //Text {
+                                                        //text: "  Pywal color:"
+                                                        //color: Theme.cOnSurfVar
+                                                        //font.family: Config.labelFont; font.pixelSize: 11
+                                                    //}
                                                     Flow {
                                                         Layout.fillWidth: true; spacing: 5
                                                         Repeater {
@@ -2409,7 +2409,7 @@ PanelWindow {
                             CCSection { text: "Border Colors" }
                             Text {
                                 Layout.fillWidth: true
-                                text: "Matugen: auto-updates with wallpaper  •  Pywal: follows wal palette"
+                                text: "Matugen: follows matugen themes  •  Pywal: follows wal palette"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
                                 font.family: Config.labelFont; font.pixelSize: 11
                                 wrapMode: Text.Wrap
@@ -2485,11 +2485,11 @@ PanelWindow {
                                     active: ccWin._activeBorderMode === "matugen"
                                     sourceComponent: ColumnLayout {
                                         spacing: 4
-                                        Text {
-                                            text: "  Matugen color:"
-                                            color: Theme.cOnSurfVar
-                                            font.family: Config.labelFont; font.pixelSize: 11
-                                        }
+                                        //Text {
+                                            //text: "  Matugen color:"
+                                            //color: Theme.cOnSurfVar
+                                            //font.family: Config.labelFont; font.pixelSize: 11
+                                        //}
                                         Flow {
                                             Layout.fillWidth: true; spacing: 5
                                             Repeater {
@@ -2533,11 +2533,11 @@ PanelWindow {
                                     active: ccWin._activeBorderMode === "pywal"
                                     sourceComponent: ColumnLayout {
                                         spacing: 4
-                                        Text {
-                                            text: "  Pywal color:"
-                                            color: Theme.cOnSurfVar
-                                            font.family: Config.labelFont; font.pixelSize: 11
-                                        }
+                                        //Text {
+                                            //text: "  Pywal color:"
+                                            //color: Theme.cOnSurfVar
+                                            //font.family: Config.labelFont; font.pixelSize: 11
+                                        //}
                                         Flow {
                                             Layout.fillWidth: true; spacing: 5
                                             Repeater {
@@ -2650,11 +2650,11 @@ PanelWindow {
                                     active: ccWin._inactiveBorderMode === "matugen"
                                     sourceComponent: ColumnLayout {
                                         spacing: 4
-                                        Text {
-                                            text: "  Matugen color:"
-                                            color: Theme.cOnSurfVar
-                                            font.family: Config.labelFont; font.pixelSize: 11
-                                        }
+                                        //Text {
+                                            //text: "  Matugen color:"
+                                            //color: Theme.cOnSurfVar
+                                            //font.family: Config.labelFont; font.pixelSize: 11
+                                        //}
                                         Flow {
                                             Layout.fillWidth: true; spacing: 5
                                             Repeater {
@@ -2698,11 +2698,11 @@ PanelWindow {
                                     active: ccWin._inactiveBorderMode === "pywal"
                                     sourceComponent: ColumnLayout {
                                         spacing: 4
-                                        Text {
-                                            text: "  Pywal color:"
-                                            color: Theme.cOnSurfVar
-                                            font.family: Config.labelFont; font.pixelSize: 11
-                                        }
+                                        //Text {
+                                            //text: "  Pywal color:"
+                                            //color: Theme.cOnSurfVar
+                                            //font.family: Config.labelFont; font.pixelSize: 11
+                                        //}
                                         Flow {
                                             Layout.fillWidth: true; spacing: 5
                                             Repeater {
