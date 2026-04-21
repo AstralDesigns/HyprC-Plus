@@ -148,7 +148,7 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
-                    text: UpdatesPopupState.hcHasUpdates ? "HC+ Updates Available" : "HCPlus Is Up To Date"
+                    text: UpdatesPopupState.hcHasUpdates ? "HC+ Updates Available" : "HC+ Is Up To Date"
                     color: UpdatesPopupState.hcHasUpdates ? Theme.cTertiary : Theme.cOnSurfVar
                     font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1
