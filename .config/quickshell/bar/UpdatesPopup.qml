@@ -14,6 +14,9 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     implicitHeight: popRect.implicitHeight + 8
 
+    // ── Rescan sentinel path (shared with Updates.qml) ────────────────────────
+    readonly property string _rescanSentinel: Quickshell.env("HOME") + "/.config/hyprcandy/qs-rescan-updates"
+
     MouseArea {
         anchors.fill: parent
         z: -1
@@ -205,6 +208,10 @@ PanelWindow {
     }
 
     // ── System update process ─────────────────────────────────────────────────
+    // Launched directly inside the popup as a kitty floating-installer window.
+    // The script calls signal_qs_rescan (touches the sentinel) when the user
+    // picks 'n' for reboot, which Updates.qml picks up within 2 s.
+    // The kitty window closes itself naturally when the script exits.
     Process {
         id: _sysUpdateProc
         command: [
@@ -222,8 +229,17 @@ PanelWindow {
     }
 
     // ── HyprCandy Plus update process ────────────────────────────────────────
-    // Launches the main update.sh in an independent kitty window.
-    // The popup can be toggled/closed without interrupting the terminal.
+    // Launches Candy_Update.sh in an independent kitty floating-installer window.
+    // When the user picks 'n' at the logout prompt, Candy_Update.sh touches the
+    // rescan sentinel AND exits — which causes kitty to close.  However, if for
+    // any reason the window stays alive we also pkill it here so it doesn't hang
+    // around after the update flow completes.
+    //
+    // The state file (~/.config/hyprcandy/hc-update-state.json) is the persistent
+    // "updates pending" record written by hc-update-check.sh.  It is intentionally
+    // never overwritten by a clean scan — only deleted here, when the user actually
+    // runs the update.  Deleting it is what allows the next scan's "Already up to
+    // date" result to be surfaced as genuinely up-to-date in the UI.
     Process {
         id: _hcUpdateProc
         command: [
@@ -236,7 +252,29 @@ PanelWindow {
         running: false
         onExited: {
             running = false
+            // Delete the persistent HC+ update state file so the next scan's
+            // "Already up to date" result is no longer shadowed by the old
+            // pending-update record.
+            _hcStateCleanup.running = true
+            // Kill any lingering floating-installer kitty windows.
+            _hcKittyCleanup.running = true
             // Don't auto-close popup — user may want to check sys section too
         }
+    }
+
+    // Delete the HC+ update state file — run when the user completes the update.
+    // Until this file is absent, clean scans will re-surface the pending state.
+    Process {
+        id: _hcStateCleanup
+        command: ["rm", "-f", Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state.json"]
+        running: false
+    }
+
+    // pkill all kitty instances whose WM_CLASS is floating-installer that are
+    // still alive after the HC+ update process has fully exited.
+    Process {
+        id: _hcKittyCleanup
+        command: ["pkill", "--exact", "--full", "floating-installer"]
+        running: false
     }
 }

@@ -35,6 +35,12 @@ get_aur_helper() {
 get_aur_helper
 export -f pkg_installed
 
+# Touch a signal file that tells Quickshell to immediately rescan updates.
+# Called after the user declines reboot so the bar reflects the fresh state.
+signal_qs_rescan() {
+    touch "$HOME/.config/hyprcandy/qs-rescan-updates"
+}
+
 clean_cache() {
     echo
     print_warning "Clearing the cache frees disk space but requires redownloading if you need to downgrade later."
@@ -63,6 +69,8 @@ prompt_reboot() {
     case "$reboot_choice" in
         [nN][oO]|[nN])
             print_status "Reboot skipped. Please reboot manually when convenient."
+            # Signal Quickshell to rescan updates immediately
+            signal_qs_rescan
             ;;
         *)
             print_status "󰜉 Rebooting system..."
@@ -74,7 +82,7 @@ prompt_reboot() {
 # Trigger upgrade (legacy — via waybar/kitty self-spawn)
 if [ "$1" == "up" ]; then
   trap 'pkill -RTMIN+20 waybar' EXIT
-  export -f prompt_reboot print_warning print_status clean_cache
+  export -f prompt_reboot print_warning print_status clean_cache signal_qs_rescan
   export YELLOW NC aur_helper
   command="
     $0 upgrade

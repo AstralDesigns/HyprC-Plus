@@ -27,6 +27,10 @@ Item {
     readonly property bool _anyUpdates:  _hasUpdates || _hcHasUpdates
     readonly property bool _anyChecking: _checking   || _hcChecking
 
+    // ── Paths ─────────────────────────────────────────────────────────────────
+    readonly property string _hcStatePath:   Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state.json"
+    readonly property string _rescanSentinel: Quickshell.env("HOME") + "/.config/hyprcandy/qs-rescan-updates"
+
     // ── Loader animation ──────────────────────────────────────────────────────
     readonly property var _loaderFrames: ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
     property int _loaderIdx: 0
@@ -34,6 +38,62 @@ Item {
         id: loaderTick
         interval: 80; running: root._anyChecking; repeat: true
         onTriggered: root._loaderIdx = (root._loaderIdx + 1) % root._loaderFrames.length
+    }
+
+    // ── Restore persisted HC state on startup ─────────────────────────────────
+    // Read ~/.config/hyprcandy/hc-update-state.json written by hc-update-check.sh
+    // so a bar restart or session restart remembers the last known HC+ update status.
+    FileView {
+        id: hcStateFile
+        path: root._hcStatePath
+        // onLoaded fires once the file has been read
+        onLoaded: {
+            const t = (hcStateFile.text || "").trim()
+            if (!t) return
+            try {
+                const d = JSON.parse(t)
+                const hasUp = !!d.hasUpdates
+                const noSt  = !!d.noStore
+                const tip   = d.tooltip || ""
+                // Only restore an "updates available" state — don't restore
+                // an "up to date" state because that's the safe default anyway.
+                if (hasUp) {
+                    root._hcHasUpdates = hasUp
+                    UpdatesPopupState.updateHC(hasUp, tip, noSt)
+                }
+            } catch(e) { /* malformed file, ignore */ }
+        }
+    }
+
+    // ── Rescan sentinel watcher ───────────────────────────────────────────────
+    // system-update.sh and Candy_Update.sh both touch
+    // ~/.config/hyprcandy/qs-rescan-updates when the user declines
+    // reboot/logout.  We watch for that file appearing and immediately
+    // re-run both checks, then delete the sentinel.
+    FileView {
+        id: rescanSentinel
+        path: root._rescanSentinel
+        onLoaded: {
+            // File exists — trigger an immediate rescan and remove sentinel
+            rescanCleanup.running = true
+            root._hcBuffer  = ""
+            root._sysBuffer = ""
+            if (!checkProc.running)   checkProc.running   = true
+            if (!hcCheckProc.running) hcCheckProc.running = true
+        }
+    }
+    // Poll sentinel path every 2 s (lightweight — just a stat).
+    // Quickshell's FileView will only fire onLoaded when the file is readable.
+    Timer {
+        id: sentinelPoller
+        interval: 2000; running: true; repeat: true
+        onTriggered: rescanSentinel.reload()
+    }
+    // Remove the sentinel file after we've acted on it
+    Process {
+        id: rescanCleanup
+        command: ["rm", "-f", root._rescanSentinel]
+        running: false
     }
 
     // ── System update check ───────────────────────────────────────────────────
