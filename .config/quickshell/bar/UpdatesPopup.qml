@@ -274,7 +274,7 @@ PanelWindow {
     // still alive after the HC+ update process has fully exited.
     Process {
         id: _hcKittyCleanup
-        command: ["pkill", "--exact", "--full", "floating-installer"]
+        command: ["pkill", "-f", "floating-installer"]
         running: false
     }
 }

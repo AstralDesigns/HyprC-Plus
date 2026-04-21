@@ -65,38 +65,37 @@ Item {
         }
     }
 
-    // ── Rescan sentinel watcher ───────────────────────────────────────────────
+    // ── Rescan sentinel watcher ─────────────────────────────────────────────
     // system-update.sh and Candy_Update.sh both touch
     // ~/.config/hyprcandy/qs-rescan-updates when the user declines
-    // reboot/logout.  We watch for that file appearing and immediately
-    // re-run both checks, then delete the sentinel.
-    FileView {
-        id: rescanSentinel
-        path: root._rescanSentinel
-        onLoaded: {
-            // File exists — trigger an immediate rescan and remove sentinel
-            rescanCleanup.running = true
+    // reboot/logout.  We poll for that file every 2 s with a Process test
+    // rather than FileView so it only acts when the file genuinely exists —
+    // FileView.onLoaded fires at startup regardless of file presence.
+    Timer {
+        id: sentinelPoller
+        interval: 2000; running: true; repeat: true
+        onTriggered: sentinelCheck.running = true
+    }
+    Process {
+        id: sentinelCheck
+        command: ["bash", "-c", "test -f '" + root._rescanSentinel + "'"]
+        running: false
+        onExited: function(code) {
+            if (code !== 0) return   // file absent — nothing to do
+            sentinelCleanup.running = true
             root._hcBuffer  = ""
             root._sysBuffer = ""
             if (!checkProc.running)   checkProc.running   = true
             if (!hcCheckProc.running) hcCheckProc.running = true
         }
     }
-    // Poll sentinel path every 2 s (lightweight — just a stat).
-    // Quickshell's FileView will only fire onLoaded when the file is readable.
-    Timer {
-        id: sentinelPoller
-        interval: 2000; running: true; repeat: true
-        onTriggered: rescanSentinel.reload()
-    }
-    // Remove the sentinel file after we've acted on it
     Process {
-        id: rescanCleanup
+        id: sentinelCleanup
         command: ["rm", "-f", root._rescanSentinel]
         running: false
     }
 
-    // ── System update check ───────────────────────────────────────────────────
+        // ── System update check ───────────────────────────────────────────────────
     Process {
         id: checkProc
         command: [Config.scriptsDir + "/system-update.sh"]
