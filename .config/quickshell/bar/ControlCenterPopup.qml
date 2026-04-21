@@ -1799,7 +1799,7 @@ PanelWindow {
                                         }
 
                                         CCSlider {
-                                            label: "Gradient Split"
+                                            label: "Color Ratio"
                                             visible: Config.cavaGradientEnabled
                                             from: 0.1; to: 0.9; stepSize: 0.05; decimals: 2
                                             value: Config.cavaGradientSplit
