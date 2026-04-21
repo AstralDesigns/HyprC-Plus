@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Effects
 import Quickshell.Io
 import ".."
 
@@ -80,34 +79,17 @@ Item {
                         width: MediaPlayerState.thumbSize; height: MediaPlayerState.thumbSize
                         radius: width / 2
                         anchors.verticalCenter: parent.verticalCenter
-                        color: "transparent"
+                        color: Qt.rgba(Theme.cSurfMid.r, Theme.cSurfMid.g, Theme.cSurfMid.b, 0.85)
+                        antialiasing: true
                         layer.enabled: true
                         layer.smooth: true
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: discMask
-                            maskThresholdMin: 0.5
-                            maskSpreadAtMin: 1.0
-                        }
-                        Rectangle {
-                            id: discMask; anchors.fill: parent
-                            radius: width / 2; color: "white"; opacity: 0; layer.enabled: true
-                        }
-
-                        // Circular background for placeholder state — declared first so
-                        // it renders behind the glyph Text
-                        Rectangle {
-                            visible: MediaPlayerState.artPath === ""
-                            anchors.fill: parent
-                            radius: width / 2
-                            color: Qt.rgba(Theme.cSurfMid.r, Theme.cSurfMid.g,
-                                           Theme.cSurfMid.b, 0.85)
-                        }
 
                         Image {
                             visible: MediaPlayerState.artPath !== ""
                             anchors.fill: parent
-                            source: MediaPlayerState.artPath !== "" ? ("file://" + MediaPlayerState.artPath.split("?")[0]) : ""
+                            source: MediaPlayerState.artPath !== ""
+                                ? ("file://" + MediaPlayerState.artPath.split("?")[0] + "?v=" + MediaPlayerState.artPath.split("?")[1])
+                                : ""
                             fillMode: Image.PreserveAspectCrop
                             smooth: true; cache: false; asynchronous: true
                         }
@@ -122,8 +104,8 @@ Item {
                         }
 
                         RotationAnimator on rotation {
-                            from: discContainer.rotation; to: discContainer.rotation + 360
-                            duration: 8000; loops: Animation.Infinite
+                            from: 0; to: 360
+                            duration: 80000; loops: Animation.Infinite
                             running: MediaPlayerState.playing
                         }
                     }
