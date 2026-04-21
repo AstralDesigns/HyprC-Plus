@@ -42,7 +42,8 @@ Item {
         command: [Config.scriptsDir + "/system-update.sh"]
 
         onRunningChanged: {
-            root._checking  = running
+            root._checking = running
+            // Only clear buffer when starting a fresh run, not on exit
             if (running) root._sysBuffer = ""
         }
 
@@ -75,10 +76,10 @@ Item {
         id: hcCheckProc
         command: [Config.scriptsDir + "/hc-update-check.sh"]
 
-        onRunningChanged: {
-            root._hcChecking = running
-            if (running) root._hcBuffer = ""
-        }
+        // Only track checking state here — buffer is cleared at run start
+        // separately so onExited always sees the last populated buffer
+        // regardless of signal ordering between onExited/onRunningChanged.
+        onRunningChanged: root._hcChecking = running
 
         stdout: SplitParser {
             splitMarker: "\n"
@@ -101,6 +102,8 @@ Item {
             } catch(e) {
                 // leave previous state
             }
+            // Clear after parse so a future stale buffer can't bleed through
+            root._hcBuffer = ""
         }
     }
 
@@ -109,6 +112,9 @@ Item {
         id: startupDelay
         interval: 1500; running: true; repeat: false
         onTriggered: {
+            // Clear HC buffer here, just before launch, so ordering is safe
+            root._hcBuffer  = ""
+            root._sysBuffer = ""
             if (!checkProc.running)   checkProc.running   = true
             if (!hcCheckProc.running) hcCheckProc.running = true
         }
@@ -118,6 +124,8 @@ Item {
     Timer {
         interval: 3600000; running: true; repeat: true
         onTriggered: {
+            root._hcBuffer  = ""
+            root._sysBuffer = ""
             if (!checkProc.running)   checkProc.running   = true
             if (!hcCheckProc.running) hcCheckProc.running = true
         }

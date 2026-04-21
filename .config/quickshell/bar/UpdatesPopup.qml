@@ -234,10 +234,8 @@ PanelWindow {
             "kitty",
             "--class", "floating-installer",
             "--title", "   HC+ Update",
-            "--override", "initial_window_width=900",
-            "--override", "initial_window_height=600",
             "-e", "bash", "-ic",
-            Quickshell.env("HOME") + "/.config/hypr/scripts/update.sh"
+            "rm -rf ~/candyinstall && git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/candyinstall && cd ~/candyinstall && chmod +x Candy_Update.sh && bash Candy_Update.sh"
         ]
         running: false
         onExited: {
