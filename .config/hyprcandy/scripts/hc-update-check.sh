@@ -10,7 +10,7 @@
 #   - If ~/HCUpdates exists → run git pull; if changes were pulled → updates
 #     available; if already up-to-date → no updates.
 
-HC_STORE="$HOME/HCUpdates"
+HC_STORE="$HOME/.HCUpdates"
 HC_REPO="https://github.com/AstralDesigns/HyprC-Plus.git"
 
 emit() {
