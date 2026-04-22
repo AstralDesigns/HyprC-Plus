@@ -219,6 +219,7 @@ PanelWindow {
                 _sddmValReader.running = true
                 _weatherLocReader.running = true
                 _hyprlandValReader.running = true
+                _layoutReader.running = true
             }
         }
     }
@@ -230,6 +231,7 @@ PanelWindow {
         // Run _confReadProc to sync dock values (autohide/layer/margin) from conf file.
         _confReadProc.running      = true
         _hyprlandValReader.running = true
+        _layoutReader.running      = true
         _dockValReader.running     = true
         _rofiValReader.running     = true
         _lcValReader.running       = true
@@ -1965,7 +1967,35 @@ PanelWindow {
                                     }
                                 }
                             }
-                            Process { id: _layoutProc; running: false; onExited: running = false }
+                            Process {
+                                id: _layoutProc
+                                running: false
+                                onExited: {
+                                    running = false
+                                    // Re-read live layout after applying so highlight
+                                    // always reflects actual Hyprland state
+                                    _layoutReader.running = true
+                                }
+                            }
+                            Process {
+                                id: _layoutReader
+                                command: ["bash", "-c",
+                                    "hyprctl getoption general:layout 2>/dev/null | awk '/^str:/{print $2}'"]
+                                running: false
+                                property string _buf: ""
+                                onRunningChanged: if (running) _buf = ""
+                                stdout: SplitParser {
+                                    splitMarker: "\n"
+                                    onRead: function(l) {
+                                        const t = l.trim()
+                                        if (t) _layoutReader._buf = t
+                                    }
+                                }
+                                onExited: {
+                                    const v = _layoutReader._buf.trim().toLowerCase()
+                                    if (v) ccWin._currentLayout = v
+                                }
+                            }
 
                             // ── Hyprsunset toggle — reads sentinel state file ─────
                             CCToggle {
