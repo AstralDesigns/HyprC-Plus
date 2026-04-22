@@ -15,7 +15,6 @@ declare -A menu_options=(
     [" Clipboard"]="$SCRIPTS/cliphist.sh"
     [" Emojis"]="$SETTINGS/emojipicker.sh"
     [" Glyphs"]="$SETTINGS/glyphpicker.sh"
-    ["󰮏 Update"]="$HYPRSCRIPTS/update.sh"
     #["󰑐 Reinstall"]="$HYPRSCRIPTS/reinstall.sh"
 )
 
