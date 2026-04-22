@@ -63,9 +63,6 @@ prompt_reboot() {
     case "$reboot_choice" in
         [nN][oO]|[nN])
             print_status "Reboot skipped. Please reboot manually when convenient."
-            # Signal Quickshell to rescan updates immediately
-            mkdir -p "$HOME/.config/hyprcandy"
-            touch "$HOME/.config/hyprcandy/qs-rescan-updates"
             ;;
         *)
             print_status "󰜉 Rebooting system..."
