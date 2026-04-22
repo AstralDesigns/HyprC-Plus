@@ -11,7 +11,7 @@
 # Outputs one JSON line:
 #   {"hasUpdates": true|false, "tooltip": "...", "noStore": true|false}
 
-HC_STORE="$HOME/HCUpdates"
+HC_STORE="$HOME/.HCUpdates"
 STATE_FILE="$HOME/.config/hyprcandy/hc-update-state"
 
 emit() {
