@@ -118,7 +118,7 @@ PanelWindow {
             // ════════════════════════════════════════════════════════════════
             Rectangle {
                 width: parent.width; height: 1
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.5)
+                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.15)
             }
 
             // ════════════════════════════════════════════════════════════════
