@@ -323,7 +323,7 @@ PanelWindow {
                 Item { Layout.fillWidth: true }
                 Text {
                     text: wxWin._city ? "󰍎  " + wxWin._city : ""
-                    color: Theme.cOnSurfVar; font.pixelSize: 11; font.family: Config.labelFont
+                    color: Theme.cOnSurfVar; font.pixelSize: 12; font.family: Config.labelFont
                     elide: Text.ElideRight; Layout.maximumWidth: 180
                 }
                 Rectangle {
@@ -409,7 +409,7 @@ PanelWindow {
                             }
                             Column {
                                 spacing: 0
-                                Text { text: modelData.label; color: Theme.cOnSurfVar; font.pixelSize: 9;  font.family: Config.labelFont }
+                                Text { text: modelData.label; color: Theme.cOnSurfVar; font.pixelSize: 10;  font.family: Config.labelFont }
                                 Text { text: modelData.val;   color: Theme.cOnSurf;    font.pixelSize: 12; font.weight: Font.Medium; font.family: Config.labelFont }
                             }
                         }
@@ -441,7 +441,7 @@ PanelWindow {
                                 Text {
                                     text: wxWin._hrTimes[index] || "--"
                                     color: index === 0 ? Theme.cPrimary : Theme.cOnSurfVar
-                                    font.pixelSize: 8; font.family: Config.labelFont
+                                    font.pixelSize: 11; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
@@ -453,13 +453,13 @@ PanelWindow {
                                 }
                                 Text {
                                     text: wxWin._hrTemps[index] || "--"
-                                    color: Theme.cOnSurf; font.pixelSize: 9; font.weight: Font.Medium; font.family: Config.labelFont
+                                    color: Theme.cOnSurf; font.pixelSize: 11; font.weight: Font.Medium; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text {
                                     text: wxWin._hrPrec[index] || "0%"
-                                    color: Theme.cSecondary; font.pixelSize: 8; font.family: Config.labelFont
+                                    color: Theme.cSecondary; font.pixelSize: 11; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
@@ -487,26 +487,26 @@ PanelWindow {
                             Text {
                                 text: wxWin._fcDays[index] || "--"
                                 color: index === 0 ? Theme.cPrimary : Theme.cOnSurfVar
-                                font.pixelSize: 9; font.weight: index === 0 ? Font.Medium : Font.Normal
+                                font.pixelSize: 11; font.weight: index === 0 ? Font.Medium : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: wxWin._fcIcons[index] || "󰖐"
-                                color: Theme.cPrimary; font.pixelSize: 18; font.family: Config.fontFamily
+                                color: Theme.cPrimary; font.pixelSize: 14; font.family: Config.fontFamily
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: wxWin._fcHi[index] || "--"
-                                color: Theme.cOnSurf; font.pixelSize: 10; font.weight: Font.Medium; font.family: Config.labelFont
+                                color: Theme.cOnSurf; font.pixelSize: 11; font.weight: Font.Medium; font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: wxWin._fcLo[index] || "--"
-                                color: Theme.cOnSurfVar; font.pixelSize: 9; font.family: Config.labelFont
+                                color: Theme.cOnSurfVar; font.pixelSize: 11; font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }

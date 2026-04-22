@@ -386,14 +386,14 @@ PanelWindow {
             anchors.top: arcC.bottom; anchors.topMargin: 2
             anchors.horizontalCenter: parent.horizontalCenter
             text: ag.sub; color: Theme.cOnSurfVar
-            font.pixelSize: 9; font.family: Config.labelFont
+            font.pixelSize: 11; font.family: Config.labelFont
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight; width: parent.width
         }
         Text {
             anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
             text: ag.label; color: Theme.cOnSurfVar
-            font.pixelSize: 11; font.family: Config.labelFont
+            font.pixelSize: 12; font.family: Config.labelFont
             horizontalAlignment: Text.AlignHCenter
         }
     }
