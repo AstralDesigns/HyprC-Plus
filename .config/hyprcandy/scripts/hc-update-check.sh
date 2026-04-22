@@ -43,7 +43,7 @@ fi
 
 # Store folder absent or not a git repo → needs setup
 if [ ! -d "$HC_STORE" ] || [ ! -d "$HC_STORE/.git" ]; then
-    tip="HCPlus store not found — run Apply to set up and sync dotfiles."
+    tip="HC+ store not found — 󰇚 to set up and sync dotfiles."
     write_state "$tip"
     emit "true" "$tip" "true"
     exit 0
@@ -55,7 +55,7 @@ pull_exit=$?
 
 if [ $pull_exit -ne 0 ]; then
     # Network/git failure — don't write state, don't claim updates
-    emit "false" "HCPlus check failed: ${pull_out}" "false"
+    emit "false" "HC+ check failed: ${pull_out}" "false"
     exit 0
 fi
 
@@ -64,7 +64,7 @@ if echo "$pull_out" | grep -q "Already up to date"; then
     emit "false" "HyprCandy Plus is up to date" "false"
 else
     # New changes were pulled — write state so this survives restarts
-    tip="HC+ dotfile updates available — apply to sync."
+    tip="HC+ files changed — 󰇚 to sync."
     write_state "$tip"
     emit "true" "$tip" "false"
 fi
