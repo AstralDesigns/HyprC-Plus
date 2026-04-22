@@ -24,7 +24,7 @@ Item {
     property bool   _hcChecking:   false
     property string _hcBuffer:     ""
 
-    readonly property bool _anyUpdates:  _hasUpdates || _hcHasUpdates
+    readonly property bool _anyUpdates: _hasUpdates || UpdatesPopupState.hcHasUpdates
     readonly property bool _anyChecking: _checking   || _hcChecking
 
     // ── Loader animation ──────────────────────────────────────────────────────
