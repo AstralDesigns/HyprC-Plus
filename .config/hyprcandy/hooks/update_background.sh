@@ -6,7 +6,6 @@ ROFI_RASI="$HOME/.config/rofi/colors.rasi"
 
 if command -v sed >/dev/null; then
     sed -i "2s/, 1)/, 0.3)/" "$ROFI_RASI"
-    echo "Rofi color updated"
 fi
 
 # Update local background.png
@@ -40,14 +39,14 @@ if [[ -f "$WAYPAPER_CONFIG" && -f "$SDDM_CONF" ]]; then
             WP_FILENAME="${WP_FILENAME%.*}.jpg"
             sudo magick "$CURRENT_WP" "$SDDM_BG_DIR/$WP_FILENAME"
             sudo chmod 644 "$SDDM_BG_DIR/$WP_FILENAME"
-            echo "🔄 Converted webp → $WP_FILENAME"
+            #echo "🔄 Converted webp → $WP_FILENAME"
         else
             sudo magick "$CURRENT_WP" "$SDDM_BG_DIR/$WP_FILENAME"
             sudo chmod 644 "$SDDM_BG_DIR/$WP_FILENAME"
         fi
 
         sudo sed -i "s|^Background=.*|Background=\"Backgrounds/$WP_FILENAME\"|" "$SDDM_CONF"
-        echo "🖥️  SDDM background updated → Backgrounds/$WP_FILENAME"
+        #echo "🖥️  SDDM background updated → Backgrounds/$WP_FILENAME"
     fi
 
     # ── BackgroundColor from inverse_primary in colors.css ───────────────────
@@ -58,7 +57,7 @@ if [[ -f "$WAYPAPER_CONFIG" && -f "$SDDM_CONF" ]]; then
 
         if [[ -n "$FULL_HEX" ]]; then
             sudo sed -i "s|^BackgroundColor=.*|BackgroundColor=\"#$FULL_HEX\"|" "$SDDM_CONF"
-            echo "🎨 SDDM BackgroundColor updated → #$FULL_HEX (from inverse_primary)"
+            #echo "🎨 SDDM BackgroundColor updated → #$FULL_HEX (from inverse_primary)"
         else
             echo "⚠️  Could not parse inverse_primary from $COLORS_CSS"
         fi
@@ -74,7 +73,7 @@ if [[ -f "$WAYPAPER_CONFIG" && -f "$SDDM_CONF" ]]; then
 
         if [[ -n "$FULL_HEX" ]]; then
             sudo sed -i "s|^AccentColor=.*|AccentColor=\"#$FULL_HEX\"|" "$SDDM_CONF"
-            echo "🎨 SDDM AccentColor updated → #$FULL_HEX (from primary_container)"
+            #echo "🎨 SDDM AccentColor updated → #$FULL_HEX (from primary_container)"
         else
             echo "⚠️  Could not parse primary_container from $COLORS_CSS"
         fi
@@ -85,10 +84,4 @@ if [[ -f "$WAYPAPER_CONFIG" && -f "$SDDM_CONF" ]]; then
 else
     [[ ! -f "$WAYPAPER_CONFIG" ]] && echo "⚠️  waypaper config not found: $WAYPAPER_CONFIG"
     [[ ! -f "$SDDM_CONF" ]]      && echo "⚠️  SDDM config not found: $SDDM_CONF"
-fi
-
-# Create lock.png at 661x661 pixels
-if command -v magick >/dev/null && [ -f "$HOME/.config/background" ]; then
-    magick "$HOME/.config/background[0]" -resize 661x661^ -gravity center -extent 661x661 "$HOME/.config/lock.png"
-    echo "🔒 Created lock.png at 661x661 pixels"
 fi
