@@ -1,4 +1,5 @@
 #!/bin/bash
+
 CONFIG_BG="$HOME/.config/background"
 WP_CONFIG="$HOME/.config/wallpaper/wallpaper.ini"
 WAYPAPER_CONFIG="$HOME/.config/waypaper/config.ini"
@@ -7,7 +8,7 @@ RELOAD_SO="/usr/local/lib/gtk3-reload.so"
 RELOAD_SRC="/usr/local/share/gtk3-reload/gtk3-reload.c"
 HOOKS_DIR="$HOME/.config/hyprcandy/hooks"
 
-get_wallpaper_background() {
+get_waypaper_background() {
     # Prefer quickshell wallpaper picker config, fall back to waypaper config
     for cfg in "$WP_CONFIG" "$WAYPAPER_CONFIG"; do
         if [ -f "$cfg" ]; then
@@ -26,8 +27,8 @@ update_config_background() {
     local bg_path="$1"
     if [ -f "$bg_path" ] && [ -f "$MATUGEN_CONFIG" ]; then
         echo "🎨 Triggering matugen color generation..."
-        wal -i "$bg_path" -n --cols16 darken --backend haishoku --contrast 1.5 --saturate 0.2 2>/dev/null
-		matugen image "$bg_path" --type scheme-content -m dark -r nearest --base16-backend wal --lightness-dark -0.1 --source-color-index 0 --contrast 0.2 2>/dev/null
+        wal -i "$bg_path" -n --cols16 darken --backend colorthief --contrast 1.5 --saturate 0.2 2>/dev/null
+		matugen image "$bg_path" --type scheme-fidelity -m dark -r nearest --base16-backend wal --lightness-dark -0.1 --source-color-index 0 --contrast 0.2 2>/dev/null
         sleep 0.5
         magick "$bg_path" "$HOME/.config/background"
         sleep 1
@@ -41,15 +42,15 @@ update_config_background() {
 }
 
 main() {
-    echo "🎯 Wallpaper integration triggered"
-    current_bg=$(get_wallpaper_background)
+    echo "🎯 Waypaper integration triggered"
+    current_bg=$(get_waypaper_background)
     if [ $? -eq 0 ]; then
-        echo "📸 Current wallpaper background: $current_bg"
+        echo "📸 Current Waypaper background: $current_bg"
         if update_config_background "$current_bg"; then
            echo "✅ Color generation processes complete"
         fi
     else
-        echo "⚠️  Could not determine current wallpaper background"
+        echo "⚠️  Could not determine current Waypaper background"
     fi
 }
 

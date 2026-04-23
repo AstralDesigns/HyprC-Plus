@@ -45,14 +45,14 @@ ShellRoot {
     // Outer panel tint
     readonly property color cPanel: Qt.rgba(
         Qt.color(_m3inversePrimary).r, Qt.color(_m3inversePrimary).g,
-        Qt.color(_m3inversePrimary).b, 0.62)
+        Qt.color(_m3inversePrimary).b, 0.65)
     // Sub-card backgrounds
     readonly property color cCardDark: Qt.rgba(
         Qt.color(_m3onSecondary).r, Qt.color(_m3onSecondary).g,
-        Qt.color(_m3onSecondary).b, 0.80)
+        Qt.color(_m3onSecondary).b, 0.60)
     readonly property color cCardWarm: Qt.rgba(
-        Qt.color(_m3inversePrimary).r, Qt.color(_m3inversePrimary).g,
-        Qt.color(_m3inversePrimary).b, 0.65)
+        Qt.color(_m3background).r, Qt.color(_m3background).g,
+        Qt.color(_m3background).b, 0.30)
 
     function parseColors(t) {
         const re=/property color (\w+): "(#[0-9a-fA-F]+)"/g; let m
@@ -618,7 +618,7 @@ ShellRoot {
 
                                         Rectangle {
                                             Layout.fillWidth:true; height:1
-                                            color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.30)
+                                            color:Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.30)
                                         }
 
                                         // PIN ENTRY
@@ -1049,7 +1049,7 @@ ShellRoot {
                     // inversePrimary tint overlay
                     Rectangle {
                         anchors.fill: parent; radius: height / 2
-                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.62)
+                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
                         border.width: 1
                         border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.18)
                     }
