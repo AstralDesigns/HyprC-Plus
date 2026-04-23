@@ -16,15 +16,15 @@ Item {
     readonly property string _icon: {
         switch (root._profile) {
             case "performance": return "󰠠"
-            case "power-saver":  return "󰽥"
-            default:             return "󰽣"   // balanced
+            case "power-saver":  return "󰌪"
+            default:             return "󰄯"   // balanced
         }
     }
     readonly property color _color: {
         switch (root._profile) {
-            case "performance": return Theme.cErr        // hot — red
-            case "power-saver":  return Theme.cPrimary   // cool — primary
-            default:             return Theme.cOnSurf    // balanced — neutral
+            case "performance": return Theme.cSecondary
+            case "power-saver":  return Theme.cOnSurf
+            default:             return Theme.cPrimary
         }
     }
 
