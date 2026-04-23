@@ -151,6 +151,27 @@ PanelWindow {
                     font.weight:    Font.Medium
                     anchors.verticalCenter: parent.verticalCenter
                 }
+                // Re-run button: shown only when HC is "up to date" so the user
+                // can force a fresh install even after an abrupt closure.
+                Text {
+                    id: hcRerunBtn
+                    visible: !UpdatesPopupState.hcHasUpdates
+                    text: _hcUpdateProc.running ? "󰑓" : "󰇚"
+                    color: hcRerunHover.containsMouse
+                        ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.75)
+                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
+                    font.family:    Config.fontFamily
+                    font.pixelSize: Config.fontSize + 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    MouseArea {
+                        id: hcRerunHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape:  Qt.PointingHandCursor
+                        onClicked:    if (!_hcUpdateProc.running) _hcUpdateProc.running = true
+                    }
+                }
             }
 
             Rectangle {
