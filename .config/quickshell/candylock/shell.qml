@@ -10,6 +10,7 @@ ShellRoot {
     id: root
 
     // ── Matugen colors ──────────────────────────────────────────────────────
+    property string _m3sourceColor:	     "#a57c44"
     property string _m3primary:              "#f7af91"
     property string _m3primaryContainer:     "#a37c48"
     property string _m3onPrimary:            "#170700"
@@ -22,13 +23,13 @@ ShellRoot {
     property string _m3error:                "#ffb4ab"
     property string _m3primaryFixedDim:      "#f7af91"
     property string _m3secondary:            "#e7bfb0"
-    property string _m3secondaryContainer:   "#535457"
     property string _m3onSecondary:          "#160701"
     property string _m3tertiary:             "#c9cb90"
     property string _m3onTertiary:           "#141500"
     property string _m3secondaryFixedDim:    "#e7bfb0"
     property string _m3tertiaryFixedDim:     "#c9cb90"
 
+    readonly property color cSourceColor:	Qt.color(_m3sourceColor)
     readonly property color cPrimary:           Qt.color(_m3primary)
     readonly property color cPrimaryContainer:  Qt.color(_m3primaryContainer)
     readonly property color cOnSurf:            Qt.color(_m3onSurface)
@@ -40,7 +41,6 @@ ShellRoot {
     readonly property color cErr:               Qt.color(_m3error)
     readonly property color cPrimFixedDim:      Qt.color(_m3primaryFixedDim)
     readonly property color cSecondary:         Qt.color(_m3secondary)
-    readonly property color cSecondaryContainer:Qt.color(_m3secondaryContainer)
     readonly property color cOnSecondary:       Qt.color(_m3onSecondary)
     readonly property color cTertiary:          Qt.color(_m3tertiary)
     readonly property color cSecondaryFixedDim: Qt.color(_m3secondaryFixedDim)
@@ -61,6 +61,7 @@ ShellRoot {
     function parseColors(t) {
         const re=/property color (\w+): "(#[0-9a-fA-F]+)"/g; let m
         while((m=re.exec(t))!==null) switch(m[1]) {
+            case "m3sourceColor":   	   root._m3sourceColor=m[2]; break
             case "m3primary":              root._m3primary=m[2]; break
             case "m3primaryContainer":     root._m3primaryContainer=m[2]; break
             case "m3onPrimary":            root._m3onPrimary=m[2]; break
@@ -73,7 +74,6 @@ ShellRoot {
             case "m3error":                root._m3error=m[2]; break
             case "m3primaryFixedDim":      root._m3primaryFixedDim=m[2]; break
             case "m3secondary":            root._m3secondary=m[2]; break
-            case "m3secondaryContainer":   root._m3secondaryContainer=m[2]; break
             case "m3onSecondary":          root._m3onSecondary=m[2]; break
             case "m3tertiary":             root._m3tertiary=m[2]; break
             case "m3onTertiary":           root._m3onTertiary=m[2]; break
@@ -580,7 +580,7 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:root.cPrimaryContainer
+                                            text:root.clockDate; color:root.cSourceColor
                                             font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
@@ -897,7 +897,7 @@ ShellRoot {
                                                     const angle = (i / _barCount) * Math.PI * 2 - Math.PI / 2
                                                     const barH  = 2 + amp * (maxBarH - 2)   // 2px baseline above disc
                                                     ctx.beginPath()
-                                                    ctx.strokeStyle = Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.40 + amp * 1.00)
+                                                    ctx.strokeStyle = Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cSourceColor.b, 0.40 + amp * 1.00)
                                                     ctx.lineWidth = 1.5
                                                     ctx.lineCap   = "round"
                                                     ctx.moveTo(cx + Math.cos(angle) * innerR,            cy + Math.sin(angle) * innerR)

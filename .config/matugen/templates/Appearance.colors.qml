@@ -3,6 +3,7 @@ import QtQuick
 
 QtObject {
     property bool darkmode: true
+    property color m3sourceColor: "{{colors.source_color.default.hex}}"
     property color m3primary: "{{colors.primary.default.hex}}"
     property color m3onPrimary: "{{colors.on_primary.default.hex}}"
     property color m3primaryContainer: "{{colors.primary_container.default.hex}}"

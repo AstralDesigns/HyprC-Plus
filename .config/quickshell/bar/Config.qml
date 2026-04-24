@@ -601,7 +601,7 @@ QtObject {
     // Resolve a matugen "$varname" → the live Theme.cXxx color.
     function _cavaThemeColor(varName) {
         switch (varName) {
-            case "$source_color":           return Theme.cPrimary
+            case "$source_color":           return Theme.cSourceColor
             case "$primary":                return Theme.cPrimary
             case "$on_primary":             return Theme.cOnPrimary
             case "$primary_container":      return Theme.cPrimaryContainer
