@@ -580,7 +580,7 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:root.cSourceColor
+                                            text:root.clockDate; color:Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cSourceColor.b, 1.00)
                                             font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
@@ -643,12 +643,12 @@ ShellRoot {
                                             RowLayout {
                                                 anchors.centerIn:parent; spacing:7
                                                 visible:root.pinEntry.length===0 && !root.authChecking
-                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:root.cPrimaryContainer; opacity:0.90 }
+                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cSourceColor.b, 1.00) }
                                                 Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cSecondary; opacity:1.00 }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; visible:root.authChecking
-                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:root.cPrimaryContainer
+                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cSourceColor.b, 1.00)
                                                 RotationAnimator on rotation { from:0; to:360; duration:900; loops:Animation.Infinite; running:root.authChecking }
                                             }
                                             Row {
