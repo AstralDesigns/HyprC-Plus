@@ -11,6 +11,7 @@ ShellRoot {
 
     // ── Matugen colors ──────────────────────────────────────────────────────
     property string _m3primary:              "#f7af91"
+    property string _m3primaryContainer:     "#a37c48"
     property string _m3onPrimary:            "#170700"
     property string _m3background:           "#170700"
     property string _m3inversePrimary:       "#6f2900"
@@ -28,6 +29,7 @@ ShellRoot {
     property string _m3tertiaryFixedDim:     "#c9cb90"
 
     readonly property color cPrimary:           Qt.color(_m3primary)
+    readonly property color cPrimaryContainer:  Qt.color(_m3primaryContainer)
     readonly property color cOnSurf:            Qt.color(_m3onSurface)
     readonly property color cOnSurfVar:         Qt.color(_m3onSurfaceVariant)
     readonly property color cBg:                Qt.color(_m3background)
@@ -58,6 +60,7 @@ ShellRoot {
         const re=/property color (\w+): "(#[0-9a-fA-F]+)"/g; let m
         while((m=re.exec(t))!==null) switch(m[1]) {
             case "m3primary":              root._m3primary=m[2]; break
+            case "m3primaryContainer":     root._m3primaryContainer=m[2]; break
             case "m3onPrimary":            root._m3onPrimary=m[2]; break
             case "m3background":           root._m3background=m[2]; break
             case "m3inversePrimary":       root._m3inversePrimary=m[2]; break
@@ -536,7 +539,7 @@ ShellRoot {
                                     anchors.centerIn:parent; spacing:0
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockHour; color:root.cPrimary
+                                        text:root.clockHour; color:root.cPrimaryContainer
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
