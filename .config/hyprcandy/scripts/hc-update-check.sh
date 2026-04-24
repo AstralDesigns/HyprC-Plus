@@ -36,6 +36,7 @@ if [ -f "$STATE_FILE" ]; then
     if [ -d "$HC_STORE/.git" ]; then
         git -C "$HC_STORE" pull 2>&1 > /dev/null &
     fi
+    notify-send " HC+ Update" "New updates available"
     exit 0
 fi
 
