@@ -581,7 +581,7 @@ ShellRoot {
                                         Text {
                                             Layout.fillWidth:true
                                             text:root.clockDate; color:root.cPrimaryContainer
-                                            font.family:"C059"; font.pixelSize:28; font.italic:true; font.weight:Font.DemiBold
+                                            font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
 
@@ -611,12 +611,12 @@ ShellRoot {
                                                 Layout.fillWidth:true; spacing:4; Layout.alignment:Qt.AlignVCenter
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherTemp; color:root.cPrimary
-                                                    font.family:"C059"; font.pixelSize:28; font.italic:true; font.weight:Font.DemiBold
+                                                    text:root.weatherTemp; color:root.cSecondary; opacity:0.90
+                                                    font.family:"C059"; font.pixelSize:24; font.italic:true; font.weight:Font.DemiBold
                                                 }
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherIcon; color:root.cPrimary
+                                                    text:root.weatherIcon; color:root.cSecondary; opacity:0.90
                                                     font.pixelSize:24; font.family:"Symbols Nerd Font Mono"
                                                 }
                                             }
@@ -644,7 +644,7 @@ ShellRoot {
                                                 anchors.centerIn:parent; spacing:7
                                                 visible:root.pinEntry.length===0 && !root.authChecking
                                                 Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:root.cPrimaryContainer; opacity:0.90 }
-                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cPrimary; opacity:0.90 }
+                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cSecondary; opacity:1.00 }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; visible:root.authChecking
@@ -654,7 +654,7 @@ ShellRoot {
                                             Row {
                                                 anchors.centerIn:parent; spacing:6
                                                 visible:root.pinEntry.length>0 && !root.authChecking
-                                                Repeater { model:root.pinEntry.length; delegate:Rectangle{width:9;height:9;radius:5;color:root.cPrimary;opacity:0.90} }
+                                                Repeater { model:root.pinEntry.length; delegate:Rectangle{width:9;height:9;radius:5;color:root.cSecondary;opacity:0.90} }
                                             }
                                         }
 
