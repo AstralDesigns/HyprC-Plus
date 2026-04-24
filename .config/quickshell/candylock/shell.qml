@@ -480,7 +480,7 @@ ShellRoot {
                     anchors.verticalCenter:   parent.verticalCenter
                     anchors.verticalCenterOffset: -36
                     width:660
-                    height:panelCol.implicitHeight+56
+                    height:panelCol.implicitHeight+42
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
