@@ -377,6 +377,7 @@ function createMediaBox() {
             const [ok2, c2] = sc.lookup_color('background');
             const [ok3, c3] = sc.lookup_color('blur_background');
             const [ok4, c4] = sc.lookup_color('primary');
+            const [ok5, c5] = sc.lookup_color('primary_container');
             if (ok1 && ok2) {
                 _bgColors = {
                     inv: { r: c1.red, g: c1.green, b: c1.blue, a: c1.alpha },
@@ -385,6 +386,8 @@ function createMediaBox() {
                                : { r: c2.red, g: c2.green, b: c2.blue, a: 0.5 },
                     // @primary — used for placeholder glyph colour
                     pri: ok4 ? { r: c4.red, g: c4.green, b: c4.blue }
+                              : { r: 1, g: 1, b: 1 },  // fallback: white
+		    pric: ok5 ? { r: c5.red, g: c5.green, b: c5.blue }
                               : { r: 1, g: 1, b: 1 },  // fallback: white
                 };
             }
@@ -545,7 +548,7 @@ function createMediaBox() {
         if (!_cavaOn) return;
         const cx = w / 2, cy = h / 2;
         const rInner = THUMB_SIZE / 2 + CAVA_GAP;
-        const _cp = _bgColors ? _bgColors.pri : { r: 0.6, g: 0.85, b: 1.0 };
+        const _cp = _bgColors ? _bgColors.pric : { r: 0.6, g: 0.85, b: 1.0 };
         const N  = _cavaN;
         const dA = (2 * Math.PI) / N;
         const s0 = -Math.PI / 2;

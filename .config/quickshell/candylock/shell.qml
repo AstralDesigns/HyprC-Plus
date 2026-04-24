@@ -580,8 +580,8 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:root.cPrimary
-                                            font.family:"C059"; font.pixelSize:24; font.italic:true; font.weight:Font.DemiBold
+                                            text:root.clockDate; color:root.cPrimaryContainer
+                                            font.family:"C059"; font.pixelSize:28; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
 
@@ -611,7 +611,7 @@ ShellRoot {
                                                 Layout.fillWidth:true; spacing:4; Layout.alignment:Qt.AlignVCenter
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherTemp; color:root.cPrimaryContainer
+                                                    text:root.weatherTemp; color:root.cPrimary
                                                     font.family:"C059"; font.pixelSize:28; font.italic:true; font.weight:Font.DemiBold
                                                 }
                                                 Text {
@@ -897,7 +897,7 @@ ShellRoot {
                                                     const angle = (i / _barCount) * Math.PI * 2 - Math.PI / 2
                                                     const barH  = 2 + amp * (maxBarH - 2)   // 2px baseline above disc
                                                     ctx.beginPath()
-                                                    ctx.strokeStyle = Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.20 + amp * 0.80)
+                                                    ctx.strokeStyle = Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.40 + amp * 1.00)
                                                     ctx.lineWidth = 1.5
                                                     ctx.lineCap   = "round"
                                                     ctx.moveTo(cx + Math.cos(angle) * innerR,            cy + Math.sin(angle) * innerR)
