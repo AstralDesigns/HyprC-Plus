@@ -17,7 +17,7 @@ Item {
         switch (root._profile) {
             case "performance": return "󰠠"
             case "power-saver":  return "󱤅"
-            default:             return ""   // balanced
+            default:             return "󰚀"   // balanced
         }
     }
     readonly property color _color: {
