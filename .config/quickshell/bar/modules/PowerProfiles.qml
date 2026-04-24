@@ -16,7 +16,7 @@ Item {
     readonly property string _icon: {
         switch (root._profile) {
             case "performance": return "󰠠"
-            case "power-saver":  return "󰌪"
+            case "power-saver":  return "󱤅"
             default:             return ""   // balanced
         }
     }

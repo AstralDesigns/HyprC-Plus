@@ -9,26 +9,37 @@ Item {
     implicitWidth: powerText.implicitWidth + Config.btnPadLeft + Config.btnPadRight
     implicitHeight: Config.moduleHeight
 
-    // Local toggle state — flips on every click; self-corrects on next interaction.
-    property bool _menuOpen: false
+    // Tracks whether the spin animation is in flight
+    property bool _spinning: false
+
+    // Rotation target — incremented by 360 on each click to chain cleanly
+    property real _rotationTarget: 0
 
     Process {
         id: smProc
         command: [Config.scriptsDir + "/startmenu.sh"]
         running: false
-        onExited: function(code) {
-            if (code !== 0) root._menuOpen = false
-        }
     }
 
     Text {
         id: powerText
         anchors.centerIn: parent
-        // Down = closed (click to open), Up = open (click to close)
-        text: root._menuOpen ? "" : ""   // nf-fa-chevron_circle_up / _down
+        text: ""
         color: Config.powerGlyphColor
         font.family: Config.fontFamily
         font.pixelSize: Config.fontSize
+
+        transformOrigin: Item.Center
+        rotation: 0
+
+        Behavior on rotation {
+            RotationAnimation {
+                duration: 420
+                direction: RotationAnimation.Clockwise
+                easing.type: Easing.InOutCubic
+                onRunningChanged: if (!running) root._spinning = false
+            }
+        }
     }
 
     opacity: ma.containsMouse ? 0.7 : 1.0
@@ -40,7 +51,9 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: {
-            root._menuOpen = !root._menuOpen
+            root._spinning = true
+            root._rotationTarget += 360
+            powerText.rotation = root._rotationTarget
             if (!smProc.running) smProc.running = true
         }
     }
