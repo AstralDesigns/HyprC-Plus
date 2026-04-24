@@ -6,7 +6,7 @@ import ".."
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
-    implicitWidth: powerText.implicitWidth + Config.btnPadLeft + Config.btnPadRight
+    implicitWidth: Config.moduleHeight
     implicitHeight: Config.moduleHeight
 
     // Tracks whether the spin animation is in flight

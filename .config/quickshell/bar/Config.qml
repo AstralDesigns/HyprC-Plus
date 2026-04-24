@@ -333,8 +333,8 @@ QtObject {
     //  barHeight   = reserved screen strip (PanelWindow exclusion zone)
     //  moduleHeight = visual island/pill height (≤ barHeight)
     //    Gap = (barHeight − moduleHeight) / 2 → "floating pill" look
-    property int barHeight:    36   // px — reserved screen strip
-    property int moduleHeight: 22   // px — visual island/pill height
+    property int barHeight:    34   // px — reserved screen strip
+    property int moduleHeight: 20   // px — visual island/pill height
 
     //  Outer margins from screen edges:
     property int outerMarginTop:    2   // px — gap from screen top

@@ -1278,8 +1278,8 @@ PanelWindow {
                                         }
 
                                         CCSection { text: "Dimensions" }
-                                        CCSlider { label:"Bar Height";    from:20;to:80;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
-                                        CCSlider { label:"Module Height";  from:12;to:70;  value:Config.moduleHeight;  onMoved:function(v){Config.moduleHeight=v} }
+                                        CCSlider { label:"Bar Height";    from:20;to:80;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
+                                        CCSlider { label:"Module Height";  from:12;to:70;  stepSize:2;  value:Config.moduleHeight;  onMoved:function(v){Config.moduleHeight=v} }
 
                                         CCSection { text: "Screen Margins" }
                                         CCSlider { label:"Top Margin";    from:0;to:30; value:Config.outerMarginTop;    onMoved:function(v){Config.outerMarginTop=v} }

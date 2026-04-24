@@ -10,7 +10,7 @@ import ".."
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
-    implicitWidth: ccIcon.implicitWidth + Config.btnPadLeft + Config.btnPadRight
+    implicitWidth: Config.moduleHeight
     implicitHeight: Config.moduleHeight
 
     property string _glyph: Config.ccGlyph
