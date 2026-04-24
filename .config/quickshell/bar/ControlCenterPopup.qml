@@ -676,6 +676,7 @@ PanelWindow {
         id: ccTabSettings
         category: "cc-tabs-v1"
         property int activeTab: 1  // Default to Hyprland tab (index 1)
+        property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
     }
     Settings {
         id: ccLocSettings
@@ -927,7 +928,6 @@ PanelWindow {
                                 hoverEnabled: true
                                 onClicked: {
                                     mainStack.currentIndex = modelData.idx
-                                    barSubStack.currentIndex = 0
                                     ccTabSettings.activeTab = modelData.idx
                                 }
                             }
@@ -1023,7 +1023,10 @@ PanelWindow {
                                         }
                                         MouseArea {
                                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                            onClicked: barSubStack.currentIndex = index
+                                            onClicked: {
+                                                barSubStack.currentIndex = index
+                                                ccTabSettings.activeBarSubTab = index
+                                            }
                                         }
                                         Behavior on color { ColorAnimation { duration: 120 } }
                                     }
@@ -1041,7 +1044,7 @@ PanelWindow {
                                 id: barSubStack
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                currentIndex: 0
+                                currentIndex: ccTabSettings.activeBarSubTab
 
                                 // ── General ────────────────────────────────
                                 CCScrollPane {

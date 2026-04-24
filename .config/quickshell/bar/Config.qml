@@ -57,6 +57,8 @@ QtObject {
         v = _settings.value("outerMarginTop"); if (v !== undefined && v !== null) outerMarginTop = v
         v = _settings.value("outerMarginBottom"); if (v !== undefined && v !== null) outerMarginBottom = v
         v = _settings.value("outerMarginSide"); if (v !== undefined && v !== null) outerMarginSide = v
+        v = _settings.value("barEdgePaddingLeft");  if (v !== undefined && v !== null) barEdgePaddingLeft  = v
+        v = _settings.value("barEdgePaddingRight"); if (v !== undefined && v !== null) barEdgePaddingRight = v
         v = _settings.value("barRadius"); if (v !== undefined && v !== null) barRadius = v
         v = _settings.value("islandRadius"); if (v !== undefined && v !== null) islandRadius = v
         v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
@@ -73,13 +75,19 @@ QtObject {
         v = _settings.value("groupedSpacing"); if (v !== undefined && v !== null) groupedSpacing = v
         v = _settings.value("glyphSize"); if (v !== undefined && v !== null) glyphSize = v
         v = _settings.value("infoGlyphSize"); if (v !== undefined && v !== null) infoGlyphSize = v
+        v = _settings.value("mediaGlyphSize"); if (v !== undefined && v !== null) mediaGlyphSize = v
+        v = _settings.value("infoFontSize");   if (v !== undefined && v !== null) infoFontSize   = v
+        v = _settings.value("labelFontSize");  if (v !== undefined && v !== null) labelFontSize  = v
         v = _settings.value("mediaPlayPauseSize"); if (v !== undefined && v !== null) mediaPlayPauseSize = v
         v = _settings.value("mediaThumbSize"); if (v !== undefined && v !== null) mediaThumbSize = v
         v = _settings.value("batteryRadialVisible"); if (v !== undefined && v !== null) batteryRadialVisible = _toBool(v)
         v = _settings.value("batteryRadialSize"); if (v !== undefined && v !== null) batteryRadialSize = v
         v = _settings.value("batteryRadialWidth"); if (v !== undefined && v !== null) batteryRadialWidth = v
         v = _settings.value("trayIconSz"); if (v !== undefined && v !== null) trayIconSz = v
+        v = _settings.value("trayItemPadH");   if (v !== undefined && v !== null) trayItemPadH   = v
+        v = _settings.value("trayItemSpacing"); if (v !== undefined && v !== null) trayItemSpacing = v
         v = _settings.value("ccGlyph"); if (v !== undefined && v !== null) ccGlyph = v
+        v = _settings.value("ccGlyphColorA"); if (v !== undefined && v !== null) ccGlyphColor = Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, parseFloat(v))
         v = _settings.value("wsIconMode"); if (v !== undefined && v !== null) wsIconMode = v
         v = _settings.value("wsGlyphSize"); if (v !== undefined && v !== null) wsGlyphSize = v
         v = _settings.value("wsSpacing"); if (v !== undefined && v !== null) wsSpacing = v
@@ -115,6 +123,7 @@ QtObject {
         v = _settings.value("cavaInactiveOpacity"); if (v !== undefined && v !== null) cavaInactiveOpacity = v
         v = _settings.value("cavaAutoHide"); if (v !== undefined && v !== null) cavaAutoHide = _toBool(v)
         v = _settings.value("cavaGradientEnabled"); if (v !== undefined && v !== null) cavaGradientEnabled = _toBool(v)
+        v = _settings.value("cavaGradientSplit"); if (v !== undefined && v !== null) cavaGradientSplit = parseFloat(v)
         v = _settings.value("cavaStartMode"); if (v !== undefined && v !== null) cavaStartMode = v
         v = _settings.value("cavaEndMode");   if (v !== undefined && v !== null) cavaEndMode   = v
         v = _settings.value("cavaStartVar");  if (v !== undefined && v !== null) cavaStartVar  = v
@@ -181,6 +190,8 @@ QtObject {
         _settings.setValue("outerMarginTop", outerMarginTop)
         _settings.setValue("outerMarginBottom", outerMarginBottom)
         _settings.setValue("outerMarginSide", outerMarginSide)
+        _settings.setValue("barEdgePaddingLeft",  barEdgePaddingLeft)
+        _settings.setValue("barEdgePaddingRight", barEdgePaddingRight)
         _settings.setValue("barRadius", barRadius)
         _settings.setValue("islandRadius", islandRadius)
         _settings.setValue("islandBorder", islandBorder)
@@ -197,13 +208,19 @@ QtObject {
         _settings.setValue("groupedSpacing", groupedSpacing)
         _settings.setValue("glyphSize", glyphSize)
         _settings.setValue("infoGlyphSize", infoGlyphSize)
+        _settings.setValue("mediaGlyphSize", mediaGlyphSize)
+        _settings.setValue("infoFontSize",   infoFontSize)
+        _settings.setValue("labelFontSize",  labelFontSize)
         _settings.setValue("mediaPlayPauseSize", mediaPlayPauseSize)
         _settings.setValue("mediaThumbSize", mediaThumbSize)
         _settings.setValue("batteryRadialVisible", batteryRadialVisible)
         _settings.setValue("batteryRadialSize", batteryRadialSize)
         _settings.setValue("batteryRadialWidth", batteryRadialWidth)
         _settings.setValue("trayIconSz", trayIconSz)
+        _settings.setValue("trayItemPadH",    trayItemPadH)
+        _settings.setValue("trayItemSpacing", trayItemSpacing)
         _settings.setValue("ccGlyph", ccGlyph)
+        _settings.setValue("ccGlyphColorA", ccGlyphColor.a)
         _settings.setValue("wsIconMode", wsIconMode)
         _settings.setValue("wsGlyphSize", wsGlyphSize)
         _settings.setValue("wsSpacing", wsSpacing)
@@ -239,6 +256,7 @@ QtObject {
         _settings.setValue("cavaInactiveOpacity", cavaInactiveOpacity)
         _settings.setValue("cavaAutoHide", cavaAutoHide)
         _settings.setValue("cavaGradientEnabled", cavaGradientEnabled)
+        _settings.setValue("cavaGradientSplit",   cavaGradientSplit)
         _settings.setValue("cavaStartMode",        cavaStartMode)
         _settings.setValue("cavaEndMode",          cavaEndMode)
         _settings.setValue("cavaStartVar",         cavaStartVar)
