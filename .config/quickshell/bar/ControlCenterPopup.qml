@@ -1349,7 +1349,7 @@ PanelWindow {
                                                 _ccGlyphWrite.running = true
                                             }
                                         }
-                                        CCSlider { label:"CC Glyph Opacity"; from:0;to:1;stepSize:0.05;decimals:2; value:Config.ccGlyphColor.a; onMoved:function(v){Config.ccGlyphColor=Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,v)} }
+                                        CCSlider { label:"CC Glyph Opacity"; from:0;to:1;stepSize:0.05;decimals:2; value:Config.ccGlyphOpacity; onMoved:function(v){Config.ccGlyphOpacity=v} }
                                         Process { id:_ccGlyphWrite; running:false }
 
                                         CCSection { text: "Battery" }
