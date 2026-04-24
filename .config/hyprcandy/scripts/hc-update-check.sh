@@ -64,6 +64,7 @@ if echo "$pull_out" | grep -q "Already up to date"; then
     emit "false" "HyprCandy Plus is up to date" "false"
 else
     # New changes were pulled — write state so this survives restarts
+    notify-send " HC+ Update" "New updates available"
     tip="HC+ files changed — 󰇚 to sync."
     write_state "$tip"
     emit "true" "$tip" "false"
