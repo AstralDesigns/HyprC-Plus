@@ -466,7 +466,7 @@ PanelWindow {
                     value:    smWin._tempOk ? Math.min(smWin._temp / 100, 1) : 0
                     glyph:    "󰔏"; label: "Temp"
                     valStr:   smWin._tempOk ? Math.round(smWin._temp) + "°" : "N/A"
-                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cTertiary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimaryFixedDim.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                 }
                 ArcGauge {
                     visible:  smWin._swapOk
