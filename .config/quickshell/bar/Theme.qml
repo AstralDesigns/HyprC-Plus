@@ -19,6 +19,7 @@ QtObject {
     id: root
 
     // ── Raw hex strings (writable, parsed from file) ──────────────────────
+    property string _sourceColor:               "#a57c44"
     property string _primary:                   "#8ec8ea"
     property string _onPrimary:                 "#000f16"
     property string _primaryContainer:          "#346985"
@@ -57,6 +58,7 @@ QtObject {
     property string _onPrimaryFixedVariant:     "#1b4d65"
 
     // ── Typed color properties (reactive to string changes) ───────────────
+    readonly property color cSourceColor:	   Qt.color(_sourceColor)
     readonly property color cPrimary:              Qt.color(_primary)
     readonly property color cOnPrimary:            Qt.color(_onPrimary)
     readonly property color cPrimaryContainer:     Qt.color(_primaryContainer)
@@ -179,6 +181,7 @@ QtObject {
         while ((m = hexRe.exec(t)) !== null) {
             const key = m[1], hex = m[2]
             switch (key) {
+                case "sourceColor":               root._sourceColor = hex; break
                 case "primary":                   root._primary = hex; break
                 case "onPrimary":                 root._onPrimary = hex; break
                 case "primaryContainer":          root._primaryContainer = hex; break

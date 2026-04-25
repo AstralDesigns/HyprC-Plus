@@ -460,20 +460,20 @@ PanelWindow {
                     value:    smWin._ram;  glyph: "󰍛"; label: "RAM"
                     valStr:   Math.round(smWin._ram * 100) + "%"
                     sub:      smWin._fmtBytes(smWin._ramUsed)
-                    arcColor: Theme.cSecondary
+                    arcColor: Theme.cPrimaryContainer
                 }
                 ArcGauge {
                     value:    smWin._tempOk ? Math.min(smWin._temp / 100, 1) : 0
                     glyph:    "󰔏"; label: "Temp"
                     valStr:   smWin._tempOk ? Math.round(smWin._temp) + "°" : "N/A"
-                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cTertiary
+                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cTertiary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                 }
                 ArcGauge {
                     visible:  smWin._swapOk
                     value:    smWin._swap; glyph: "󰾴"; label: "Swap"
                     valStr:   Math.round(smWin._swap * 100) + "%"
                     sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
-                    arcColor: Theme.cPrimaryContainer
+                    arcColor: Theme.cSecondaryContainer
                 }
 
                 // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
@@ -486,7 +486,7 @@ PanelWindow {
                         label:    (modelData.isIgpu ? "iGPU" : "dGPU") + (smWin._gpus.length > 1 ? "" : "")
                         valStr:   modelData.pct + "%"
                         sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
-                        arcColor: modelData.isIgpu ? Theme.cSecondary : Theme.cTertiaryContainer
+                        arcColor: modelData.isIgpu ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cPrimaryContainer.g, Theme.cSourceColor.b, 1.00)
                     }
                 }
 
@@ -502,7 +502,7 @@ PanelWindow {
                     sub:      smWin._batStatus
                     arcColor: smWin._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
                               : smWin._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
-                              : Theme.cPrimary
+                              : Theme.cSourceColor
                 }
             }
 
