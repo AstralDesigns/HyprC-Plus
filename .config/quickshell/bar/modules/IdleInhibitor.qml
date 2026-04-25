@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Io
+import Quickshell
+import Quickshell.Wayland
 import ".."
 
 Item {
@@ -11,24 +12,11 @@ Item {
 
     property bool _active: false
 
-    readonly property string _script: Config.barDir + "/idle-inhibitor.sh"
-
-    Process {
-        id: statusProc
-        command: [root._script, "status"]
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: function(l) {
-                try { root._active = (JSON.parse(l).class === "activated") } catch(e) {}
-            }
-        }
+    IdleInhibitor {
+        id: inhibitor
+        window: QsWindow.window
+        enabled: root._active
     }
-    Process {
-        id: toggleProc
-        command: [root._script, "toggle"]
-        onExited: if (!statusProc.running) statusProc.running = true
-    }
-    Component.onCompleted: statusProc.running = true
 
     Text {
         id: icon
@@ -49,6 +37,6 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: if (!toggleProc.running) toggleProc.running = true
+        onClicked: root._active = !root._active
     }
 }
