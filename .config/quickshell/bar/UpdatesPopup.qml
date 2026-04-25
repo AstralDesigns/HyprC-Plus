@@ -273,7 +273,7 @@ PanelWindow {
             "--class", "floating-installer",
             "--title", "   HC+ Update",
             "-e", "bash", "-ic",
-            "rm -rf ~/candyinstall && git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/candyinstall && cd ~/candyinstall && chmod +x Candy_Update.sh && bash Candy_Update.sh"
+            "rm -rf ~/.hyprcandy/candyinstall && git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && cd ~/.hyprcandy/candyinstall && chmod +x Candy_Update.sh && bash Candy_Update.sh"
         ]
         running: false
         onExited: {
