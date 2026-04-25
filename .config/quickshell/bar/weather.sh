@@ -96,8 +96,8 @@ jq --arg unit "$CURRENT_UNIT" \
         elif (code == 48) then {text: "Depositing Rime Fog", icon: (if is_day == 1 then "" else "" end)}
         
         # Drizzle variants
-        elif (code == 51) then {text: "Light Drizzle", icon: "󰖗"}
-        elif (code == 53) then {text: "Moderate Drizzle", icon: "󰖗"}
+        elif (code == 51) then {text: "Drizzle", icon: (if "󰖖"}
+        elif (code == 53) then {text: "Moderate Drizzle", icon: "󰖖"}
         elif (code == 55) then {text: "Dense Drizzle", icon: "󰖖"}
         elif (code == 56) then {text: "Light Freezing Drizzle", icon: "󰖒"}
         elif (code == 57) then {text: "Dense Freezing Drizzle", icon: "󰖒"}
