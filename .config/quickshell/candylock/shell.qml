@@ -580,7 +580,7 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00)
+                                            text:root.clockDate; color:Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                             font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
@@ -624,7 +624,7 @@ ShellRoot {
 
                                         Rectangle {
                                             Layout.fillWidth:true; height:1
-                                            color:Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 0.30)
+                                            color:Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.30)
                                         }
 
                                         // PIN ENTRY
@@ -637,18 +637,18 @@ ShellRoot {
                                                 border.color: root.authFailed ? root.cErr
                                                     : (root.authChecking
                                                         ? Qt.rgba(root.cPrimaryContainer.r,root.cPrimaryContainer.g,root.cPrimaryContainer.b,0.40)
-                                                        : Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00))
+                                                        : Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
                                                 Behavior on border.color { ColorAnimation{duration:250} }
                                             }
                                             RowLayout {
                                                 anchors.centerIn:parent; spacing:7
                                                 visible:root.pinEntry.length===0 && !root.authChecking
-                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00) }
+                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00) }
                                                 Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cSecondary; opacity:1.00 }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; visible:root.authChecking
-                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00)
+                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                                 RotationAnimator on rotation { from:0; to:360; duration:900; loops:Animation.Infinite; running:root.authChecking }
                                             }
                                             Row {
@@ -897,7 +897,7 @@ ShellRoot {
                                                     const angle = (i / _barCount) * Math.PI * 2 - Math.PI / 2
                                                     const barH  = 2 + amp * (maxBarH - 2)   // 2px baseline above disc
                                                     ctx.beginPath()
-                                                    ctx.strokeStyle = Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 0.40 + amp * 1.00)
+                                                    ctx.strokeStyle = Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.40 + amp * 1.00)
                                                     ctx.lineWidth = 1.5
                                                     ctx.lineCap   = "round"
                                                     ctx.moveTo(cx + Math.cos(angle) * innerR,            cy + Math.sin(angle) * innerR)
@@ -1151,16 +1151,16 @@ ShellRoot {
                             width: 44; height: 44
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maShut.containsMouse ? Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 0.20) : "transparent"
+                                color:        _maShut.containsMouse ? Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.20) : "transparent"
                                 border.width: 1
-                                border.color: _maShut.containsMouse ? Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 0.45) : "transparent"
+                                border.color: _maShut.containsMouse ? Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.45) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰐥"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: Qt.rgba(root.cSecondary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00); opacity: _maShut.containsMouse ? 1.0 : 0.72
+                                color: Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00); opacity: _maShut.containsMouse ? 1.0 : 0.72
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
