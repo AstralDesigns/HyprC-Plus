@@ -473,7 +473,7 @@ PanelWindow {
                     value:    smWin._swap; glyph: "󰾴"; label: "Swap"
                     valStr:   Math.round(smWin._swap * 100) + "%"
                     sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
-                    arcColor: Theme.cSecondaryContainer
+                    arcColor: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                 }
 
                 // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
@@ -486,7 +486,7 @@ PanelWindow {
                         label:    (modelData.isIgpu ? "iGPU" : "dGPU") + (smWin._gpus.length > 1 ? "" : "")
                         valStr:   modelData.pct + "%"
                         sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
-                        arcColor: modelData.isIgpu ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cPrimaryContainer.g, Theme.cSourceColor.b, 1.00)
+                        arcColor: modelData.isIgpu ? Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cPrimaryContainer.g, Theme.cSourceColor.b, 1.00)
                     }
                 }
 
