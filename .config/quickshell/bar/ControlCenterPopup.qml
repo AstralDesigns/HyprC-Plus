@@ -1885,31 +1885,6 @@ PanelWindow {
                                     ColumnLayout {
                                         width: parent.width; spacing: 5
 
-                                        CCSection { text: "Show / Hide Modules" }
-                                        CCToggle { label:"Clock";          value:Config.showClock;          onToggled:function(v){Config.showClock=v} }
-                                        CCToggle { label:"Date";           value:Config.showDate;           onToggled:function(v){Config.showDate=v} }
-                                        CCToggle { label:"Workspaces";     value:Config.showWorkspaces;     onToggled:function(v){Config.showWorkspaces=v} }
-                                        CCToggle { label:"Cava";           value:Config.showCava;           onToggled:function(v){Config.showCava=v} }
-                                        CCToggle {
-                                            label:"Cava Auto-Hide"
-                                            value:Config.cavaAutoHide
-                                            enabled: Config.showCava
-                                            onToggled:function(v){Config.cavaAutoHide=v}
-                                        }
-                                        CCToggle { label:"Weather";        value:Config.showWeather;        onToggled:function(v){Config.showWeather=v} }
-                                        CCToggle { label:"Battery";        value:Config.showBattery;        onToggled:function(v){Config.showBattery=v} }
-                                        CCToggle { label:"Media Player";   value:Config.showMediaPlayer;    onToggled:function(v){Config.showMediaPlayer=v} }
-                                        CCToggle { label:"Idle Inhibitor"; value:Config.showIdleInhibitor;  onToggled:function(v){Config.showIdleInhibitor=v} }
-                                        CCToggle { label:"Rofi";           value:Config.showRofi;           onToggled:function(v){Config.showRofi=v} }
-                                        CCToggle { label:"Updates";        value:Config.showUpdates;        onToggled:function(v){Config.showUpdates=v} }
-                                        CCToggle { label:"Power Profiles"; value:Config.showPowerProfiles;  onToggled:function(v){Config.showPowerProfiles=v} }
-                                        CCToggle { label:"Overview";       value:Config.showOverview;       onToggled:function(v){Config.showOverview=v} }
-                                        CCToggle { label:"Notifications";  value:Config.showNotifications;  onToggled:function(v){Config.showNotifications=v} }
-                                        CCToggle { label:"Wallpaper Btn";  value:Config.showWallpaper;      onToggled:function(v){Config.showWallpaper=v} }
-                                        CCToggle { label:"System Tray";    value:Config.showTray;           onToggled:function(v){Config.showTray=v} }
-                                        //CCToggle { label:"Distro Icon";    value:Config.showDistro;         onToggled:function(v){Config.showDistro=v} }
-
-                                        Item { height: 6 }
                                         CCSection { text: "Bar Auto-Hide" }
 
                                         CCToggle {
@@ -1933,6 +1908,31 @@ PanelWindow {
                                                 Config.barAutoHideDelay = v
                                             }
                                         }
+
+                                        Item { height: 6 }
+                                        CCSection { text: "Show / Hide Modules" }
+                                        CCToggle { label:"Clock";          value:Config.showClock;          onToggled:function(v){Config.showClock=v} }
+                                        CCToggle { label:"Date";           value:Config.showDate;           onToggled:function(v){Config.showDate=v} }
+                                        CCToggle { label:"Workspaces";     value:Config.showWorkspaces;     onToggled:function(v){Config.showWorkspaces=v} }
+                                        CCToggle { label:"Cava";           value:Config.showCava;           onToggled:function(v){Config.showCava=v} }
+                                        CCToggle {
+                                            label:"Cava Auto-Hide"
+                                            value:Config.cavaAutoHide
+                                            enabled: Config.showCava
+                                            onToggled:function(v){Config.cavaAutoHide=v}
+                                        }
+                                        CCToggle { label:"Weather";        value:Config.showWeather;        onToggled:function(v){Config.showWeather=v} }
+                                        CCToggle { label:"Battery";        value:Config.showBattery;        onToggled:function(v){Config.showBattery=v} }
+                                        CCToggle { label:"Media Player";   value:Config.showMediaPlayer;    onToggled:function(v){Config.showMediaPlayer=v} }
+                                        CCToggle { label:"Idle Inhibitor"; value:Config.showIdleInhibitor;  onToggled:function(v){Config.showIdleInhibitor=v} }
+                                        CCToggle { label:"Rofi";           value:Config.showRofi;           onToggled:function(v){Config.showRofi=v} }
+                                        CCToggle { label:"Updates";        value:Config.showUpdates;        onToggled:function(v){Config.showUpdates=v} }
+                                        CCToggle { label:"Power Profiles"; value:Config.showPowerProfiles;  onToggled:function(v){Config.showPowerProfiles=v} }
+                                        CCToggle { label:"Overview";       value:Config.showOverview;       onToggled:function(v){Config.showOverview=v} }
+                                        CCToggle { label:"Notifications";  value:Config.showNotifications;  onToggled:function(v){Config.showNotifications=v} }
+                                        CCToggle { label:"Wallpaper Btn";  value:Config.showWallpaper;      onToggled:function(v){Config.showWallpaper=v} }
+                                        CCToggle { label:"System Tray";    value:Config.showTray;           onToggled:function(v){Config.showTray=v} }
+                                        //CCToggle { label:"Distro Icon";    value:Config.showDistro;         onToggled:function(v){Config.showDistro=v} }
 
                                         Item { height: 10 }
                                     }
