@@ -1886,6 +1886,9 @@ PanelWindow {
                                         width: parent.width; spacing: 5
 
                                         CCSection { text: "Show / Hide Modules" }
+                                        CCToggle { label:"Clock";          value:Config.showClock;          onToggled:function(v){Config.showClock=v} }
+                                        CCToggle { label:"Date";           value:Config.showDate;           onToggled:function(v){Config.showDate=v} }
+                                        CCToggle { label:"Workspaces";     value:Config.showWorkspaces;     onToggled:function(v){Config.showWorkspaces=v} }
                                         CCToggle { label:"Cava";           value:Config.showCava;           onToggled:function(v){Config.showCava=v} }
                                         CCToggle {
                                             label:"Cava Auto-Hide"

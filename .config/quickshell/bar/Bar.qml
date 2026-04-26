@@ -400,7 +400,7 @@ PanelWindow {
             }
             spacing: Config.islandSpacing
 
-            Island { bgType: "workspace"; Modules.Workspaces {} }
+            Island { bgType: "workspace"; visible_: Config.showWorkspaces; Modules.Workspaces {} }
 
             Island {
                 bgType: "grouped"
@@ -428,14 +428,14 @@ PanelWindow {
             spacing: Config.islandSpacing
 
             Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaLeft; side: "left" } }
-            Island { bgType: "ungrouped"; Modules.Clock {} }
+            Island { bgType: "ungrouped"; visible_: Config.showClock; Modules.Clock {} }
             Island {
                 bgType: "distro"
                 visible_: Config.showDistro
                 bgOverride: Config.ccTransparentBg ? 0.0 : -1
                 Modules.ControlCenter {}
             }
-            Island { bgType: "ungrouped"; Modules.DateDisplay {} }
+            Island { bgType: "ungrouped"; visible_: Config.showDate;  Modules.DateDisplay {} }
             Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaRight; side: "right" } }
         }
 
@@ -533,7 +533,7 @@ PanelWindow {
                 }
                 spacing: Config.islandSpacing
 
-                Island { bgType: "workspace"; Modules.Workspaces {} }
+                Island { bgType: "workspace"; visible_: Config.showWorkspaces; Modules.Workspaces {} }
                 Island {
                     bgType: "grouped"
                     visible_: Config.showNotifications || Config.showWallpaper || Config.showOverview
@@ -602,14 +602,14 @@ PanelWindow {
                 spacing: Config.islandSpacing
 
                 Island { bgType: "cava";      visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaLeftV; side: "left" } }
-                Island { bgType: "ungrouped"; Modules.Clock {} }
+                Island { bgType: "ungrouped"; visible_: Config.showClock; Modules.Clock {} }
                 Island {
                     bgType: "distro"
                     visible_: Config.showDistro
                     bgOverride: Config.ccTransparentBg ? 0.0 : -1
                     Modules.ControlCenter {}
                 }
-                Island { bgType: "ungrouped"; Modules.DateDisplay {} }
+                Island { bgType: "ungrouped"; visible_: Config.showDate;  Modules.DateDisplay {} }
                 Island { bgType: "cava";      visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaRightV; side: "right" } }
             }
         }
@@ -717,9 +717,9 @@ PanelWindow {
             spacing: Config.islandSpacing
             padding: Config.outerMarginEdge
 
-            Island { Modules.Workspaces { vertical: true } }
+            Island { visible_: Config.showWorkspaces; Modules.Workspaces { vertical: true } }
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
-            Island { Modules.Clock {} }
+            Island { visible_: Config.showClock; Modules.Clock {} }
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
             Island { bgType: "tray"; visible_: Config.showTray; Modules.SystemTray { rootWindow: bar } }
             Island { bgType: "startmenu"; Modules.PowerButton {} }

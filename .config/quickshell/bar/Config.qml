@@ -143,6 +143,9 @@ QtObject {
         v = _settings.value("distroBgOpacity"); if (v !== undefined && v !== null) distroBgOpacity = Math.max(0, parseFloat(v))
         v = _settings.value("activeWindowBgOpacity"); if (v !== undefined && v !== null) activeWindowBgOpacity = v
         v = _settings.value("activeWindowMinWidth"); if (v !== undefined && v !== null) activeWindowMinWidth = v
+        v = _settings.value("showClock"); if (v !== undefined && v !== null) showClock = _toBool(v)
+        v = _settings.value("showDate"); if (v !== undefined && v !== null) showDate = _toBool(v)
+        v = _settings.value("showWorkspaces"); if (v !== undefined && v !== null) showWorkspaces = _toBool(v)
         v = _settings.value("showCava"); if (v !== undefined && v !== null) showCava = _toBool(v)
         v = _settings.value("showWeather"); if (v !== undefined && v !== null) showWeather = _toBool(v)
         v = _settings.value("showBattery"); if (v !== undefined && v !== null) showBattery = _toBool(v)
@@ -276,6 +279,9 @@ QtObject {
         _settings.setValue("distroBgOpacity", distroBgOpacity)
         _settings.setValue("activeWindowBgOpacity", activeWindowBgOpacity)
         _settings.setValue("activeWindowMinWidth", activeWindowMinWidth)
+        _settings.setValue("showClock", showClock)
+        _settings.setValue("showDate", showDate)
+        _settings.setValue("showWorkspaces", showWorkspaces)
         _settings.setValue("showCava", showCava)
         _settings.setValue("showWeather", showWeather)
         _settings.setValue("showBattery", showBattery)
@@ -816,6 +822,9 @@ QtObject {
     //  Module visibility
     // ═══════════════════════════════════════════════════════════════════════
 
+    property bool showClock:         true
+    property bool showDate:          true
+    property bool showWorkspaces:    true
     property bool showCava:          true
     property bool showWeather:       true
     property bool showBattery:       true
