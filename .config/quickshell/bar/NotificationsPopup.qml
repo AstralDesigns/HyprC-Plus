@@ -32,7 +32,7 @@ Item {
             return WlrKeyboardFocus.None
         }
         readonly property bool  _barAtBottom: Config.barPosition === "bottom"
-        readonly property real  _panelMargin: Config.outerMarginSide * 5
+        readonly property real  _panelMargin: Config.outerMarginSide * 2
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true }
         margins {
             top:    _barAtBottom ? 6 : (Config.barHeight + Config.outerMarginTop + 6)
