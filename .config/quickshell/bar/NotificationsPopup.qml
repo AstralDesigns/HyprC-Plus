@@ -121,11 +121,11 @@ Item {
                     Rectangle { x:0;y:0;width:6; height:parent.height-parent._radius
                         color: notif.urgency>=2?Theme.cErr : notif.category==="bt"?Theme.cPrimaryContainer
                             : notif.category==="media.playing"?Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b,1)
-                            : Qt.rgba(Theme.cOutVar.r,Theme.cPrimaryContainer.g,Theme.cPrimaryContainer.b,1) }
+                            : Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b,1) }
                     Rectangle { x:0;width:6;radius:3; y:parent.height-parent._radius*2; height:parent._radius*2
                         color: notif.urgency>=2?Theme.cErr : notif.category==="bt"?Theme.cPrimary
                             : notif.category==="media.playing"?Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b,1)
-                            : Qt.rgba(Theme.cOutVar.r,Theme.cPrimaryContainer.g,Theme.cPrimaryContainer.b,1) }
+                            : Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b,1) }
 
                     // Progress bar
                     Item {

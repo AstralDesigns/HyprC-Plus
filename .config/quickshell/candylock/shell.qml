@@ -898,7 +898,7 @@ ShellRoot {
                                                     const angle = (i / _barCount) * Math.PI * 2 - Math.PI / 2
                                                     const barH  = 2 + amp * (maxBarH - 2)   // 2px baseline above disc
                                                     ctx.beginPath()
-                                                    ctx.strokeStyle = Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cInvPrimary.b, 0.40 + amp * 1.00)
+                                                    ctx.strokeStyle = Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.40 + amp * 1.00)
                                                     ctx.lineWidth = 1.5
                                                     ctx.lineCap   = "round"
                                                     ctx.moveTo(cx + Math.cos(angle) * innerR,            cy + Math.sin(angle) * innerR)
