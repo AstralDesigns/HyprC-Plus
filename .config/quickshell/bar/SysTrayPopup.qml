@@ -18,7 +18,8 @@ PanelWindow {
         bottom: _barAtBottom ? (Config.barHeight + Config.outerMarginTop + Config.outerMarginBottom + 3) : 0
     }
     exclusionMode: ExclusionMode.Ignore
-    implicitHeight: popupRect.implicitHeight + 8
+    implicitWidth:  popupRect.implicitWidth + 1366
+    implicitHeight: popupRect.implicitHeight + 768
 
     // Full-surface dismiss — window is transparent so this is invisible
     MouseArea {
