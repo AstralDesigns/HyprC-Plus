@@ -466,14 +466,14 @@ PanelWindow {
                     value:    smWin._tempOk ? Math.min(smWin._temp / 100, 1) : 0
                     glyph:    "󰔏"; label: "Temp"
                     valStr:   smWin._tempOk ? Math.round(smWin._temp) + "°" : "N/A"
-                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cPrimaryContainer.g, Theme.cInversePrimary.b, 1.00)
+                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cSourceColor.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                 }
                 ArcGauge {
                     visible:  smWin._swapOk
                     value:    smWin._swap; glyph: "󰾴"; label: "Swap"
                     valStr:   Math.round(smWin._swap * 100) + "%"
                     sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
-                    arcColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
+                    arcColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 1.00)
                 }
 
                 // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
@@ -486,7 +486,7 @@ PanelWindow {
                         label:    (modelData.isIgpu ? "iGPU" : "dGPU") + (smWin._gpus.length > 1 ? "" : "")
                         valStr:   modelData.pct + "%"
                         sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
-                        arcColor: modelData.isIgpu ? Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 1.00)
+                        arcColor: modelData.isIgpu ? Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 1.00)
                     }
                 }
 

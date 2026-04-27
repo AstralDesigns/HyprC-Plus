@@ -23,6 +23,7 @@ ShellRoot {
     property string _m3error:                "#ffb4ab"
     property string _m3primaryFixedDim:      "#f7af91"
     property string _m3secondary:            "#e7bfb0"
+    property string _m3secondaryContainer:   "#61503b"
     property string _m3onSecondary:          "#160701"
     property string _m3tertiary:             "#c9cb90"
     property string _m3onTertiary:           "#141500"
@@ -42,6 +43,7 @@ ShellRoot {
     readonly property color cErr:               Qt.color(_m3error)
     readonly property color cPrimFixedDim:      Qt.color(_m3primaryFixedDim)
     readonly property color cSecondary:         Qt.color(_m3secondary)
+    readonly property color cSecondaryContainer:Qt.color(_m3secondaryContainer)
     readonly property color cOnSecondary:       Qt.color(_m3onSecondary)
     readonly property color cTertiary:          Qt.color(_m3tertiary)
     readonly property color cSecondaryFixedDim: Qt.color(_m3secondaryFixedDim)
@@ -75,6 +77,7 @@ ShellRoot {
             case "m3error":                root._m3error=m[2]; break
             case "m3primaryFixedDim":      root._m3primaryFixedDim=m[2]; break
             case "m3secondary":            root._m3secondary=m[2]; break
+            case "m3secondaryContainer":   root._m3secondaryContainer=m[2]; break
             case "m3onSecondary":          root._m3onSecondary=m[2]; break
             case "m3tertiary":             root._m3tertiary=m[2]; break
             case "m3onTertiary":           root._m3onTertiary=m[2]; break
@@ -543,7 +546,7 @@ ShellRoot {
                                     anchors.centerIn:parent; spacing:0
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockHour; color:root.cPrimaryContainer
+                                        text:root.clockHour; color:Qt.rgba(root.cSecondaryContainer.r, root.cSecondaryContainer.g, root.cSecondaryContainer.b, 1.00)
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
@@ -581,7 +584,7 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
+                                            text:root.clockDate; color:Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                             font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
@@ -625,7 +628,7 @@ ShellRoot {
 
                                         Rectangle {
                                             Layout.fillWidth:true; height:1
-                                            color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.30)
+                                            color:Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.30)
                                         }
 
                                         // PIN ENTRY
@@ -638,18 +641,18 @@ ShellRoot {
                                                 border.color: root.authFailed ? root.cErr
                                                     : (root.authChecking
                                                         ? Qt.rgba(root.cPrimaryContainer.r,root.cPrimaryContainer.g,root.cPrimaryContainer.b,0.40)
-                                                        : Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
+                                                        : Qt.rgba(root.cSecondaryContainer.r, root.cSecondaryContainer.g, root.cSecondaryContainer.b, 1.00))
                                                 Behavior on border.color { ColorAnimation{duration:250} }
                                             }
                                             RowLayout {
                                                 anchors.centerIn:parent; spacing:7
                                                 visible:root.pinEntry.length===0 && !root.authChecking
-                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00) }
+                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:Qt.rgba(root.cSecondaryContainer.r, root.cSecondaryContainer.g, root.cSecondaryContainer.b, 1.00) }
                                                 Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cSecondary; opacity:1.00 }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; visible:root.authChecking
-                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
+                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:Qt.rgba(root.cSecondaryContainer.r, root.cSecondaryContainer.g, root.cSecondaryContainer.b, 1.00)
                                                 RotationAnimator on rotation { from:0; to:360; duration:900; loops:Animation.Infinite; running:root.authChecking }
                                             }
                                             Row {
@@ -898,7 +901,7 @@ ShellRoot {
                                                     const angle = (i / _barCount) * Math.PI * 2 - Math.PI / 2
                                                     const barH  = 2 + amp * (maxBarH - 2)   // 2px baseline above disc
                                                     ctx.beginPath()
-                                                    ctx.strokeStyle = Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.40 + amp * 1.00)
+                                                    ctx.strokeStyle = Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.40 + amp * 1.00)
                                                     ctx.lineWidth = 1.5
                                                     ctx.lineCap   = "round"
                                                     ctx.moveTo(cx + Math.cos(angle) * innerR,            cy + Math.sin(angle) * innerR)
@@ -969,7 +972,7 @@ ShellRoot {
                                                 : (root.tempOk ? Math.round(root.tempC)+"°" : "N/A"))
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
-                                            readonly property color arcColor: index===0 ? root.cPrimaryContainer
+                                            readonly property color arcColor: index===0 ? Qt.rgba(root.cSecondaryContainer.r, root.cSecondaryContainer.g, root.cSecondaryContainer.b, 1.00)
                                                 : (index===1 ? root.cTertiary : root.cSecondary)
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
