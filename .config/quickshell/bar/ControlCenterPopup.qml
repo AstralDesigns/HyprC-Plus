@@ -1323,8 +1323,7 @@ PanelWindow {
                                         CCSlider { label:"Media Glyph"; from:8;to:24; value:Config.mediaGlyphSize; onMoved:function(v){Config.mediaGlyphSize=v} }
 
                                         CCSection { text: "Text Sizes" }
-                                        CCSlider { label:"Info Text";  from:8;to:20; value:Config.infoFontSize;  onMoved:function(v){Config.infoFontSize=v} }
-                                        CCSlider { label:"Label Text"; from:8;to:20; value:Config.labelFontSize; onMoved:function(v){Config.labelFontSize=v} }
+                                        CCSlider { label:"Module Text"; from:8;to:20; value:Config.infoFontSize;  onMoved:function(v){Config.infoFontSize=v} }
 
                                         CCSection { text: "Workspace Icon Glyphs" }
                                         CCIconEntry { label:"Active Dot";     value:Config.wsDotActive;     onApplied:function(v){Config.wsDotActive=v} }
