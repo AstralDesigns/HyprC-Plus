@@ -1451,7 +1451,29 @@ const HyprCandyDock = GObject.registerClass({
         settingsBtn.add_css_class('popover-item');
         settingsBtn.set_halign(Gtk.Align.FILL);
         settingsBtn.connect('clicked', () => {
-            _spawnCleanCmd('bash -c "$HOME/.hyprcandy/GJS/toggle-hyprland-settings.sh"');
+            try {
+                // pgrep -x matches exact process name; exclude zombies (state Z)
+                const [, out] = GLib.spawn_command_line_sync('pgrep -x hyprviz');
+                const pids = out ? new TextDecoder().decode(out).trim().split('\n').filter(Boolean) : [];
+                const alive = pids.some(pid => {
+                    try {
+                        const [, stat] = GLib.spawn_command_line_sync(`cat /proc/${pid.trim()}/status`);
+                        const text = new TextDecoder().decode(stat);
+                        const stateMatch = text.match(/^State:\s+(\S)/m);
+                        return stateMatch && stateMatch[1] !== 'Z';
+                    } catch (_) { return false; }
+                });
+                if (alive) {
+                    GLib.spawn_command_line_sync('pkill -x hyprviz');
+                } else {
+                    // Spawn without DO_NOT_REAP_CHILD so GLib auto-reaps the child
+                    const [, argv] = GLib.shell_parse_argv('hyprviz');
+                    let envp = GLib.get_environ();
+                    envp = GLib.environ_unsetenv(envp, 'LD_PRELOAD');
+                    GLib.spawn_async(GLib.get_home_dir(), argv, envp,
+                        GLib.SpawnFlags.SEARCH_PATH, null);
+                }
+            } catch (e) { console.error('hyprviz toggle failed:', e.message); }
             popover.popdown();
         });
         menuBox.append(settingsBtn);
