@@ -3561,7 +3561,7 @@ PanelWindow {
                 "-resize 160x100^ -gravity center -extent 160x100 " +
                 "\\( +clone -alpha extract " +
                 "   -fill black -colorize 100 " +
-                "   -fill white -draw 'roundrectangle 0,0 159,99 14,14' \\) " +
+                "   -fill white -draw 'roundrectangle 0,0 159,99 9,9' \\) " +
                 "-alpha off -compose CopyOpacity -composite " +
                 "-strip '" + safed + "' 2>/dev/null && echo ok"
             wpThumbProc.running = true

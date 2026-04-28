@@ -1111,7 +1111,7 @@ ShellRoot {
                                         // clip boundary — only bottom corners show.
                                         height: (thumb.isFocused ? 28 : 0) + 20
                                         radius: 20
-                                        color: root.cScrim
+                                        color: root.cPanelBg
                                         Text {
                                             anchors {
                                                 left:   parent.left
@@ -1123,7 +1123,7 @@ ShellRoot {
                                             }
                                             height: 28
                                             text: thumb.path.split('/').pop()
-                                            color: "#ffffff"; font.pixelSize: 12
+                                            color: root.cOnSecCont; font.pixelSize: 12
                                             elide: Text.ElideRight
                                             verticalAlignment: Text.AlignVCenter
                                         }
