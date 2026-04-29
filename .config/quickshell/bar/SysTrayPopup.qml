@@ -32,7 +32,7 @@ PanelWindow {
         id: popupRect
 
         x: Math.max(0, Math.min(
-               SysTrayPopupState.anchorX - implicitWidth / 2,
+               SysTrayPopupState.anchorX - implicitWidth / 2.5,
                win.width - implicitWidth))
         y: 4
 
@@ -45,7 +45,11 @@ PanelWindow {
                         Config.trayBgColor.g,
                         Config.trayBgColor.b,
                         0.10)
-        border.width: 0
+        border.width: 2
+        border.color : Qt.rgba(Theme.cOnPrimaryFixedVariant.r,
+                               Theme.cOnPrimaryFixedVariant.g,
+                               Theme.cOnPrimaryFixedVariant.b,
+                               1.00)
 
         Row {
             id: trayRow
