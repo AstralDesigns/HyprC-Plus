@@ -204,7 +204,7 @@ Item {
                             anchors.topMargin: 4
                             width:  Math.min(nameLabel.implicitWidth + 10, parent.width)
                             height: nameLabel.implicitHeight + 5
-                            radius: 4
+                            radius: 20
                             color:  Theme.cPanelBg
 
                             Text {
