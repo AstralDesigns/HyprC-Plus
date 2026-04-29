@@ -19,7 +19,7 @@ PanelWindow {
     }
     exclusionMode: ExclusionMode.Ignore
     implicitWidth:  popupRect.implicitWidth + 1366
-    implicitHeight: popupRect.implicitHeight + 768
+    implicitHeight: popupRect.implicitHeight + 4
 
     // Full-surface dismiss — window is transparent so this is invisible
     MouseArea {
