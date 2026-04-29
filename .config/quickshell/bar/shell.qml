@@ -6,6 +6,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtCore
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
@@ -14,7 +15,8 @@ import Quickshell.Hyprland
 ShellRoot {
     id: root
 
-    // Sync settings after Config initializes
+    // Sync settings after Config initializes, and seed the qt6ct icon theme
+    // so the watcher below never sees a false "first change" on startup.
     Component.onCompleted: {
         if (Config._settings) Config._settings.sync()
     }
@@ -55,7 +57,43 @@ ShellRoot {
     Loader { active: TrayMenuState.visible;      source: "TrayMenuPopup.qml" }
     SysTrayPopup {}
     UpdatesPopup {}
-    DesktopLayer {}
+
+    // ── qt6ct icon_theme watcher — full DesktopLayer kill+restart ──────────
+    property bool _desktopActive:      true
+    property bool _qt6ctDoubleRestart: false  // true on first change only
+
+    FileView {
+        id: qt6ctWatch
+        path: StandardPaths.writableLocation(StandardPaths.HomeLocation) + "/.config/qt6ct/qt6ct.conf"
+        watchChanges: true
+        onFileChanged: {
+            _desktopHide.restart()
+        }
+    }
+
+    Timer {
+        id: _desktopHide
+        interval: 3000
+        repeat:   false
+        onTriggered: {
+            root._desktopActive = false
+            _desktopRestartTimer.restart()
+        }
+    }
+    Timer {
+        id: _desktopRestartTimer
+        interval: 300
+        repeat:   false
+        onTriggered: root._desktopActive = true
+    }
+
+    // Wrapped in a Loader so _desktopActive can fully destroy+recreate it
+    // on icon_theme changes. DesktopLayer internally gates PanelWindow.visible
+    // on Config.desktopVisible, so the "Show Icons" toggle still works fine.
+    Loader {
+        active: root._desktopActive
+        source: "DesktopLayer.qml"
+    }
     Loader { active: ControlCenterState.visible;  source: "ControlCenterPopup.qml" }
     Loader { active: WeatherPopupState.visible;        source: "WeatherPopup.qml"        }
     Loader { active: SystemMonitorPopupState.visible;  source: "SystemMonitorPopup.qml"  }
