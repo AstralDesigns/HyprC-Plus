@@ -1949,9 +1949,12 @@ PanelWindow {
                             CCSlider { label:"Icon Size";  from:24; to:128; stepSize:4;
                                        value:Config.desktopIconSize;
                                        onMoved:function(v){ Config.desktopIconSize=v } }
-                            CCSlider { label:"Label Size"; from:8;  to:20;  stepSize:1;
+                            CCSlider { label:"Label Size";   from:8;  to:20;  stepSize:1;
                                        value:Config.desktopLabelSize;
                                        onMoved:function(v){ Config.desktopLabelSize=v } }
+                            CCSlider { label:"Label Radius"; from:0;  to:20;  stepSize:1;
+                                       value:Config.desktopLabelRadius;
+                                       onMoved:function(v){ Config.desktopLabelRadius=v } }
 
                             // ── Layout switcher ───────────────────────────────────
                             CCSection { text: "Layout" }

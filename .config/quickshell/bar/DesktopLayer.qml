@@ -204,7 +204,7 @@ Item {
                             anchors.topMargin: 4
                             width:  Math.min(nameLabel.implicitWidth + 10, parent.width)
                             height: nameLabel.implicitHeight + 5
-                            radius: 20
+                            radius: Config.desktopLabelRadius
                             color:  Theme.cPanelBg
 
                             Text {

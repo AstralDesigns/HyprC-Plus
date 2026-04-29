@@ -183,9 +183,10 @@ QtObject {
         v = _settings.value("dockAutoHide");     if (v !== undefined && v !== null) dockAutoHide     = _toBool(v)
         v = _settings.value("dockAutoHideDelay");if (v !== undefined && v !== null) dockAutoHideDelay= parseInt(v) || 5
         v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v) || 6
-        v = _settings.value("desktopIconSize");  if (v !== undefined && v !== null) desktopIconSize  = parseInt(v) || 64
-        v = _settings.value("desktopLabelSize"); if (v !== undefined && v !== null) desktopLabelSize = parseInt(v) || 11
-        v = _settings.value("desktopVisible");   if (v !== undefined && v !== null) desktopVisible   = _toBool(v)
+        v = _settings.value("desktopIconSize");    if (v !== undefined && v !== null) desktopIconSize    = parseInt(v) || 64
+        v = _settings.value("desktopLabelSize");   if (v !== undefined && v !== null) desktopLabelSize   = parseInt(v) || 11
+        v = _settings.value("desktopLabelRadius"); if (v !== undefined && v !== null) desktopLabelRadius = parseInt(v) || 20
+        v = _settings.value("desktopVisible");     if (v !== undefined && v !== null) desktopVisible     = _toBool(v)
     }
 
     function _saveSettings() {
@@ -322,9 +323,10 @@ QtObject {
         _settings.setValue("dockAutoHide",     dockAutoHide)
         _settings.setValue("dockAutoHideDelay",dockAutoHideDelay)
         _settings.setValue("dockMargin",       dockMargin)
-        _settings.setValue("desktopIconSize",  desktopIconSize)
-        _settings.setValue("desktopLabelSize", desktopLabelSize)
-        _settings.setValue("desktopVisible",   desktopVisible)
+        _settings.setValue("desktopIconSize",    desktopIconSize)
+        _settings.setValue("desktopLabelSize",   desktopLabelSize)
+        _settings.setValue("desktopLabelRadius", desktopLabelRadius)
+        _settings.setValue("desktopVisible",     desktopVisible)
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -868,9 +870,10 @@ QtObject {
     property int    dockMargin:        6       // px — screen-edge gap
 
     // ── Desktop icon layer ───────────────────────────────────────────────
-    property int  desktopIconSize:  64   // px — app icon size
-    property int  desktopLabelSize: 11   // pt — label font size
-    property bool desktopVisible:   true // show/hide desktop icon layer
+    property int  desktopIconSize:    36   // px — app icon size
+    property int  desktopLabelSize:   11   // pt — label font size
+    property int  desktopLabelRadius: 10   // px — label background corner radius
+    property bool desktopVisible:     true // show/hide desktop icon layer
 
     readonly property bool wsScrollSwitch:  true
     readonly property int  weatherInterval: 300    // seconds
