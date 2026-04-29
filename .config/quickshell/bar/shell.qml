@@ -55,19 +55,36 @@ ShellRoot {
     Loader { active: NetworkPopupState.visible;  source: "NetworkPopup.qml"  }
     Loader { active: CalendarPopupState.visible; source: "CalendarPopup.qml" }
     Loader { active: TrayMenuState.visible;      source: "TrayMenuPopup.qml" }
-    SysTrayPopup {}
+    // Wrapped in a Loader so wallpaper changes can fully destroy+recreate
+    // it, forcing Qt to re-apply the new QT color palette for native menus.
+    property bool _sysTrayActive: true
+    Loader {
+        active: root._sysTrayActive
+        source: "SysTrayPopup.qml"
+    }
     UpdatesPopup {}
 
     // ── qt6ct icon_theme watcher — full DesktopLayer kill+restart ──────────
-    property bool _desktopActive:      true
-    property bool _qt6ctDoubleRestart: false  // true on first change only
+    // Only restarts when icon_theme value actually changes, not on every
+    // qt6ct.conf write (e.g. wallpaper/color changes also touch this file).
+    property bool   _desktopActive:   true
+    property string _lastIconTheme:   ""
 
     FileView {
         id: qt6ctWatch
         path: StandardPaths.writableLocation(StandardPaths.HomeLocation) + "/.config/qt6ct/qt6ct.conf"
         watchChanges: true
-        onFileChanged: {
+        onFileChanged: reload()
+        onLoaded: {
+            const match = text().match(/^icon_theme\s*=\s*(.+)$/m)
+            const theme = match ? match[1].trim() : ""
+            if (theme === "" || theme === root._lastIconTheme) return
+            root._lastIconTheme = theme
             _desktopHide.restart()
+        }
+        Component.onCompleted: {
+            // Seed _lastIconTheme at startup so the first read never triggers a restart
+            reload()
         }
     }
 
@@ -85,6 +102,26 @@ ShellRoot {
         interval: 300
         repeat:   false
         onTriggered: root._desktopActive = true
+    }
+
+    // ── Wallpaper color watcher — reload SysTray for QT native menu colors ──
+    // pywal writes ~/.cache/wal/colors-hyprland.conf on every wallpaper change.
+    // Toggling _sysTrayActive destroys and recreates SysTrayPopup so Qt picks
+    // up the new palette for its native right-click popup menus.
+    FileView {
+        path: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+              + "/.cache/wal/colors-hyprland.conf"
+        watchChanges: true
+        onFileChanged: {
+            root._sysTrayActive = false
+            _sysTrayRestartTimer.restart()
+        }
+    }
+    Timer {
+        id: _sysTrayRestartTimer
+        interval: 500
+        repeat:   false
+        onTriggered: root._sysTrayActive = true
     }
 
     // Wrapped in a Loader so _desktopActive can fully destroy+recreate it
