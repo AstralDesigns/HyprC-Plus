@@ -798,6 +798,14 @@ var Daemon = class {
         return cmd ? cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim() : null;
     }
 
+    // Clear cached app lookups so newly installed apps are discovered.
+    // Called from dock-main.js hotReload() after external changes.
+    clearAppInfoCache() {
+        this._appInfoCache.clear();
+        this.iconCache.clear();
+        console.log('[daemon] app-info and icon caches cleared');
+    }
+
     // Clean shutdown
     shutdown() {
         if (this._refreshTimer) {

@@ -384,6 +384,7 @@ function hotReload() {
         // Reload pinned apps from disk so external writes (e.g. from the
         // App Launcher's "Pin to Dock" action) are reflected immediately.
         if (dockWindow.daemon) {
+            dockWindow.daemon.clearAppInfoCache();
             dockWindow.daemon.pinnedApps.clear();
             dockWindow.daemon.loadPinnedApps();
             // Reload desktop-pinned apps synchronously so QML unpin/reorder

@@ -790,6 +790,9 @@ const AppLauncherWindow = GObject.registerClass({
         this._colorMonitor            = null;   // Gio.FileMonitor for gtk-4.0/colors.css
         this._colorReloadTimer        = 0;      // debounce source ID
         this._groupDragClass          = null;   // className being dragged into/within a group
+        this._appDirMonitors          = [];     // Gio.FileMonitor[] for XDG application directories
+        this._appDirReloadTimer       = 0;      // debounce source ID for app-dir changes
+        this._appsDirty               = false;  // true when app directories changed while hidden
 
         this._loadGlobalCSS();
         this._setupLayerShell();
@@ -797,12 +800,16 @@ const AppLauncherWindow = GObject.registerClass({
         this._setupKeyboard();
         this._setupFocusClose();
         this._setupColorMonitor();
+        this._setupAppDirMonitors();
 
         // Daemon mode: close() must hide the window rather than destroy it,
         // so the process stays alive between toggles and all state is preserved.
         this.set_hide_on_close(true);
 
-        this.connect('destroy', () => this._teardownColorMonitor());
+        this.connect('destroy', () => {
+            this._teardownColorMonitor();
+            this._teardownAppDirMonitors();
+        });
         this.add_css_class('hyprcandy-launcher');
     }
 
@@ -2149,6 +2156,92 @@ const AppLauncherWindow = GObject.registerClass({
         }
     }
 
+    // ── App directory hot-reload ─────────────────────────────────────────
+    // Watches XDG application directories so newly installed or removed
+    // apps are reflected without restarting the launcher daemon.
+    // A 500 ms debounce prevents rapid successive refreshes during batch
+    // installs.  If the launcher is hidden the dirty flag is set and the
+    // list is refreshed on the next show (SIGUSR1 path).
+
+    _setupAppDirMonitors() {
+        const dirs = [];
+        // User applications directory
+        try {
+            const userApps = GLib.build_filenamev([GLib.get_user_data_dir(), 'applications']);
+            if (GLib.file_test(userApps, GLib.FileTest.EXISTS)) dirs.push(userApps);
+        } catch (_) {}
+        // System applications directories
+        try {
+            for (const d of GLib.get_system_data_dirs()) {
+                const sysApps = GLib.build_filenamev([d, 'applications']);
+                if (GLib.file_test(sysApps, GLib.FileTest.EXISTS)) dirs.push(sysApps);
+            }
+        } catch (_) {}
+        // Flatpak exports (user + system)
+        try {
+            const flatpakUser = GLib.build_filenamev([HOME, '.local', 'share', 'flatpak', 'exports', 'share', 'applications']);
+            if (GLib.file_test(flatpakUser, GLib.FileTest.EXISTS)) dirs.push(flatpakUser);
+        } catch (_) {}
+        try {
+            const flatpakSystem = '/var/lib/flatpak/exports/share/applications';
+            if (GLib.file_test(flatpakSystem, GLib.FileTest.EXISTS)) dirs.push(flatpakSystem);
+        } catch (_) {}
+
+        for (const dirPath of dirs) {
+            try {
+                const dir = Gio.File.new_for_path(dirPath);
+                const mon = dir.monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, null);
+                mon.connect('changed', (_m, _f, _other, ev) => {
+                    if (ev !== Gio.FileMonitorEvent.CHANGES_DONE_HINT &&
+                        ev !== Gio.FileMonitorEvent.CREATED &&
+                        ev !== Gio.FileMonitorEvent.DELETED &&
+                        ev !== Gio.FileMonitorEvent.RENAMED) return;
+                    this._appsDirty = true;
+                    // If currently visible, debounced refresh
+                    if (this.get_visible()) {
+                        if (this._appDirReloadTimer) {
+                            GLib.source_remove(this._appDirReloadTimer);
+                            this._appDirReloadTimer = 0;
+                        }
+                        this._appDirReloadTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 500, () => {
+                            this._appDirReloadTimer = 0;
+                            this._reloadAndRefreshApps();
+                            return GLib.SOURCE_REMOVE;
+                        });
+                    }
+                });
+                this._appDirMonitors.push(mon);
+            } catch (e) {
+                console.warn('[launcher] app-dir monitor failed for', dirPath, e.message);
+            }
+        }
+    }
+
+    _teardownAppDirMonitors() {
+        if (this._appDirReloadTimer) {
+            GLib.source_remove(this._appDirReloadTimer);
+            this._appDirReloadTimer = 0;
+        }
+        for (const mon of this._appDirMonitors) {
+            try { mon.cancel(); } catch (_) {}
+        }
+        this._appDirMonitors = [];
+    }
+
+    _reloadAndRefreshApps() {
+        this._allApps = getAllApps();
+        this._appsDirty = false;
+        const q = this._searchEntry ? this._searchEntry.get_text().toLowerCase().trim() : '';
+        this._favoritesSet = readFavorites();
+        this._runningApps = getRunningApps();
+        this._refreshFavorites(q);
+        this._refreshGroups(q);
+        const filtered = q ? this._allApps.filter(a => a.name.toLowerCase().includes(q)) : this._allApps;
+        this._populateApps(filtered);
+        console.log('[launcher] app list refreshed —', this._allApps.length, 'apps');
+    }
+
+
     _setupFocusClose() {
         this._bgWin = null;
 
@@ -2283,7 +2376,9 @@ const LauncherApp = GObject.registerClass({
                     // Re-anchor to the current dock edge (user may have cycled
                     // positions since the launcher daemon last showed).
                     this._win._refreshLayerShell();
-                    // Refresh running apps and reset search on each show
+                    // Refresh app list and running apps from disk on each show
+                    this._win._allApps     = this._win._appsDirty ? getAllApps() : this._win._allApps;
+                    this._win._appsDirty   = false;
                     this._win._runningApps = getRunningApps();
                     // Reset collapse state — favorites and groups start collapsed
                     // on every fresh open; the user expands what they want.
