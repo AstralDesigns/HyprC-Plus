@@ -546,7 +546,7 @@ ShellRoot {
                                     anchors.centerIn:parent; spacing:0
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockHour; color:Qt.rgba(root.cSecondaryContainer.r, root.cSecondaryContainer.g, root.cSecondaryContainer.b, 1.00)
+                                        text:root.clockHour; color:Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
@@ -558,7 +558,7 @@ ShellRoot {
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockMin; color:root.cSecondary
+                                        text:root.clockMin; color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
@@ -972,7 +972,7 @@ ShellRoot {
                                                 : (root.tempOk ? Math.round(root.tempC)+"°" : "N/A"))
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
-                                            readonly property color arcColor: index===0 ? Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
+                                            readonly property color arcColor: index===0 ? Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                                 : (index===1 ? root.cTertiary : root.cSecondary)
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
