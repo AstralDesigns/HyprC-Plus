@@ -1,5 +1,7 @@
 singleton Theme 1.0 Theme.qml
 singleton Config 1.0 Config.qml
+singleton InhibitorState 1.0 InhibitorState.qml
+InhibitorAnchor 1.0 InhibitorAnchor.qml
 singleton DesktopPinnedState 1.0 DesktopPinnedState.qml
 singleton NotificationsState 1.0 NotificationsState.qml
 singleton MediaPlayerState 1.0 MediaPlayerState.qml

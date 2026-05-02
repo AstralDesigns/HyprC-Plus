@@ -2,42 +2,19 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import ".."
 
+// The IdleInhibitor Wayland protocol object lives in InhibitorAnchor (shell.qml),
+// which is always mapped regardless of bar autohide state.  This widget only
+// drives InhibitorState.active — it owns no inhibitor object of its own.
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
     implicitWidth: icon.implicitWidth + Config.moduleHPad * 2
     implicitHeight: Config.moduleHeight
 
-    property bool _active: false
-    readonly property string _stateFile: Quickshell.env("HOME") + "/.config/hyprcandy/inhibitor-state"
-
-    function _toggle() {
-        root._active = !root._active
-        writeProc.running = true
-    }
-
-    // Read persisted state on startup
-    FileView {
-        path: root._stateFile
-        onLoaded: root._active = text().trim() === "enabled"
-    }
-
-    Process {
-        id: writeProc
-        command: ["bash", "-c",
-            "mkdir -p \"$(dirname \"$1\")\" && echo \"$2\" > \"$1\"",
-            "--", root._stateFile, root._active ? "enabled" : "disabled"]
-        running: false
-    }
-
-    IdleInhibitor {
-        id: inhibitor
-        window: QsWindow.window
-        enabled: root._active
-    }
+    // Mirror the shared state so the icon stays in sync.
+    readonly property bool _active: InhibitorState.active
 
     Text {
         id: icon
@@ -58,6 +35,6 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: root._toggle()
+        onClicked: InhibitorState.toggle()
     }
 }

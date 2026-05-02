@@ -137,6 +137,10 @@ ShellRoot {
     Loader { active: NotificationsState.historyVisible || NotificationsState.notifications.length > 0; source: "NotificationsPopup.qml" }
     Loader { active: StartMenuState.menuVisible;    source: "StartMenuPopup.qml"    }
 
+    // ── Idle-inhibitor anchor — always mapped so the Wayland protocol object
+    //    survives bar autohide (bar.visible = false unmaps the bar surface).
+    InhibitorAnchor {}
+
     // ── One bar instance per monitor ────────────────────────────────────────
     Variants {
         id: barVariants

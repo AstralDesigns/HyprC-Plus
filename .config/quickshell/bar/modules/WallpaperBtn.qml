@@ -32,15 +32,24 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onClicked: function(ev) {
-            if (ev.button === Qt.RightButton) {
-                // Right-click: reload colors from current wallpaper
-                if (!wpReColorProc.running) wpReColorProc.running = true
-            } else {
-                // Left-click: open wallpaper picker
+
+        // Left-click: launch picker on press so it feels as instant as OverviewBtn.
+        // Using onPressed instead of onClicked avoids the click-disambiguation delay
+        // Qt introduces when acceptedButtons includes RightButton.
+        onPressed: function(ev) {
+            if (ev.button === Qt.LeftButton) {
+                ev.accepted = true
                 if (!wpPickProc.running) wpPickProc.running = true
             }
         }
+
+        // Right-click: reload colors from current wallpaper (latency not critical here)
+        onClicked: function(ev) {
+            if (ev.button === Qt.RightButton) {
+                if (!wpReColorProc.running) wpReColorProc.running = true
+            }
+        }
+
         onWheel: function(wheel) {
             if (wheel.angleDelta.y > 0) {
                 if (!wpNextProc.running) wpNextProc.running = true

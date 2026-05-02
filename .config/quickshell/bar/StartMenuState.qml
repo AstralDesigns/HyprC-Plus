@@ -26,6 +26,9 @@ Item {
     property bool netScanProcRunning: false
     property bool netSavedProcRunning: false
     function startNetScan() {
+        // Open the gate immediately so the follow-up auto-scan after this
+        // manual refresh isn't blocked by the 30-second cooldown.
+        _autoScanGate.open()
         if (!netSavedProc.running) netSavedProc.running = true
         if (!netRescanProc.running) netRescanProc.running = true
     }
@@ -93,6 +96,12 @@ Item {
 
     // ── Network ────────────────────────────────────────────────────────────────
     property bool networkExpanded: false
+    onNetworkExpandedChanged: {
+        if (networkExpanded) {
+            // Open the gate so the first expand always triggers an immediate scan.
+            _autoScanGate.open()
+        }
+    }
     property var networkList: []
     property string networkStatus: ""; property string networkSSID: ""
     property string netDevice: ""          // active interface name (wlan0, eth0, …)
@@ -130,14 +139,33 @@ Item {
             // After device status, also poll wifi radio state (harmless on ethernet boxes)
             if (!netRadioProc.running) netRadioProc.running = true
             // Refresh the network list whenever status settles and the panel is
-            // expanded — keeps active/saved flags consistent with what netStatusProc
-            // just learned (header and list agree), including after a connect.
-            if (sm.networkExpanded && !sm._forgetInFlight && !netScanProc.running)
+            // expanded — but only if the 30-second auto-scan gate is open.
+            // This prevents repeated nmcli dev wifi list calls from interrupting
+            // passkey entry; the user can still force an immediate rescan via the
+            // refresh button (startNetScan() bypasses the gate entirely).
+            if (sm.networkExpanded && !sm._forgetInFlight && !netScanProc.running
+                    && _autoScanGate.elapsed)
                 netScanProc.running = true
         }
         Component.onCompleted: running=true
     }
     Timer { interval:8000; repeat:true; running:true; onTriggered: if(!netStatusProc.running) netStatusProc.running=true }
+
+    // Auto-scan gate — allows at most one background nmcli wifi list call per
+    // 30 seconds.  Resets whenever the network panel is first expanded or when
+    // startNetScan() (the manual refresh button) fires.
+    QtObject {
+        id: _autoScanGate
+        property bool elapsed: true   // open at startup so the first expand scans immediately
+        function reset() { elapsed = false; _gateTimer.restart() }
+        function open()  { _gateTimer.stop(); elapsed = true }
+    }
+    Timer {
+        id: _gateTimer
+        interval: 30000   // 30 seconds between automatic background scans
+        repeat:   false
+        onTriggered: _autoScanGate.elapsed = true
+    }
 
     // Wi-Fi radio on/off toggle
     Process { id: netRadioProc
@@ -215,7 +243,12 @@ Item {
         }}
         onRunningChanged: {
             sm.netScanProcRunning = running
-            if(running) { sm._netBuf=[] } else { sm.networkList=sm._netBuf.slice() }
+            if(running) { sm._netBuf=[] } else {
+                sm.networkList=sm._netBuf.slice()
+                // Start the 30-second cooldown so the next STATUS→scan cycle
+                // won't re-run nmcli wifi list until the gate reopens.
+                _autoScanGate.reset()
+            }
         }
     }
     Process { id: netConnProc; property string _cmd:""; property string _lastSSID:"";
