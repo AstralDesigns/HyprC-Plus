@@ -85,11 +85,57 @@ QtObject {
                         .replace(/\.desktop$/, "")
             if (eid === normLast || eid === normLast2
                     || eid.endsWith("-" + normLast)
-                    || eid.endsWith("." + normLast)) {
+                    || eid.endsWith("." + normLast)
+                    || eid.startsWith(normLast + "-")) {
                 return e
             }
         }
-        return null
+
+        // Exec-binary match: cls="spotify" → Exec="spotify-launcher %U".
+        // Extract the binary name (first word, strip any path) and apply the
+        // same prefix/suffix patterns used above for desktop IDs.  This catches
+        // wrapper-launcher desktops where the stored WM class is a prefix of
+        // the real launcher binary (StartupWMClass=spotify, Exec=spotify-launcher).
+        for (let i = 0; i < total; i++) {
+            const e = DesktopEntries.applications.get(i)
+            if (!e || !e.execString) continue
+            const bin = e.execString.trim().split(/\s+/)[0].split('/').pop().toLowerCase()
+            if (bin === normLast
+                    || bin.startsWith(normLast + "-")
+                    || bin.endsWith("-" + normLast)) {
+                return e
+            }
+        }
+
+        // Name-match fallback: the GJS dock may store the desktop entry Name
+        // (e.g. "Spotify (Launcher)") rather than the desktop ID or WM class.
+        // Collect ALL name candidates in one pass, ranked by match quality:
+        //   rank 0 — exact name match
+        //   rank 1 — stripped name matches AND qualifier presence agrees
+        //             "Spotify (Launcher)" → prefers entries that also have "("
+        //             "Spotify"            → prefers entries that have no "("
+        //   rank 2 — stripped name matches regardless of qualifier
+        // Pick the lowest rank; ties broken by whichever was seen first.
+        const normCls     = cls.toLowerCase()
+        const strippedCls = normCls.replace(/\s*\(.*?\)\s*/g, "").trim()
+        const clsHasQual  = normCls.includes("(")
+        let nameMatch = null
+        let nameRank  = 99
+        for (let i = 0; i < total; i++) {
+            const e = DesktopEntries.applications.get(i)
+            if (!e) continue
+            const eName     = (e.name || "").toLowerCase()
+            const eStripped = eName.replace(/\s*\(.*?\)\s*/g, "").trim()
+            let rank = 99
+            if (eName === normCls) {
+                rank = 0
+            } else if (eStripped === strippedCls) {
+                rank = (clsHasQual === eName.includes("(")) ? 1 : 2
+            }
+            if (rank < nameRank) { nameRank = rank; nameMatch = e }
+            if (nameRank === 0) break
+        }
+        return nameMatch
     }
 
     function _resolveApps() {

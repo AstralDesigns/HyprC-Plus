@@ -1409,7 +1409,7 @@ const HyprCandyDock = GObject.registerClass({
 
         // Pin to Desktop / Unpin from Desktop
         const cls = data.iconClass || data.className;
-        const isDesktopPinned = this.daemon.desktopPinnedApps.has(cls);
+        const isDesktopPinned = this.daemon.isDesktopPinned(cls);
         const desktopPinBtn = Gtk.Button.new_with_label(isDesktopPinned ? 'Unpin from Desktop' : 'Pin to Desktop');
         desktopPinBtn.add_css_class('popover-item');
         desktopPinBtn.set_halign(Gtk.Align.FILL);

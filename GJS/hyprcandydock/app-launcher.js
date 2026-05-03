@@ -229,14 +229,20 @@ function getAllApps() {
             }
         }
 
-        // Prefer StartupWMClass for pin matching (same key the dock uses)
+        // Prefer StartupWMClass for pin matching (same key the dock uses).
+        // wmClass is stored separately so pin checks can always test it even
+        // when Gio.AppInfo returns the object without get_startup_wm_class.
         const wm        = info.get_startup_wm_class && info.get_startup_wm_class();
+        const wmClass   = wm || null;
         const className = wm || id.replace('.desktop', '');
+        // Desktop file ID — used when writing to desktop-pinned so QML can
+        // resolve the entry via DesktopEntries.byId() without heuristics.
+        const desktopId = id.replace(/\.desktop$/, '');
 
         const cmd  = info.get_commandline && info.get_commandline();
         const exec = cmd ? cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim() : null;
 
-        apps.push({ name, iconName, className, exec, info });
+        apps.push({ name, iconName, className, desktopId, wmClass, exec, info });
     }
     apps.sort((a, b) => a.name.localeCompare(b.name));
     return apps;
@@ -1516,16 +1522,27 @@ const AppLauncherWindow = GObject.registerClass({
 
         // ── Pin / Unpin ────────────────────────────────────────────────
         this._pinnedSet = readPinnedApps();
-        const isPinned  = this._pinnedSet.has(app.className);
+        // ~/.config/pinned may store the WMClass ("spotify"), the desktop ID
+        // ("spotify-launcher"), or className (whichever getAllApps() resolved).
+        // Check all three so the button label is always correct regardless of
+        // which form was written at pin time.
+        const dockKey  = app.desktopId || app.className;
+        const isPinned = this._pinnedSet.has(dockKey)
+                         || this._pinnedSet.has(app.className)
+                         || (app.wmClass && this._pinnedSet.has(app.wmClass));
         const pinBtn    = Gtk.Button.new_with_label(isPinned ? 'Unpin from Dock' : 'Pin to Dock');
         pinBtn.add_css_class('pop-item');
         pinBtn.set_halign(Gtk.Align.FILL);
         pinBtn.connect('clicked', () => {
             this._pinnedSet = readPinnedApps();
-            if (this._pinnedSet.has(app.className))
+            if (isPinned) {
+                // Remove whichever form(s) are present.
+                this._pinnedSet.delete(dockKey);
                 this._pinnedSet.delete(app.className);
-            else
-                this._pinnedSet.add(app.className);
+                if (app.wmClass) this._pinnedSet.delete(app.wmClass);
+            } else {
+                this._pinnedSet.add(dockKey);
+            }
             savePinnedApps(this._pinnedSet);
             signalDockRefresh();
             pop.popdown();
@@ -1534,14 +1551,22 @@ const AppLauncherWindow = GObject.registerClass({
 
         // ── Pin / Unpin Desktop ────────────────────────────────────────
         const desktopPinnedSet  = readDesktopPinnedApps();
-        const isDesktopPinned   = desktopPinnedSet.has(app.className);
+        // Use desktop file ID, not WMClass — QML resolves pinned entries via
+        // DesktopEntries.byId(desktopId), so "spotify-launcher" is correct
+        // whereas the WMClass "spotify" would require heuristic fallbacks.
+        const desktopKey        = app.desktopId || app.className;
+        const isDesktopPinned   = desktopPinnedSet.has(desktopKey)
+                                  || desktopPinnedSet.has(app.className);
         const desktopPinBtn     = Gtk.Button.new_with_label(isDesktopPinned ? 'Unpin from Desktop' : 'Pin to Desktop');
         desktopPinBtn.add_css_class('pop-item');
         desktopPinBtn.set_halign(Gtk.Align.FILL);
         desktopPinBtn.connect('clicked', () => {
             const ds = readDesktopPinnedApps();
-            if (ds.has(app.className)) ds.delete(app.className);
-            else ds.add(app.className);
+            // Remove both possible stored forms (migration: old entries may
+            // have been stored under WMClass; new ones use desktop file ID).
+            ds.delete(app.className);
+            if (desktopKey !== app.className) ds.delete(desktopKey);
+            if (!isDesktopPinned) ds.add(desktopKey);
             saveDesktopPinnedApps(ds);
             pop.popdown();
         });

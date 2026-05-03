@@ -512,6 +512,22 @@ Item {
                     const e = DesktopEntries.byId(v)
                     if (e) { e.execute(); return }
                 }
+                // Exec-binary scan: match cls against the binary name in each
+                // entry's Exec= field.  Handles wrapper-launcher desktops like
+                // spotify (WM class) → spotify-launcher (Exec binary), where
+                // byId("spotify") finds nothing but the binary prefix matches.
+                const normCls = cls.split('.').pop().toLowerCase()
+                const total   = DesktopEntries.applications.count
+                for (let i = 0; i < total; i++) {
+                    const e = DesktopEntries.applications.get(i)
+                    if (!e || !e.execString) continue
+                    const bin = e.execString.trim().split(/\s+/)[0].split('/').pop().toLowerCase()
+                    if (bin === normCls
+                            || bin.startsWith(normCls + "-")
+                            || bin.endsWith("-" + normCls)) {
+                        e.execute(); return
+                    }
+                }
                 // Final fallback: strip field codes and run via bash
                 _launchApp(exec || cls)
             }

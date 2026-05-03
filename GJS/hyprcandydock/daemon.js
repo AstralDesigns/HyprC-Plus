@@ -288,9 +288,24 @@ var Daemon = class {
             const pinned = _decoder.decode(contents);
             pinned.trim().split('\n').forEach(app => {
                 const a = app.trim();
-                if (a) this.pinnedApps.add(a); // store original class as-is
+                if (a) this.pinnedApps.add(a);
             });
         }
+
+        // Migrate: resolve any WM-class entries (e.g. "spotify") to their
+        // desktop file ID (e.g. "spotify-launcher") so the file stays in sync
+        // with what the app-launcher and togglePin now write.
+        let migrated = false;
+        for (const entry of Array.from(this.pinnedApps)) {
+            const key = this._desktopKey(entry);
+            if (key !== entry) {
+                this.pinnedApps.delete(entry);
+                this.pinnedApps.add(key);
+                migrated = true;
+                console.log(`📌 Migrated pinned entry: "${entry}" -> "${key}"`);
+            }
+        }
+        if (migrated) this.savePinnedApps();
         
         console.log(`📌 Loaded ${this.pinnedApps.size} pinned apps`);
     }
@@ -335,11 +350,42 @@ var Daemon = class {
         }
     }
 
+    // Resolve a WM class name to the desktop file ID that should be stored in
+    // desktop-pinned.  Using the desktop ID (e.g. "spotify-launcher") instead
+    // of the WMClass (e.g. "spotify") lets Quickshell's DesktopEntries.byId()
+    // find the entry directly without needing heuristic fallbacks.
+    _desktopKey(className) {
+        const info = this._findAppInfo(className);
+        if (info) {
+            const id = info.get_id && info.get_id();
+            if (id) return id.replace(/\.desktop$/, '');
+        }
+        return className;
+    }
+
+    // Check whether a className (WMClass or desktop ID) is dock-pinned,
+    // regardless of which form was used when it was pinned.
+    isPinned(className) {
+        if (this.pinnedApps.has(className)) return true;
+        const key = this._desktopKey(className);
+        return key !== className && this.pinnedApps.has(key);
+    }
+
+    // Check whether a className (WMClass or desktop ID) is desktop-pinned,
+    // regardless of which form was used when it was pinned.
+    isDesktopPinned(className) {
+        if (this.desktopPinnedApps.has(className)) return true;
+        const key = this._desktopKey(className);
+        return key !== className && this.desktopPinnedApps.has(key);
+    }
+
     toggleDesktopPin(className) {
-        if (this.desktopPinnedApps.has(className))
-            this.desktopPinnedApps.delete(className);
+        // Always store by desktop file ID so QML can resolve it unambiguously.
+        const key = this._desktopKey(className);
+        if (this.desktopPinnedApps.has(key))
+            this.desktopPinnedApps.delete(key);
         else
-            this.desktopPinnedApps.add(className);
+            this.desktopPinnedApps.add(key);
         this.saveDesktopPinnedApps();
     }
 
@@ -545,10 +591,18 @@ var Daemon = class {
     getClientData() {
         const data = [];
 
-        // pinnedApps and clients both use original Hyprland class names now.
-        // Direct key match — no normalization needed for lookup.
+        // pinnedApps now stores desktop file IDs (e.g. "spotify-launcher").
+        // clients is still keyed by Hyprland WM class (e.g. "spotify").
+        // Resolve back to WM class via StartupWMClass so running instances are
+        // found and the dedup check in the loop below works correctly.
+        const pinnedWmClasses = new Set(); // WM-class keys consumed by a pinned entry
         this.pinnedApps.forEach(pinnedOrig => {
-            const instances = this.clients.get(pinnedOrig) || [];
+            // Resolve desktop ID -> WM class for the clients lookup.
+            const info  = this._findAppInfo(pinnedOrig);
+            const wmCls = (info && info.get_startup_wm_class && info.get_startup_wm_class()) || pinnedOrig;
+            const instances = this.clients.get(wmCls) || this.clients.get(pinnedOrig) || [];
+            pinnedWmClasses.add(wmCls);
+            pinnedWmClasses.add(pinnedOrig); // cover legacy WM-class entries too
             data.push({
                 className: this._normalizeClass(pinnedOrig), // unique widget key
                 displayName: this.getDisplayName(pinnedOrig), // "Files", "Zen Browser" etc.
@@ -562,7 +616,7 @@ var Daemon = class {
 
         // Running apps not covered by a pinned entry.
         this.clients.forEach((instances, originalCls) => {
-            if (!this.pinnedApps.has(originalCls)) {
+            if (!pinnedWmClasses.has(originalCls)) {
                 data.push({
                     className: this._normalizeClass(originalCls),
                     displayName: this.getDisplayName(originalCls),
@@ -706,11 +760,18 @@ var Daemon = class {
     }
     
     // Toggle pin
+    // Always store by desktop file ID (e.g. "spotify-launcher") so the key
+    // matches what the app-launcher writes and a single Spotify icon appears
+    // on the dock regardless of which surface triggered the pin.
     togglePin(className) {
-        if (this.pinnedApps.has(className)) {
-            this.pinnedApps.delete(className);
+        const key = this._desktopKey(className);
+        if (this.pinnedApps.has(key)) {
+            this.pinnedApps.delete(key);
         } else {
-            this.pinnedApps.add(className);
+            // Also remove any legacy WM-class entry that may already be present
+            // so we don't end up with both forms stored at the same time.
+            if (key !== className) this.pinnedApps.delete(className);
+            this.pinnedApps.add(key);
         }
         this.savePinnedApps();
         this.refreshClients();
