@@ -369,6 +369,37 @@ function onActivate() {
 
     // File interface for toggle scripts
     setupFileInterface();
+
+    // Auto-exit after 60 seconds of inactivity. Any toggle resets the timer so
+    // the daemon stays alive while widgets are actively being used. When all
+    // widgets are hidden and nothing has been toggled for a full minute the
+    // process quits cleanly, letting the next toggle script relaunch it fresh.
+    let _autoExitId = null;
+    function _resetAutoExit() {
+        if (_autoExitId !== null) GLib.source_remove(_autoExitId);
+        _autoExitId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 60, () => {
+            const allHidden = Object.values(widgets).every(w => !w || !w.get_visible());
+            if (allHidden) {
+                print('⏱ Auto-exit: 60 s idle with all widgets hidden — quitting');
+                app.quit();
+            } else {
+                // A widget is still visible — reset and keep watching
+                _resetAutoExit();
+            }
+            return false; // one-shot
+        });
+    }
+    // Patch toggle functions to reset the timer on every user interaction
+    const _origToggleUtils    = toggleUtils;
+    const _origToggleSystem   = toggleSystem;
+    const _origToggleMedia    = toggleMedia;
+    const _origToggleWeather  = toggleWeather;
+    toggleUtils   = function() { _resetAutoExit(); _origToggleUtils();   };
+    toggleSystem  = function() { _resetAutoExit(); _origToggleSystem();  };
+    toggleMedia   = function() { _resetAutoExit(); _origToggleMedia();   };
+    toggleWeather = function() { _resetAutoExit(); _origToggleWeather(); };
+
+    _resetAutoExit(); // start the initial countdown
 }
 
 function onShutdown() {

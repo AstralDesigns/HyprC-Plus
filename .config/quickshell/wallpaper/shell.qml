@@ -301,17 +301,15 @@ ShellRoot {
         gridView.positionViewAtIndex(focusedIdx, GridView.Contain)
     }
 
-    // ── Visibility toggle (persisted — toggled via IPC, never quits) ──────────
-    property bool pickerVisible: false
-
-    // Cleanup when hidden: stop background scans and flush pending thumb queue
-    onPickerVisibleChanged: {
-        if (!pickerVisible) {
-            if (scanProc.running)    scanProc.running = false
-            if (sidebarProc.running) sidebarProc.running = false
-            root._thumbQueue   = []    // discard pending work; in-flight magick finishes naturally
-            root._thumbCurrent = ""    // clear so next open can re-request freely
-        }
+    // ── Quit helper ──────────────────────────────────────────────────────────
+    // Stops background work then exits the process so no zombie qs -c wallpaper
+    // remains after the user closes the picker via backdrop click or Escape.
+    function _quit() {
+        if (scanProc.running)    scanProc.running = false
+        if (sidebarProc.running) sidebarProc.running = false
+        root._thumbQueue   = []
+        root._thumbCurrent = ""
+        Qt.quit()
     }
 
     // ── Rounded-thumbnail pipeline (ImageMagick → 160×100 rounded-rect PNG) ──
@@ -411,21 +409,14 @@ ShellRoot {
         }
     }
 
-    IpcHandler {
-        target: "wallpaper"
-        function toggle(): void { root.pickerVisible = !root.pickerVisible }
-        function open():   void { root.pickerVisible = true  }
-        function close():  void { root.pickerVisible = false }
-    }
-
     // ── Window ────────────────────────────────────────────────────────────────
     PanelWindow {
         id: win
-        visible: root.pickerVisible
+        visible: true
         anchors { top: true; left: true; right: true; bottom: true }
         WlrLayershell.namespace: "quickshell:wallpaper"
         WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.keyboardFocus: root.pickerVisible ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
         color: "transparent"
 
         // Clip mask to panel only → no shadow on transparent fullscreen area
@@ -439,7 +430,7 @@ ShellRoot {
                 anchors.fill: parent
                 onClicked: {
                     if (root.sidebarOpen) root.sidebarOpen = false
-                    else root.pickerVisible = false
+                    else root._quit()
                 }
             }
 
@@ -781,7 +772,7 @@ ShellRoot {
                                         Component.onCompleted: forceActiveFocus()
                                         Keys.onEscapePressed: {
                                             if (root.sidebarOpen) root.sidebarOpen = false
-                                            else root.pickerVisible = false
+                                            else root._quit()
                                         }
                                         Keys.onUpPressed:    function(e) { root.moveFocus(-gridView.cols); e.accepted = true }
                                         Keys.onDownPressed:  function(e) { root.moveFocus(+gridView.cols); e.accepted = true }
