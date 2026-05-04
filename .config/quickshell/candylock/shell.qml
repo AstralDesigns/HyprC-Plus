@@ -973,7 +973,7 @@ ShellRoot {
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
                                             readonly property color arcColor: index===0 ? Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
-                                                : (index===1 ? root.cTertiary : root.cSecondary)
+                                                : (index===1 ? root.cTertiary : Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
 
