@@ -101,36 +101,28 @@ function setupCandyDesktop() {
         }
     }
 
-    // Generate icons in hicolor structure
+    // Generate icons in hicolor structure under the HyprCandy name so the
+    // theme lookup resolves Icon=HyprCandy without needing a flat file or path.
     const sizes = [16, 24, 32, 48, 64, 128, 256, 512];
     for (let size of sizes) {
         try {
             const sizeDir = GLib.build_filenamev([ICON_DIR, `${size}x${size}`, 'apps']);
             GLib.mkdir_with_parents(sizeDir, 0o755);
-            GLib.spawn_command_line_sync(`magick "${ICON_SOURCE}" -resize ${size}x${size} "${sizeDir}/com.candy.applet.png"`);
+            GLib.spawn_command_line_sync(`magick "${ICON_SOURCE}" -resize ${size}x${size} "${sizeDir}/HyprCandy.png"`);
         } catch (e) {}
     }
 
-    // Scalable icon
+    // Scalable icon — PNG copy is sufficient; dock themes accept .png in scalable
     try {
         const scalableDir = GLib.build_filenamev([ICON_DIR, 'scalable', 'apps']);
         GLib.mkdir_with_parents(scalableDir, 0o755);
-        GLib.spawn_command_line_sync(`cp "${ICON_SOURCE}" "${scalableDir}/com.candy.applet.svg"`);
-        GLib.spawn_command_line_sync(`cp "${ICON_SOURCE}" "${scalableDir}/Candy.svg"`);
+        GLib.spawn_command_line_sync(`cp "${ICON_SOURCE}" "${scalableDir}/HyprCandy.png"`);
     } catch (e) {}
 
     // Update icon cache
     try {
         GLib.spawn_command_line_sync('gtk-update-icon-cache -f ~/.local/share/icons/hicolor 2>/dev/null || true');
         print('✅ Icon cache updated');
-    } catch (e) {}
-
-    // Install to system icons for nwg-dock compatibility
-    try {
-        const sysIconDir = GLib.build_filenamev([HOME, '.local', 'share', 'icons']);
-        GLib.spawn_command_line_sync(`cp "${ICON_SOURCE}" "${sysIconDir}/HyprCandy.png"`);
-        GLib.spawn_command_line_sync(`cp "${ICON_SOURCE}" "${sysIconDir}/Candy.png"`);
-        print('✅ System icons installed');
     } catch (e) {}
 
     // Desktop entry
@@ -140,13 +132,13 @@ Version=1.0
 Name=Candy Applet
 Comment=Candy Media Player Applet
 Exec=${launcherScript}
-Icon=com.candy.applet
+Icon=HyprCandy
 Terminal=false
 Type=Application
 Categories=Utility;AudioVideo;
 StartupNotify=false
 StartupWMClass=candy-launcher
-NoDisplay=false
+NoDisplay=true
 `;
     GLib.file_set_contents(DESKTOP_FILE, content);
     GLib.spawn_command_line_async('update-desktop-database ~/.local/share/applications 2>/dev/null || true');
