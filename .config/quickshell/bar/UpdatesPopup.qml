@@ -279,14 +279,11 @@ PanelWindow {
         id: _hcUpdateProc
         command: [
             "bash", "-ic",
-            "rm -rf " + Quickshell.env("HOME") + "/.hyprcandy/candyinstall && " +
-            "git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git " +
-                Quickshell.env("HOME") + "/.hyprcandy/candyinstall && " +
-            "chmod +x " + Quickshell.env("HOME") + "/.hyprcandy/candyinstall/Candy_Update.sh && " +
-            // setsid puts the script in a brand-new session → own PGID →
-            // not a child of QS → survives any QS reload or restart.
-            "setsid pexec bash " + Quickshell.env("HOME") + "/.hyprcandy/candyinstall/Candy_Update.sh " +
-                "> /tmp/candy-update.log 2>&1 &"
+            "rm -rf ~/.hyprcandy/candyinstall && " +
+            "git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && " +
+            "cd ~/.hyprcandy/candyinstall && " +
+            "chmod +x Candy_Update.sh && " +
+            "bash Candy_Update.sh > /tmp/candy-update.log 2>&1 &"
         ]
         running: false
         onExited: (code) => {
@@ -350,7 +347,7 @@ PanelWindow {
     Process {
         id: _hcStateClearProc
         command: [
-            "bash", "-ic",
+            "bash", "-c",
             "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
         ]
         running: false
