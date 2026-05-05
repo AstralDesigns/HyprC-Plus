@@ -306,7 +306,7 @@ PanelWindow {
     // _hcPollTimer tick while _hcScriptRunning is true.
     Process {
         id: _hcPgrepProc
-        command: ["pgrep", "-f", "Candy_Update.sh"]
+        command: ["pgrep", "-f", "candyinstall/Candy_Update"]
         running: false
         onExited: (code) => {
             running = false
