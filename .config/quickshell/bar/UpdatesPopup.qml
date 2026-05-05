@@ -278,7 +278,7 @@ PanelWindow {
     Process {
         id: _hcUpdateProc
         command: [
-            "bash", "-c",
+            "bash", "-ic",
             "rm -rf " + Quickshell.env("HOME") + "/.hyprcandy/candyinstall && " +
             "git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git " +
                 Quickshell.env("HOME") + "/.hyprcandy/candyinstall && " +
@@ -350,7 +350,7 @@ PanelWindow {
     Process {
         id: _hcStateClearProc
         command: [
-            "bash", "-c",
+            "bash", "-ic",
             "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
         ]
         running: false
