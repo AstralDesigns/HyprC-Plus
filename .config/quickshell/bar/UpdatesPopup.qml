@@ -376,6 +376,7 @@ PanelWindow {
         running: false
         onExited: {
             running = false
+            UpdatesPopupState.close()
             // Trigger the authoritative rescan — hc-update-check.sh will run
             // git pull on ~/HCUpdates; "Already up to date" → hasUpdates:false.
             UpdatesPopupState.requestRescan()
