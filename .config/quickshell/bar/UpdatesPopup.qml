@@ -268,13 +268,19 @@ PanelWindow {
 
     // ── HC update launcher ────────────────────────────────────────────────────
     // Phase 1 (this process): git clone into ~/.hyprcandy, then launch
-    // Candy_Update.sh via setsid so it runs in its own process group —
-    // completely detached from QuickShell.  When QS reloads (e.g. because
-    // the bar itself was just updated) this process is gone but the script
-    // keeps running; _hcPgrepProc picks it back up on Component.onCompleted.
+    // Candy_Update.sh via pkexec detached from QuickShell.  This process
+    // exits as soon as the background job is handed off — the actual update
+    // work happens asynchronously.  When QS reloads mid-update, _hcPgrepProc
+    // picks the running script back up on Component.onCompleted.
     //
-    // pexec inside Candy_Update.sh handles privilege elevation via hyprpolkit
-    // so the password prompt appears in the foreground independently of QS.
+    // IMPORTANT: do NOT trigger _hcStateClearProc or requestRescan here.
+    // This onExited fires the moment the `& ` background job is forked off —
+    // long before Candy_Update.sh has finished.  Cleaning the state file now
+    // would cause a rescan while the update is still running and the package
+    // manager still has pending updates, leaving hcHasUpdates stuck true.
+    // The single correct cleanup point is _hcPgrepProc.onExited (code !== 0)
+    // which only fires once pgrep can no longer find the script in the process
+    // table, i.e. after it has actually completed.
     Process {
         id: _hcUpdateProc
         command: [
@@ -289,11 +295,12 @@ PanelWindow {
         onExited: (code) => {
             running = false
             if (code === 0) {
-                // Git clone succeeded and the script has been launched.
-                // Mark it running so the UI shows "Running …" immediately,
-                // then let the poll timer take over tracking.
+                // The background job launched successfully.
+                // Show "Running …" in the UI immediately and hand off all
+                // further lifecycle management to the pgrep poll loop.
                 _hcScriptRunning = true
-                _hcPollTimer.start()
+                // _hcPollTimer.running is bound to _hcScriptRunning so it
+                // starts automatically — no explicit start() call needed.
             }
             // Non-zero: git clone or chmod failed — nothing to poll.
             // _hcScriptRunning stays false; user can retry.
@@ -301,9 +308,15 @@ PanelWindow {
     }
 
     // ── pgrep probe — detects Candy_Update.sh in the OS process table ─────────
-    // Exit code 0 → script is alive; 1 → script has finished.
-    // This fires on Component.onCompleted (reload recovery) and on every
-    // _hcPollTimer tick while _hcScriptRunning is true.
+    // Exit code 0 → script is alive; non-zero → script has finished (or was
+    // never running on this boot).
+    //
+    // This is the SOLE authority for post-update cleanup.  It fires on
+    // Component.onCompleted (reload recovery) and on every _hcPollTimer tick
+    // while _hcScriptRunning is true.  Cleanup must not happen anywhere else
+    // (in particular NOT in _hcUpdateProc.onExited) because that fires the
+    // instant the background job is forked off, before the script has done
+    // any work.
     Process {
         id: _hcPgrepProc
         command: ["pgrep", "-f", "candyinstall/Candy_Update"]
@@ -319,6 +332,9 @@ PanelWindow {
                 // a cold QS start doesn't spuriously clear the state file.
                 if (_hcScriptRunning) {
                     _hcScriptRunning = false
+                    // State file deletion + rescan happen here — after the
+                    // script has genuinely finished — so hc-update-check.sh
+                    // will find a clean slate and report "up to date".
                     _hcStateClearProc.running = true
                 }
                 // If _hcScriptRunning was already false (cold start, no
@@ -328,7 +344,8 @@ PanelWindow {
     }
 
     // ── Poll timer — re-checks pgrep every 3 s while the script is running ────
-    // Stops automatically once _hcScriptRunning flips to false.
+    // Driven entirely by the _hcScriptRunning binding — starts and stops
+    // automatically.  No explicit start()/stop() calls needed anywhere.
     Timer {
         id: _hcPollTimer
         interval: 1000
