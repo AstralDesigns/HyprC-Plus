@@ -274,12 +274,11 @@ PanelWindow {
     Process {
         id: _hcUpdateProc
         command: [
-            "kitty",
+            "pkexec", "kitty",
             "--class", "floating-installer",
             "--title", "   HC+ Update",
             "-e", "bash", "-ic",
-            "rm -rf ~/.hyprcandy/candyinstall && git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && cd ~/.hyprcandy/candyinstall && chmod +x Candy_Update.sh &&" +
-            "pkexec bash ~/.hyprcandy/candyinstall/Candy_Update.sh > /tmp/candy-update.log 2>&1 &"
+            "rm -rf ~/.hyprcandy/candyinstall && git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && cd ~/.hyprcandy/candyinstall && chmod +x Candy_Update.sh && bash ~/.hyprcandy/candyinstall/Candy_Update.sh > /tmp/candy-update.log 2>&1 &"
         ]
         running: false
         onExited: {
