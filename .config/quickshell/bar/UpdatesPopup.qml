@@ -271,20 +271,16 @@ PanelWindow {
     }
 
     // ── HC update launcher ────────────────────────────────────────────────────
-    // Phase 1 (this process): git clone into ~/.hyprcandy, then launch
-    // Candy_Update.sh via pkexec detached from QuickShell.  This process
-    // exits as soon as the background job is handed off — the actual update
-    // work happens asynchronously.  When QS reloads mid-update, _hcPgrepProc
-    // picks the running script back up on Component.onCompleted.
+    // Phase 1 (this process): wipe any stale sentinel, git-clone candyinstall,
+    // then fork Candy_Update.sh off via pkexec completely detached from QS.
+    // This process exits the moment the background job is handed to the OS —
+    // the actual update work happens asynchronously under the elevated UID.
     //
-    // IMPORTANT: do NOT trigger _hcStateClearProc or requestRescan here.
-    // This onExited fires the moment the `& ` background job is forked off —
-    // long before Candy_Update.sh has finished.  Cleaning the state file now
-    // would cause a rescan while the update is still running and the package
-    // manager still has pending updates, leaving hcHasUpdates stuck true.
-    // The single correct cleanup point is _hcPgrepProc.onExited (code !== 0)
-    // which only fires once pgrep can no longer find the script in the process
-    // table, i.e. after it has actually completed.
+    // IMPORTANT: do NOT call _hcStateClearProc or requestRescan here.
+    // onExited fires the instant the `&` fork returns, long before
+    // Candy_Update.sh has done any work.  The sole cleanup authority is
+    // _hcSentinelCheckProc.onExited (code === 0), which only fires once
+    // complete.sh has touch'd /tmp/hc-update-complete at the very end.
     Process {
         id: _hcUpdateProc
         command: [
@@ -314,12 +310,14 @@ PanelWindow {
     }
 
     // ── Sentinel-file check — does /tmp/hc-update-complete exist? ────────────
-    // Exit code 0 → file exists → update finished; non-zero → not yet done.
+    // Exit code 0 → sentinel present → Candy_Update.sh has finished.
+    // Non-zero → sentinel absent → update is still in progress (or not started).
     //
-    // Fired on Component.onCompleted (reload recovery) and by _hcPollTimer
-    // while _hcScriptRunning is true.  This is the SOLE authority for
-    // post-update cleanup — pgrep is NOT used because pkexec runs the script
-    // under a different UID and is invisible to an unprivileged pgrep.
+    // Fired on Component.onCompleted (covers QS reload mid-update) and by
+    // _hcPollTimer on every tick while _hcScriptRunning is true.
+    //
+    // We do NOT use pgrep because pkexec elevates the script to a different
+    // UID, making it invisible to an unprivileged pgrep from the user session.
     Process {
         id: _hcSentinelCheckProc
         command: ["test", "-f", "/tmp/hc-update-complete"]
@@ -327,29 +325,29 @@ PanelWindow {
         onExited: (code) => {
             running = false
             if (code === 0) {
-                // Sentinel found — Candy_Update.sh has finished.
-                // Only run cleanup when we were tracking a run so a cold QS
-                // start with a leftover file doesn't spuriously reset state.
-                if (_hcScriptRunning) {
-                    _hcScriptRunning = false
-                    // Remove sentinel + HC state file, then rescan.
+                // ── Sentinel found: update complete ──────────────────────────
+                // Stop the poll loop regardless of whether we were the ones who
+                // launched the update (handles stale sentinel on cold boot too).
+                _hcScriptRunning = false
+
+                // Optimistically clear the UI state immediately so the popup
+                // reflects "up to date" without waiting for the async rescan.
+                // The rescan below will confirm and set the tooltip correctly.
+                UpdatesPopupState.updateHC(false, "HyprCandy Plus is up to date", false)
+
+                // Clean up both the sentinel and the persisted state file,
+                // then rescan so hc-update-check.sh can run a fresh git pull
+                // and emit the authoritative JSON result.
+                if (!_hcStateClearProc.running)
                     _hcStateClearProc.running = true
-                }
-                // else: stale sentinel from a previous session — leave it;
-                // _hcStateClearProc will tidy it on the next actual run.
-            } else {
-                // Sentinel absent.
-                if (_hcScriptRunning) {
-                    // Still waiting — poller will check again on next tick.
-                } else {
-                    // Cold start, no run in progress — nothing to do.
-                }
             }
+            // Sentinel absent — if _hcScriptRunning is true the poll timer
+            // will fire again; if false (cold start, nothing running) no-op.
         }
     }
 
-    // ── Poll timer — checks the sentinel file every 2 s while running ─────────
-    // Bound to _hcScriptRunning so it starts/stops automatically.
+    // ── Poll timer — checks sentinel every 2 s while update is running ────────
+    // Bound to _hcScriptRunning so it auto-starts/stops with no manual calls.
     Timer {
         id: _hcPollTimer
         interval: 2000
@@ -362,8 +360,12 @@ PanelWindow {
     }
 
     // ── HC state-file cleanup (runs once sentinel is detected) ────────────────
-    // Removes the sentinel and the persisted hc-update-state so the next
-    // check starts clean and hc-update-check.sh reports "up to date".
+    // Removes /tmp/hc-update-complete so it doesn't re-trigger on the next
+    // QS load, and removes hc-update-state so hc-update-check.sh runs a
+    // live git pull rather than reading stale cached output.
+    // On exit, requestRescan() fires hcCheckProc in Updates.qml which calls
+    // hc-update-check.sh — if GitHub says "Already up to date" it emits
+    // hasUpdates:false and UpdatesPopupState.updateHC locks in the final state.
     Process {
         id: _hcStateClearProc
         command: [
@@ -374,6 +376,8 @@ PanelWindow {
         running: false
         onExited: {
             running = false
+            // Trigger the authoritative rescan — hc-update-check.sh will run
+            // git pull on ~/HCUpdates; "Already up to date" → hasUpdates:false.
             UpdatesPopupState.requestRescan()
         }
     }
