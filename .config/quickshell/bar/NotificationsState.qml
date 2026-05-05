@@ -137,6 +137,133 @@ Item {
     Process { id: urlOpenerProc; property string _url: ""
         command: ["xdg-open", urlOpenerProc._url] }
 
+    // ── Smart redirect launcher ───────────────────────────────────────────
+    // Opens a path in Nautilus, navigating to the containing folder and
+    // selecting the file. Used for screenshot/recording save notifications.
+    Process { id: nautilusSelectProc; property string _path: ""
+        command: ["nautilus", "--select", nautilusSelectProc._path] }
+
+    // Launches a media app by desktop app-id or binary name.
+    Process { id: mediaAppProc; property string _app: ""
+        command: ["bash", "-c",
+            "gtk-launch " + mediaAppProc._app + " 2>/dev/null || " +
+            mediaAppProc._app + " 2>/dev/null &"] }
+
+    // ── Redirect helpers ──────────────────────────────────────────────────
+    // Returns a file path if the notification body/icon looks like a saved
+    // screenshot or screen recording, otherwise "".
+    function _savedFilePath(notif) {
+        // Some screenshot tools embed the full path in the body
+        const body = notif.body || ""
+        const m = body.match(/(\/[^\s"'<>]+\.(png|jpg|jpeg|webp|mp4|mkv|webm|gif))/i)
+        if (m) return m[1]
+        // Fall back to the iconPath if it points to Pictures/Screenshots or
+        // Videos/Recordings (e.g. gnome-screenshot, spectacle, wf-recorder)
+        const ip = notif.iconPath || ""
+        if (ip && (ip.includes("Screenshots") || ip.includes("Recordings") ||
+                   ip.includes("Pictures")    || ip.includes("Videos"))) return ip
+        return ""
+    }
+
+    // Returns a URL if this looks like a browser tab/site notification.
+    function _browserUrl(notif) {
+        // Prefer an explicit URL in the body
+        const body = notif.body || ""
+        const m = body.match(/https?:\/\/[^\s"'<>]+/)
+        if (m) return m[0]
+        // Firefox / Chrome / Brave send the site origin as the app name
+        const ap = (notif.appName || "").toLowerCase()
+        if (ap.includes("firefox") || ap.includes("chrome") ||
+            ap.includes("chromium") || ap.includes("brave") ||
+            ap.includes("zen") || ap.includes("librewolf")) {
+            // No extractable URL — just focus the browser
+            return "__browser__"
+        }
+        return ""
+    }
+
+    // Returns the app to launch for a Now Playing / media notification.
+    function _mediaApp(notif) {
+        const ic = (notif.icon  || "").toLowerCase()
+        const ap = (notif.appName || "").toLowerCase()
+        if (ic.includes("spotify")  || ap.includes("spotify"))  return "spotify"
+        if (ic.includes("firefox")  || ap.includes("firefox"))  return "firefox"
+        if (ic.includes("chrome")   || ap.includes("chrome"))   return "google-chrome"
+        if (ic.includes("chromium") || ap.includes("chromium")) return "chromium"
+        if (ic.includes("brave")    || ap.includes("brave"))    return "brave"
+        if (ic.includes("zen")      || ap.includes("zen"))      return "zen-browser"
+        if (ic.includes("vlc")      || ap.includes("vlc"))      return "vlc"
+        if (ic.includes("mpv")      || ap.includes("mpv"))      return "mpv"
+        if (ic.includes("rhythmbox")|| ap.includes("rhythmbox"))return "rhythmbox"
+        if (ic.includes("elisa")    || ap.includes("elisa"))    return "elisa"
+        if (ic.includes("clementine")||ap.includes("clementine"))return "clementine"
+        return ""
+    }
+
+    // ── Primary redirect entry point ──────────────────────────────────────
+    // Call this when tapping a history card or toast. Decides the right
+    // destination: file manager, browser, media app, or default action.
+    function redirectNotification(notif) {
+        const cat = notif.category || ""
+        const ic  = (notif.icon || "").toLowerCase()
+        const ap  = (notif.appName || "").toLowerCase()
+
+        // 1. Screenshot / screen-recording save → Nautilus select
+        const fp = ns._savedFilePath(notif)
+        if (fp) {
+            nautilusSelectProc._path = fp
+            if (!nautilusSelectProc.running) nautilusSelectProc.running = true
+            return
+        }
+
+        // 2. Screenshot/recording category even without a path → open folder
+        const isScreenshot = ic.includes("screenshot") || ap.includes("screenshot") ||
+                             ap.includes("flameshot")  || ap.includes("spectacle")  ||
+                             ap.includes("grimblast")  || ap.includes("grim")
+        const isRecording  = ic.includes("record") || ap.includes("record") ||
+                             ap.includes("obs")    || ap.includes("wf-recorder") ||
+                             ap.includes("kooha")
+        if (isScreenshot) {
+            nautilusSelectProc._path = Quickshell.env("HOME") + "/Pictures/Screenshots"
+            if (!nautilusSelectProc.running) nautilusSelectProc.running = true
+            return
+        }
+        if (isRecording) {
+            nautilusSelectProc._path = Quickshell.env("HOME") + "/Videos/Recordings"
+            if (!nautilusSelectProc.running) nautilusSelectProc.running = true
+            return
+        }
+
+        // 3. Now Playing / media → focus/launch the source app
+        if (cat === "media.playing" || ap === "now playing") {
+            const mapp = ns._mediaApp(notif)
+            if (mapp) {
+                mediaAppProc._app = mapp
+                if (!mediaAppProc.running) mediaAppProc.running = true
+            }
+            return
+        }
+
+        // 4. Browser tab notification → open URL or focus browser
+        const burl = ns._browserUrl(notif)
+        if (burl && burl !== "__browser__") {
+            urlOpenerProc._url = burl
+            if (!urlOpenerProc.running) urlOpenerProc.running = true
+            return
+        }
+        if (burl === "__browser__") {
+            const mapp2 = ns._mediaApp(notif) // reuses browser name lookup
+            if (mapp2) {
+                mediaAppProc._app = mapp2
+                if (!mediaAppProc.running) mediaAppProc.running = true
+            }
+            return
+        }
+
+        // 5. Fallback — invoke the notification's default action (standard dbus)
+        ns.invokeAction(notif, "default")
+    }
+
     function invokeAction(notif, actionKey) {
         const daemonId = notif._daemonId || notif.id
         actionInvokerProc._nid = daemonId

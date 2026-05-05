@@ -350,8 +350,7 @@ Item {
                         onClicked:function(e) {
                             if (notif.isPrompt) return
                             if (e.button===Qt.LeftButton) {
-                                if ((notif.actions||[]).some(function(a){return a.key==="default"}))
-                                    NotificationsState.invokeAction(notif,"default")
+                                NotificationsState.redirectNotification(notif)
                                 NotificationsState.dismissNotification(notif.id)
                             } else NotificationsState.dismissNotification(notif.id)
                         }
@@ -584,7 +583,13 @@ Item {
                                             MouseArea{id:haH;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:NotificationsState.invokeAction(notif,modelData.key)}}}}
                                 }
                             }
-                            MouseArea{id:hcMA;anchors.fill:parent;hoverEnabled:true;z:-1;propagateComposedEvents:true}
+                            MouseArea{id:hcMA;anchors.fill:parent;hoverEnabled:true;z:-1;propagateComposedEvents:true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    NotificationsState.redirectNotification(notif)
+                                    NotificationsState.historyVisible = false
+                                }
+                            }
                         }
                     }
                     Item{height:4}
