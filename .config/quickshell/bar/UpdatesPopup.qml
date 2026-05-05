@@ -19,12 +19,16 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     implicitHeight: popRect.implicitHeight + 8
 
-    // ── Tracks whether Candy_Update.sh is alive in the OS, even across QS reloads ──
+    // ── Tracks whether Candy_Update.sh is running (sentinel-file approach) ──────
+    // True while we are waiting for /tmp/hc-update-complete to appear.
+    // Does NOT depend on pgrep / process-table visibility, so it works
+    // correctly even when the script runs under a pkexec-elevated UID.
     property bool _hcScriptRunning: false
 
-    // On every QS load (including reloads mid-update) check immediately whether
-    // the update script is already running so the button reflects reality.
-    Component.onCompleted: _hcPgrepProc.running = true
+    // On every QS load check whether the sentinel already exists — handles the
+    // case where QS is reloaded mid-update (the timer will start automatically
+    // because _hcScriptRunning is bound to it).
+    Component.onCompleted: _hcSentinelCheckProc.running = true
 
     MouseArea {
         anchors.fill: parent
@@ -285,6 +289,8 @@ PanelWindow {
         id: _hcUpdateProc
         command: [
             "bash", "-ic",
+            // Remove any stale sentinel so the poller starts fresh.
+            "rm -f /tmp/hc-update-complete && " +
             "rm -rf ~/.hyprcandy/candyinstall && " +
             "git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && " +
             "cd ~/.hyprcandy/candyinstall && " +
@@ -307,71 +313,67 @@ PanelWindow {
         }
     }
 
-    // ── pgrep probe — detects Candy_Update.sh in the OS process table ─────────
-    // Exit code 0 → script is alive; non-zero → script has finished (or was
-    // never running on this boot).
+    // ── Sentinel-file check — does /tmp/hc-update-complete exist? ────────────
+    // Exit code 0 → file exists → update finished; non-zero → not yet done.
     //
-    // This is the SOLE authority for post-update cleanup.  It fires on
-    // Component.onCompleted (reload recovery) and on every _hcPollTimer tick
-    // while _hcScriptRunning is true.  Cleanup must not happen anywhere else
-    // (in particular NOT in _hcUpdateProc.onExited) because that fires the
-    // instant the background job is forked off, before the script has done
-    // any work.
+    // Fired on Component.onCompleted (reload recovery) and by _hcPollTimer
+    // while _hcScriptRunning is true.  This is the SOLE authority for
+    // post-update cleanup — pgrep is NOT used because pkexec runs the script
+    // under a different UID and is invisible to an unprivileged pgrep.
     Process {
-        id: _hcPgrepProc
-        command: ["pgrep", "-f", "candyinstall/Candy_Update"]
+        id: _hcSentinelCheckProc
+        command: ["test", "-f", "/tmp/hc-update-complete"]
         running: false
         onExited: (code) => {
             running = false
             if (code === 0) {
-                // Still running — keep the "Running …" state alive.
-                _hcScriptRunning = true
-            } else {
-                // Script finished (or was never running on this boot).
-                // Only run cleanup when we were previously tracking it so
-                // a cold QS start doesn't spuriously clear the state file.
+                // Sentinel found — Candy_Update.sh has finished.
+                // Only run cleanup when we were tracking a run so a cold QS
+                // start with a leftover file doesn't spuriously reset state.
                 if (_hcScriptRunning) {
                     _hcScriptRunning = false
-                    // State file deletion + rescan happen here — after the
-                    // script has genuinely finished — so hc-update-check.sh
-                    // will find a clean slate and report "up to date".
+                    // Remove sentinel + HC state file, then rescan.
                     _hcStateClearProc.running = true
                 }
-                // If _hcScriptRunning was already false (cold start, no
-                // prior run detected) do nothing — leave state as-is.
+                // else: stale sentinel from a previous session — leave it;
+                // _hcStateClearProc will tidy it on the next actual run.
+            } else {
+                // Sentinel absent.
+                if (_hcScriptRunning) {
+                    // Still waiting — poller will check again on next tick.
+                } else {
+                    // Cold start, no run in progress — nothing to do.
+                }
             }
         }
     }
 
-    // ── Poll timer — re-checks pgrep every 3 s while the script is running ────
-    // Driven entirely by the _hcScriptRunning binding — starts and stops
-    // automatically.  No explicit start()/stop() calls needed anywhere.
+    // ── Poll timer — checks the sentinel file every 2 s while running ─────────
+    // Bound to _hcScriptRunning so it starts/stops automatically.
     Timer {
         id: _hcPollTimer
-        interval: 1000
+        interval: 2000
         repeat:   true
         running:  _hcScriptRunning
         onTriggered: {
-            // Don't stack concurrent pgrep calls
-            if (!_hcPgrepProc.running)
-                _hcPgrepProc.running = true
+            if (!_hcSentinelCheckProc.running)
+                _hcSentinelCheckProc.running = true
         }
     }
 
-    // ── HC state file cleanup process (runs after script finishes) ────────────
-    // Removes ~/.config/hyprcandy/hc-update-state so the next check
-    // evaluates fresh rather than reading the now-stale persisted state.
+    // ── HC state-file cleanup (runs once sentinel is detected) ────────────────
+    // Removes the sentinel and the persisted hc-update-state so the next
+    // check starts clean and hc-update-check.sh reports "up to date".
     Process {
         id: _hcStateClearProc
         command: [
             "bash", "-c",
-            "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
+            "rm -f /tmp/hc-update-complete " +
+            Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
         ]
         running: false
         onExited: {
             running = false
-            // Rescan — hc-update-check.sh will find no state file and run a
-            // fresh git pull which should report up to date.
             UpdatesPopupState.requestRescan()
         }
     }
