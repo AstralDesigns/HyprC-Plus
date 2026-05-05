@@ -19,6 +19,13 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     implicitHeight: popRect.implicitHeight + 8
 
+    // ── Tracks whether Candy_Update.sh is alive in the OS, even across QS reloads ──
+    property bool _hcScriptRunning: false
+
+    // On every QS load (including reloads mid-update) check immediately whether
+    // the update script is already running so the button reflects reality.
+    Component.onCompleted: _hcPgrepProc.running = true
+
     MouseArea {
         anchors.fill: parent
         z: -1
@@ -160,8 +167,11 @@ PanelWindow {
                 // can force a fresh install even after an abrupt closure.
                 Text {
                     id: hcRerunBtn
+                    // _hcUpdateProc.running covers the git-clone phase;
+                    // _hcScriptRunning covers the detached Candy_Update.sh phase
+                    // (including across QS reloads).
                     visible: !UpdatesPopupState.hcHasUpdates
-                    text: _hcUpdateProc.running ? "󰑓" : "󰇚"
+                    text: (_hcUpdateProc.running || _hcScriptRunning) ? "󰑓" : "󰇚"
                     color: hcRerunHover.containsMouse
                         ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.75)
                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
@@ -174,7 +184,10 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape:  Qt.PointingHandCursor
-                        onClicked:    if (!_hcUpdateProc.running) _hcUpdateProc.running = true
+                        onClicked: {
+                            if (!_hcUpdateProc.running && !_hcScriptRunning)
+                                _hcUpdateProc.running = true
+                        }
                     }
                 }
             }
@@ -210,7 +223,9 @@ PanelWindow {
                 Behavior on color  { ColorAnimation   { duration: 120 } }
                 Text {
                     anchors.centerIn: parent
-                    text:  _hcUpdateProc.running ? "󰑓  Running …" : "󰇚 HC+ Updates"
+                    // Show "Running" during both the git-clone phase and the
+                    // detached Candy_Update.sh phase (even after a QS reload).
+                    text:  (_hcUpdateProc.running || _hcScriptRunning) ? "󰑓  Running …" : "󰇚 HC+ Updates"
                     color: Theme.cTertiary
                     font.family:    Config.labelFont
                     font.pixelSize: 13
@@ -220,13 +235,19 @@ PanelWindow {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape:  Qt.PointingHandCursor
-                    onClicked:    if (!_hcUpdateProc.running) _hcUpdateProc.running = true
+                    onClicked: {
+                        if (!_hcUpdateProc.running && !_hcScriptRunning)
+                            _hcUpdateProc.running = true
+                    }
                 }
             }
         }
     }
 
     // ── System update process ─────────────────────────────────────────────────
+    // Still launches kitty (system-update.sh is interactive / pacman-driven).
+    // If you also want system updates to survive QS reloads, apply the same
+    // setsid + pgrep pattern used for HC below.
     Process {
         id: _sysUpdateProc
         command: [
@@ -245,7 +266,82 @@ PanelWindow {
         }
     }
 
-    // ── HC state file cleanup process (runs after HC update, before rescan) ───
+    // ── HC update launcher ────────────────────────────────────────────────────
+    // Phase 1 (this process): git clone into ~/.hyprcandy, then launch
+    // Candy_Update.sh via setsid so it runs in its own process group —
+    // completely detached from QuickShell.  When QS reloads (e.g. because
+    // the bar itself was just updated) this process is gone but the script
+    // keeps running; _hcPgrepProc picks it back up on Component.onCompleted.
+    //
+    // pexec inside Candy_Update.sh handles privilege elevation via hyprpolkit
+    // so the password prompt appears in the foreground independently of QS.
+    Process {
+        id: _hcUpdateProc
+        command: [
+            "bash", "-ic",
+            "rm -rf ~/.hyprcandy/candyinstall && " +
+            "git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && " +
+            "cd ~/.hyprcandy/candyinstall && " +
+            "chmod +x Candy_Update.sh && " +
+            "pkexec ~/.hyprcandy/candyinstall/bash Candy_Update.sh > /tmp/candy-update.log 2>&1 &"
+        ]
+        running: false
+        onExited: (code) => {
+            running = false
+            if (code === 0) {
+                // Git clone succeeded and the script has been launched.
+                // Mark it running so the UI shows "Running …" immediately,
+                // then let the poll timer take over tracking.
+                _hcScriptRunning = true
+                _hcPollTimer.start()
+            }
+            // Non-zero: git clone or chmod failed — nothing to poll.
+            // _hcScriptRunning stays false; user can retry.
+        }
+    }
+
+    // ── pgrep probe — detects Candy_Update.sh in the OS process table ─────────
+    // Exit code 0 → script is alive; 1 → script has finished.
+    // This fires on Component.onCompleted (reload recovery) and on every
+    // _hcPollTimer tick while _hcScriptRunning is true.
+    Process {
+        id: _hcPgrepProc
+        command: ["pgrep", "-f", "Candy_Update.sh"]
+        running: false
+        onExited: (code) => {
+            running = false
+            if (code === 0) {
+                // Still running — keep the "Running …" state alive.
+                _hcScriptRunning = true
+            } else {
+                // Script finished (or was never running on this boot).
+                // Only run cleanup when we were previously tracking it so
+                // a cold QS start doesn't spuriously clear the state file.
+                if (_hcScriptRunning) {
+                    _hcScriptRunning = false
+                    _hcStateClearProc.running = true
+                }
+                // If _hcScriptRunning was already false (cold start, no
+                // prior run detected) do nothing — leave state as-is.
+            }
+        }
+    }
+
+    // ── Poll timer — re-checks pgrep every 3 s while the script is running ────
+    // Stops automatically once _hcScriptRunning flips to false.
+    Timer {
+        id: _hcPollTimer
+        interval: 1000
+        repeat:   true
+        running:  _hcScriptRunning
+        onTriggered: {
+            // Don't stack concurrent pgrep calls
+            if (!_hcPgrepProc.running)
+                _hcPgrepProc.running = true
+        }
+    }
+
+    // ── HC state file cleanup process (runs after script finishes) ────────────
     // Removes ~/.config/hyprcandy/hc-update-state so the next check
     // evaluates fresh rather than reading the now-stale persisted state.
     Process {
@@ -257,36 +353,9 @@ PanelWindow {
         running: false
         onExited: {
             running = false
-            // Now rescan — hc-update-check.sh will find no state file and
-            // run a fresh git pull which should report up to date
+            // Rescan — hc-update-check.sh will find no state file and run a
+            // fresh git pull which should report up to date.
             UpdatesPopupState.requestRescan()
-        }
-    }
-
-    // ── Kill lingering HC kitty window process ────────────────────────────────
-    Process {
-        id: _hcKittyKillProc
-        command: ["bash", "-c", "pkill -f 'kitty.*floating-installer' || true"]
-        running: false
-    }
-
-    // ── HyprCandy Plus update process ────────────────────────────────────────
-    Process {
-        id: _hcUpdateProc
-        command: [
-            "kitty",
-            "--class", "floating-installer",
-            "--title", "   HC+ Update",
-            "-e", "bash", "-ic",
-            "rm -rf ~/.hyprcandy/candyinstall && git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && cd ~/.hyprcandy/candyinstall && chmod +x Candy_Update.sh && pkexec bash ~/.hyprcandy/candyinstall/Candy_Update.sh"
-        ]
-        running: false
-        onExited: {
-            running = false
-            // Kill any kitty floating-installer that stayed open
-            _hcKittyKillProc.running = true
-            // Clear the persistent state file then rescan
-            _hcStateClearProc.running = true
         }
     }
 }
