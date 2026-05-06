@@ -352,7 +352,8 @@ Item {
                         onClicked:function(e) {
                             if (notif.isPrompt) return
                             if (e.button===Qt.LeftButton) {
-                                NotificationsState.redirectNotification(notif)
+                                if (notif.urgency < 2)
+                                    NotificationsState.redirectNotification(notif)
                                 NotificationsState.dismissNotification(notif.id)
                             } else NotificationsState.dismissNotification(notif.id)
                         }
@@ -588,7 +589,8 @@ Item {
                             MouseArea{id:hcMA;anchors.fill:parent;hoverEnabled:true;z:-1;propagateComposedEvents:true
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    NotificationsState.redirectNotification(notif)
+                                    if (notif.urgency < 2)
+                                        NotificationsState.redirectNotification(notif)
                                     NotificationsState.historyVisible = false
                                 }
                             }
