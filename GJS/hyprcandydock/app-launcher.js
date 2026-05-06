@@ -256,6 +256,7 @@ function getAllApps() {
 const FAV_GLYPH  = '';
 const CHEV_UP    = '󰬬';  // nf-md-chevron_up_circle  (section expanded)
 const CHEV_DOWN  = '󰬦';  // nf-md-chevron_down_circle (section collapsed)
+const GLYPH_INDICATOR = '\u{F09DF}';  //  active-window dot (same glyph as dock)
 
 // FlowBox helpers for arrow-key edge detection
 function flowSelIdx(fb) {
@@ -714,6 +715,13 @@ window.hyprcandy-group-dialog {
     border-style: solid;
     border-width: 1px;
     border-color: alpha(@primary, 0.30);
+}
+
+/* ── Running-app dot indicators (overlaid on tile) ───────────────────── */
+.launcher-indicator {
+    font-size: ${Math.max(5, Math.round(APP_ICON_SIZE * 0.18))}px;
+    color: @primary;
+    margin-bottom: 2px;
 }
 `;
 }
@@ -1374,7 +1382,44 @@ const AppLauncherWindow = GObject.registerClass({
         });
         btn.add_controller(dragSrc);
 
-        return btn;
+        // ── Running-app dot indicators (same pattern as dock-main.js) ─
+        // Check _runningApps for this app's class — 0 dots if not running,
+        // 1 dot for a single instance, 2 dots for 2+ (capped like the dock).
+        const _appKey       = app.className.toLowerCase();
+        const _instances    = this._runningApps.get(_appKey)
+                           ?? this._runningApps.get(app.className)
+                           ?? [];
+        const _instanceCount = _instances.length;
+
+        const dotsBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
+        dotsBox.set_halign(Gtk.Align.CENTER);
+        dotsBox.set_valign(Gtk.Align.END);   // bottom of the tile
+        dotsBox.set_name('launcher-indicator-dots');
+
+        if (_instanceCount >= 1) {
+            const dot1 = Gtk.Label.new(GLYPH_INDICATOR);
+            dot1.add_css_class('launcher-indicator');
+            dotsBox.append(dot1);
+        }
+        if (_instanceCount >= 2) {
+            const dot2 = Gtk.Label.new(GLYPH_INDICATOR);
+            dot2.add_css_class('launcher-indicator');
+            dot2.set_margin_start(3);
+            dotsBox.append(dot2);
+        }
+
+        // Wrap btn + dots in an overlay — no size penalty vs a plain button.
+        // set_measure_overlay(false) prevents dotsBox from expanding the tile;
+        // set_clip_overlay(true) passes pointer events through to the button.
+        const tileOverlay = new Gtk.Overlay();
+        tileOverlay.set_halign(Gtk.Align.CENTER);
+        tileOverlay.set_valign(Gtk.Align.CENTER);
+        tileOverlay.set_child(btn);
+        tileOverlay.add_overlay(dotsBox);
+        tileOverlay.set_measure_overlay(dotsBox, false);
+        tileOverlay.set_clip_overlay(dotsBox, true);
+
+        return tileOverlay;
     }
 
     // ─── Context menu ────────────────────────────────────────────────────
@@ -1503,15 +1548,112 @@ const AppLauncherWindow = GObject.registerClass({
             menu.append(sep0);
         }
 
-        // ── New Window (always) ────────────────────────────────────────
-        const newBtn = Gtk.Button.new_with_label('New Window');
+        // ── New Window (always) — with workspace sub-popover on hover ──
+        // Compute sub-popover direction (same rule as the main popover but
+        // the sub-popover always opens to the opposite side of the launcher).
+        const _launcherPos = this._dockPos;
+        const _subPopPos   = (_launcherPos === 'right')
+            ? Gtk.PositionType.LEFT : Gtk.PositionType.RIGHT;
+
+        // Helper shared by New Window and each dGPU button:
+        // attaches a workspace sub-popover that opens on hover.
+        // Clicking the parent button (without entering the sub-popover)
+        // launches on the current workspace; clicking a WS entry first
+        // switches to that workspace then launches.
+        let _openSubPop = null;  // track which sub-popover is open
+
+        const _attachLauncherWsSub = (parentBtn, launchFn) => {
+            // Parent to parentBtn (inside pop's content tree) so wsSub shares
+            // the same Wayland grab chain as pop.  Parenting to `this` (the
+            // launcher window) gives wsSub its own grab, which immediately
+            // dismisses pop when wsSub.popup() is called — causing the cascade
+            // breakage (pop closes, subsequent right-clicks broken).
+            // NOTE: do NOT call wsSub.unparent() in a 'closed' handler here;
+            // pop's own 'closed' → idle_add(unparent) tears down the whole tree
+            // including parentBtn and wsSub automatically.
+            const wsSub = new Gtk.Popover();
+            wsSub.set_parent(parentBtn);
+            wsSub.set_has_arrow(false);
+            wsSub.set_position(_subPopPos);
+            wsSub.add_css_class('launcher-popover');
+            wsSub.get_style_context().add_provider(
+                this._getPopoverCSSProvider(),
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            );
+
+            const wsBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+            wsBox.set_margin_start(6);
+            wsBox.set_margin_end(6);
+            wsBox.set_margin_top(6);
+            wsBox.set_margin_bottom(6);
+
+            const wsHdr = Gtk.Label.new('Open on Workspace');
+            wsHdr.set_halign(Gtk.Align.CENTER);
+            wsHdr.add_css_class('pop-section-header');
+            wsBox.append(wsHdr);
+
+            const wsHdrSep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            wsHdrSep.set_margin_top(4);
+            wsHdrSep.set_margin_bottom(4);
+            wsBox.append(wsHdrSep);
+
+            for (let i = 1; i <= 10; i++) {
+                const wsBtn = Gtk.Button.new_with_label('→ WS ' + i);
+                wsBtn.add_css_class('pop-item');
+                wsBtn.set_halign(Gtk.Align.FILL);
+                wsBtn.connect('clicked', () => {
+                    try {
+                        GLib.spawn_command_line_async('hyprctl dispatch workspace ' + i);
+                    } catch (_) {}
+                    launchFn();
+                    wsSub.popdown();
+                    pop.popdown();
+                    this.close();
+                });
+                wsBox.append(wsBtn);
+            }
+            wsSub.set_child(wsBox);
+
+            // Open sub-popover on hover; GTK's grab handles close-on-leave
+            // automatically once the pointer exits the popover surface — no
+            // manual leave handler needed (and a leave handler on wsBox would
+            // fire as the cursor crosses the gap between button and popover,
+            // dismissing wsSub before the user can reach it).
+            const hoverCtrl = new Gtk.EventControllerMotion();
+            hoverCtrl.connect('enter', () => {
+                if (_openSubPop && _openSubPop !== wsSub) _openSubPop.popdown();
+                _openSubPop = wsSub;
+                wsSub.popup();
+            });
+            parentBtn.add_controller(hoverCtrl);
+            wsSub.connect('closed', () => {
+                if (_openSubPop === wsSub) _openSubPop = null;
+            });
+        };
+
+        // New Window row with chevron hint
+        const newWinRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        const newWinRowLabel = Gtk.Label.new('New Window');
+        newWinRowLabel.set_halign(Gtk.Align.START);
+        newWinRowLabel.set_hexpand(true);
+        newWinRowBox.append(newWinRowLabel);
+        const newWinChev = Gtk.Label.new('›');
+        newWinChev.set_halign(Gtk.Align.END);
+        newWinChev.set_valign(Gtk.Align.CENTER);
+        newWinChev.set_margin_start(8);
+        newWinRowBox.append(newWinChev);
+
+        const newBtn = Gtk.Button.new();
+        newBtn.set_child(newWinRowBox);
         newBtn.add_css_class('pop-item');
         newBtn.set_halign(Gtk.Align.FILL);
+        const _newWinLaunch = () => { spawnApp(app.exec); };
         newBtn.connect('clicked', () => {
-            spawnApp(app.exec);
+            _newWinLaunch();
             pop.popdown();
             this.close();
         });
+        _attachLauncherWsSub(newBtn, _newWinLaunch);
         menu.append(newBtn);
 
         // ── Separator ──────────────────────────────────────────────────
@@ -1691,14 +1833,28 @@ const AppLauncherWindow = GObject.registerClass({
             menu.append(gpuSepBot);
 
             for (const gpu of gpus) {
-                const gpuBtn = Gtk.Button.new_with_label(abbreviateGpuName(gpu.name));
+                const gpuRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+                const gpuRowLabel = Gtk.Label.new(abbreviateGpuName(gpu.name));
+                gpuRowLabel.set_halign(Gtk.Align.START);
+                gpuRowLabel.set_hexpand(true);
+                gpuRowBox.append(gpuRowLabel);
+                const gpuChev = Gtk.Label.new('›');
+                gpuChev.set_halign(Gtk.Align.END);
+                gpuChev.set_valign(Gtk.Align.CENTER);
+                gpuChev.set_margin_start(8);
+                gpuRowBox.append(gpuChev);
+
+                const gpuBtn = Gtk.Button.new();
+                gpuBtn.set_child(gpuRowBox);
                 gpuBtn.add_css_class('pop-item');
                 gpuBtn.set_halign(Gtk.Align.FILL);
+                const _gpuLaunch = ((_g) => () => { spawnAppOnGPU(app.exec, _g.envVars); })(gpu);
                 gpuBtn.connect('clicked', () => {
-                    spawnAppOnGPU(app.exec, gpu.envVars);
+                    _gpuLaunch();
                     pop.popdown();
                     this.close();
                 });
+                _attachLauncherWsSub(gpuBtn, _gpuLaunch);
                 menu.append(gpuBtn);
             }
         }

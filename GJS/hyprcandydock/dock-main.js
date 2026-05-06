@@ -1325,6 +1325,76 @@ const HyprCandyDock = GObject.registerClass({
         // switcheroo-control, or [] if unavailable / single GPU.
         const gpus = this.daemon.getAvailableGPUs();
 
+        // Helper: build and attach a workspace sub-popover to a launch button.
+        // On hover the sub-popover appears showing WS 1-10; clicking a WS launches
+        // on that workspace.  Clicking the button itself (without hovering into the
+        // sub-popover) launches on the current workspace.
+        const _attachWsSubPopover = (launchBtn, launchFn) => {
+            const wsSubPop = new Gtk.Popover();
+            wsSubPop.set_parent(launchBtn);
+            wsSubPop.set_has_arrow(false);
+            wsSubPop.set_position(sidePopPos);
+            wsSubPop.set_offset(sideOffX, sideOffY);
+            wsSubPop.add_css_class('dock-popover');
+            const wsSubStyleCtx = wsSubPop.get_style_context();
+            wsSubStyleCtx.add_provider(this._getPopoverCSSProvider(), Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+            const wsBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+            wsBox.set_margin_start(6);
+            wsBox.set_margin_end(6);
+            wsBox.set_margin_top(6);
+            wsBox.set_margin_bottom(6);
+
+            const wsHdr = Gtk.Label.new('Open on Workspace');
+            wsHdr.set_halign(Gtk.Align.CENTER);
+            wsHdr.add_css_class('popover-section-header');
+            wsBox.append(wsHdr);
+
+            const wsHdrSep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            wsHdrSep.set_margin_top(4);
+            wsHdrSep.set_margin_bottom(4);
+            wsBox.append(wsHdrSep);
+
+            for (let i = 1; i <= 10; i++) {
+                const wsBtn = Gtk.Button.new_with_label('→ WS ' + i);
+                wsBtn.add_css_class('popover-item');
+                wsBtn.add_css_class('popover-action');
+                wsBtn.set_halign(Gtk.Align.FILL);
+                wsBtn.connect('clicked', () => {
+                    // Dispatch to workspace first, then launch
+                    this.daemon.hyprctl('dispatch workspace ' + i);
+                    launchFn();
+                    wsSubPop.popdown();
+                    mainPopover.popdown();
+                });
+                wsBox.append(wsBtn);
+            }
+            wsSubPop.set_child(wsBox);
+
+            // Track open state for autohide suppression
+            let _wsSubOpen = false;
+            wsSubPop.connect('closed', () => {
+                if (_wsSubOpen) { _wsSubOpen = false; _ahPopoverClosed(); }
+            });
+
+            const hoverCtrl = new Gtk.EventControllerMotion();
+            hoverCtrl.connect('enter', () => {
+                if (openSidePopover && openSidePopover !== wsSubPop)
+                    openSidePopover.popdown();
+                openSidePopover = wsSubPop;
+                if (!_wsSubOpen) { _wsSubOpen = true; _ahPopoverOpened(); }
+                wsSubPop.popup();
+            });
+            launchBtn.add_controller(hoverCtrl);
+
+            const wsBoxHover = new Gtk.EventControllerMotion();
+            wsBoxHover.connect('leave', () => {
+                wsSubPop.popdown();
+                if (openSidePopover === wsSubPop) openSidePopover = null;
+            });
+            wsBox.add_controller(wsBoxHover);
+        };
+
         // Always: separator + "New Window" (plain launch on default GPU)
         if (data.instances.length > 0 || gpus.length > 0) {
             const newWinSepTop = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
@@ -1332,14 +1402,32 @@ const HyprCandyDock = GObject.registerClass({
             newWinSepTop.set_margin_bottom(4);
             menuBox.append(newWinSepTop);
         }
-        const newWinBtn = Gtk.Button.new_with_label('New Window');
+
+        // "New Window" row — label + chevron to hint at sub-popover
+        const newWinBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        const newWinLabel = Gtk.Label.new('New Window');
+        newWinLabel.set_halign(Gtk.Align.START);
+        newWinLabel.set_hexpand(true);
+        newWinBox.append(newWinLabel);
+        const newWinChev = Gtk.Label.new('›');
+        newWinChev.set_halign(Gtk.Align.END);
+        newWinChev.set_valign(Gtk.Align.CENTER);
+        newWinChev.set_margin_start(8);
+        newWinBox.append(newWinChev);
+
+        const newWinBtn = Gtk.Button.new();
+        newWinBtn.set_child(newWinBox);
         newWinBtn.add_css_class('popover-item');
         newWinBtn.set_halign(Gtk.Align.FILL);
-        newWinBtn.connect('clicked', () => {
+        const _newWinLaunch = () => {
             const execCmd = this.daemon.getExecFromDesktop(data.iconClass || data.className);
             _spawnCleanCmd(execCmd || (data.iconClass || data.className).toLowerCase());
+        };
+        newWinBtn.connect('clicked', () => {
+            _newWinLaunch();
             mainPopover.popdown();
         });
+        _attachWsSubPopover(newWinBtn, _newWinLaunch);
         menuBox.append(newWinBtn);
 
         // dGPU options — only if switcheroo-control reports non-default GPUs
@@ -1362,14 +1450,32 @@ const HyprCandyDock = GObject.registerClass({
             for (const gpu of gpus) {
                 const _abbrev = imports.daemon.abbreviateGpuName
                     ? imports.daemon.abbreviateGpuName(gpu.name) : gpu.name;
-                const gpuBtn = Gtk.Button.new_with_label(_abbrev);
+
+                // dGPU row — label + chevron
+                const gpuRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+                const gpuRowLabel = Gtk.Label.new(_abbrev);
+                gpuRowLabel.set_halign(Gtk.Align.START);
+                gpuRowLabel.set_hexpand(true);
+                gpuRowBox.append(gpuRowLabel);
+                const gpuChev = Gtk.Label.new('›');
+                gpuChev.set_halign(Gtk.Align.END);
+                gpuChev.set_valign(Gtk.Align.CENTER);
+                gpuChev.set_margin_start(8);
+                gpuRowBox.append(gpuChev);
+
+                const gpuBtn = Gtk.Button.new();
+                gpuBtn.set_child(gpuRowBox);
                 gpuBtn.add_css_class('popover-item');
                 gpuBtn.add_css_class('popover-action');
                 gpuBtn.set_halign(Gtk.Align.FILL);
+                const _gpuLaunch = ((_gpu) => () => {
+                    this.daemon.launchWithGPU(data.iconClass || data.className, _gpu);
+                })(gpu);
                 gpuBtn.connect('clicked', () => {
-                    this.daemon.launchWithGPU(data.iconClass || data.className, gpu);
+                    _gpuLaunch();
                     mainPopover.popdown();
                 });
+                _attachWsSubPopover(gpuBtn, _gpuLaunch);
                 menuBox.append(gpuBtn);
             }
         }
