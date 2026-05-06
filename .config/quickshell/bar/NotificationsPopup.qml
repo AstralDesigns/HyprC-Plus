@@ -128,21 +128,22 @@ Item {
                             : notif.category==="media.playing"?Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b,1)
                             : Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b,1) }
 
-                    // Progress bar
+                    // Progress bar — smooth continuous drain
                     Item {
                         id: progTrackItem
                         visible: !notif.isPrompt && notif.urgency<2
                         anchors { bottom:parent.bottom; left:parent.left; right:parent.right }
                         height: 3; clip: true
                         property real _age: 0
+                        // Poll at 250 ms; the wide Behavior window fills the gap smoothly
+                        Timer { interval:250; repeat:true; running:progTrackItem.visible
+                            onTriggered: progTrackItem._age = Math.min(1,(Date.now()-notif.timestamp)/5000) }
                         Rectangle {
                             anchors.fill:parent; radius:parent.parent._radius
                             color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.22)
-                            Timer { interval:80; repeat:true; running:progTrackItem.visible
-                                onTriggered: progTrackItem._age=Math.min(1,(Date.now()-notif.timestamp)/5000) }
                             Rectangle { anchors{left:parent.left;top:parent.top;bottom:parent.bottom}
                                 width:parent.width*Math.max(0,1-progTrackItem._age); color:Theme.cPrimary; radius:parent.radius
-                                Behavior on width { NumberAnimation { duration:80 } } }
+                                Behavior on width { NumberAnimation { duration:260; easing.type:Easing.Linear } } }
                         }
                     }
 

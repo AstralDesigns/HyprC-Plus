@@ -144,7 +144,24 @@ Item {
     // ── Smart redirect ────────────────────────────────────────────────────
     // Opens a path in Nautilus with the file selected (screenshot/recording).
     Process { id: nautilusSelectProc; property string _path: ""
-        command: ["nautilus", "--select", nautilusSelectProc._path] }
+        command: ["nautilus", "--select", nautilusSelectProc._path]
+        onRunningChanged: {
+            if (!running && nautilusSelectProc._pending !== "") {
+                nautilusSelectProc._path = nautilusSelectProc._pending
+                nautilusSelectProc._pending = ""
+                Qt.callLater(function() { nautilusSelectProc.running = true })
+            }
+        }
+        property string _pending: ""
+    }
+    function _launchNautilus(path) {
+        if (nautilusSelectProc.running) {
+            nautilusSelectProc._pending = path
+        } else {
+            nautilusSelectProc._path = path
+            nautilusSelectProc.running = true
+        }
+    }
 
     // Bash fallback launcher for apps not reachable via DesktopEntries.execute()
     Process { id: _notifLaunchProc; property string _cmd: ""
@@ -189,8 +206,7 @@ Item {
         // 1. Screenshot/recording with embedded file path → Nautilus select
         const fp = ns._savedFilePath(notif)
         if (fp) {
-            nautilusSelectProc._path = fp
-            if (!nautilusSelectProc.running) nautilusSelectProc.running = true
+            ns._launchNautilus(fp)
             return
         }
 
@@ -202,18 +218,20 @@ Item {
                              ap.includes("obs")    || ap.includes("wf-recorder") ||
                              ap.includes("kooha")
         if (isScreenshot) {
-            nautilusSelectProc._path = Quickshell.env("HOME") + "/Pictures/Screenshots"
-            if (!nautilusSelectProc.running) nautilusSelectProc.running = true
+            ns._launchNautilus(Quickshell.env("HOME") + "/Pictures/Screenshots")
             return
         }
         if (isRecording) {
-            nautilusSelectProc._path = Quickshell.env("HOME") + "/Videos/Recordings"
-            if (!nautilusSelectProc.running) nautilusSelectProc.running = true
+            ns._launchNautilus(Quickshell.env("HOME") + "/Videos/Recordings")
             return
         }
 
         // 3. Resolve via NotifAppState
-        const stored    = NotifAppState.lookup(notif.appName) || {}
+        // For media notifications the cls key is the icon name, not the appName
+        const genericNames2 = ["now playing", "media player", "music", "audio"]
+        const isGenericAp = genericNames2.includes(ap.trim())
+        const lookupKey = isGenericAp ? ic : ap
+        const stored    = NotifAppState.lookup(lookupKey) || NotifAppState.lookup(ap) || {}
         const desktopId = stored.desktopId || ""
         const storedUrl = stored.url || ""
         const bodyUrl   = (notif.body || "").match(/https?:\/\/[^\s"'<>]+/)
@@ -246,7 +264,7 @@ Item {
                 Hyprland.dispatch("togglespecialworkspace " + wsName.replace(/^special:/, ""))
             }
             Hyprland.dispatch("focuswindow address:" + client.address)
-            // Also open URL if present (brings browser to the page)
+            // Open URL in the already-running instance via xdg-open (reuses existing process)
             if (url) {
                 urlOpenerProc._url = url
                 Qt.callLater(function() { if (!urlOpenerProc.running) urlOpenerProc.running = true })
@@ -256,7 +274,7 @@ Item {
 
         // 3c. Not running — launch via DesktopEntries or bash
         if (url && !desktopId) {
-            // Pure URL with no known app → xdg-open
+            // Pure URL with no known app → xdg-open (lets the default handler decide)
             urlOpenerProc._url = url
             if (!urlOpenerProc.running) urlOpenerProc.running = true
             return
@@ -264,6 +282,8 @@ Item {
         if (desktopId) {
             const entry = DesktopEntries.byId(desktopId)
             if (entry) {
+                // Always pass URL to the entry so the browser opens the right tab,
+                // not a new window on its default page.
                 if (url) {
                     const clean = (entry.execString || "").replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
                     _notifLaunchProc._cmd = clean + " " + JSON.stringify(url) + " &"
@@ -336,14 +356,28 @@ Item {
 
     function _writeNotifAppState(appName, iconName, summary, body) {
         if (!appName) return
+
+        // Screenshot and recorder notifications are handled via Nautilus directly;
+        // never persist them to the state file.
+        const apLow = appName.toLowerCase()
+        const icLow = (iconName || "").toLowerCase()
+        const _skipCls = ["screenshot", "recorder", "grimblast", "grim",
+                          "flameshot", "spectacle", "wf-recorder", "kooha",
+                          "obs", "obs-studio"]
+        for (const sc of _skipCls) {
+            if (apLow.includes(sc) || icLow.includes(sc)) return
+        }
+
         // For generic app names like "now playing", "media player" etc.
         // the icon name is the real identifier (e.g. "spotify").
-        // Try candidates in order: appName, icon, summary.
         const genericNames = ["now playing", "media player", "music", "audio"]
-        const isGeneric = genericNames.includes(appName.toLowerCase().trim())
+        const isGeneric = genericNames.includes(apLow.trim())
+
+        // cls is the lookup key — use icon/resolved name for generic media,
+        // but store the *real* resolved appName so redirects find the right app.
         const cls = isGeneric
             ? (iconName || appName).toLowerCase()
-            : appName.toLowerCase()
+            : apLow
 
         // Resolve desktop entry — try most-specific first
         let entry = null
@@ -367,7 +401,9 @@ Item {
             existing.desktopId === desktopId &&
             existing.url === url) return
 
-        ns._notifAppMap[cls] = { cls, desktopId, url }
+        // Store the real app name so media redirects resolve properly
+        const realName = (entry && entry.name) ? entry.name : (isGeneric ? (iconName || appName) : appName)
+        ns._notifAppMap[cls] = { cls, desktopId, url, realName }
 
         // Build arg list for notif-app-write.sh (one JSON line per entry)
         const lines = Object.values(ns._notifAppMap)
@@ -385,11 +421,27 @@ Item {
         const urgMap = { "low": 0, "normal": 1, "critical": 2 }
         const appName = ev.app_name || ""
         const body    = ev.body     || ""
+        const icon    = ev.icon     || ""
+
+        // For media/generic app names, resolve the real source name so it
+        // shows in the card subline instead of "now playing".
+        const genericNames = ["now playing", "media player", "music", "audio"]
+        const isGeneric = genericNames.includes(appName.toLowerCase().trim())
+        let resolvedAppName = appName
+        if (isGeneric && icon) {
+            const stored = NotifAppState.lookup(icon.toLowerCase())
+            if (stored && stored.realName) resolvedAppName = stored.realName
+            else {
+                const entry = NotifAppState._findEntry(icon)
+                if (entry && entry.name) resolvedAppName = entry.name
+            }
+        }
+
         ns.addNotification({
-            appName:  appName,
+            appName:  resolvedAppName,
             summary:  ev.summary   || "",
             body:     body,
-            icon:     ev.icon      || "",
+            icon:     icon,
             iconPath: ev.icon_path || "",
             urgency:  urgMap[ev.urgency] !== undefined ? urgMap[ev.urgency] : 1,
             actions:  ev.actions   || [],
@@ -397,7 +449,7 @@ Item {
             _daemonId: ev.id
         })
         // Resolve desktop entry and write to ~/.config/notif-running-apps
-        ns._writeNotifAppState(appName, ev.icon || "", ev.summary || "", body)
+        ns._writeNotifAppState(appName, icon, ev.summary || "", body)
     }
 
     // ═════════════════════════════════════════════════════════════════════
