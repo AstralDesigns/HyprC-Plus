@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  NotificationsState — single source for notification daemon, BT agent,
@@ -140,75 +141,52 @@ Item {
     // ── Smart redirect launcher ───────────────────────────────────────────
     // Opens a path in Nautilus, navigating to the containing folder and
     // selecting the file. Used for screenshot/recording save notifications.
+    // ── Smart redirect ────────────────────────────────────────────────────
+    // Opens a path in Nautilus with the file selected (screenshot/recording).
     Process { id: nautilusSelectProc; property string _path: ""
         command: ["nautilus", "--select", nautilusSelectProc._path] }
 
-    // Launches a media app by desktop app-id or binary name.
-    Process { id: mediaAppProc; property string _app: ""
-        command: ["bash", "-c",
-            "gtk-launch " + mediaAppProc._app + " 2>/dev/null || " +
-            mediaAppProc._app + " 2>/dev/null &"] }
+    // Bash fallback launcher for apps not reachable via DesktopEntries.execute()
+    Process { id: _notifLaunchProc; property string _cmd: ""
+        command: ["bash", "-c", _notifLaunchProc._cmd] }
+    Timer { id: _notifLaunchTimer; interval: 0; repeat: false
+        onTriggered: {
+            if (_notifLaunchProc._cmd !== "") {
+                _notifLaunchProc.running = false
+                _notifLaunchProc.running = true
+            }
+        }
+    }
 
-    // ── Redirect helpers ──────────────────────────────────────────────────
-    // Returns a file path if the notification body/icon looks like a saved
-    // screenshot or screen recording, otherwise "".
+    // ── Notif app state writer — mirrors DesktopLayer/_writeProc pattern ──
+    // Bare Process; command is assigned dynamically in _writeNotifAppState().
+    Process { id: _notifWriteProc; running: false }
+
+
+    // ── Saved file path extractor ─────────────────────────────────────────
     function _savedFilePath(notif) {
-        // Some screenshot tools embed the full path in the body
         const body = notif.body || ""
         const m = body.match(/(\/[^\s"'<>]+\.(png|jpg|jpeg|webp|mp4|mkv|webm|gif))/i)
         if (m) return m[1]
-        // Fall back to the iconPath if it points to Pictures/Screenshots or
-        // Videos/Recordings (e.g. gnome-screenshot, spectacle, wf-recorder)
         const ip = notif.iconPath || ""
         if (ip && (ip.includes("Screenshots") || ip.includes("Recordings") ||
                    ip.includes("Pictures")    || ip.includes("Videos"))) return ip
         return ""
     }
 
-    // Returns a URL if this looks like a browser tab/site notification.
-    function _browserUrl(notif) {
-        // Prefer an explicit URL in the body
-        const body = notif.body || ""
-        const m = body.match(/https?:\/\/[^\s"'<>]+/)
-        if (m) return m[0]
-        // Firefox / Chrome / Brave send the site origin as the app name
-        const ap = (notif.appName || "").toLowerCase()
-        if (ap.includes("firefox") || ap.includes("chrome") ||
-            ap.includes("chromium") || ap.includes("brave") ||
-            ap.includes("zen") || ap.includes("librewolf")) {
-            // No extractable URL — just focus the browser
-            return "__browser__"
-        }
-        return ""
-    }
-
-    // Returns the app to launch for a Now Playing / media notification.
-    function _mediaApp(notif) {
-        const ic = (notif.icon  || "").toLowerCase()
-        const ap = (notif.appName || "").toLowerCase()
-        if (ic.includes("spotify")  || ap.includes("spotify"))  return "spotify"
-        if (ic.includes("firefox")  || ap.includes("firefox"))  return "firefox"
-        if (ic.includes("chrome")   || ap.includes("chrome"))   return "google-chrome"
-        if (ic.includes("chromium") || ap.includes("chromium")) return "chromium"
-        if (ic.includes("brave")    || ap.includes("brave"))    return "brave"
-        if (ic.includes("zen")      || ap.includes("zen"))      return "zen-browser"
-        if (ic.includes("vlc")      || ap.includes("vlc"))      return "vlc"
-        if (ic.includes("mpv")      || ap.includes("mpv"))      return "mpv"
-        if (ic.includes("rhythmbox")|| ap.includes("rhythmbox"))return "rhythmbox"
-        if (ic.includes("elisa")    || ap.includes("elisa"))    return "elisa"
-        if (ic.includes("clementine")||ap.includes("clementine"))return "clementine"
-        return ""
-    }
-
     // ── Primary redirect entry point ──────────────────────────────────────
-    // Call this when tapping a history card or toast. Decides the right
-    // destination: file manager, browser, media app, or default action.
+    // 1. Screenshot/recording path → Nautilus select
+    // 2. Screenshot/recording app  → open save folder
+    // 3. Look up NotifAppState for stored desktopId + url:
+    //    a. Try Hyprland.windows scan by address, then by class/desktopId
+    //    b. If running → focuswindow (+ togglespecialworkspace if needed)
+    //    c. If not running → DesktopEntries.byId(desktopId).execute() or bash
+    //    d. If URL present → also/instead xdg-open the URL
     function redirectNotification(notif) {
-        const cat = notif.category || ""
-        const ic  = (notif.icon || "").toLowerCase()
-        const ap  = (notif.appName || "").toLowerCase()
+        const ic = (notif.icon    || "").toLowerCase()
+        const ap = (notif.appName || "").toLowerCase()
 
-        // 1. Screenshot / screen-recording save → Nautilus select
+        // 1. Screenshot/recording with embedded file path → Nautilus select
         const fp = ns._savedFilePath(notif)
         if (fp) {
             nautilusSelectProc._path = fp
@@ -216,7 +194,7 @@ Item {
             return
         }
 
-        // 2. Screenshot/recording category even without a path → open folder
+        // 2. Screenshot/recording by app identity → open save folder
         const isScreenshot = ic.includes("screenshot") || ap.includes("screenshot") ||
                              ap.includes("flameshot")  || ap.includes("spectacle")  ||
                              ap.includes("grimblast")  || ap.includes("grim")
@@ -234,34 +212,84 @@ Item {
             return
         }
 
-        // 3. Now Playing / media → focus/launch the source app
-        if (cat === "media.playing" || ap === "now playing") {
-            const mapp = ns._mediaApp(notif)
-            if (mapp) {
-                mediaAppProc._app = mapp
-                if (!mediaAppProc.running) mediaAppProc.running = true
+        // 3. Resolve via NotifAppState
+        const stored    = NotifAppState.lookup(notif.appName) || {}
+        const desktopId = stored.desktopId || ""
+        const storedUrl = stored.url || ""
+        const bodyUrl   = (notif.body || "").match(/https?:\/\/[^\s"'<>]+/)
+        const url       = bodyUrl ? bodyUrl[0] : storedUrl
+
+        // 3a. Try to find a running Hyprland window
+        let client = null
+        if (Hyprland.windows) {
+            const vals = Hyprland.windows.values
+            const normAp = ap.split(".").pop()
+            const normId = desktopId.replace(/\.desktop$/, "").toLowerCase()
+            for (let i = 0; i < vals.length; i++) {
+                const w = vals[i]
+                if (!w) continue
+                const wc = (w.class        || "").toLowerCase()
+                const wi = (w.initialClass || "").toLowerCase()
+                const wt = (w.title        || "").toLowerCase()
+                if (wc.includes(normAp) || wi.includes(normAp) ||
+                    (normId && (wc.includes(normId) || wi.includes(normId)))) {
+                    client = w
+                    break
+                }
+            }
+        }
+
+        if (client) {
+            // 3b. Focus running window
+            const wsName = (client.workspace?.name || "")
+            if (wsName.startsWith("special:")) {
+                Hyprland.dispatch("togglespecialworkspace " + wsName.replace(/^special:/, ""))
+            }
+            Hyprland.dispatch("focuswindow address:" + client.address)
+            // Also open URL if present (brings browser to the page)
+            if (url) {
+                urlOpenerProc._url = url
+                Qt.callLater(function() { if (!urlOpenerProc.running) urlOpenerProc.running = true })
             }
             return
         }
 
-        // 4. Browser tab notification → open URL or focus browser
-        const burl = ns._browserUrl(notif)
-        if (burl && burl !== "__browser__") {
-            urlOpenerProc._url = burl
+        // 3c. Not running — launch via DesktopEntries or bash
+        if (url && !desktopId) {
+            // Pure URL with no known app → xdg-open
+            urlOpenerProc._url = url
             if (!urlOpenerProc.running) urlOpenerProc.running = true
             return
         }
-        if (burl === "__browser__") {
-            const mapp2 = ns._mediaApp(notif) // reuses browser name lookup
-            if (mapp2) {
-                mediaAppProc._app = mapp2
-                if (!mediaAppProc.running) mediaAppProc.running = true
+        if (desktopId) {
+            const entry = DesktopEntries.byId(desktopId)
+            if (entry) {
+                if (url) {
+                    const clean = (entry.execString || "").replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
+                    _notifLaunchProc._cmd = clean + " " + JSON.stringify(url) + " &"
+                    _notifLaunchTimer.restart()
+                } else {
+                    entry.execute()
+                }
+                return
+            }
+        }
+        // 3d. Fallback — try the resolved entry via NotifAppState directly
+        const fallbackEntry = NotifAppState._findEntry(notif.appName || notif.icon || "")
+        if (fallbackEntry) {
+            if (url) {
+                const clean = (fallbackEntry.execString || "").replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
+                _notifLaunchProc._cmd = clean + " " + JSON.stringify(url) + " &"
+                _notifLaunchTimer.restart()
+            } else {
+                fallbackEntry.execute()
             }
             return
         }
-
-        // 5. Fallback — invoke the notification's default action (standard dbus)
-        ns.invokeAction(notif, "default")
+        if (url) {
+            urlOpenerProc._url = url
+            if (!urlOpenerProc.running) urlOpenerProc.running = true
+        }
     }
 
     function invokeAction(notif, actionKey) {
@@ -303,13 +331,64 @@ Item {
         }
     }
 
+    // In-memory map — mirrors what's on disk, avoids re-reading the file
+    property var _notifAppMap: ({})
+
+    function _writeNotifAppState(appName, iconName, summary, body) {
+        if (!appName) return
+        // For generic app names like "now playing", "media player" etc.
+        // the icon name is the real identifier (e.g. "spotify").
+        // Try candidates in order: appName, icon, summary.
+        const genericNames = ["now playing", "media player", "music", "audio"]
+        const isGeneric = genericNames.includes(appName.toLowerCase().trim())
+        const cls = isGeneric
+            ? (iconName || appName).toLowerCase()
+            : appName.toLowerCase()
+
+        // Resolve desktop entry — try most-specific first
+        let entry = null
+        const candidates = isGeneric
+            ? [iconName, summary, appName]
+            : [appName, iconName, summary]
+        for (const c of candidates) {
+            if (!c) continue
+            entry = NotifAppState._findEntry(c)
+            if (entry) break
+        }
+
+        const desktopId = entry ? (entry.id || "") : ""
+        const urlMatch  = body ? body.match(/https?:\/\/[^\s"'<>]+/) : null
+        const url       = urlMatch ? urlMatch[0] : ""
+
+        const existing = ns._notifAppMap[cls]
+
+        // Always write on first encounter; skip only on exact repeat
+        if (existing &&
+            existing.desktopId === desktopId &&
+            existing.url === url) return
+
+        ns._notifAppMap[cls] = { cls, desktopId, url }
+
+        // Build arg list for notif-app-write.sh (one JSON line per entry)
+        const lines = Object.values(ns._notifAppMap)
+            .filter(e => e && e.cls)
+            .map(e => JSON.stringify(e))
+
+        const scriptPath = Config.barDir + "/scripts/notif-app-write.sh"
+        _notifWriteProc.command = [scriptPath, ...lines]
+        _notifWriteProc.running = false
+        _notifWriteProc.running = true
+    }
+
     function _handleNotifEvent(ev) {
         if (ev.type !== "notify") return
         const urgMap = { "low": 0, "normal": 1, "critical": 2 }
+        const appName = ev.app_name || ""
+        const body    = ev.body     || ""
         ns.addNotification({
-            appName:  ev.app_name  || "",
+            appName:  appName,
             summary:  ev.summary   || "",
-            body:     ev.body      || "",
+            body:     body,
             icon:     ev.icon      || "",
             iconPath: ev.icon_path || "",
             urgency:  urgMap[ev.urgency] !== undefined ? urgMap[ev.urgency] : 1,
@@ -317,6 +396,8 @@ Item {
             category: ev.category  || "app",
             _daemonId: ev.id
         })
+        // Resolve desktop entry and write to ~/.config/notif-running-apps
+        ns._writeNotifAppState(appName, ev.icon || "", ev.summary || "", body)
     }
 
     // ═════════════════════════════════════════════════════════════════════
