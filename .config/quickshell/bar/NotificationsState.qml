@@ -202,8 +202,21 @@ Item {
     function redirectNotification(notif) {
         const ic = (notif.icon    || "").toLowerCase()
         const ap = (notif.appName || "").toLowerCase()
+        const de = (notif.desktopEntry || "").toLowerCase()
 
-        // 0. Storage/unmount notifications (Nautilus, udisks, gvfs) have no
+        // 0a. Media notifications — URL/app resolution is unreliable; skip redirect.
+        if (notif.category === "media.playing") return
+
+        // 0b. Browser web-push notifications — URL and desktop-entry resolution
+        //     is unreliable (Zen→firefox, url always empty); skip redirect.
+        const _browserIds = ["brave-browser", "google-chrome", "google-chrome-stable",
+                             "chromium", "chromium-browser", "firefox", "zen-browser",
+                             "zen", "librewolf", "vivaldi-stable", "vivaldi",
+                             "microsoft-edge", "microsoft-edge-stable", "opera"]
+        if (_browserIds.some(b => de === b || ap.includes(b.replace("-stable","").replace("-browser",""))))
+            return
+
+        // 0c. Storage/unmount notifications (Nautilus, udisks, gvfs) have no
         //    meaningful redirect target — bail out immediately.
         const _noRedirectApp = ["nautilus", "org.gnome.nautilus", "udisks", "gvfs", "devicekit"]
         const _noRedirectIcon = ["media-removable", "drive-removable-media",
@@ -234,16 +247,17 @@ Item {
             return
         }
 
-        // 3. Resolve via NotifAppState
-        // For media notifications the cls key is the icon name, not the appName
-        const genericNames2 = ["now playing", "media player", "music", "audio"]
-        const isGenericAp = genericNames2.includes(ap.trim())
-        const lookupKey = isGenericAp ? ic : ap
-        const stored    = NotifAppState.lookup(lookupKey) || NotifAppState.lookup(ap) || {}
+        // 3. Resolve via NotifAppState.
+        // desktopEntry is the authoritative key written by _writeNotifAppState.
+        const deKey  = (notif.desktopEntry || "").toLowerCase()
+        const stored = NotifAppState.lookup(deKey) || NotifAppState.lookup(ap) || {}
         const desktopId = stored.desktopId || ""
         const storedUrl = stored.url || ""
+        // Priority: _sourceUrl on notif (from daemon hints) > body URL > stored URL
         const bodyUrl   = (notif.body || "").match(/https?:\/\/[^\s"'<>]+/)
-        const url       = bodyUrl ? bodyUrl[0] : storedUrl
+        const url       = (notif._sourceUrl || "").trim()
+                       || (bodyUrl ? bodyUrl[0] : "")
+                       || storedUrl
 
         // 3a. Try to find a running Hyprland window
         let client = null
@@ -369,12 +383,10 @@ Item {
     // In-memory map — mirrors what's on disk, avoids re-reading the file
     property var _notifAppMap: ({})
 
-    function _writeNotifAppState(appName, iconName, summary, body) {
+    function _writeNotifAppState(appName, iconName, summary, body, sourceUrl) {
         if (!appName) return
 
-        // Screenshot, recorder, and storage/unmount notifications are handled
-        // specially (Nautilus select / no redirect); never persist them to the
-        // state file so they don't pollute app-redirect lookups.
+        // Screenshot, recorder, and storage/unmount notifications → Nautilus; skip.
         const apLow = appName.toLowerCase()
         const icLow = (iconName || "").toLowerCase()
         const _skipCls = ["screenshot", "recorder", "grimblast", "grim",
@@ -385,52 +397,58 @@ Item {
         for (const sc of _skipCls) {
             if (apLow.includes(sc) || icLow.includes(sc)) return
         }
-
-        // Icons that are system/storage generics or meaningless audio placeholders
-        // — never a useful redirect target, so skip entirely.
         const _skipIcons = ["media-removable", "drive-removable-media",
-                            "drive-harddisk", "media-flash", "media-optical",
-                            "audio-x-generic"]
+                            "drive-harddisk", "media-flash", "media-optical"]
         if (_skipIcons.includes(icLow)) return
 
-        // For generic app names like "now playing", "media player" etc.
-        // the appName (e.g. "firefox", "chromium") is the real identifier.
-        // We no longer use the icon name as cls because icons like
-        // "audio-x-generic" are meaningless; the actual app sending the
-        // notification is always more useful.
-        const genericNames = ["now playing", "media player", "music", "audio"]
-        const isGeneric = genericNames.includes(apLow.trim())
-
-        // cls is always keyed on appName so lookups match what redirectNotification
-        // resolves from Hyprland windows (which uses the app class/name).
         const cls = apLow
 
-        // Resolve desktop entry — appName is the best candidate for both generic
-        // and specific notifications; fall back to icon name then summary.
-        let entry = null
-        const candidates = [appName, iconName, summary]
-        for (const c of candidates) {
-            if (!c) continue
-            entry = NotifAppState._findEntry(c)
-            if (entry) break
+        // desktopId: daemon already resolved this via _resolve_app_entry
+        // (StartupWMClass → binary → name scan in Python with full .desktop access),
+        // so appName when called as _writeNotifAppState(desktopEntry || appName, ...)
+        // is either the verified desktop entry id or the resolved display name.
+        // Try a direct id lookup first; fall back to _findEntry for app-native notifs.
+        let desktopId = ""
+        const directEntry = DesktopEntries.byId(appName)
+        if (directEntry) {
+            desktopId = directEntry.id || ""
+        } else {
+            const lookupCandidates = [appName]
+            if (iconName && iconName.toLowerCase() !== "audio-x-generic")
+                lookupCandidates.push(iconName)
+            lookupCandidates.push(summary)
+            for (const c of lookupCandidates) {
+                if (!c) continue
+                const e = NotifAppState._findEntry(c)
+                if (e) { desktopId = e.id || ""; break }
+            }
         }
 
-        const desktopId = entry ? (entry.id || "") : ""
-        const urlMatch  = body ? body.match(/https?:\/\/[^\s"'<>]+/) : null
-        const url       = urlMatch ? urlMatch[0] : ""
+        // URL: prefer sourceUrl from daemon (has access to Chromium hints),
+        // fall back to body/summary scraping.
+        function _extractUrl(text) {
+            if (!text) return ""
+            const hrefM = text.match(/href=["']?(https?:\/\/[^"'\s<>]+)/)
+            if (hrefM) return hrefM[1]
+            const bareM = text.match(/https?:\/\/[^\s"'<>]+/)
+            if (bareM) return bareM[0]
+            return ""
+        }
+        let url = (sourceUrl || "").trim()
+            || _extractUrl(body) || _extractUrl(summary)
+        if (!url && summary) {
+            const domainM = summary.match(/^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/)
+            if (domainM) url = "https://" + summary
+        }
 
         const existing = ns._notifAppMap[cls]
-
-        // Always write on first encounter; skip only on exact repeat
+        // Skip only exact repeats; new url or resolved desktopId always writes
         if (existing &&
             existing.desktopId === desktopId &&
             existing.url === url) return
 
-        // Store the real app name so media redirects resolve properly
-        const realName = (entry && entry.name) ? entry.name : appName
-        ns._notifAppMap[cls] = { cls, desktopId, url, realName }
+        ns._notifAppMap[cls] = { cls, desktopId, url, realName: appName }
 
-        // Build arg list for notif-app-write.sh (one JSON line per entry)
         const lines = Object.values(ns._notifAppMap)
             .filter(e => e && e.cls)
             .map(e => JSON.stringify(e))
@@ -444,44 +462,28 @@ Item {
     function _handleNotifEvent(ev) {
         if (ev.type !== "notify") return
         const urgMap = { "low": 0, "normal": 1, "critical": 2 }
-        const appName = ev.app_name || ""
-        const body    = ev.body     || ""
-        const icon    = ev.icon     || ""
-
-        // For generic app names ("now playing", "media player" etc.) resolve
-        // the real source name from the stored map so the card subline shows
-        // e.g. "Firefox" instead of "now playing".
-        // cls is now always keyed on appName (not icon), so look up by appName.
-        const genericNames = ["now playing", "media player", "music", "audio"]
-        const isGeneric = genericNames.includes(appName.toLowerCase().trim())
-        let resolvedAppName = appName
-        if (isGeneric) {
-            const stored = NotifAppState.lookup(appName.toLowerCase())
-            if (stored && stored.realName) resolvedAppName = stored.realName
-            else if (icon && icon !== "audio-x-generic") {
-                // Fall back: try icon name only when it's a real app identifier
-                const storedByIcon = NotifAppState.lookup(icon.toLowerCase())
-                if (storedByIcon && storedByIcon.realName) resolvedAppName = storedByIcon.realName
-                else {
-                    const entry = NotifAppState._findEntry(icon)
-                    if (entry && entry.name) resolvedAppName = entry.name
-                }
-            }
-        }
+        // The daemon now resolves app_name and desktop_entry via _resolve_app_entry,
+        // so these are already the correct display name and desktop entry id.
+        const appName      = ev.app_name      || ""
+        const body         = ev.body          || ""
+        const icon         = ev.icon          || ""
+        const desktopEntry = ev.desktop_entry || ""
+        const sourceUrl    = ev.source_url    || ""
 
         ns.addNotification({
-            appName:  resolvedAppName,
-            summary:  ev.summary   || "",
-            body:     body,
-            icon:     icon,
-            iconPath: ev.icon_path || "",
-            urgency:  urgMap[ev.urgency] !== undefined ? urgMap[ev.urgency] : 1,
-            actions:  ev.actions   || [],
-            category: ev.category  || "app",
-            _daemonId: ev.id
+            appName:      appName,
+            desktopEntry: desktopEntry,
+            summary:      ev.summary   || "",
+            body:         body,
+            icon:         icon,
+            iconPath:     ev.icon_path || "",
+            urgency:      urgMap[ev.urgency] !== undefined ? urgMap[ev.urgency] : 1,
+            actions:      ev.actions   || [],
+            category:     ev.category  || "app",
+            _daemonId:    ev.id,
+            _sourceUrl:   sourceUrl
         })
-        // Resolve desktop entry and write to ~/.config/notif-running-apps
-        ns._writeNotifAppState(appName, icon, ev.summary || "", body)
+        ns._writeNotifAppState(desktopEntry || appName, icon, ev.summary || "", body, sourceUrl)
     }
 
     // ═════════════════════════════════════════════════════════════════════

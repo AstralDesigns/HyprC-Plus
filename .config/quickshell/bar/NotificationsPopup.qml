@@ -591,7 +591,10 @@ Item {
                                 onClicked: {
                                     if (notif.urgency < 2)
                                         NotificationsState.redirectNotification(notif)
-                                    NotificationsState.historyVisible = false
+                                    // Close the panel on the next frame so redirectNotification's
+                                    // Qt.callLater / Process assignments complete first, preventing
+                                    // the panel teardown from racing with Nautilus launch.
+                                    Qt.callLater(function() { NotificationsState.historyVisible = false })
                                 }
                             }
                         }

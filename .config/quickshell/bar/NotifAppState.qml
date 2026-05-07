@@ -59,13 +59,35 @@ QtObject {
             if (!m[cls].desktopId) {
                 const entry = root._findEntry(cls)
                 if (entry) {
-                    m[cls] = Object.assign({}, m[cls], { desktopId: entry.id || "" })
+                    m[cls] = Object.assign({}, m[cls], {
+                        desktopId: entry.id || "",
+                        realName:  m[cls].realName || entry.name || cls
+                    })
                     changed = true
                 }
             }
         }
-        if (changed) root._map = m
-        // No write here — NotificationsState owns writes
+        if (changed) {
+            root._map = m
+            // Persist the resolved desktopIds back to disk via NotificationsState
+            // (which owns the write lock). Patch its in-memory map directly so
+            // the next write includes the resolved entries.
+            try {
+                const ns = NotificationsState
+                for (const cls of Object.keys(m)) {
+                    if (ns._notifAppMap[cls] !== undefined) {
+                        ns._notifAppMap[cls] = Object.assign({}, ns._notifAppMap[cls], m[cls])
+                    }
+                }
+                const lines = Object.values(ns._notifAppMap)
+                    .filter(e => e && e.cls)
+                    .map(e => JSON.stringify(e))
+                const scriptPath = Config.barDir + "/scripts/notif-app-write.sh"
+                ns._notifWriteProc.command = [scriptPath, ...lines]
+                ns._notifWriteProc.running = false
+                ns._notifWriteProc.running = true
+            } catch(_) {}
+        }
     }
 
     // ── _findEntry — direct copy of DesktopPinnedState._findEntry ───────────
@@ -98,6 +120,20 @@ QtObject {
                     || eid.endsWith("-" + normLast)
                     || eid.endsWith("." + normLast)
                     || eid.startsWith(normLast + "-"))
+                return e
+        }
+
+        // StartupWMClass scan — must run BEFORE exec-binary scan so apps like
+        // Zen Browser (WMClass "zen", binary "firefox") resolve to their own
+        // .desktop entry rather than being swallowed by Firefox's binary match.
+        for (let i = 0; i < total; i++) {
+            const e = DesktopEntries.applications.get(i)
+            if (!e) continue
+            const wmc = (e.startupWmClass || "").toLowerCase()
+            if (!wmc) continue
+            if (wmc === normLast || wmc === normLast2
+                    || wmc.startsWith(normLast + "-")
+                    || wmc.endsWith("-" + normLast))
                 return e
         }
 

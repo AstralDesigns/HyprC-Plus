@@ -278,15 +278,168 @@ def _fetch_art_circle(art_url: str) -> str:
     return ""
 
 
+
+# ── Desktop-entry database ─────────────────────────────────────────────────
+# Built once on first use and cached.  Stores every .desktop file's key fields
+# so we can do O(1) lookups instead of re-scanning on every notification.
+#
+# Each entry: { "id": str, "name": str, "wmc": str, "bin": str, "exec": str }
+#   id   — basename without .desktop (e.g. "brave-browser")
+#   name — Name= value (e.g. "Brave")
+#   wmc  — StartupWMClass= lowercased (e.g. "brave-browser", "zen")
+#   bin  — first word of Exec= stripped to basename, lowercased (e.g. "brave-browser")
+#   exec — full Exec= line (for launch)
+
+_DESKTOP_DIRS = [
+    "/usr/share/applications",
+    "/usr/local/share/applications",
+    os.path.expanduser("~/.local/share/applications"),
+    "/var/lib/flatpak/exports/share/applications",
+    os.path.expanduser("~/.local/share/flatpak/exports/share/applications"),
+]
+_desktop_db: "list[dict] | None" = None
+
+
+def _get_desktop_db() -> "list[dict]":
+    global _desktop_db
+    if _desktop_db is not None:
+        return _desktop_db
+    import glob as _glob
+    db = []
+    for d in _DESKTOP_DIRS:
+        for df in _glob.glob(os.path.join(d, "*.desktop")):
+            try:
+                eid = os.path.basename(df).replace(".desktop", "")
+                name = wmc = bin_ = exec_ = ""
+                with open(df, encoding="utf-8", errors="ignore") as f:
+                    in_main = True
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("[") and line != "[Desktop Entry]":
+                            in_main = False
+                        if not in_main:
+                            continue
+                        if line.startswith("Name=") and not name:
+                            name = line[5:].strip()
+                        elif line.startswith("StartupWMClass="):
+                            wmc = line[15:].strip().lower()
+                        elif line.startswith("Exec=") and not exec_:
+                            exec_ = line[5:].strip()
+                            bin_ = exec_.split()[0].split("/")[-1].lower()
+                            # Strip %U/%F/etc field codes from bin
+                            bin_ = bin_.split("%")[0].rstrip("-").strip()
+                db.append({"id": eid, "name": name, "wmc": wmc,
+                           "bin": bin_, "exec": exec_})
+            except Exception:
+                continue
+    _desktop_db = db
+    return db
+
+
+def _resolve_app_entry(key: str) -> "tuple[str, str]":
+    """Given any of: desktop-entry hint, app_name, app_icon — return
+    (desktop_entry_id, display_name).
+
+    Resolution order (most → least authoritative):
+      1. Exact id match (case-insensitive)
+      2. StartupWMClass match   ← catches zen (wmc=zen, bin=firefox)
+      3. id prefix/suffix match (e.g. "org.gnome.Foo" → "foo")
+      4. Exec binary match      ← after WMClass so firefox binary doesn't eat zen
+      5. Name match with qualifier stripping ("Spotify (Launcher)" → "spotify")
+
+    Returns ("", "") when nothing matches.
+    """
+    if not key:
+        return ("", "")
+    k = key.lower().strip()
+    # Strip common suffixes that appear in desktop-entry hints
+    k_base = k.replace("-browser", "").replace("-desktop", "").replace("-stable", "")
+    db = _get_desktop_db()
+
+    # Pass 1 — exact id
+    for e in db:
+        if e["id"].lower() == k or e["id"].lower() == k + "-browser":
+            return (e["id"], e["name"])
+
+    # Pass 2 — StartupWMClass (before binary so zen wins over firefox)
+    for e in db:
+        if e["wmc"] and (e["wmc"] == k or e["wmc"] == k_base):
+            return (e["id"], e["name"])
+
+    # Pass 3 — id ends/starts with key (handles reverse-dns ids)
+    for e in db:
+        eid = e["id"].lower()
+        if eid.endswith("-" + k) or eid.endswith("." + k) or eid.startswith(k + "-"):
+            return (e["id"], e["name"])
+
+    # Pass 4 — binary match (Exec= basename)
+    for e in db:
+        if e["bin"] and (e["bin"] == k or e["bin"] == k_base
+                         or e["bin"].startswith(k + "-")
+                         or e["bin"].endswith("-" + k)):
+            return (e["id"], e["name"])
+
+    # Pass 5 — Name match, stripping parenthetical qualifiers
+    import re as _re
+    k_stripped = _re.sub(r'\s*\(.*?\)\s*', '', k).strip()
+    best_id = best_name = ""
+    best_rank = 99
+    for e in db:
+        en = e["name"].lower()
+        en_stripped = _re.sub(r'\s*\(.*?\)\s*', '', en).strip()
+        rank = 99
+        if en == k:
+            rank = 0
+        elif en_stripped == k_stripped:
+            rank = 1
+        if rank < best_rank:
+            best_rank, best_id, best_name = rank, e["id"], e["name"]
+        if best_rank == 0:
+            break
+    if best_id:
+        return (best_id, best_name)
+
+    return ("", "")
+
+
+def _resolve_player_desktop_entry(player_name: str) -> "tuple[str, str]":
+    """Given a playerctl playerName (e.g. 'brave', 'spotify', 'vlc'), return
+    (desktop_entry_id, display_name) by querying MPRIS then the shared db."""
+    if not player_name:
+        return ("", "")
+    pn_low = player_name.lower()
+
+    # 1. MPRIS DesktopEntry property — authoritative
+    try:
+        import dbus as _dbus
+        _bus = _dbus.SessionBus()
+        _obj = _bus.get_object(f"org.mpris.MediaPlayer2.{player_name}", "/org/mpris/MediaPlayer2")
+        _p   = _dbus.Interface(_obj, "org.freedesktop.DBus.Properties")
+        de   = str(_p.Get("org.mpris.MediaPlayer2", "DesktopEntry"))
+        iden = str(_p.Get("org.mpris.MediaPlayer2", "Identity"))
+        if de:
+            return (de, iden or player_name)
+    except Exception:
+        pass
+
+    # 2. Shared desktop-entry db (StartupWMClass → binary → name)
+    eid, name = _resolve_app_entry(player_name)
+    if eid:
+        return (eid, name or player_name)
+
+    return (pn_low, player_name)
+
+
 def _poll_mpris(notif_service):
     """Background thread: poll playerctl every 3 s, emit Playing notification on track change."""
     global _last_media_key
+    _player_cache: dict = {}
     while True:
         time.sleep(3)
         try:
             result = subprocess.run(
                 ["playerctl", "-a", "metadata", "--format",
-                 "{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{xesam:album}}"],
+                 "{{status}}\t{{playerName}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{xesam:album}}"],
                 capture_output=True, text=True, timeout=3
             )
             if result.returncode != 0:
@@ -299,38 +452,41 @@ def _poll_mpris(notif_service):
                     playing_line = line
                     break
             if not playing_line:
-                # Nothing playing — reset so next play triggers notification
                 _last_media_key = ""
                 continue
             parts = playing_line.split("\t")
-            if len(parts) < 4:
+            if len(parts) < 5:
                 continue
-            art_url = parts[1].strip()
-            title   = parts[2].strip() or "Unknown Title"
-            artist  = parts[3].strip()
-            album   = parts[4].strip() if len(parts) > 4 else ""
-            media_key = artist + "|" + title
+            player_name = parts[1].strip()
+            art_url     = parts[2].strip()
+            title       = parts[3].strip() or "Unknown Title"
+            artist      = parts[4].strip()
+            album       = parts[5].strip() if len(parts) > 5 else ""
+            media_key   = player_name + "|" + artist + "|" + title
             if media_key == _last_media_key:
                 continue
             _last_media_key = media_key
-            # Build circular thumbnail
+            if player_name not in _player_cache:
+                _player_cache[player_name] = _resolve_player_desktop_entry(player_name)
+            desktop_entry, display_name = _player_cache[player_name]
             icon_path = _fetch_art_circle(art_url)
             body_parts = []
             if artist: body_parts.append(artist)
             if album:  body_parts.append(album)
             body = " · ".join(body_parts)
             emit({
-                "type":      "notify",
-                "id":        MEDIA_NOTIF_ID,
-                "app_name":  "Now Playing",
-                "icon":      "audio-x-generic",
-                "icon_path": icon_path,
-                "summary":   title,
-                "body":      body,
-                "urgency":   "low",
-                "category":  "media.playing",
-                "actions":   [],
-                "timeout":   6000
+                "type":          "notify",
+                "id":            MEDIA_NOTIF_ID,
+                "app_name":      display_name or player_name,
+                "desktop_entry": desktop_entry,
+                "icon":          desktop_entry or player_name,
+                "icon_path":     icon_path,
+                "summary":       title,
+                "body":          body,
+                "urgency":       "low",
+                "category":      "media.playing",
+                "actions":       [],
+                "timeout":       6000
             })
         except Exception:
             pass
@@ -363,18 +519,71 @@ class NotificationService(dbus.service.Object):
             label = next(it, "")
             action_list.append({"key": str(key), "label": str(label)})
 
+        # desktop-entry hint is the authoritative app id.
+        # Chromium browsers (Brave, Zen, Chrome, Vivaldi…) always set it
+        # on website notifications, e.g. "brave-browser", "zen-browser".
+        desktop_entry_hint = str(hints.get("desktop-entry", hints.get("desktop_entry", "")))
+
+        # Resolve to a verified desktop entry id + display name.
+        # Use the hint as the primary key; fall back to app_icon then app_name.
+        # _resolve_app_entry handles StartupWMClass so zen → zen-browser (not firefox),
+        # and name-stripped matching so "spotify" → "Spotify (Launcher)".
+        # Resolve app identity from desktop-entry hint then app_name only.
+        # app_icon is intentionally excluded: Firefox-based browsers (Zen, Librewolf)
+        # set app_icon = "org.mozilla.firefox" which would match firefox.desktop
+        # before app_name = "Zen Browser" gets a chance to match zen.desktop.
+        resolved_id = resolved_name = ""
+        for _key in filter(None, [desktop_entry_hint, str(app_name)]):
+            resolved_id, resolved_name = _resolve_app_entry(_key)
+            if resolved_id:
+                break
+        # Prefer the hint value as the emitted desktop_entry when we couldn't
+        # resolve it — QML's _findEntry may still succeed via DesktopEntries.byId.
+        desktop_entry = resolved_id or desktop_entry_hint
+
+        # Chromium web-push: source URL lives in several hint keys.
+        source_url = ""
+        for _hk in ("x-chromium-notification-url", "x-notification-url", "source-url"):
+            _v = hints.get(_hk, "")
+            if _v:
+                source_url = str(_v)
+                break
+        if not source_url and body:
+            _href = re.search(r'href=["\']?(https?://[^"\'\\s<>]+)', str(body))
+            if _href:
+                source_url = _href.group(1)
+            else:
+                _bare = re.search(r'https?://[^\s"\'<>]+', str(body))
+                if _bare:
+                    source_url = _bare.group(0)
+        if not source_url:
+            # Check summary and first line of body as bare domain candidates.
+            # Chromium web-push sets body = "domain.com\nMessage text".
+            _domain_candidates = [str(summary).strip()]
+            if body:
+                _domain_candidates.append(str(body).split("\n")[0].strip())
+            _dom_re = re.compile(
+                r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+            )
+            for _dc in _domain_candidates:
+                if _dom_re.match(_dc):
+                    source_url = "https://" + _dc
+                    break
+
         emit({
-            "type":      "notify",
-            "id":        nid,
-            "app_name":  str(app_name),
-            "icon":      str(app_icon),
-            "icon_path": icon_path,
-            "summary":   str(summary),
-            "body":      str(body),
-            "urgency":   urgency,
-            "category":  category,
-            "actions":   action_list,
-            "timeout":   int(expire_timeout)
+            "type":             "notify",
+            "id":               nid,
+            "app_name":         resolved_name or str(app_name),
+            "desktop_entry":    desktop_entry,
+            "icon":             str(app_icon),
+            "icon_path":        icon_path,
+            "summary":          str(summary),
+            "body":             str(body),
+            "urgency":          urgency,
+            "category":         category,
+            "actions":          action_list,
+            "timeout":          int(expire_timeout),
+            "source_url":       source_url
         })
         return dbus.UInt32(nid)
 
