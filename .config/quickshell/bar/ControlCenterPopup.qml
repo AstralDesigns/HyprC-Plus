@@ -99,6 +99,26 @@ PanelWindow {
     property string _borderWEntryVal:    ""
     property string _borderREntryVal:    ""
     property string _currentLayout:      ""   // "scrolling" | "dwindle" | "master" | "monocle"
+    property string _kbLayout:           ""   // keyboard layout — empty until first user entry
+
+    // ── Hyprland slider real-number backing (used by CCSlider; seeded from
+    //    hyprcandy-bar.conf [hyprland] on open, or Config.hyprDefault* if unset) ──
+    property real _hyprOpacSlider:    -1   // -1 = not yet loaded from state file
+    property int  _hyprBlurSzSlider:  -1
+    property int  _hyprBlurPsSlider:  -1
+    property int  _hyprGapsInSlider:  -1
+    property int  _hyprGapsOutSlider: -1
+    property int  _hyprBorderWSlider: -1
+    property int  _hyprBorderRSlider: -1
+
+    // Resolved slider value: state-file value if set, otherwise Config default
+    readonly property real hyprOpacVal:    _hyprOpacSlider    >= 0 ? _hyprOpacSlider    : Config.hyprDefaultOpacity
+    readonly property int  hyprBlurSzVal:  _hyprBlurSzSlider  >= 0 ? _hyprBlurSzSlider  : Config.hyprDefaultBlurSize
+    readonly property int  hyprBlurPsVal:  _hyprBlurPsSlider  >= 0 ? _hyprBlurPsSlider  : Config.hyprDefaultBlurPasses
+    readonly property int  hyprGapsInVal:  _hyprGapsInSlider  >= 0 ? _hyprGapsInSlider  : Config.hyprDefaultGapsIn
+    readonly property int  hyprGapsOutVal: _hyprGapsOutSlider >= 0 ? _hyprGapsOutSlider : Config.hyprDefaultGapsOut
+    readonly property int  hyprBorderWVal: _hyprBorderWSlider >= 0 ? _hyprBorderWSlider : Config.hyprDefaultBorderW
+    readonly property int  hyprBorderRVal: _hyprBorderRSlider >= 0 ? _hyprBorderRSlider : Config.hyprDefaultBorderR
 
     // ── Hyprland border colors ─────────────────────────────────────────────
     property color _activeBorderColor:   Theme.cPrimary
@@ -220,6 +240,8 @@ PanelWindow {
                 _weatherLocReader.running = true
                 _hyprlandValReader.running = true
                 _layoutReader.running = true
+                _hyprStateReader.running = true
+                _kbLayoutReader.running  = true
             }
         }
     }
@@ -237,6 +259,8 @@ PanelWindow {
         _lcValReader.running       = true
         _sddmValReader.running     = true
         _weatherLocReader.running  = true
+        _hyprStateReader.running   = true
+        _kbLayoutReader.running    = true
     }
 
     // Read hyprland config values
@@ -423,6 +447,109 @@ PanelWindow {
                 else if (kv.startsWith("DOCK_DELAY=autohide_delay=")) { ccWin._dockAhDelay   = kv.slice(26);            Config.dockAutoHideDelay = parseInt(kv.slice(26)) || 5 }
                 else if (kv.startsWith("DOCK_MARGIN=margin_from_edge=")){ ccWin._dockMarginVal = parseInt(kv.slice(29)) || 6; Config.dockMargin = ccWin._dockMarginVal }
             }
+        }
+    }
+
+    // ── Read [hyprland] slider values from hyprcandy-bar.conf ────────────────
+    // Values written here take priority over Config.hyprDefault* fallbacks.
+    Process {
+        id: _hyprStateReader
+        command: ["bash", "-c",
+            "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+            "[ -f \"$f\" ] || exit 0; " +
+            "awk '/^\\[hyprland\\]/{s=1;next} /^\\[/{s=0} s{print}' \"$f\""]
+        running: false
+        property string _buf: ""
+        onRunningChanged: if (running) _buf = ""
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { _hyprStateReader._buf += l.trim() + "\n" }
+        }
+        onExited: {
+            const lines = _buf.trim().split("\n")
+            _buf = ""
+            for (const line of lines) {
+                const eq = line.indexOf("=")
+                if (eq < 0) continue
+                const k = line.slice(0, eq).trim()
+                const v = line.slice(eq + 1).trim()
+                if      (k === "opacity")     { const f = parseFloat(v); if (!isNaN(f)) ccWin._hyprOpacSlider    = f }
+                else if (k === "blur_size")   { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprBlurSzSlider  = i }
+                else if (k === "blur_passes") { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprBlurPsSlider  = i }
+                else if (k === "gaps_in")     { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprGapsInSlider  = i }
+                else if (k === "gaps_out")    { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprGapsOutSlider = i }
+                else if (k === "border_size") { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprBorderWSlider = i }
+                else if (k === "rounding")    { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprBorderRSlider = i }
+                else if (k === "kb_layout"  ) { if (v.length > 0) ccWin._kbLayout = v }
+            }
+        }
+    }
+
+    // ── Read kb_layout from hyprviz.conf (only used if state file has no entry) ─
+    Process {
+        id: _kbLayoutReader
+        command: ["bash", "-c",
+            "f=\"$HOME/.config/hypr/hyprviz.conf\"; " +
+            "[ -f \"$f\" ] || exit 0; " +
+            "grep -m1 'kb_layout' \"$f\" | grep -oP '(?<=kb_layout = )\\S*'"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) {
+                const v = l.trim()
+                // Only populate if state file has not set a layout yet
+                if (ccWin._kbLayout === "" && v.length > 0)
+                    ccWin._kbLayout = v
+            }
+        }
+    }
+
+    // ── Write one key=value into hyprcandy-bar.conf [hyprland] section ───────
+    // Caller sets _key and _val then sets running = true.
+    // Uses the same queue pattern as _confWriteProc.
+    Process {
+        id: _hyprStateWriter
+        property string _key: ""
+        property string _val: ""
+        property string _pendingKey: ""
+        property string _pendingVal: ""
+        command: ["bash", "-c",
+            "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+            "mkdir -p \"$(dirname \"$f\")\"; " +
+            // Create file + section if missing
+            "grep -q '^\\[hyprland\\]' \"$f\" 2>/dev/null || echo -e '\\n[hyprland]' >> \"$f\"; " +
+            // Replace existing key or append under section
+            "if grep -q '^" + _hyprStateWriter._key + "=' \"$f\" 2>/dev/null; then " +
+            "  sed -i 's|^" + _hyprStateWriter._key + "=.*|" + _hyprStateWriter._key + "=" + _hyprStateWriter._val + "|' \"$f\"; " +
+            "else " +
+            "  sed -i '/^\\[hyprland\\]/a " + _hyprStateWriter._key + "=" + _hyprStateWriter._val + "' \"$f\"; " +
+            "fi"]
+        running: false
+        onExited: {
+            running = false
+            if (_pendingKey !== "") {
+                _key = _pendingKey; _val = _pendingVal
+                _pendingKey = ""; _pendingVal = ""
+                running = true
+            }
+        }
+    }
+
+    // Helper: write a hyprland value to the state file (queued, non-blocking)
+    function _writeHyprState(key, val) {
+        const cmd = "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
+            "mkdir -p \"$(dirname \"$f\")\"; " +
+            "grep -q '^\\[hyprland\\]' \"$f\" 2>/dev/null || printf '\\n[hyprland]\\n' >> \"$f\"; " +
+            "if grep -q '^" + key + "=' \"$f\" 2>/dev/null; then " +
+            "  sed -i 's|^" + key + "=.*|" + key + "=" + val + "|' \"$f\"; " +
+            "else " +
+            "  sed -i '/^\\[hyprland\\]/a " + key + "=" + val + "' \"$f\"; " +
+            "fi"
+        if (_confWriteProc.running) {
+            _confWriteProc._pendingCmd = cmd
+        } else {
+            _confWriteProc._cmd = cmd
+            _confWriteProc.running = true
         }
     }
 
@@ -2011,7 +2138,50 @@ PanelWindow {
                                 }
                             }
 
-                            // ── Hyprsunset toggle — reads sentinel state file ─────
+                            // ── Keyboard Layout ───────────────────────────────────
+                            CCSection { text: "Keyboard Layout" }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Text {
+                                    text: "Keyboard"
+                                    color: Theme.cPrimary
+                                    font.family: Config.labelFont; font.pixelSize: 13
+                                    Layout.preferredWidth: 100
+                                }
+                                Rectangle {
+                                    Layout.preferredWidth: 80; height: 28; radius: 7
+                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                    TextInput {
+                                        id: _kbLayoutTI
+                                        anchors { fill: parent; margins: 6 }
+                                        text: ccWin._kbLayout
+                                        color: Theme.cPrimary
+                                        font.family: Config.labelFont; font.pixelSize: 12
+                                        verticalAlignment: TextInput.AlignVCenter; clip: true
+                                        onAccepted: {
+                                            const v = text.trim()
+                                            if (v.length === 0) return
+                                            ccWin._kbLayout = v
+                                            _kbLayoutSetProc.command = ["bash", "-c",
+                                                "f=\"$HOME/.config/hypr/hyprviz.conf\"; " +
+                                                "sed -i 's|^\\(\\s*kb_layout\\s*=\\s*\\).*|\\1" + v + "|' \"$f\""]
+                                            _kbLayoutSetProc.running = true
+                                            ccWin._writeHyprState("kb_layout", v)
+                                        }
+                                        Connections {
+                                            target: ccWin
+                                            function on_kbLayoutChanged() {
+                                                if (!_kbLayoutTI.activeFocus) _kbLayoutTI.text = ccWin._kbLayout
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Process { id: _kbLayoutSetProc; running: false }
+
+                            // ── Hyprsunset toggle ─────────────────────────────────
                             CCToggle {
                                 id: sunsetToggle
                                 label: "Hyprsunset"
@@ -2084,353 +2254,106 @@ PanelWindow {
                             }
                             Process { id: _xrayToggleProc; running: false }
 
-                            // ── Opacity toggle ────────────────────────────────────
-                            CCToggle {
-                                id: opacToggle; label: "Opacity"; value: false
-                                Component.onCompleted: _opacStatus.running = true
-                                onToggled: function(v) {
-                                    _opacToggleProc.command = [scriptDir + "/hyprland-opacity.sh", "toggle"]
-                                    _opacToggleProc.running = true
+                            // ── Opacity slider ───────────────────────────────────
+                            CCSlider {
+                                label: "Opacity"
+                                from: 0.0; to: 1.0; stepSize: 0.05; decimals: 2
+                                value: ccWin.hyprOpacVal
+                                onMoved: function(v) {
+                                    ccWin._hyprOpacSlider = v
+                                    ccWin._writeHyprState("opacity", v.toFixed(2))
+                                    _opacSet.command = [scriptDir + "/hyprland-opacity-set.sh", v.toFixed(2)]
+                                    _opacSet.running = true
                                 }
                             }
-                            Process {
-                                id: _opacStatus
-                                command: [scriptDir + "/hyprland-opacity.sh", "status"]
-                                running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) { opacToggle.value = l.trim() === "on" }
-                                }
-                            }
-                            Process { id: _opacToggleProc; running: false }
-
-                            // ── Opacity +/- buttons with direct entry ────────────
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 6
-                                Text {
-                                    text: "Opacity"
-                                    color: Theme.cPrimary
-                                    font.family: Config.labelFont
-                                    font.pixelSize: 13
-                                    Layout.preferredWidth: 100
-                                }
-                                CCPillBtn {
-                                    text: "−"
-                                    onClicked: {
-                                        _opacDec.command = [scriptDir + "/hyprland-opacity-adjust.sh", "-0.05"]
-                                        _opacDec.running = true
-                                    }
-                                }
-                                // Direct value entry
-                                Rectangle {
-                                    Layout.preferredWidth: 60; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _opacTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: _opacEntryVal
-                                        color: Theme.cPrimary
-                                        font.family: Config.labelFont
-                                        font.pixelSize: 12
-                                        horizontalAlignment: Text.AlignHCenter
-                                        validator: DoubleValidator { bottom: 0.0; top: 1.0; decimals: 2; notation: DoubleValidator.StandardNotation }
-                                        onAccepted: {
-                                            _opacSet.command = [scriptDir + "/hyprland-opacity-set.sh", text]
-                                            _opacSet.running = true
-                                            _opacEntryVal = text
-                                        }
-                                        Connections {
-                                            target: ccWin
-                                            function on_opacEntryValChanged() {
-                                                if (!_opacTI.activeFocus) _opacTI.text = ccWin._opacEntryVal
-                                            }
-                                        }
-                                    }
-                                }
-                                CCPillBtn {
-                                    text: "+"
-                                    onClicked: {
-                                        _opacInc.command = [scriptDir + "/hyprland-opacity-adjust.sh", "0.05"]
-                                        _opacInc.running = true
-                                    }
-                                }
-                            }
-                            Process { id: _opacDec; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
-                            Process { id: _opacInc; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
                             Process { id: _opacSet; running: false }
 
-                            // ── Blur Size +/- buttons with direct entry ──────────
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 6
-                                Text {
-                                    text: "Blur Size"
-                                    color: Theme.cPrimary
-                                    font.family: Config.labelFont
-                                    font.pixelSize: 13
-                                    Layout.preferredWidth: 100
-                                }
-                                CCPillBtn {
-                                    text: "−"
-                                    onClicked: {
-                                        _blurSizeDec.command = [scriptDir + "/hyprland-blur-size.sh", "-1"]
-                                        _blurSizeDec.running = true
-                                    }
-                                }
-                                // Direct value entry
-                                Rectangle {
-                                    Layout.preferredWidth: 60; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _blurSizeTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: _blurSizeEntryVal
-                                        color: Theme.cPrimary
-                                        font.family: Config.labelFont
-                                        font.pixelSize: 12
-                                        horizontalAlignment: Text.AlignHCenter
-                                        validator: IntValidator { bottom: 0; top: 50 }
-                                        onAccepted: {
-                                            _blurSizeSet.command = [scriptDir + "/hyprland-blur-size-set.sh", text]
-                                            _blurSizeSet.running = true
-                                            _blurSizeEntryVal = text
-                                        }
-                                        Connections {
-                                            target: ccWin
-                                            function on_blurSizeEntryValChanged() {
-                                                if (!_blurSizeTI.activeFocus) _blurSizeTI.text = ccWin._blurSizeEntryVal
-                                            }
-                                        }
-                                    }
-                                }
-                                CCPillBtn {
-                                    text: "+"
-                                    onClicked: {
-                                        _blurSizeInc.command = [scriptDir + "/hyprland-blur-size.sh", "1"]
-                                        _blurSizeInc.running = true
-                                    }
+                            // ── Blur Size slider ─────────────────────────────────
+                            CCSlider {
+                                label: "Blur Size"
+                                from: 0; to: 20; stepSize: 1; decimals: 0
+                                value: ccWin.hyprBlurSzVal
+                                onMoved: function(v) {
+                                    ccWin._hyprBlurSzSlider = v
+                                    ccWin._writeHyprState("blur_size", Math.round(v).toString())
+                                    _blurSizeSet.command = [scriptDir + "/hyprland-blur-size-set.sh", Math.round(v).toString()]
+                                    _blurSizeSet.running = true
                                 }
                             }
-                            Process { id: _blurSizeDec; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
-                            Process { id: _blurSizeInc; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
                             Process { id: _blurSizeSet; running: false }
 
-                            // ── Blur Passes +/- buttons with direct entry ────────
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 6
-                                Text {
-                                    text: "Blur Passes"
-                                    color: Theme.cPrimary
-                                    font.family: Config.labelFont
-                                    font.pixelSize: 13
-                                    Layout.preferredWidth: 100
-                                }
-                                CCPillBtn {
-                                    text: "−"
-                                    onClicked: {
-                                        _blurPassesDec.command = [scriptDir + "/hyprland-blur-passes.sh", "-1"]
-                                        _blurPassesDec.running = true
-                                    }
-                                }
-                                // Direct value entry
-                                Rectangle {
-                                    Layout.preferredWidth: 60; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _blurPassesTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: _blurPassesEntryVal
-                                        color: Theme.cPrimary
-                                        font.family: Config.labelFont
-                                        font.pixelSize: 12
-                                        horizontalAlignment: Text.AlignHCenter
-                                        validator: IntValidator { bottom: 0; top: 10 }
-                                        onAccepted: {
-                                            _blurPassesSet.command = [scriptDir + "/hyprland-blur-passes-set.sh", text]
-                                            _blurPassesSet.running = true
-                                            _blurPassesEntryVal = text
-                                        }
-                                        Connections {
-                                            target: ccWin
-                                            function on_blurPassesEntryValChanged() {
-                                                if (!_blurPassesTI.activeFocus) _blurPassesTI.text = ccWin._blurPassesEntryVal
-                                            }
-                                        }
-                                    }
-                                }
-                                CCPillBtn {
-                                    text: "+"
-                                    onClicked: {
-                                        _blurPassesInc.command = [scriptDir + "/hyprland-blur-passes.sh", "1"]
-                                        _blurPassesInc.running = true
-                                    }
+                            // ── Blur Passes slider ───────────────────────────────
+                            CCSlider {
+                                label: "Blur Passes"
+                                from: 0; to: 10; stepSize: 1; decimals: 0
+                                value: ccWin.hyprBlurPsVal
+                                onMoved: function(v) {
+                                    ccWin._hyprBlurPsSlider = v
+                                    ccWin._writeHyprState("blur_passes", Math.round(v).toString())
+                                    _blurPassesSet.command = [scriptDir + "/hyprland-blur-passes-set.sh", Math.round(v).toString()]
+                                    _blurPassesSet.running = true
                                 }
                             }
-                            Process { id: _blurPassesDec; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
-                            Process { id: _blurPassesInc; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
                             Process { id: _blurPassesSet; running: false }
 
                             // ── Gaps & Border ─────────────────────────────────────
                             CCSection { text: "Gaps & Border" }
 
-                            // Inner Gaps
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 6
-                                Text {
-                                    text: "Inner Gaps"
-                                    color: Theme.cPrimary
-                                    font.family: Config.labelFont
-                                    font.pixelSize: 13
-                                    Layout.preferredWidth: 100
+                            // Inner Gaps slider
+                            CCSlider {
+                                label: "Inner Gaps"
+                                from: 0; to: 60; stepSize: 1; decimals: 0
+                                value: ccWin.hyprGapsInVal
+                                onMoved: function(v) {
+                                    ccWin._hyprGapsInSlider = v
+                                    ccWin._writeHyprState("gaps_in", Math.round(v).toString())
+                                    _gapsInnerSet.command = [scriptDir + "/hyprland-gaps-inner-set.sh", Math.round(v).toString()]
+                                    _gapsInnerSet.running = true
                                 }
-                                CCPillBtn { text: "−"; onClicked: {
-                                    _gapsInnerDec.command=[scriptDir+"/hyprland-gaps-inner-adjust.sh", "-1"]
-                                    _gapsInnerDec.running=true
-                                }}
-                                Rectangle {
-                                    Layout.preferredWidth: 60; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
-                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _gapsInnerTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: _gapsInnerEntryVal; color: Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                        horizontalAlignment: Text.AlignHCenter
-                                        validator: IntValidator { bottom: 0; top: 100 }
-                                        onAccepted: { _gapsInnerSet.command=[scriptDir+"/hyprland-gaps-inner-set.sh",text]; _gapsInnerSet.running=true; _gapsInnerEntryVal=text }
-                                        Connections {
-                                            target: ccWin
-                                            function on_gapsInnerEntryValChanged() {
-                                                if (!_gapsInnerTI.activeFocus) _gapsInnerTI.text = ccWin._gapsInnerEntryVal
-                                            }
-                                        }
-                                    }
-                                }
-                                CCPillBtn { text: "+"; onClicked: {
-                                    _gapsInnerInc.command=[scriptDir+"/hyprland-gaps-inner-adjust.sh", "1"]
-                                    _gapsInnerInc.running=true
-                                }}
                             }
-                            Process { id:_gapsInnerDec; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
-                            Process { id:_gapsInnerInc; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
-                            Process { id:_gapsInnerSet; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id: _gapsInnerSet; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
 
-                            // Outer Gaps
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 6
-                                Text { text: "Outer Gaps"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
-                                CCPillBtn { text: "−"; onClicked: {
-                                    _gapsOuterDec.command=[scriptDir+"/hyprland-gaps-outer-adjust.sh", "-1"]
-                                    _gapsOuterDec.running=true
-                                }}
-                                Rectangle {
-                                    Layout.preferredWidth: 60; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
-                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _gapsOuterTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: _gapsOuterEntryVal; color: Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                        horizontalAlignment: Text.AlignHCenter
-                                        validator: IntValidator { bottom: 0; top: 100 }
-                                        onAccepted: { _gapsOuterSet.command=[scriptDir+"/hyprland-gaps-outer-set.sh",text]; _gapsOuterSet.running=true; _gapsOuterEntryVal=text }
-                                        Connections {
-                                            target: ccWin
-                                            function on_gapsOuterEntryValChanged() {
-                                                if (!_gapsOuterTI.activeFocus) _gapsOuterTI.text = ccWin._gapsOuterEntryVal
-                                            }
-                                        }
-                                    }
+                            // Outer Gaps slider
+                            CCSlider {
+                                label: "Outer Gaps"
+                                from: 0; to: 80; stepSize: 1; decimals: 0
+                                value: ccWin.hyprGapsOutVal
+                                onMoved: function(v) {
+                                    ccWin._hyprGapsOutSlider = v
+                                    ccWin._writeHyprState("gaps_out", Math.round(v).toString())
+                                    _gapsOuterSet.command = [scriptDir + "/hyprland-gaps-outer-set.sh", Math.round(v).toString()]
+                                    _gapsOuterSet.running = true
                                 }
-                                CCPillBtn { text: "+"; onClicked: {
-                                    _gapsOuterInc.command=[scriptDir+"/hyprland-gaps-outer-adjust.sh", "1"]
-                                    _gapsOuterInc.running=true
-                                }}
                             }
-                            Process { id:_gapsOuterDec; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
-                            Process { id:_gapsOuterInc; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
-                            Process { id:_gapsOuterSet; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id: _gapsOuterSet; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
 
-                            // Border Width
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 6
-                                Text { text: "Border W"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
-                                CCPillBtn { text: "−"; onClicked: {
-                                    _borderWDec.command=[scriptDir+"/hyprland-border-width-adjust.sh", "-1"]
-                                    _borderWDec.running=true
-                                }}
-                                Rectangle {
-                                    Layout.preferredWidth: 60; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
-                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _borderWTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: _borderWEntryVal; color: Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                        horizontalAlignment: Text.AlignHCenter
-                                        validator: IntValidator { bottom: 0; top: 20 }
-                                        onAccepted: { _borderWSet.command=[scriptDir+"/hyprland-border-width-set.sh",text]; _borderWSet.running=true; _borderWEntryVal=text }
-                                        Connections {
-                                            target: ccWin
-                                            function on_borderWEntryValChanged() {
-                                                if (!_borderWTI.activeFocus) _borderWTI.text = ccWin._borderWEntryVal
-                                            }
-                                        }
-                                    }
+                            // Border Width slider
+                            CCSlider {
+                                label: "Border W"
+                                from: 0; to: 10; stepSize: 1; decimals: 0
+                                value: ccWin.hyprBorderWVal
+                                onMoved: function(v) {
+                                    ccWin._hyprBorderWSlider = v
+                                    ccWin._writeHyprState("border_size", Math.round(v).toString())
+                                    _borderWSet.command = [scriptDir + "/hyprland-border-width-set.sh", Math.round(v).toString()]
+                                    _borderWSet.running = true
                                 }
-                                CCPillBtn { text: "+"; onClicked: {
-                                    _borderWInc.command=[scriptDir+"/hyprland-border-width-adjust.sh", "1"]
-                                    _borderWInc.running=true
-                                }}
                             }
-                            Process { id:_borderWDec; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
-                            Process { id:_borderWInc; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
-                            Process { id:_borderWSet; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id: _borderWSet; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
 
-                            // Border Radius (Rounding)
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 6
-                                Text { text: "Border R"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 100 }
-                                CCPillBtn { text: "−"; onClicked: {
-                                    _borderRDec.command=[scriptDir+"/hyprland-border-radius-adjust.sh", "-1"]
-                                    _borderRDec.running=true
-                                }}
-                                Rectangle {
-                                    Layout.preferredWidth: 60; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.12)
-                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _borderRTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: _borderREntryVal; color: Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                        horizontalAlignment: Text.AlignHCenter
-                                        validator: IntValidator { bottom: 0; top: 50 }
-                                        onAccepted: { _borderRSet.command=[scriptDir+"/hyprland-border-radius-set.sh",text]; _borderRSet.running=true; _borderREntryVal=text }
-                                        Connections {
-                                            target: ccWin
-                                            function on_borderREntryValChanged() {
-                                                if (!_borderRTI.activeFocus) _borderRTI.text = ccWin._borderREntryVal
-                                            }
-                                        }
-                                    }
+                            // Border Radius (Rounding) slider
+                            CCSlider {
+                                label: "Border R"
+                                from: 0; to: 40; stepSize: 1; decimals: 0
+                                value: ccWin.hyprBorderRVal
+                                onMoved: function(v) {
+                                    ccWin._hyprBorderRSlider = v
+                                    ccWin._writeHyprState("rounding", Math.round(v).toString())
+                                    _borderRSet.command = [scriptDir + "/hyprland-border-radius-set.sh", Math.round(v).toString()]
+                                    _borderRSet.running = true
                                 }
-                                CCPillBtn { text: "+"; onClicked: {
-                                    _borderRInc.command=[scriptDir+"/hyprland-border-radius-adjust.sh", "1"]
-                                    _borderRInc.running=true
-                                }}
                             }
-                            Process { id:_borderRDec; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
-                            Process { id:_borderRInc; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
-                            Process { id:_borderRSet; running:false; onExited: { running=false; _hyprlandValReader.running=true } }
+                            Process { id: _borderRSet; running: false; onExited: { running = false; _hyprlandValReader.running = true } }
 
                             CCSection { text: "Gap Presets" }
                             Flow { Layout.fillWidth: true; spacing: 5
@@ -2951,49 +2874,45 @@ PanelWindow {
                             }
                             Process { id: _dockCycle; running: false; onExited: running = false }
 
-                            // Spacing — read current value on open
-                            CCEntryRow {
+                            // Spacing — sliders write directly via dock-set.sh
+                            CCSlider {
                                 label: "Spacing"
-                                value: _dockSpacingVal
-                                onApplied: function(val) {
-                                    const n = parseInt(val)
-                                    if (!isNaN(n) && n >= 0 && n <= 30) {
-                                        _dockWrite.command = [scriptDir + "/dock-set.sh", "buttonSpacing", n.toString()]
-                                        _dockWrite.running = true
-                                    }
+                                from: 0; to: 30; stepSize: 1
+                                value: parseInt(_dockSpacingVal) || 0
+                                onMoved: function(v) {
+                                    _dockSpacingVal = v.toString()
+                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "buttonSpacing", v.toString()]
+                                    _dockWrite.running = true
                                 }
                             }
-                            CCEntryRow {
+                            CCSlider {
                                 label: "Padding"
-                                value: _dockPaddingVal
-                                onApplied: function(val) {
-                                    const n = parseInt(val)
-                                    if (!isNaN(n) && n >= 0 && n <= 30) {
-                                        _dockWrite.command = [scriptDir + "/dock-set.sh", "innerPadding", n.toString()]
-                                        _dockWrite.running = true
-                                    }
+                                from: 0; to: 30; stepSize: 1
+                                value: parseInt(_dockPaddingVal) || 0
+                                onMoved: function(v) {
+                                    _dockPaddingVal = v.toString()
+                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "innerPadding", v.toString()]
+                                    _dockWrite.running = true
                                 }
                             }
-                            CCEntryRow {
+                            CCSlider {
                                 label: "Border W"
-                                value: _dockBorderWVal
-                                onApplied: function(val) {
-                                    const n = parseInt(val)
-                                    if (!isNaN(n) && n >= 0 && n <= 10) {
-                                        _dockWrite.command = [scriptDir + "/dock-set.sh", "borderWidth", n.toString()]
-                                        _dockWrite.running = true
-                                    }
+                                from: 0; to: 10; stepSize: 1
+                                value: parseInt(_dockBorderWVal) || 0
+                                onMoved: function(v) {
+                                    _dockBorderWVal = v.toString()
+                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderWidth", v.toString()]
+                                    _dockWrite.running = true
                                 }
                             }
-                            CCEntryRow {
+                            CCSlider {
                                 label: "Border R"
-                                value: _dockBorderRVal
-                                onApplied: function(val) {
-                                    const n = parseInt(val)
-                                    if (!isNaN(n) && n >= 0 && n <= 100) {
-                                        _dockWrite.command = [scriptDir + "/dock-set.sh", "borderRadius", n.toString()]
-                                        _dockWrite.running = true
-                                    }
+                                from: 0; to: 100; stepSize: 1
+                                value: parseInt(_dockBorderRVal) || 0
+                                onMoved: function(v) {
+                                    _dockBorderRVal = v.toString()
+                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderRadius", v.toString()]
+                                    _dockWrite.running = true
                                 }
                             }
                             Process { id: _dockWrite; running: false; onExited: running = false }
@@ -3068,15 +2987,14 @@ PanelWindow {
                                 }
                             }
 
-                            CCEntryRow {
+                            CCSlider {
                                 label: "Icon Size"
-                                value: _dockIconSizeVal
-                                onApplied: function(val) {
-                                    const n = parseInt(val)
-                                    if (!isNaN(n) && n >= 12 && n <= 64) {
-                                        _dockIcon.command = [scriptDir + "/dock-icon-size.sh", n.toString()]
-                                        _dockIcon.running = true
-                                    }
+                                from: 12; to: 64; stepSize: 1
+                                value: parseInt(_dockIconSizeVal) || 24
+                                onMoved: function(v) {
+                                    _dockIconSizeVal = v.toString()
+                                    _dockIcon.command = [scriptDir + "/dock-icon-size.sh", v.toString()]
+                                    _dockIcon.running = true
                                 }
                             }
                             Process { id: _dockIcon; running: false; onExited: running = false }
@@ -3295,30 +3213,26 @@ PanelWindow {
                             // ── Rofi (other menus — drun replaced by App Launcher) ──
                             CCSection { text: "Rofi (Other Menus)" }
 
-                            CCEntryRow {
+                            CCSlider {
                                 label: "Border"
-                                value: _rofiBorderVal
-                                onApplied: function(v) {
-                                    const n = parseInt(v)
-                                    if (!isNaN(n) && n >= 0 && n <= 10) {
-                                        _rofiBorderVal = n.toString()
-                                        _rofiBorder.command = [scriptDir + "/rofi-border.sh", n.toString()]
-                                        _rofiBorder.running = true
-                                    }
+                                from: 0; to: 10; stepSize: 1
+                                value: parseInt(_rofiBorderVal) || 0
+                                onMoved: function(v) {
+                                    _rofiBorderVal = v.toString()
+                                    _rofiBorder.command = [scriptDir + "/rofi-border.sh", v.toString()]
+                                    _rofiBorder.running = true
                                 }
                             }
                             Process { id: _rofiBorder; running: false }
 
-                            CCEntryRow {
+                            CCSlider {
                                 label: "Radius"
-                                value: _rofiRadiusVal
-                                onApplied: function(v) {
-                                    const n = parseFloat(v)
-                                    if (!isNaN(n) && n >= 0 && n <= 5) {
-                                        _rofiRadiusVal = n.toFixed(1)
-                                        _rofiRadius.command = [scriptDir + "/rofi-radius.sh", n.toFixed(1)]
-                                        _rofiRadius.running = true
-                                    }
+                                from: 0; to: 5; stepSize: 0.1; decimals: 1
+                                value: parseFloat(_rofiRadiusVal) || 0
+                                onMoved: function(v) {
+                                    _rofiRadiusVal = v.toFixed(1)
+                                    _rofiRadius.command = [scriptDir + "/rofi-radius.sh", v.toFixed(1)]
+                                    _rofiRadius.running = true
                                 }
                             }
                             Process { id: _rofiRadius; running: false }

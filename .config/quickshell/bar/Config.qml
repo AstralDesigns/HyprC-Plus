@@ -875,6 +875,19 @@ QtObject {
     property int  desktopLabelRadius: 10   // px — label background corner radius
     property bool desktopVisible:     true // show/hide desktop icon layer
 
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Hyprland compositor defaults  (from hyprviz.conf)
+    //  These are used as slider starting values until the user has saved
+    //  independent values into hyprcandy-bar.conf [hyprland] section.
+    // ═══════════════════════════════════════════════════════════════════════
+    readonly property real hyprDefaultOpacity:    0.90   // active_opacity / inactive_opacity
+    readonly property int  hyprDefaultBlurSize:   2      // blur { size = 2 }
+    readonly property int  hyprDefaultBlurPasses: 4      // blur { passes = 4 }
+    readonly property int  hyprDefaultGapsIn:     4      // gaps_in = 4
+    readonly property int  hyprDefaultGapsOut:    9      // gaps_out = 9
+    readonly property int  hyprDefaultBorderW:    3      // border_size = 3
+    readonly property int  hyprDefaultBorderR:    20     // rounding = 20
+
     readonly property bool wsScrollSwitch:  true
     readonly property int  weatherInterval: 300    // seconds
     readonly property int  wsCount:         5      // persistent workspace slots
