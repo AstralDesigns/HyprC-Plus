@@ -3269,16 +3269,15 @@ PanelWindow {
                             }
                             Process { id: _sddmForm; running: false }
 
-                            CCEntryRow {
+                            CCSlider {
                                 label: "Blur R"
-                                value: _sddmBlurVal
-                                onApplied: function(v) {
-                                    const n = parseInt(v)
-                                    if (!isNaN(n) && n >= 0 && n <= 100) {
-                                        _sddmBlurVal = n.toString()
-                                        _sddmBlur.command = [scriptDir + "/sddm-set.sh", "BlurRadius", n.toString(), "sddm_blur.state"]
-                                        _sddmBlur.running = true
-                                    }
+                                from: 0; to: 100; stepSize: 1; decimals: 0
+                                value: parseInt(_sddmBlurVal) || 0
+                                onMoved: function(v) {
+                                    const n = Math.round(v)
+                                    _sddmBlurVal = n.toString()
+                                    _sddmBlur.command = [scriptDir + "/sddm-set.sh", "BlurRadius", n.toString(), "sddm_blur.state"]
+                                    _sddmBlur.running = true
                                 }
                             }
                             Process { id: _sddmBlur; running: false }
