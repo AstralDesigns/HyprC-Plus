@@ -37,5 +37,4 @@ QtObject {
     property color m3primaryFixed:           "{{colors.primary_fixed.default.hex}}"
     property color m3primaryFixedDim:         "{{colors.primary_fixed_dim.default.hex}}"
     property color m3onPrimaryFixed:          "{{colors.on_primary_fixed.default.hex}}"
-    property color m3onPrimaryFixedVariant:   "{{colors.on_primary_fixed_variant.default.hex}}"
 }
