@@ -3258,13 +3258,29 @@ PanelWindow {
                             }
                             Process { id: _sddmHdr; running: false }
 
-                            CCEntryRow {
-                                label: "Form Pos"
-                                value: _sddmFormVal
-                                onApplied: function(v) {
-                                    _sddmFormVal = v
-                                    _sddmForm.command = [scriptDir + "/sddm-set.sh", "FormPosition", v, "sddm_form.state"]
-                                    _sddmForm.running = true
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Text {
+                                    text: "Form Pos"
+                                    color: Theme.cPrimary
+                                    font.family: Config.labelFont; font.pixelSize: 13
+                                    Layout.preferredWidth: 100
+                                }
+                                Flow {
+                                    spacing: 5
+                                    Repeater {
+                                        model: ["left", "center", "right"]
+                                        delegate: CCPillBtn {
+                                            required property string modelData
+                                            text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                            active: _sddmFormVal === modelData
+                                            onClicked: {
+                                                _sddmFormVal = modelData
+                                                _sddmForm.command = [scriptDir + "/sddm-set.sh", "FormPosition", modelData, "sddm_form.state"]
+                                                _sddmForm.running = true
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             Process { id: _sddmForm; running: false }
