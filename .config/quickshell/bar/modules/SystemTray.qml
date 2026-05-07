@@ -16,11 +16,7 @@ Item {
 
     Layout.alignment: Qt.AlignVCenter
 
-    // Collapse to zero width when there are no tray items so the grouped
-    // island doesn't waste space.
-    implicitWidth:  SystemTray.items.values.length > 0
-                        ? icon.implicitWidth + Config.moduleHPad * 2
-                        : 0
+    implicitWidth:  icon.implicitWidth + Config.moduleHPad * 2
     implicitHeight: Config.moduleHeight
 
     // ── Tray icon glyph ──────────────────────────────────────────────────────
