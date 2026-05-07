@@ -41,10 +41,7 @@ PanelWindow {
                                  trayRow.implicitWidth + Config.trayItemPadH * 2)
 
         radius: Config.barMode === "island" ? Config.islandRadius : Config.barRadius
-        color:  Qt.rgba(Config.trayBgColor.r,
-                        Config.trayBgColor.g,
-                        Config.trayBgColor.b,
-                        0.10)
+        color:  Theme.cPanelBg
         border.width: 2
         border.color : Qt.rgba(Theme.cOnPrimaryFixedVariant.r,
                                Theme.cOnPrimaryFixedVariant.g,
