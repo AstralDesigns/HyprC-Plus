@@ -69,7 +69,8 @@ const ICON_SIZE = APP_ICON_SIZE;
 const GLYPH_START      = '󱗼';   //  Linux / start
 const GLYPH_INDICATOR  = '\u{F09DF}';  //  active-window dot
 const GLYPH_TRASH_EMPTY = '󰩺';   //  nf-md-trash_can_outline — no files in trash
-const GLYPH_TRASH_FULL  = '󰛌';   //  nf-md-delete_empty         — files present in trash
+const GLYPH_TRASH_FULL  = '󰩹';   //  nf-md-trash_can         — files present (replaces delete_empty)
+const GLYPH_TRASH_HEAVY = '󰆴';   //  nf-md-delete            — heavily loaded (>20 items)
 // Hyprland logo glyph (nf-linux-hyprland, NerdFonts >= 3.2)
 const GLYPH_FALLBACK  = '󱙝';   //  shown when app has no icon
 
@@ -793,14 +794,6 @@ const HyprCandyDock = GObject.registerClass({
     }
 
     _addTrashButton() {
-        const TRASH_FILES_DIR = GLib.build_filenamev(
-            [GLib.get_home_dir(), '.local', 'share', 'Trash', 'files']
-        );
-
-        // Ensure the Trash/files directory exists (it may not on a fresh install
-        // where the user has never trashed anything yet).
-        try { GLib.mkdir_with_parents(TRASH_FILES_DIR, 0o755); } catch (_) {}
-
         const btn = Gtk.Button.new();
         btn.add_css_class('app-button');
         btn.add_css_class('dock-button');
@@ -808,36 +801,60 @@ const HyprCandyDock = GObject.registerClass({
         btn.set_halign(Gtk.Align.CENTER);
         btn.set_valign(Gtk.Align.CENTER);
 
-        // Start with the empty glyph; _updateTrashIcon() will correct it immediately.
         const label = Gtk.Label.new(GLYPH_TRASH_EMPTY);
         label.set_name('trash-icon');
         label.set_halign(Gtk.Align.CENTER);
         label.set_valign(Gtk.Align.CENTER);
         btn.set_child(label);
-        btn.set_tooltip_text('Trash');
+        btn.set_tooltip_text('Trash (empty)');
 
-        // Returns true if Trash/files contains at least one entry.
-        function _trashHasFiles() {
+        // ── Part 2: count-aware monitoring via trash:/// ──────────────────────
+        // Query trash::item-count on trash:/// exactly as Nautilus does — this
+        // covers ALL trash locations (home + mounted external drives), not just
+        // ~/.local/share/Trash/files.  Nautilus itself only distinguishes two
+        // visual states (empty / non-empty); we add a third glyph for >20 items
+        // since no percentage-based trash icons exist in the FDO spec or any
+        // standard icon theme.
+        let _trashCount = 0;
+
+        const _updateTrashIcon = () => {
             try {
-                const dir = Gio.File.new_for_path(TRASH_FILES_DIR);
-                const en  = dir.enumerate_children(
-                    'standard::name', Gio.FileQueryInfoFlags.NONE, null
+                const trashUri = Gio.File.new_for_uri('trash:///');
+                trashUri.query_info_async(
+                    'trash::item-count',
+                    Gio.FileQueryInfoFlags.NONE,
+                    GLib.PRIORITY_DEFAULT,
+                    null,
+                    (_, res) => {
+                        try {
+                            const info  = trashUri.query_info_finish(res);
+                            const count = info.get_attribute_uint32('trash::item-count');
+                            _trashCount = count;
+                            if (count === 0) {
+                                label.set_text(GLYPH_TRASH_EMPTY);
+                                btn.set_tooltip_text('Trash (empty)');
+                            } else if (count <= 20) {
+                                label.set_text(GLYPH_TRASH_FULL);
+                                btn.set_tooltip_text(`Trash (${count} item${count === 1 ? '' : 's'})`);
+                            } else {
+                                label.set_text(GLYPH_TRASH_HEAVY);
+                                btn.set_tooltip_text(`Trash (${count} items)`);
+                            }
+                        } catch (_) {}
+                    }
                 );
-                const hasEntry = en.next_file(null) !== null;
-                try { en.close(null); } catch (_) {}
-                return hasEntry;
-            } catch (_) { return false; }
-        }
+            } catch (_) {}
+        };
 
-        function _updateTrashIcon() {
-            label.set_text(_trashHasFiles() ? GLYPH_TRASH_FULL : GLYPH_TRASH_EMPTY);
-        }
-
-        // Set correct initial state before the monitor is even ready.
         _updateTrashIcon();
 
-        // Watch Trash/files for additions and deletions — zero-polling.
-        // WATCH_MOVES catches rename-into-trash (the most common write path).
+        // The local Trash/files dir is the zero-latency change trigger.
+        // Any change re-queries trash:/// so the count stays accurate across
+        // all trash locations.
+        const TRASH_FILES_DIR = GLib.build_filenamev(
+            [GLib.get_home_dir(), '.local', 'share', 'Trash', 'files']
+        );
+        try { GLib.mkdir_with_parents(TRASH_FILES_DIR, 0o755); } catch (_) {}
         try {
             const trashDir = Gio.File.new_for_path(TRASH_FILES_DIR);
             this._trashMonitor = trashDir.monitor_directory(
@@ -849,8 +866,27 @@ const HyprCandyDock = GObject.registerClass({
             log('[dock] Trash monitor setup failed: ' + e.message);
         }
 
+        // ── Part 1: no-op when trash is empty ────────────────────────────────
         btn.connect('clicked', () => {
-            _spawnCleanCmd('nautilus trash:///');
+            if (_trashCount === 0) return;
+
+            try {
+                Gio.DBus.session.call(
+                    'org.gnome.Nautilus',
+                    '/org/gnome/Nautilus/FileOperations2',
+                    'org.gnome.Nautilus.FileOperations2',
+                    'EmptyTrash',
+                    new GLib.Variant('(ba{sv})', [true, {}]),
+                    null,
+                    Gio.DBusCallFlags.NONE,
+                    -1,
+                    null,
+                    (conn, res) => {
+                        try { conn.call_finish(res); }
+                        catch (e) { console.error('[dock] EmptyTrash D-Bus call failed:', e.message); }
+                    }
+                );
+            } catch (e) { console.error('[dock] EmptyTrash D-Bus error:', e.message); }
         });
 
         this.mainBox.append(btn);
