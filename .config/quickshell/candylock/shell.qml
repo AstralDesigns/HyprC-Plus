@@ -10,25 +10,25 @@ ShellRoot {
     id: root
 
     // ── Matugen colors ──────────────────────────────────────────────────────
-    property string _m3sourceColor:	     "#a57c44"
-    property string _m3primary:              "#f7af91"
-    property string _m3primaryContainer:     "#a37c48"
-    property string _m3onPrimary:            "#170700"
-    property string _m3background:           "#170700"
-    property string _m3inversePrimary:       "#6f2900"
-    property string _m3surfaceContainerHigh: "#1e1613"
-    property string _m3onSurface:            "#f8dfd5"
-    property string _m3onSurfaceVariant:     "#dab9ad"
-    property string _m3outlineVariant:       "#665046"
-    property string _m3error:                "#ffb4ab"
-    property string _m3primaryFixedDim:      "#f7af91"
-    property string _m3secondary:            "#e7bfb0"
-    property string _m3secondaryContainer:   "#61503b"
-    property string _m3onSecondary:          "#160701"
-    property string _m3tertiary:             "#c9cb90"
-    property string _m3onTertiary:           "#141500"
-    property string _m3secondaryFixedDim:    "#e7bfb0"
-    property string _m3tertiaryFixedDim:     "#c9cb90"
+    property string _m3sourceColor:	     ""
+    property string _m3primary:              ""
+    property string _m3primaryContainer:     ""
+    property string _m3onPrimary:            ""
+    property string _m3background:           ""
+    property string _m3inversePrimary:       ""
+    property string _m3surfaceContainerHigh: ""
+    property string _m3onSurface:            ""
+    property string _m3onSurfaceVariant:     ""
+    property string _m3outlineVariant:       ""
+    property string _m3error:                ""
+    property string _m3primaryFixedDim:      ""
+    property string _m3secondary:            ""
+    property string _m3secondaryContainer:   ""
+    property string _m3onSecondary:          ""
+    property string _m3tertiary:             ""
+    property string _m3onTertiary:           ""
+    property string _m3secondaryFixedDim:    ""
+    property string _m3tertiaryFixedDim:     ""
 
     readonly property color cSourceColor:	Qt.color(_m3sourceColor)
     readonly property color cPrimary:           Qt.color(_m3primary)
@@ -552,7 +552,7 @@ ShellRoot {
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:"󰫢  󰫢"; color:root.cTertiary
+                                        text:"󰫢  󰫢"; color:Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                         font.family:"codicon"; font.pixelSize:14
                                         topPadding:8; bottomPadding:8
                                     }
@@ -584,7 +584,7 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
+                                            text:root.clockDate; color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                             font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
@@ -973,7 +973,7 @@ ShellRoot {
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
                                             readonly property color arcColor: index===0 ? Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
-                                                : (index===1 ? root.cTertiary : Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
+                                                : (index===1 ? Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00) : Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
 
@@ -1131,16 +1131,16 @@ ShellRoot {
                             width: 44; height: 44
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maRebt.containsMouse ? Qt.rgba(root.cTertiary.r,root.cTertiary.g,root.cTertiary.b,0.20) : "transparent"
+                                color:        _maRebt.containsMouse ? Qt.rgba(root.cInvPrimary.r, root.cPrimary.g, root.cPrimary.b,0.20) : "transparent"
                                 border.width: 1
-                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cTertiary.r,root.cTertiary.g,root.cTertiary.b,0.45) : "transparent"
+                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cInvPrimary.r, root.cPrimary.g, root.cPrimary.b,0.45) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰑙"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cTertiary; opacity: _maRebt.containsMouse ? 1.0 : 0.72
+                                color: Qt.rgba(root.cInvPrimary.r, root.cPrimary.g, root.cPrimary.b,1.00); opacity: _maRebt.containsMouse ? 1.0 : 0.72
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {

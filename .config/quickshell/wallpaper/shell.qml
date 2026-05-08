@@ -21,18 +21,18 @@ ShellRoot {
     // FileView watches ~/.cache/quickshell/wallpaper/MatugenColors.qml (outside
     // the QS config dir) so matugen rewrites never trigger a hot-reload.
     // onTextChanged fires live whenever the file changes → instant color update.
-    property string _m3primary:                 "#f7c382"
-    property string _m3onPrimary:               "#1d1100"
-    property string _m3onSecondary:             "#100a00"
-    property string _m3secondaryContainer:      "#6a4b20"
-    property string _m3onSecondaryContainer:    "#ffffff"
-    property string _m3background:              "#100a00"
-    property string _m3surfaceContainer:        "#0d0a07"
-    property string _m3surfaceContainerHigh:    "#1b1611"
-    property string _m3onSurface:               "#f1e1d2"
-    property string _m3onSurfaceVariant:        "#d1bca6"
-    property string _m3outline:                 "#998874"
-    property string _m3outlineVariant:          "#5f5242"
+    property string _m3primary:                 ""
+    property string _m3onPrimary:               ""
+    property string _m3onSecondary:             ""
+    property string _m3secondaryContainer:      ""
+    property string _m3onSecondaryContainer:    ""
+    property string _m3background:              ""
+    property string _m3surfaceContainer:        ""
+    property string _m3surfaceContainerHigh:    ""
+    property string _m3onSurface:               ""
+    property string _m3onSurfaceVariant:        ""
+    property string _m3outline:                 ""
+    property string _m3outlineVariant:          ""
 
     // Derived semantic colors
     readonly property color cBg:        Qt.color(_m3background)
