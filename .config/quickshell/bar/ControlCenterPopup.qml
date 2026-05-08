@@ -1422,18 +1422,11 @@ PanelWindow {
                                         CCSection { text: "Borders" }
                                         CCSlider { label:"Bar Border";        from:0;to:8; value:Config.barBorderWidth;    onMoved:function(v){Config.barBorderWidth=v} }
                                         CCSlider { label:"Bar Border Alpha";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
-                                        CCSlider { label:"Island Border";     from:0;to:8; value:Config.islandBorder;      onMoved:function(v){Config.islandBorder=v} }
-                                        CCSlider { label:"Island Border α";   from:0;to:1;stepSize:0.05;decimals:2; value:Config.islandBorderAlpha;  onMoved:function(v){Config.islandBorderAlpha=v} }
 
                                         CCSection { text: "Spacing & Padding" }
                                         CCSlider { label:"Island Spacing";  from:0;to:24; value:Config.islandSpacing;  onMoved:function(v){Config.islandSpacing=v} }
                                         CCSlider { label:"Grouped Spacing"; from:0;to:12; value:Config.groupedSpacing; onMoved:function(v){Config.groupedSpacing=v} }
                                         CCSlider { label:"Module Pad H";    from:0;to:20; value:Config.modPadH;        onMoved:function(v){Config.modPadH=v} }
-                                        CCSlider { label:"Module Pad V";    from:0;to:12; value:Config.modPadV;        onMoved:function(v){Config.modPadV=v} }
-
-                                        CCSection { text: "Opacity" }
-                                        CCSlider { label:"Module BG";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.moduleBgOpacity;      onMoved:function(v){Config.moduleBgOpacity=v} }
-                                        CCSlider { label:"Island BG";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.islandBgOpacityIsland;onMoved:function(v){Config.islandBgOpacityIsland=v} }
 
                                         Item { height: 10 }
                                     }
