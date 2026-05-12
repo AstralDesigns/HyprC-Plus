@@ -4,7 +4,7 @@ import Quickshell.Io
 import ".."
 
 // Combined updates indicator — system packages + HyprCandy Plus dotfiles.
-// Shows 󰏗 when everything is up-to-date, 󰏖 (primary colour) when any
+// Shows 󰏗 when everything is up-to-date, 󰏖 (OnSurfVar colour) when any
 // updates are pending.  Click opens UpdatesPopup with two sections.
 Item {
     id: root
@@ -129,9 +129,9 @@ Item {
         anchors.centerIn: parent
         text:  root._anyChecking ? root._loaderFrames[root._loaderIdx]
                                  : (root._anyUpdates ? "󰏖" : "󰏗")
-        color: root._anyChecking ? Theme.cOnSurfVar
-             : root._anyUpdates  ? Theme.cPrimary
-             :                     Theme.cOnSurfVar
+        color: root._anyChecking ? Theme.cPrimary
+             : root._anyUpdates  ? Theme.cOnSurfVar
+             :                     Theme.cPrimary
         font.family:    Config.fontFamily
         font.pixelSize: Config.fontSize
         font.weight:    Config.fontWeight
