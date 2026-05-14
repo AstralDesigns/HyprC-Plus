@@ -839,6 +839,12 @@ PanelWindow {
         property string licensedEmail: ""
         property string lastVerified:  ""
     }
+    // ── Color generation (matugen + pywal) toggle persistence ────────────────
+    Settings {
+        id: ccColorRegenSettings
+        category: "cc-color-regen-v1"
+        property bool colorRegenEnabled: true   // default: live colors on
+    }
 
     property string _licKeyInput:    ccLicenseSettings.licenseKey
     property string _licStatus:      ccLicenseSettings.licenseStatus
@@ -3029,6 +3035,128 @@ PanelWindow {
                             id: _themeTab
                             width: parent.width; spacing: 5
                             CCSection { text: "󰔎 Matugen Themes" }
+
+                            // ── Color Generation toggle ────────────────────────────
+                            CCSection { text: "Color Generation" }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+
+                                Text {
+                                    text: "Live Colors"
+                                    color: Theme.cPrimary
+                                    font.family: Config.labelFont
+                                    font.pixelSize: 13
+                                    Layout.fillWidth: true
+                                    Layout.alignment: Qt.AlignVCenter
+                                }
+
+                                // Pill toggle — mirrors CCPillBtn styling with active/idle states
+                                Rectangle {
+                                    id: _colorRegenPill
+                                    implicitWidth: _colorRegenLabel.implicitWidth + 28
+                                    implicitHeight: 28; radius: 9
+                                    Layout.alignment: Qt.AlignVCenter
+
+                                    property bool regenEnabled: ccColorRegenSettings.colorRegenEnabled
+
+                                    color: regenEnabled
+                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                  Theme.cInversePrimary.b, 0.82)
+                                        : (_colorRegenMA.containsMouse
+                                            ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                      Theme.cInversePrimary.b, 0.38)
+                                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                      Theme.cInversePrimary.b, 0.16))
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                          Theme.cPrimary.b, regenEnabled ? 0.55 : 0.2)
+                                    Behavior on color     { ColorAnimation { duration: 120 } }
+                                    Behavior on border.color { ColorAnimation { duration: 120 } }
+
+                                    Text {
+                                        id: _colorRegenLabel
+                                        anchors.centerIn: parent
+                                        text: _colorRegenPill.regenEnabled ? " ON " : " OFF"
+                                        color: Theme.cPrimary
+                                        font.family: Config.labelFont
+                                        font.pixelSize: 12
+                                    }
+
+                                    MouseArea {
+                                        id: _colorRegenMA
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            const nowEnabled = !_colorRegenPill.regenEnabled
+                                            _colorRegenPill.regenEnabled = nowEnabled
+                                            ccColorRegenSettings.colorRegenEnabled = nowEnabled
+                                            // sed: comment/uncomment pywal + matugen lines (30-31) in the hook
+                                            _colorRegenSedProc.command = [
+                                                "bash", "-c",
+                                                nowEnabled
+                                                    ? 'f="$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh"; ' +
+                                                      'sed -i \'30s/^#[[:space:]]*//' + "'" + ' "$f"; ' +
+                                                      'sed -i \'31s/^#[[:space:]]*//' + "'" + ' "$f"'
+                                                    : 'f="$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh"; ' +
+                                                      'sed -i \'30s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"; ' +
+                                                      'sed -i \'31s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"'
+                                            ]
+                                            _colorRegenSedProc._runAfter = nowEnabled
+                                            _colorRegenSedProc.running = true
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Hint text — only visible when color generation is off
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.topMargin: 2
+                                visible: !_colorRegenPill.regenEnabled
+                                text: " Disabled color regenaration. Current color palette will be used on all themes and backgrounds"
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                               Theme.cPrimary.b, 0.55)
+                                font.family: Config.labelFont
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                            
+                            // Hint text — only visible when color generation is on
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.topMargin: 2
+                                visible: _colorRegenPill.regenEnabled
+                                text: " Enabled color regenaration. Color palette will be reloaded on all theme and background changes"
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                               Theme.cPrimary.b, 0.55)
+                                font.family: Config.labelFont
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+
+                            // sed writer — patches lines 30-31 of wallpaper_integration.sh
+                            // _runAfter: set true by the click handler when enabling, so onExited
+                            // chains into the integration script only after the uncomment lands.
+                            Process {
+                                id: _colorRegenSedProc
+                                running: false
+                                property bool _runAfter: false
+                                onExited: {
+                                    running = false
+                                    if (_runAfter) {
+                                        _runAfter = false
+                                        _colorRegenRunProc.running = true
+                                    }
+                                }
+                            }
+                            // Runs the full integration script when re-enabling (live color refresh)
+                            Process {
+                                id: _colorRegenRunProc
+                                command: [Quickshell.env("HOME") + "/.config/hyprcandy/hooks/wallpaper_integration.sh"]
+                                running: false
+                                onExited: running = false
+                            }
 
                             // ── Light Mode button alone at top ─────────────────────────────────
                             CCSection { text: "Light Mode" }
