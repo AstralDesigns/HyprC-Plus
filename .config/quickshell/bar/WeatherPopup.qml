@@ -14,6 +14,7 @@ PanelWindow {
     readonly property bool _barAtBottom: Config.barPosition === "bottom"
     readonly property real _barGap:    Config.outerMarginTop    + Config.barHeight + 6
     readonly property real _barGapBot: Config.outerMarginBottom + Config.barHeight + 6
+    readonly property real _panelMargin: Config.outerMarginSide * 2
 
     anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
     margins {
@@ -21,7 +22,6 @@ PanelWindow {
         bottom: _barAtBottom ? _barGapBot : 0
     }
 
-    implicitWidth:  560
     implicitHeight: wxPanel.implicitHeight
 
     exclusionMode: ExclusionMode.Ignore
@@ -33,7 +33,7 @@ PanelWindow {
 
     // ── Dismiss on focus change ───────────────────────────────────────────
     Connections {
-        target: HyprlandFocusedClient
+        target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
         ignoreUnknownSignals: true
         function onAddressChanged() {
             if (HyprlandFocusedClient.address !== "")
@@ -292,8 +292,8 @@ PanelWindow {
     // ── Panel ─────────────────────────────────────────────────────────────
     Rectangle {
         id: wxPanel
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
+        anchors { right: parent.right; rightMargin: wxWin._panelMargin
+                  top: parent.top; bottom: parent.bottom }
         width: 560
         implicitHeight: wxCol.implicitHeight + 32
 
@@ -303,7 +303,7 @@ PanelWindow {
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
 
         scale: WeatherPopupState.visible ? 1.0 : 0.94
-        transformOrigin: wxWin._barAtBottom ? Item.Bottom : Item.Top
+        transformOrigin: wxWin._barAtBottom ? Item.BottomRight : Item.TopRight
         Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
         MouseArea { anchors.fill: parent }

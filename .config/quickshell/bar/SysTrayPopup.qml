@@ -10,15 +10,17 @@ PanelWindow {
 
     WlrLayershell.namespace: "quickshell:systraypopup"
 
-    readonly property bool _barAtBottom: Config.barPosition === "bottom"
+    readonly property bool _barAtBottom:  Config.barPosition === "bottom"
+    readonly property real _barGap:       Config.outerMarginTop    + Config.barHeight + 6
+    readonly property real _barGapBot:    Config.outerMarginBottom + Config.barHeight + 6
+    readonly property real _panelMargin:  Config.outerMarginSide * 2
 
     anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
     margins {
-        top:    _barAtBottom ? 0 : (Config.barHeight + Config.outerMarginTop + Config.outerMarginBottom + 3)
-        bottom: _barAtBottom ? (Config.barHeight + Config.outerMarginTop + Config.outerMarginBottom + 3) : 0
+        top:    _barAtBottom ? 0 : _barGap
+        bottom: _barAtBottom ? _barGapBot : 0
     }
     exclusionMode: ExclusionMode.Ignore
-    implicitWidth:  popupRect.implicitWidth + 1366
     implicitHeight: popupRect.implicitHeight + 4
 
     // Full-surface dismiss — window is transparent so this is invisible
@@ -32,9 +34,9 @@ PanelWindow {
         id: popupRect
 
         x: Math.max(0, Math.min(
-               SysTrayPopupState.anchorX - implicitWidth / 2.5,
+               SysTrayPopupState.anchorX - implicitWidth + 18,
                win.width - implicitWidth))
-        y: 4
+        y: 0
 
         implicitHeight: Config.barHeight
         implicitWidth:  Math.max(Config.barHeight,

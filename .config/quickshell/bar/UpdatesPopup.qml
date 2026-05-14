@@ -10,11 +10,14 @@ PanelWindow {
     color: "transparent"
 
     readonly property bool _barAtBottom: Config.barPosition === "bottom"
+    readonly property real _barGap:    Config.outerMarginTop    + Config.barHeight + 6
+    readonly property real _barGapBot:   Config.outerMarginBottom + Config.barHeight + 6
+    readonly property real _panelMargin: Config.outerMarginSide * 2
 
     anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
     margins {
-        top:    _barAtBottom ? 0 : (Config.barHeight + Config.outerMarginTop + Config.outerMarginBottom + 3)
-        bottom: _barAtBottom ? (Config.barHeight + Config.outerMarginTop + Config.outerMarginBottom + 3) : 0
+        top:    _barAtBottom ? 0 : _barGap
+        bottom: _barAtBottom ? _barGapBot : 0
     }
     exclusionMode: ExclusionMode.Ignore
     implicitHeight: popRect.implicitHeight + 8
@@ -35,8 +38,8 @@ PanelWindow {
     Rectangle {
         id: popRect
         x: Math.min(
-               Math.max(0, UpdatesPopupState.anchorX - implicitWidth / 2),
-               Math.max(0, win.width - implicitWidth - 8))
+               Math.max(win._panelMargin, UpdatesPopupState.anchorX - implicitWidth / 2),
+               Math.max(win._panelMargin, win.width - win._panelMargin - implicitWidth - 8))
         y: 4
 
         implicitWidth:  Math.max(220, col.implicitWidth + 32)

@@ -168,8 +168,8 @@ PanelWindow {
         // clip:true on parent keeps everything inside the rounded corners
         Rectangle {
             anchors { top: parent.top; left: parent.left; right: parent.right }
-            height: 35
-            radius: 35
+            height: parent.radius
+            radius: parent.radius
             color: "transparent"
             gradient: Gradient {
                 GradientStop { position: 0.0; color: Qt.rgba(1,1,1,0.06) }
