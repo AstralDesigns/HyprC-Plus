@@ -5,6 +5,8 @@ import ".."
 
 // Time-only module — sits left of the ControlCenter button in center island.
 // DateDisplay sits on the right.
+// Left-click  → toggle ClockPopup (world clock)
+// (right-click is handled by the MouseArea acceptedButtons)
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
@@ -14,16 +16,13 @@ Item {
     property string _time: Qt.formatDateTime(new Date(), "HH:mm")
 
     // ── Sunrise / sunset (astronomical, no API) ───────────────────────────
-    //  Standard solar-declination formula; accurate to ~1 min for most latitudes.
-    //  Adjust lat/lon to your location (positive = N/E, negative = S/W).
-    readonly property real _lat: 0.0   // ← set your latitude  (e.g. 51.5 for London)
-    readonly property real _lon: 0.0   // ← set your longitude (e.g. -0.1 for London)
+    readonly property real _lat: 0.0
+    readonly property real _lon: 0.0
 
-    // Returns { rise, set } as fractional hours in local time (e.g. 6.5 = 06:30).
     function _sunTimes() {
         const now       = new Date()
         const D2R       = Math.PI / 180
-        const tzOff     = -now.getTimezoneOffset() / 60   // hours ahead of UTC
+        const tzOff     = -now.getTimezoneOffset() / 60
         const dayOfYear = Math.floor(
             (now - new Date(now.getFullYear(), 0, 0)) / 86400000)
 
@@ -41,8 +40,8 @@ Item {
             const cosDec = Math.cos(Math.asin(sinDec))
             const cosH   = (-0.01454 - sinDec * Math.sin(_lat * D2R))
                          / (cosDec  * Math.cos(_lat * D2R))
-            if (cosH < -1) return isRise ? 0  : 24   // midnight sun
-            if (cosH >  1) return isRise ? 12 : 12   // polar night
+            if (cosH < -1) return isRise ? 0  : 24
+            if (cosH >  1) return isRise ? 12 : 12
             const H      = isRise
                 ? (360 - Math.acos(cosH) / D2R) / 15
                 : (      Math.acos(cosH) / D2R) / 15
@@ -54,10 +53,8 @@ Item {
     }
 
     // ── Hour-based clock icon ─────────────────────────────────────────────
-    //  Day   (sunrise → sunset): nf-md-clock_time_X filled
-    //  Night (sunset → sunrise): nf-md-clock_time_X outline
     function _clockIcon() {
-        const h12     = new Date().getHours() % 12 || 12   // 1–12
+        const h12     = new Date().getHours() % 12 || 12
         const filled  = ["󱑋","󱑌","󱑍","󱑎","󱑏","󱑐","󱑑","󱑒","󱑓","󱑔","󱑕","󱑖"]
         const outline = ["󱑋","󱑌","󱑍","󱑎","󱑏","󱑐","󱑑","󱑒","󱑓","󱑔","󱑕","󱑖"]
         const sun     = _sunTimes()
@@ -93,14 +90,13 @@ Item {
     opacity: ma.containsMouse ? 0.7 : 1.0
     Behavior on opacity { NumberAnimation { duration: 80 } }
 
-    Process { id: ttyClockProc; command: [Config.candyHyprScripts + "/tty-clock.sh"]; running: false }
-
     MouseArea {
         id: ma
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: if (!ttyClockProc.running) ttyClockProc.running = true
+        acceptedButtons: Qt.LeftButton
+        onClicked: ClockPopupState.toggle()
     }
 
     // Sync to next minute boundary, then tick every 60 s

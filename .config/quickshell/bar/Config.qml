@@ -187,6 +187,9 @@ QtObject {
         v = _settings.value("desktopLabelSize");   if (v !== undefined && v !== null) desktopLabelSize   = parseInt(v) || 11
         v = _settings.value("desktopLabelRadius"); if (v !== undefined && v !== null) desktopLabelRadius = parseInt(v) || 20
         v = _settings.value("desktopVisible");     if (v !== undefined && v !== null) desktopVisible     = _toBool(v)
+        v = _settings.value("clockTextSize");      if (v !== undefined && v !== null) clockTextSize      = parseInt(v) || 38
+        v = _settings.value("clockIconSize");      if (v !== undefined && v !== null) clockIconSize      = parseInt(v) || 32
+        v = _settings.value("clockWorldCities");   if (v !== undefined && v !== null) { try { clockWorldCities = JSON.parse(v) } catch(e) {} }
     }
 
     function _saveSettings() {
@@ -327,6 +330,9 @@ QtObject {
         _settings.setValue("desktopLabelSize",   desktopLabelSize)
         _settings.setValue("desktopLabelRadius", desktopLabelRadius)
         _settings.setValue("desktopVisible",     desktopVisible)
+        _settings.setValue("clockTextSize",      clockTextSize)
+        _settings.setValue("clockIconSize",      clockIconSize)
+        _settings.setValue("clockWorldCities",   JSON.stringify(clockWorldCities))
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -442,6 +448,21 @@ QtObject {
     property color batteryLowColor:      Theme.cErr
     property color clockIconColor:       Theme.cPrimary
     property color clockTextColor:       Theme.cInverseSurface
+
+    // ── Clock popup sizing ────────────────────────────────────────────────
+    property int clockTextSize: 38   // C059 Bold Italic time font size in ClockPopup
+    property int clockIconSize: 32   // Nerd-font clock icon size in ClockPopup
+
+    // ── World clock cities ────────────────────────────────────────────────
+    // Each entry: { city: "Display Name", timezone: "IANA/Timezone" }
+    // Managed via CC → Bar → Clock sub-tab. Unbounded — add as many as needed.
+    property var clockWorldCities: [
+        { "city": "London",    "timezone": "Europe/London"    },
+        { "city": "New York",  "timezone": "America/New_York" },
+        { "city": "Tokyo",     "timezone": "Asia/Tokyo"       },
+        { "city": "Dubai",     "timezone": "Asia/Dubai"       }
+    ]
+
     property color dateIconColor:        Theme.cPrimary
     property color dateTextColor:        Theme.cInverseSurface
     property color mediaGlyphColor:      Theme.cPrimary
