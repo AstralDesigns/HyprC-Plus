@@ -275,7 +275,7 @@ PanelWindow {
                 // Week-number gutter label
                 Item { width: 26; height: 20
                     Text { anchors.centerIn: parent; text: "Wk"
-                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.50)
                         font.family: Config.labelFont; font.pixelSize: 9 }
                 }
                 Repeater {
@@ -292,7 +292,7 @@ PanelWindow {
                             anchors.centerIn: parent
                             text: modelData
                             color: (index === 5 || index === 6)
-                                ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.70)
+                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.70)
                                 : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.70)
                             font.family: Config.labelFont
                             font.pixelSize: 10
@@ -335,7 +335,7 @@ PanelWindow {
                                     return 1
                                 }
                                 text: calWin._isoWeek(calWin._viewYear, calWin._viewMonth, _fd)
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.30)
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
                                 font.family: Config.labelFont; font.pixelSize: 9
                             }
                         }
@@ -379,7 +379,7 @@ PanelWindow {
                                     color: _isToday
                                         ? Theme.cPrimary
                                         : _isWeekend
-                                            ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.80)
+                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80)
                                             : Theme.cOnSurf
                                     font.family: Config.labelFont
                                     font.pixelSize: 12
