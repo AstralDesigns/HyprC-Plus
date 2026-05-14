@@ -1083,9 +1083,9 @@ PanelWindow {
                     Repeater {
                         model: [
                             { icon: "", label: "Hyprland",  idx: 1 },
-                            { icon: "󱟛", label: "Bar",       idx: 0 },
+                            { icon: "󰇜", label: "Bar",       idx: 0 },
                             { icon: "󰔎", label: "Themes",    idx: 2 },
-                            { icon: "󰞒", label: "Dock",      idx: 3 },
+                            { icon: "󰇜", label: "Dock",      idx: 3 },
                             { icon: "󰮫", label: "Menus",     idx: 4 },
                             { icon: "󰍂", label: "SDDM",      idx: 5 }
                         ]
@@ -3042,7 +3042,7 @@ PanelWindow {
                                 Layout.fillWidth: true; spacing: 8
 
                                 Text {
-                                    text: "Live Colors"
+                                    text: "Process Colors"
                                     color: Theme.cPrimary
                                     font.family: Config.labelFont
                                     font.pixelSize: 13
@@ -3108,26 +3108,26 @@ PanelWindow {
                                     }
                                 }
                             }
-
-                            // Hint text — only visible when color generation is off
-                            Text {
-                                Layout.fillWidth: true
-                                Layout.topMargin: 2
-                                visible: !_colorRegenPill.regenEnabled
-                                text: " Disabled color regenaration. Current color palette will be used on all themes and backgrounds"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                               Theme.cPrimary.b, 0.55)
-                                font.family: Config.labelFont
-                                font.pixelSize: 11
-                                wrapMode: Text.Wrap
-                            }
                             
                             // Hint text — only visible when color generation is on
                             Text {
                                 Layout.fillWidth: true
                                 Layout.topMargin: 2
                                 visible: _colorRegenPill.regenEnabled
-                                text: " Enabled color regenaration. Color palette will be reloaded on all theme and background changes"
+                                text: " Color palette will be reloaded on all theme and background changes"
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                               Theme.cPrimary.b, 0.55)
+                                font.family: Config.labelFont
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+
+                            // Hint text — only visible when color generation is off
+                            Text {
+                                Layout.fillWidth: true
+                                Layout.topMargin: 2
+                                visible: !_colorRegenPill.regenEnabled
+                                text: " Current color palette will be used on all themes and backgrounds"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                Theme.cPrimary.b, 0.55)
                                 font.family: Config.labelFont
