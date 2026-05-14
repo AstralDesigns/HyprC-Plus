@@ -1226,7 +1226,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["General","Icons","Workspaces","Media","Cava","Background","Visibility","Clock"]
+                                    model: ["General","Icons","Workspaces","Media","Cava","Clock","Background","Visibility"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -2029,6 +2029,29 @@ PanelWindow {
                                         Item { height: 10 }
                                     }
                                 }
+                                
+                                // ── Clock ───────────────────────────────────
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        width: parent.width; spacing: 5
+
+                                        // ── Popup sizes ──────────────────────────────
+                                        CCSection { text: "Clock Popup Sizes" }
+
+                                        CCSlider {
+                                            label: "Time Font Size"
+                                            from: 16; to: 60; stepSize: 1
+                                            value: Config.clockTextSize
+                                            onMoved: function(v) { Config.clockTextSize = v }
+                                        }
+                                        CCSlider {
+                                            label: "Icon Size"
+                                            from: 10; to: 48; stepSize: 1
+                                            value: Config.clockIconSize
+                                            onMoved: function(v) { Config.clockIconSize = v }
+                                        }
+                                    }
+                                }
 
                                 // ── Background ─────────────────────────────
                                 CCScrollPane {
@@ -2148,229 +2171,6 @@ PanelWindow {
                                         CCToggle { label:"Wallpaper Btn";  value:Config.showWallpaper;      onToggled:function(v){Config.showWallpaper=v} }
                                         CCToggle { label:"System Tray";    value:Config.showTray;           onToggled:function(v){Config.showTray=v} }
                                         //CCToggle { label:"Distro Icon";    value:Config.showDistro;         onToggled:function(v){Config.showDistro=v} }
-
-                                        Item { height: 10 }
-                                    }
-                                }
-
-                                // ── Clock ───────────────────────────────────
-                                CCScrollPane {
-                                    ColumnLayout {
-                                        width: parent.width; spacing: 5
-
-                                        // ── Popup sizes ──────────────────────────────
-                                        CCSection { text: "Clock Popup Sizes" }
-
-                                        CCSlider {
-                                            label: "Time Font Size"
-                                            from: 16; to: 60; stepSize: 1
-                                            value: Config.clockTextSize
-                                            onMoved: function(v) { Config.clockTextSize = v }
-                                        }
-                                        CCSlider {
-                                            label: "Icon Size"
-                                            from: 10; to: 48; stepSize: 1
-                                            value: Config.clockIconSize
-                                            onMoved: function(v) { Config.clockIconSize = v }
-                                        }
-
-                                        // ── World clocks ─────────────────────────────
-                                        CCSection { text: "World Clocks" }
-
-                                        // Existing city list
-                                        Repeater {
-                                            id: _clockCityList
-                                            model: Config.clockWorldCities
-                                            delegate: RowLayout {
-                                                required property var  modelData
-                                                required property int  index
-                                                Layout.fillWidth: true
-                                                spacing: 6
-
-                                                Rectangle {
-                                                    Layout.fillWidth: true
-                                                    height: 30; radius: 8
-                                                    color: Qt.rgba(Theme.cInversePrimary.r,
-                                                                   Theme.cInversePrimary.g,
-                                                                   Theme.cInversePrimary.b, 0.14)
-                                                    border.width: 1
-                                                    border.color: Qt.rgba(Theme.cOutVar.r,
-                                                                          Theme.cOutVar.g,
-                                                                          Theme.cOutVar.b, 0.28)
-                                                    RowLayout {
-                                                        anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
-                                                        Text {
-                                                            Layout.fillWidth: true
-                                                            text: modelData.city + "  ·  " + modelData.timezone
-                                                            color: Theme.cOnSurf
-                                                            font.family: Config.labelFont
-                                                            font.pixelSize: 11
-                                                            elide: Text.ElideRight
-                                                        }
-                                                    }
-                                                }
-
-                                                // Remove button
-                                                Rectangle {
-                                                    width: 28; height: 28; radius: 8
-                                                    color: _rmHov.containsMouse
-                                                        ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.20)
-                                                        : "transparent"
-                                                    Behavior on color { ColorAnimation { duration: 100 } }
-                                                    Text {
-                                                        anchors.centerIn: parent; text: "󰅖"
-                                                        color: Theme.cErr
-                                                        font.family: Config.fontFamily; font.pixelSize: 14
-                                                    }
-                                                    MouseArea {
-                                                        id: _rmHov; anchors.fill: parent
-                                                        hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                                        onClicked: {
-                                                            const arr = Config.clockWorldCities.slice()
-                                                            arr.splice(index, 1)
-                                                            Config.clockWorldCities = arr
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // Empty state hint
-                                        Text {
-                                            Layout.fillWidth: true
-                                            visible: Config.clockWorldCities.length === 0
-                                            text: "No world clocks added yet."
-                                            color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g,
-                                                           Theme.cOnSurfVar.b, 0.50)
-                                            font.family: Config.labelFont; font.pixelSize: 11
-                                            horizontalAlignment: Text.AlignHCenter
-                                            Layout.topMargin: 4
-                                        }
-
-                                        // ── Add city ─────────────────────────────────
-                                        CCSection { text: "Add City" }
-
-                                        // City name
-                                        RowLayout {
-                                            Layout.fillWidth: true; spacing: 6
-                                            Text {
-                                                Layout.preferredWidth: 80
-                                                text: "City Name"
-                                                color: Theme.cPrimary
-                                                font.family: Config.labelFont; font.pixelSize: 12
-                                            }
-                                            Rectangle {
-                                                Layout.fillWidth: true; height: 28; radius: 8
-                                                color: Qt.rgba(Theme.cSurfVariant.r, Theme.cSurfVariant.g,
-                                                               Theme.cSurfVariant.b, 0.35)
-                                                border.width: _cityTI.activeFocus ? 1 : 0
-                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                                       Theme.cPrimary.b, 0.55)
-                                                TextInput {
-                                                    id: _cityTI
-                                                    anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
-                                                    verticalAlignment: TextInput.AlignVCenter
-                                                    color: Theme.cOnSurf
-                                                    font.family: Config.labelFont; font.pixelSize: 12
-                                                    clip: true
-                                                    // Placeholder via overlay Text
-                                                }
-                                                Text {
-                                                    anchors { fill: parent; leftMargin: 8 }
-                                                    verticalAlignment: Text.AlignVCenter
-                                                    text: "e.g. Paris"
-                                                    color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g,
-                                                                   Theme.cOnSurfVar.b, 0.40)
-                                                    font.family: Config.labelFont; font.pixelSize: 12
-                                                    visible: _cityTI.text.length === 0 && !_cityTI.activeFocus
-                                                }
-                                            }
-                                        }
-
-                                        // Timezone
-                                        RowLayout {
-                                            Layout.fillWidth: true; spacing: 6
-                                            Text {
-                                                Layout.preferredWidth: 80
-                                                text: "Timezone"
-                                                color: Theme.cPrimary
-                                                font.family: Config.labelFont; font.pixelSize: 12
-                                            }
-                                            Rectangle {
-                                                Layout.fillWidth: true; height: 28; radius: 8
-                                                color: Qt.rgba(Theme.cSurfVariant.r, Theme.cSurfVariant.g,
-                                                               Theme.cSurfVariant.b, 0.35)
-                                                border.width: _tzTI.activeFocus ? 1 : 0
-                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                                       Theme.cPrimary.b, 0.55)
-                                                TextInput {
-                                                    id: _tzTI
-                                                    anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
-                                                    verticalAlignment: TextInput.AlignVCenter
-                                                    color: Theme.cOnSurf
-                                                    font.family: Config.labelFont; font.pixelSize: 12
-                                                    clip: true
-                                                }
-                                                Text {
-                                                    anchors { fill: parent; leftMargin: 8 }
-                                                    verticalAlignment: Text.AlignVCenter
-                                                    text: "e.g. Europe/Paris"
-                                                    color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g,
-                                                                   Theme.cOnSurfVar.b, 0.40)
-                                                    font.family: Config.labelFont; font.pixelSize: 12
-                                                    visible: _tzTI.text.length === 0 && !_tzTI.activeFocus
-                                                }
-                                            }
-                                        }
-
-                                        // Add button
-                                        Item {
-                                            Layout.fillWidth: true; height: 34
-                                            Layout.topMargin: 4
-                                            Rectangle {
-                                                anchors.horizontalCenter: parent.horizontalCenter
-                                                width: 130; height: 30; radius: 10
-                                                color: _addHov.containsMouse
-                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.28)
-                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
-                                                border.width: 1
-                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                                       Theme.cPrimary.b, 0.40)
-                                                Behavior on color { ColorAnimation { duration: 100 } }
-                                                Text {
-                                                    anchors.centerIn: parent
-                                                    text: "󰐕  Add City"
-                                                    color: Theme.cPrimary
-                                                    font.family: Config.labelFont
-                                                    font.pixelSize: 12; font.weight: Font.Medium
-                                                }
-                                                MouseArea {
-                                                    id: _addHov; anchors.fill: parent
-                                                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                                    onClicked: {
-                                                        const city = _cityTI.text.trim()
-                                                        const tz   = _tzTI.text.trim()
-                                                        if (city.length === 0 || tz.length === 0) return
-                                                        const arr = Config.clockWorldCities.slice()
-                                                        arr.push({ city: city, timezone: tz })
-                                                        Config.clockWorldCities = arr
-                                                        _cityTI.text = ""
-                                                        _tzTI.text   = ""
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // IANA hint
-                                        Text {
-                                            Layout.fillWidth: true
-                                            Layout.topMargin: 4
-                                            text: "Use IANA timezone IDs:\nAfrica/Nairobi · America/Los_Angeles · Asia/Kolkata · Pacific/Auckland"
-                                            color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g,
-                                                           Theme.cOnSurfVar.b, 0.50)
-                                            font.family: Config.labelFont; font.pixelSize: 10
-                                            wrapMode: Text.Wrap
-                                        }
 
                                         Item { height: 10 }
                                     }
