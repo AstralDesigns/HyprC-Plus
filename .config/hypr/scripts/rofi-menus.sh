@@ -10,7 +10,7 @@ SETTINGS="$HOME/.config/hyprcandy/settings"
 
 # Define menu options with their corresponding scripts
 declare -A menu_options=(
-    [" Keybinds"]="$HYPRSCRIPTS/keybindings.sh"
+    #[" Keybinds"]="$HYPRSCRIPTS/keybindings.sh"
     ["󰪏 Animations"]="$HYPRSCRIPTS/animations.sh"
     [" Clipboard"]="$SCRIPTS/cliphist.sh"
     [" Emojis"]="$SETTINGS/emojipicker.sh"
