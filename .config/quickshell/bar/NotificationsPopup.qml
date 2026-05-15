@@ -99,18 +99,18 @@ Item {
                     // Blurred backdrop
                     Item {
                         anchors.fill:parent; layer.enabled:true
-                        layer.effect: MultiEffect { blurEnabled:true; blur:1.0; blurMax:48 }
+                        layer.effect: MultiEffect { blurEnabled:true; blur:0.0; blurMax:48 }
                         Rectangle {
                             x:-parent.x; y:-parent.y; width:toastWindow.width; height:toastWindow.height
-                            color: Qt.rgba(Theme.cSurfMid.r, Theme.cSurfMid.g, Theme.cSurfMid.b, 0.72)
+                            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.10)
                         }
                     }
 
                     // Card surface
                     Rectangle {
                         anchors.fill:parent; radius:parent._radius
-                        color: _hov ? Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.55)
-                            : Qt.rgba(Theme.cSurfMid.r,Theme.cSurfMid.g,Theme.cSurfMid.b,0.45)
+                        color: _hov ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.40)
+                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.10)
                         border.width:1
                         border.color: notif.urgency>=2 ? Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.6)
                             : notif.category==="bt" ? Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.5)
