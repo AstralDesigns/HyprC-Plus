@@ -552,7 +552,7 @@ ShellRoot {
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:"󰫢  󰫢"; color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
+                                        text:"󰫢  󰫢"; color: Qt.rgba(root.cPrimaryContainer.r, root.cSourceColor.g, root.cSourceColor.b, 0.60)
                                         font.family:"codicon"; font.pixelSize:14
                                         topPadding:8; bottomPadding:8
                                     }
@@ -584,7 +584,7 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
+                                            text:root.clockDate; color:Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                             font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
@@ -972,8 +972,8 @@ ShellRoot {
                                                 : (root.tempOk ? Math.round(root.tempC)+"°" : "N/A"))
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
-                                            readonly property color arcColor: index===0 ? Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
-                                                : (index===1 ? Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00) : Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
+                                            readonly property color arcColor: index===0 ? Qt.rgba(root.cPrimaryContainer.r, root.cSourceColor.g, root.cSourceColor.b, 1.00)
+                                                : (index===1 ? Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00) : Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
 
@@ -1082,9 +1082,9 @@ ShellRoot {
                             width: 44; height: 44
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maSusp.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.20) : "transparent"
+                                color:        _maSusp.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.10) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
                                 border.width: 1
-                                border.color: _maSusp.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.45) : "transparent"
+                                border.color: _maSusp.containsMouse ? Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
@@ -1101,15 +1101,39 @@ ShellRoot {
                             }
                         }
 
+                        // ── Reboot ───────────────────────────────────────────
+                        Item {
+                            width: 44; height: 44
+                            Rectangle {
+                                anchors.fill: parent; radius: 22
+                                color:        _maRebt.containsMouse ? Qt.rgba(root.cPrimary.r, root.cSourceColor.g, root.cSourceColor.b,0.10) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
+                                border.width: 1
+                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cPrimary.r, root.cSourceColor.g, root.cSourceColor.b,0.65) : "transparent"
+                                Behavior on color       { ColorAnimation { duration: 130 } }
+                                Behavior on border.color{ ColorAnimation { duration: 130 } }
+                            }
+                            Text {
+                                anchors.centerIn: parent; text: "󰑙"
+                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
+                                color: Qt.rgba(root.cPrimary.r, root.cSourceColor.g, root.cSourceColor.b,1.00); opacity: _maRebt.containsMouse ? 1.0 : 0.72
+                                Behavior on opacity { NumberAnimation { duration: 130 } }
+                            }
+                            MouseArea {
+                                id: _maRebt; anchors.fill: parent
+                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                onClicked: { pwrProc.command = ["systemctl","reboot"]; pwrProc.running = true }
+                            }
+                        }
+
                         // ── Hibernate (only shown when available on this OS) ──
                         Item {
                             width: 44; height: 44
                             visible: root._hibernateAvailable
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.20) : "transparent"
+                                color:        _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.10) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
                                 border.width: 1
-                                border.color: _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.45) : "transparent"
+                                border.color: _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
@@ -1126,45 +1150,21 @@ ShellRoot {
                             }
                         }
 
-                        // ── Reboot ───────────────────────────────────────────
-                        Item {
-                            width: 44; height: 44
-                            Rectangle {
-                                anchors.fill: parent; radius: 22
-                                color:        _maRebt.containsMouse ? Qt.rgba(root.cInvPrimary.r, root.cPrimary.g, root.cPrimary.b,0.20) : "transparent"
-                                border.width: 1
-                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cInvPrimary.r, root.cPrimary.g, root.cPrimary.b,0.45) : "transparent"
-                                Behavior on color       { ColorAnimation { duration: 130 } }
-                                Behavior on border.color{ ColorAnimation { duration: 130 } }
-                            }
-                            Text {
-                                anchors.centerIn: parent; text: "󰑙"
-                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: Qt.rgba(root.cInvPrimary.r, root.cPrimary.g, root.cPrimary.b,1.00); opacity: _maRebt.containsMouse ? 1.0 : 0.72
-                                Behavior on opacity { NumberAnimation { duration: 130 } }
-                            }
-                            MouseArea {
-                                id: _maRebt; anchors.fill: parent
-                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                onClicked: { pwrProc.command = ["systemctl","reboot"]; pwrProc.running = true }
-                            }
-                        }
-
                         // ── Shutdown ─────────────────────────────────────────
                         Item {
                             width: 44; height: 44
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maShut.containsMouse ? Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.20) : "transparent"
+                                color:        _maShut.containsMouse ? Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.10) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
                                 border.width: 1
-                                border.color: _maShut.containsMouse ? Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.45) : "transparent"
+                                border.color: _maShut.containsMouse ? Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰐥"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: Qt.rgba(root.cPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00); opacity: _maShut.containsMouse ? 1.0 : 0.72
+                                color: Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00); opacity: _maShut.containsMouse ? 1.0 : 0.72
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
