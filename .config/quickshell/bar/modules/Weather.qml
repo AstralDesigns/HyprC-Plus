@@ -3,35 +3,25 @@ import QtQuick.Layouts
 import Quickshell.Io
 import ".."
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Weather bar module
+//
+//  Display is bound directly to WeatherPopupState properties so the bar and
+//  popup always show the same data. The poll timer here is the primary driver
+//  of WeatherPopupState.refresh() — the singleton's own background timer is
+//  a safety net only.
+// ─────────────────────────────────────────────────────────────────────────────
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
-    implicitWidth: row.implicitWidth + Config.moduleHPad * 2
+    implicitWidth:  row.implicitWidth + Config.moduleHPad * 2
     implicitHeight: Config.moduleHeight
 
-    property string _icon:    "󰖐"
-    property string _value:   "-- °C"
-    property string _tooltip: "Weather loading..."
-
-    // ── Fetch via weather.sh every Config.weatherInterval seconds ──
-    Process {
-        id: weatherProc
-        command: [Config.barDir + "/weather.sh"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const d = JSON.parse(this.text)
-                    root._icon    = d.icon    || "󰖐"
-                    root._value   = d.value   || d.text || "-- °C"
-                    root._tooltip = d.tooltip || ""
-                } catch(e) { root._value = "-- °C" }
-            }
-        }
-    }
+    // ── Drive the shared fetch pipeline on the bar's configured interval ──
     Timer {
         interval: Config.weatherInterval * 1000
         running: true; repeat: true; triggeredOnStart: true
-        onTriggered: if (!weatherProc.running) weatherProc.running = true
+        onTriggered: WeatherPopupState.refresh()
     }
 
     Row {
@@ -40,7 +30,7 @@ Item {
         spacing: Config.iconTextGap
 
         Text {
-            text: root._icon
+            text: WeatherPopupState.icon
             color: Config.glyphColor
             font.family: Config.fontFamily
             font.pixelSize: Config.infoGlyphSize
@@ -48,7 +38,9 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
         }
         Text {
-            text: root._value
+            // Show temp from the shared state; fall back to placeholder while
+            // the very first fetch is in flight (temp starts as "--")
+            text: WeatherPopupState.temp === "--" ? "-- °C" : WeatherPopupState.temp
             color: Config.textColor
             font.family: Config.labelFont
             font.pixelSize: Config.infoFontSize
@@ -71,12 +63,15 @@ Item {
                 WeatherPopupState.toggle()
         }
         onWheel: function(ev) {
-            if (ev.angleDelta.y > 0) toggleCProc.running = true
-            else toggleFProc.running = true
-            Qt.callLater(function() { if (!weatherProc.running) weatherProc.running = true })
+            // Route through toggleUnit() so the conversion is instant from
+            // _lastRaw — same path as the popup's °C/°F button.
+            // Scroll up = °C, scroll down = °F; only toggle if not already
+            // in the requested unit so double-scrolling doesn't flip back.
+            if (ev.angleDelta.y > 0) {
+                if (!WeatherPopupState._metric) WeatherPopupState.toggleUnit()
+            } else {
+                if (WeatherPopupState._metric)  WeatherPopupState.toggleUnit()
+            }
         }
     }
-
-    Process { id: toggleCProc; command: [Config.barDir + "/toggle-weather-format.sh", "-c"]; running: false }
-    Process { id: toggleFProc; command: [Config.barDir + "/toggle-weather-format.sh", "-f"]; running: false }
 }
