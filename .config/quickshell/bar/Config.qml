@@ -136,6 +136,10 @@ QtObject {
         v = _settings.value("wsBgOpacity"); if (v !== undefined && v !== null) wsBgOpacity = Math.max(0, parseFloat(v))
         v = _settings.value("groupedBgOpacity"); if (v !== undefined && v !== null) groupedBgOpacity = Math.max(0, parseFloat(v))
         v = _settings.value("ungroupedBgOpacity"); if (v !== undefined && v !== null) ungroupedBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("clockDateBgOpacity");  if (v !== undefined && v !== null) clockDateBgOpacity  = Math.max(0, parseFloat(v))
+        v = _settings.value("weatherBatBgOpacity"); if (v !== undefined && v !== null) weatherBatBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("leftGroupBgOpacity");  if (v !== undefined && v !== null) leftGroupBgOpacity  = Math.max(0, parseFloat(v))
+        v = _settings.value("rightGroupBgOpacity"); if (v !== undefined && v !== null) rightGroupBgOpacity = Math.max(0, parseFloat(v))
         v = _settings.value("trayBgOpacity"); if (v !== undefined && v !== null) trayBgOpacity = Math.max(0, parseFloat(v))
         v = _settings.value("startMenuBgOpacity"); if (v !== undefined && v !== null) startMenuBgOpacity = Math.max(0, parseFloat(v))
         v = _settings.value("mediaBgOpacity"); if (v !== undefined && v !== null) mediaBgOpacity = Math.max(0, parseFloat(v))
@@ -279,6 +283,10 @@ QtObject {
         _settings.setValue("wsBgOpacity", wsBgOpacity)
         _settings.setValue("groupedBgOpacity", groupedBgOpacity)
         _settings.setValue("ungroupedBgOpacity", ungroupedBgOpacity)
+        _settings.setValue("clockDateBgOpacity",  clockDateBgOpacity)
+        _settings.setValue("weatherBatBgOpacity", weatherBatBgOpacity)
+        _settings.setValue("leftGroupBgOpacity",  leftGroupBgOpacity)
+        _settings.setValue("rightGroupBgOpacity", rightGroupBgOpacity)
         _settings.setValue("trayBgOpacity", trayBgOpacity)
         _settings.setValue("startMenuBgOpacity", startMenuBgOpacity)
         _settings.setValue("mediaBgOpacity", mediaBgOpacity)
@@ -826,6 +834,14 @@ QtObject {
 
     property color ungroupedBgColor:   Theme.cOnSecondary
     property real  ungroupedBgOpacity: 0
+
+    // Split from ungrouped — Clock & Date island / Weather & Battery islands
+    property real  clockDateBgOpacity:  ungroupedBgOpacity
+    property real  weatherBatBgOpacity: ungroupedBgOpacity
+
+    // Split from grouped — left app-group island / right app-group island
+    property real  leftGroupBgOpacity:  groupedBgOpacity
+    property real  rightGroupBgOpacity: groupedBgOpacity
 
     property color trayBgColor:   Theme.cOnSecondary
     property real  trayBgOpacity: 0

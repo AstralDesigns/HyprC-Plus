@@ -14,11 +14,13 @@ PanelWindow {
     readonly property real _barGapBot:   Config.outerMarginBottom + Config.barHeight + 6
     readonly property real _panelMargin: Config.outerMarginSide * 2
 
-    anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
+    anchors { top: !_barAtBottom; bottom: _barAtBottom; right: true }
     margins {
         top:    _barAtBottom ? 0 : _barGap
         bottom: _barAtBottom ? _barGapBot : 0
+        right:  _panelMargin + 125
     }
+    implicitWidth: popRect.implicitWidth
     exclusionMode: ExclusionMode.Ignore
     implicitHeight: popRect.implicitHeight + 8
 
@@ -37,10 +39,9 @@ PanelWindow {
 
     Rectangle {
         id: popRect
-        x: Math.min(
-               Math.max(win._panelMargin, UpdatesPopupState.anchorX - implicitWidth / 2),
-               Math.max(win._panelMargin, win.width - win._panelMargin - implicitWidth - 8))
-        y: 4
+        anchors.fill: parent
+        // Add anchors.rightMargin here to nudge left under the updates module
+        y: 3
 
         implicitWidth:  Math.max(220, col.implicitWidth + 32)
         implicitHeight: col.implicitHeight + 24

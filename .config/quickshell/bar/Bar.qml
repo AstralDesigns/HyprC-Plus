@@ -286,7 +286,11 @@ PanelWindow {
             switch (bgType) {
                 case "workspace":    return Config.wsBgColor
                 case "grouped":      return Config.groupedBgColor
+                case "leftgroup":    return Config.groupedBgColor
+                case "rightgroup":   return Config.groupedBgColor
                 case "ungrouped":    return Config.ungroupedBgColor
+                case "clockdate":    return Config.ungroupedBgColor
+                case "weatherbat":   return Config.ungroupedBgColor
                 case "startmenu":    return Config.startMenuBgColor
                 case "media":        return Config.mediaBgColor
                 case "cava":         return Config.cavaBgColor
@@ -301,7 +305,11 @@ PanelWindow {
             switch (bgType) {
                 case "workspace":    return Config.wsBgOpacity
                 case "grouped":      return Config.groupedBgOpacity
+                case "leftgroup":    return Config.leftGroupBgOpacity
+                case "rightgroup":   return Config.rightGroupBgOpacity
                 case "ungrouped":    return Config.ungroupedBgOpacity
+                case "clockdate":    return Config.clockDateBgOpacity
+                case "weatherbat":   return Config.weatherBatBgOpacity
                 case "startmenu":    return Config.startMenuBgOpacity
                 case "media":        return Config.mediaBgOpacity
                 case "cava":         return Config.cavaBgOpacity
@@ -404,7 +412,7 @@ PanelWindow {
             Island { bgType: "workspace"; visible_: Config.showWorkspaces; Modules.Workspaces {} }
 
             Island {
-                bgType: "grouped"
+                bgType: "leftgroup"
                 visible_: Config.showNotifications || Config.showWallpaper || Config.showOverview
                 Modules.Notifications { visible: Config.showNotifications }
                 Modules.WallpaperBtn  { visible: Config.showWallpaper }
@@ -429,14 +437,14 @@ PanelWindow {
             spacing: Config.islandSpacing
 
             Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaLeft; side: "left" } }
-            Island { bgType: "ungrouped"; visible_: Config.showClock; Modules.Clock {} }
+            Island { bgType: "clockdate"; visible_: Config.showClock; Modules.Clock {} }
             Island {
                 bgType: "distro"
                 visible_: Config.showDistro
                 bgOverride: Config.ccTransparentBg ? 0.0 : -1
                 Modules.ControlCenter {}
             }
-            Island { bgType: "ungrouped"; visible_: Config.showDate;  Modules.DateDisplay {} }
+            Island { bgType: "clockdate"; visible_: Config.showDate;  Modules.DateDisplay {} }
             Island { bgType: "cava";     visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaRight; side: "right" } }
         }
 
@@ -452,11 +460,11 @@ PanelWindow {
             spacing: Config.islandSpacing
             layoutDirection: Qt.RightToLeft
             Island { bgType: "startmenu"; Modules.PowerButton {} }
-            Island { bgType: "ungrouped"; visible_: Config.showBattery;  Modules.Battery {} }
-            Island { bgType: "ungrouped"; visible_: Config.showWeather;  Modules.Weather {} }
+            Island { bgType: "weatherbat"; visible_: Config.showBattery;  Modules.Battery {} }
+            Island { bgType: "weatherbat"; visible_: Config.showWeather;  Modules.Weather {} }
 
             Island {
-                bgType: "grouped"
+                bgType: "rightgroup"
                 visible_: Config.showUpdates || Config.showPowerProfiles || Config.showIdleInhibitor || Config.showRofi || Config.showTray
                 Modules.Updates       { visible: Config.showUpdates }
                 Modules.IdleInhibitor { visible: Config.showIdleInhibitor }
@@ -528,7 +536,7 @@ PanelWindow {
 
                 Island { bgType: "workspace"; visible_: Config.showWorkspaces; Modules.Workspaces {} }
                 Island {
-                    bgType: "grouped"
+                    bgType: "leftgroup"
                     visible_: Config.showNotifications || Config.showWallpaper || Config.showOverview
                     Modules.Notifications { visible: Config.showNotifications }
                     Modules.WallpaperBtn  { visible: Config.showWallpaper }
@@ -595,14 +603,14 @@ PanelWindow {
                 spacing: Config.islandSpacing
 
                 Island { bgType: "cava";      visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaLeftV; side: "left" } }
-                Island { bgType: "ungrouped"; visible_: Config.showClock; Modules.Clock {} }
+                Island { bgType: "clockdate"; visible_: Config.showClock; Modules.Clock {} }
                 Island {
                     bgType: "distro"
                     visible_: Config.showDistro
                     bgOverride: Config.ccTransparentBg ? 0.0 : -1
                     Modules.ControlCenter {}
                 }
-                Island { bgType: "ungrouped"; visible_: Config.showDate;  Modules.DateDisplay {} }
+                Island { bgType: "clockdate"; visible_: Config.showDate;  Modules.DateDisplay {} }
                 Island { bgType: "cava";      visible_: Config.showCava && (!Config.cavaAutoHide || barLayout._mediaActive); Modules.Cava { id: cavaRightV; side: "right" } }
             }
         }
@@ -652,11 +660,11 @@ PanelWindow {
                 layoutDirection: Qt.RightToLeft
 
                 Island { bgType: "startmenu"; Modules.PowerButton {} }
-                Island { bgType: "ungrouped"; visible_: Config.showBattery;  Modules.Battery {} }
-                Island { bgType: "ungrouped"; visible_: Config.showWeather;  Modules.Weather {} }
+                Island { bgType: "weatherbat"; visible_: Config.showBattery;  Modules.Battery {} }
+                Island { bgType: "weatherbat"; visible_: Config.showWeather;  Modules.Weather {} }
 
                 Island {
-                    bgType: "grouped"
+                    bgType: "rightgroup"
                     visible_: Config.showUpdates || Config.showPowerProfiles || Config.showIdleInhibitor || Config.showRofi || Config.showTray
                     Modules.Updates       { visible: Config.showUpdates }
                     Modules.IdleInhibitor { visible: Config.showIdleInhibitor }

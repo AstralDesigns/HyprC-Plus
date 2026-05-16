@@ -15,13 +15,20 @@ PanelWindow {
     readonly property real _barGapBot:    Config.outerMarginBottom + Config.barHeight + 6
     readonly property real _panelMargin:  Config.outerMarginSide * 2
 
-    anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
+    anchors { top: !_barAtBottom; bottom: _barAtBottom; right: true }
     margins {
         top:    _barAtBottom ? 0 : _barGap
         bottom: _barAtBottom ? _barGapBot : 0
+        right:  _panelMargin + 135
     }
+    // _pad drives symmetric padding on all sides, sourced from bar's outerMarginTop
+    readonly property real _pad: Config.outerMarginTop
+    // Minimum slot = 24px icon + pad on both sides so pill never collapses when empty
+    readonly property real _minSlot: 24 + _pad * 2
+
+    implicitHeight: _minSlot
+    implicitWidth:  popupRect.implicitWidth
     exclusionMode: ExclusionMode.Ignore
-    implicitHeight: popupRect.implicitHeight + 4
 
     // Full-surface dismiss — window is transparent so this is invisible
     MouseArea {
@@ -32,17 +39,13 @@ PanelWindow {
 
     Rectangle {
         id: popupRect
-
-        x: Math.max(0, Math.min(
-               SysTrayPopupState.anchorX - implicitWidth + 18,
-               win.width - implicitWidth))
+        anchors.fill: parent
         y: 0
 
-        implicitHeight: Config.barHeight
-        implicitWidth:  Math.max(Config.barHeight,
-                                 trayRow.implicitWidth + Config.trayItemPadH * 2)
+        implicitHeight: win._minSlot
+        implicitWidth:  Math.max(win._minSlot, trayRow.implicitWidth + win._pad * 2)
 
-        radius: Config.barMode === "island" ? Config.islandRadius : Config.barRadius
+        radius: implicitHeight / 2
         color:  Theme.cPanelBg
         border.width: 2
         border.color : Qt.rgba(Theme.cOnPrimaryFixedVariant.r,
@@ -63,8 +66,8 @@ PanelWindow {
                     required property SystemTrayItem modelData
                     required property int index
 
-                    width:  Config.trayIconSz + Config.trayItemPadH * 2
-                    height: Config.trayIconSz + Config.trayItemPadV * 2
+                    width:  Config.trayIconSz
+                    height: Config.trayIconSz
 
                     readonly property string _src: {
                         const ic = slot.modelData.icon || ""

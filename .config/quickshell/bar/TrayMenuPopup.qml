@@ -22,10 +22,25 @@ PanelWindow {
         menu: null   // set dynamically when a hasChildren row is hovered
     }
 
-    // ── Layer shell config ─────────────────────────────────────────────────
-    // Horizontal strip anchored to the top of the screen, appearing below the bar.
-    anchors { top: true; left: true; right: true }
-    margins.top: Config.barHeight + Config.outerMarginTop + Config.outerMarginBottom + 3
+    // ── Layer shell config — mirrors StartMenuPopup positioning ───────────
+    // Anchored to top/bottom based on bar position, right edge tracking bar
+    // side margin. Adjust x by +/- pixels after to align under the tray icon.
+    readonly property bool  _barAtBottom: Config.barPosition === "bottom"
+    readonly property real  _panelMargin: Config.outerMarginSide * 2
+    property real _barGap:    Config.outerMarginTop + Config.barHeight + 6
+    property real _barGapBot: Config.outerMarginBottom + Config.barHeight + 6
+
+    anchors {
+        top:    !_barAtBottom
+        bottom:  _barAtBottom
+        left:    true
+        right:   true
+    }
+    margins {
+        top:    _barAtBottom ? 0 : _barGap
+        bottom: _barAtBottom ? _barGapBot : 0
+        right:  _panelMargin
+    }
 
     exclusionMode: ExclusionMode.Ignore
 
