@@ -3929,7 +3929,7 @@ PanelWindow {
                             }
                             Process {
                                 id: _openGumroad
-                                command: ["xdg-open", "https://mirukai.gumroad.com/l/cxsyj"]
+                                command: ["xdg-open", "https://mirukai.gumroad.com/l/mmnrfq"]
                                 running: false
                                 onExited: running = false
                             }
