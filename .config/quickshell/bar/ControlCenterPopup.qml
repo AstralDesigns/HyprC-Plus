@@ -981,8 +981,8 @@ PanelWindow {
                             _layoutReader.running = true
                             _hyprStateReader.running = true
                             _kbLayoutReader.running  = true
-                            mainStack.currentIndex = 0
-                            ccTabSettings.activeTab = 0
+                            mainStack.currentIndex = 1
+                            ccTabSettings.activeTab = 1
                         }
                     } else {
                         ccWin._licStatus = "invalid"
