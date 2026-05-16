@@ -1700,8 +1700,8 @@ PanelWindow {
                                         CCSlider { label:"Radial Stroke";from:1;to:6;  value:Config.batteryRadialWidth; onMoved:function(v){Config.batteryRadialWidth=v} }
 
                                         CCSection { text: "Tray" }
-                                        CCSlider { label:"Icon Size";    from:10;to:32; value:Config.trayIconSz;     onMoved:function(v){Config.trayIconSz=v} }
-                                        CCSlider { label:"Item Pad H";   from:0;to:8;   value:Config.trayItemPadH;   onMoved:function(v){Config.trayItemPadH=v} }
+                                        //CCSlider { label:"Icon Size";    from:10;to:32; value:Config.trayIconSz;     onMoved:function(v){Config.trayIconSz=v} }
+                                        //CCSlider { label:"Item Pad H";   from:0;to:8;   value:Config.trayItemPadH;   onMoved:function(v){Config.trayItemPadH=v} }
                                         CCSlider { label:"Item Spacing"; from:0;to:10;  value:Config.trayItemSpacing; onMoved:function(v){Config.trayItemSpacing=v} }
 
                                         Item { height: 10 }
