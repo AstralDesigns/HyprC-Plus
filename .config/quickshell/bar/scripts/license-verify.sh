@@ -7,7 +7,7 @@
 # Gumroad product settings page (Settings → License Keys → Product ID).
 # This keeps the ID out of the QML source.
 
-PRODUCT_ID="qyLXH3bCRFgiaFrjVWwIjQ=="
+PRODUCT_ID="EAr8yOIA88_asU7u9-ca4g=="
 LICENSE_KEY="${1:-}"
 INCREMENT="${2:-false}"
 
