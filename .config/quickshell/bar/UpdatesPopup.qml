@@ -115,8 +115,8 @@ PanelWindow {
                 height: UpdatesPopupState.hasUpdates ? 36 : 0
                 radius: 10
                 color: sysUpdateHover.containsMouse
-                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
                 visible: UpdatesPopupState.hasUpdates
                 clip: true
                 Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
@@ -219,8 +219,8 @@ PanelWindow {
                 height: UpdatesPopupState.hcHasUpdates ? 36 : 0
                 radius: 10
                 color: hcUpdateHover.containsMouse
-                    ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.25)
-                    : Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.12)
+                    ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.12)
+                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
                 visible: UpdatesPopupState.hcHasUpdates
                 clip: true
                 Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
