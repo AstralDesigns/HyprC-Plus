@@ -1223,8 +1223,8 @@ const HyprCandyDock = GObject.registerClass({
             label.set_hexpand(true);
             rowBox.append(label);
 
-            // Small state glyph on the right — ↩ for restore, ⤴ for focus
-            const stateLabel = Gtk.Label.new(isMinimized ? '↩' : '⤴');
+            // Small state glyph on the right — ↩ for restore,  for focus
+            const stateLabel = Gtk.Label.new(isMinimized ? '' : '');
             stateLabel.set_halign(Gtk.Align.END);
             stateLabel.set_margin_start(6);
             rowBox.append(stateLabel);
