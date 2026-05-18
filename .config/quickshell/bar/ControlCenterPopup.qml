@@ -808,6 +808,7 @@ PanelWindow {
         category: "cc-tabs-v1"
         property int activeTab: 1  // Default to Hyprland tab (index 1)
         property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
+        property int activeKbSubTab:  0  // Remembered Keybinds sub-tab (0 = View, 1 = Edit)
     }
     Settings {
         id: ccLocSettings
@@ -1202,7 +1203,8 @@ PanelWindow {
                             { icon: "󰔎", label: "Themes",    idx: 2 },
                             { icon: "󰇜", label: "Dock",      idx: 3 },
                             { icon: "󰮫", label: "Menus",     idx: 4 },
-                            { icon: "󰍂", label: "SDDM",      idx: 5 }
+                            { icon: "󰍂", label: "SDDM",      idx: 5 },
+                            { icon: "󰌌", label: "Keybinds",  idx: 7 }
                         ]
 
                         delegate: Rectangle {
@@ -3943,6 +3945,846 @@ PanelWindow {
                             }
 
                             Item { height: 10 }
+                        }
+                    }
+
+                    // ── TAB 7: Keybinds ──────────────────────────────────────
+                    Item {
+                        id: kbTabRoot
+
+                        // ── Keybind data model ─────────────────────────────────────────────
+                        // hyprviz binds (read-only from ~/.config/hypr/hyprviz.lua)
+                        property var hyprvizBinds: []
+                        // custom binds (read/write from ~/.config/custom/custom.lua)
+                        property var customBinds:  []
+                        // Editor state
+                        property int  editingIdx:   -1   // -1 = new entry
+                        property string editKeys:   ""
+                        property string editCmd:    ""
+                        property string editDesc:   ""
+                        // Search / filter
+                        property string kbFilter:   ""
+                        // Sub-tab index (mirrored to/from ccTabSettings)
+                        property int kbSubIdx: ccTabSettings.activeKbSubTab
+
+                        // ── Lua line regex helper (pure JS) ─────────────────────────────
+                        function parseBindLine(line) {
+                            // Match: hl.bind("KEYS", ..., { description = "DESC" })
+                            // or hl.bind("KEYS", hl.dsp.exec_cmd("CMD"), { description = "DESC" })
+                            // Keys
+                            const keysM = line.match(/hl\.bind\s*\(\s*"([^"]+)"/)
+                            if (!keysM) return null
+                            const keys = keysM[1]
+                            // Description
+                            const descM = line.match(/description\s*=\s*"([^"]*)"/)
+                            const desc  = descM ? descM[1] : ""
+                            // Command — try exec_cmd first, then whole second arg
+                            let cmd = ""
+                            const execM = line.match(/hl\.dsp\.exec_cmd\s*\(\s*"((?:[^"\\]|\\.)*)"\s*\)/)
+                            if (execM) {
+                                cmd = execM[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+                            } else {
+                                // Non-exec dispatch — extract the dispatch call text
+                                const dispM = line.match(/hl\.bind\s*\(\s*"[^"]+"\s*,\s*(hl\.[^,\)]+)/)
+                                if (dispM) cmd = dispM[1].trim()
+                            }
+                            return { keys: keys, cmd: cmd, desc: desc, raw: line }
+                        }
+
+                        // Build hl.bind line for custom.lua
+                        function makeBindLine(keys, cmd, desc) {
+                            const escapedCmd = cmd.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+                            const escapedDesc = desc.replace(/"/g, '\\"')
+                            return 'hl.bind("' + keys + '", hl.dsp.exec_cmd("' + escapedCmd + '"), { description = "' + escapedDesc + '" })'
+                        }
+
+                        // Serialise binds to custom.lua content.
+                        // Pass an explicit array to avoid QML notification timing issues
+                        // (e.g. after splice, the property assignment may not have propagated yet).
+                        function buildCustomLua(binds) {
+                            const src = binds !== undefined ? binds : kbTabRoot.customBinds
+                            let lines = [
+                                '--  ██████╗ █████╗ ███╗   ██╗██████╗ ██╗   ██╗',
+                                '-- ██╔════╝██╔══██╗████╗  ██║██╔══██╗╚██╗ ██╔╝',
+                                '-- ██║     ███████║██╔██╗ ██║██║  ██║ ╚████╔╝ ',
+                                '-- ██║     ██╔══██║██║╚██╗██║██║  ██║  ╚██╔╝  ',
+                                '-- ╚██████╗██║  ██║██║ ╚████║██████╔╝   ██║   ',
+                                '--  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝    ╚═╝   ',
+                                '-- ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
+                                '-- ┃                          User Settings                      ┃',
+                                '-- ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛',
+                                '-- [NOTE!!] Your personal settings added here are sourced in hyprland.lua.',
+                                '',
+                            ]
+                            for (let i = 0; i < src.length; i++)
+                                lines.push(kbTabRoot.makeBindLine(src[i].keys, src[i].cmd, src[i].desc))
+                            lines.push('')
+                            lines.push('return true')
+                            return lines.join('\n')
+                        }
+
+                        // ── Processes ─────────────────────────────────────────────────────
+                        // Read hyprviz.lua (keybinds section from line 1808 onwards)
+                        Process {
+                            id: _kbHyprvizReader
+                            command: ["bash", "-c",
+                                "f=\"$HOME/.config/hypr/hyprviz.lua\"; " +
+                                "[ -f \"$f\" ] && awk '/^-- Keybindings/,0' \"$f\" || true"]
+                            running: false
+                            property string _buf: ""
+                            stdout: SplitParser {
+                                splitMarker: "\n"
+                                onRead: function(l) { _kbHyprvizReader._buf += l + "\n" }
+                            }
+                            onExited: {
+                                const raw = _buf; _buf = ""
+                                const lines = raw.split("\n")
+                                const parsed = []
+                                for (let i = 0; i < lines.length; i++) {
+                                    const b = kbTabRoot.parseBindLine(lines[i].trim())
+                                    if (b) parsed.push(b)
+                                }
+                                kbTabRoot.hyprvizBinds = parsed
+                            }
+                        }
+
+                        // Read custom.lua
+                        Process {
+                            id: _kbCustomReader
+                            command: ["bash", "-c",
+                                "f=\"$HOME/.config/custom/custom.lua\"; " +
+                                "[ -f \"$f\" ] && cat \"$f\" || true"]
+                            running: false
+                            property string _buf: ""
+                            stdout: SplitParser {
+                                splitMarker: "\n"
+                                onRead: function(l) { _kbCustomReader._buf += l + "\n" }
+                            }
+                            onExited: {
+                                const raw = _buf; _buf = ""
+                                const lines = raw.split("\n")
+                                const parsed = []
+                                for (let i = 0; i < lines.length; i++) {
+                                    const b = kbTabRoot.parseBindLine(lines[i].trim())
+                                    if (b) parsed.push(b)
+                                }
+                                kbTabRoot.customBinds = parsed
+                            }
+                        }
+
+                        // Write custom.lua — command is assigned imperatively (not as a
+                        // declarative binding) so each call gets the current base64 payload.
+                        // Quickshell snapshots declarative bindings at component creation,
+                        // so a reactive binding on command would always use the initial empty _b64.
+                        // btoa encodes content to base64 (alphanumeric+/+=) making it safe to
+                        // single-quote in the shell command with zero escaping concerns.
+                        // Atomic tmp→mv ensures no partial writes reach the file.
+                        Process {
+                            id: _kbCustomWriter
+                            running: false
+                            onExited: running = false
+                        }
+
+                        function saveToCustomLua(content) {
+                            if (_kbCustomWriter.running) return
+                            const b64 = Qt.btoa(content)
+                            _kbCustomWriter.command = ["bash", "-c",
+                                "mkdir -p \"$HOME/.config/custom\" && " +
+                                "t=\"$(mktemp \"$HOME/.config/custom/.custom.lua.XXXXXX\")\" && " +
+                                "printf '%s' '" + b64 + "' | base64 -d > \"$t\" && " +
+                                "mv \"$t\" \"$HOME/.config/custom/custom.lua\""]
+                            _kbCustomWriter.running = true
+                        }
+
+                        // Trigger reads when this tab becomes active
+                        Connections {
+                            target: ccTabSettings
+                            function onActiveTabChanged() {
+                                if (ccTabSettings.activeTab === 7) {
+                                    _kbHyprvizReader.running = true
+                                    _kbCustomReader.running  = true
+                                }
+                            }
+                        }
+
+                        // ── Layout ─────────────────────────────────────────────────────────
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 6
+
+                            // Sub-tab header row
+                            Row {
+                                Layout.fillWidth: true
+                                spacing: 4
+                                Repeater {
+                                    model: ["󰈈 View", "󰏫 Edit"]
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        required property int index
+                                        property int _subIdx: kbSubStack.currentIndex
+                                        height: 30
+                                        implicitWidth: _kbStLabel.implicitWidth + 18
+                                        radius: 9
+                                        color: _subIdx === index
+                                            ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                      Theme.cInversePrimary.b, 0.72)
+                                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                      Theme.cInversePrimary.b, 0.16)
+                                        border.width: _subIdx === index ? 1 : 0
+                                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                              Theme.cPrimary.b, 0.42)
+                                        Text {
+                                            id: _kbStLabel; anchors.centerIn: parent
+                                            text: modelData; color: Theme.cPrimary
+                                            font.family: Config.labelFont; font.pixelSize: 12
+                                            font.weight: (index !== undefined && _subIdx === index) ? 600 : 400
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                kbSubStack.currentIndex = index
+                                                ccTabSettings.activeKbSubTab = index
+                                                kbTabRoot.kbSubIdx = index
+                                            }
+                                        }
+                                        Behavior on color { ColorAnimation { duration: 120 } }
+                                    }
+                                }
+
+                                // Search field (only on View sub-tab)
+                                Item { width: 10; visible: kbSubStack.currentIndex === 0 }
+                                Rectangle {
+                                    visible: kbSubStack.currentIndex === 0
+                                    height: 30
+                                    width: 180
+                                    radius: 9
+                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                   Theme.cInversePrimary.b, 0.16)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                          Theme.cPrimary.b, 0.18)
+                                    Row {
+                                        anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                        spacing: 5
+                                        Text {
+                                            text: "󰍉"
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.5)
+                                            font.family: Config.fontFamily; font.pixelSize: 13
+                                            anchors.verticalCenter: parent.verticalCenter
+                                        }
+                                        Item {
+                                            width: 140; height: 20
+                                            TextInput {
+                                                id: kbSearchInput
+                                                anchors.fill: parent
+                                                color: Theme.cPrimary
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                onTextChanged: kbTabRoot.kbFilter = text.toLowerCase()
+                                                verticalAlignment: TextInput.AlignVCenter
+                                            }
+                                            Text {
+                                                anchors.fill: parent
+                                                text: "Search binds..."
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.38)
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                verticalAlignment: Text.AlignVCenter
+                                                visible: kbSearchInput.text.length === 0
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Separator
+                            Rectangle {
+                                Layout.fillWidth: true; height: 1
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                            }
+
+                            // Sub-tab content
+                            StackLayout {
+                                id: kbSubStack
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                currentIndex: ccTabSettings.activeKbSubTab
+
+                                // ── VIEW sub-tab ─────────────────────────────────
+                                Item {
+                                    Flickable {
+                                        anchors.fill: parent
+                                        contentWidth: width
+                                        contentHeight: kbViewCol.implicitHeight + 20
+                                        clip: true
+                                        boundsBehavior: Flickable.StopAtBounds
+                                        ScrollBar.vertical: ScrollBar {
+                                            policy: ScrollBar.AsNeeded
+                                            contentItem: Rectangle {
+                                                implicitWidth: 4
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                                radius: 2
+                                            }
+                                            background: Rectangle { color: "transparent" }
+                                        }
+
+                                        ColumnLayout {
+                                            id: kbViewCol
+                                            width: parent.width - 8
+                                            anchors { left: parent.left; leftMargin: 2; top: parent.top; topMargin: 8 }
+                                            spacing: 0
+
+                                            // hyprviz.lua section
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Layout.topMargin: 4; Layout.bottomMargin: 4
+                                                Text {
+                                                    text: "󰌌 hyprviz.lua"
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont
+                                                    font.pixelSize: 12; font.weight: Font.Bold
+                                                    font.letterSpacing: 0.5
+                                                }
+                                                Rectangle {
+                                                    Layout.fillWidth: true; height: 1
+                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
+                                                }
+                                                Text {
+                                                    text: "read-only"
+                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.42)
+                                                    font.family: Config.labelFont; font.pixelSize: 10
+                                                }
+                                            }
+
+                                            Repeater {
+                                                model: {
+                                                    const f = kbTabRoot.kbFilter
+                                                    if (!f) return kbTabRoot.hyprvizBinds
+                                                    return kbTabRoot.hyprvizBinds.filter(function(b) {
+                                                        return b.keys.toLowerCase().indexOf(f) !== -1 ||
+                                                               b.desc.toLowerCase().indexOf(f) !== -1 ||
+                                                               b.cmd.toLowerCase().indexOf(f) !== -1
+                                                    })
+                                                }
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    required property int index
+                                                    Layout.fillWidth: true
+                                                    height: 44; radius: 9
+                                                    color: index % 2 === 0
+                                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                  Theme.cInversePrimary.b, 0.09)
+                                                        : "transparent"
+                                                    RowLayout {
+                                                        anchors { fill: parent; leftMargin: 10; rightMargin: 10 }
+                                                        spacing: 8
+                                                        // Key badge
+                                                        Rectangle {
+                                                            height: 24
+                                                            implicitWidth: _kbKeyLbl.implicitWidth + 16
+                                                            radius: 6
+                                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                           Theme.cPrimary.b, 0.14)
+                                                            border.width: 1
+                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                                  Theme.cPrimary.b, 0.28)
+                                                            Text {
+                                                                id: _kbKeyLbl
+                                                                anchors.centerIn: parent
+                                                                text: modelData.keys
+                                                                color: Theme.cPrimary
+                                                                font.family: Config.labelFont
+                                                                font.pixelSize: 11; font.weight: Font.Medium
+                                                            }
+                                                        }
+                                                        // Description
+                                                        Text {
+                                                            Layout.fillWidth: true
+                                                            text: modelData.desc !== "" ? modelData.desc : modelData.cmd
+                                                            color: Theme.cPrimary
+                                                            font.family: Config.labelFont; font.pixelSize: 12
+                                                            elide: Text.ElideRight
+                                                            opacity: 0.85
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // custom.lua section
+                                            RowLayout {
+                                                Layout.fillWidth: true
+                                                Layout.topMargin: 14; Layout.bottomMargin: 4
+                                                Text {
+                                                    text: "󰏫 custom.lua"
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont
+                                                    font.pixelSize: 12; font.weight: Font.Bold
+                                                    font.letterSpacing: 0.5
+                                                }
+                                                Rectangle {
+                                                    Layout.fillWidth: true; height: 1
+                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
+                                                }
+                                                Text {
+                                                    text: "editable"
+                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.42)
+                                                    font.family: Config.labelFont; font.pixelSize: 10
+                                                }
+                                            }
+
+                                            // Empty state for custom
+                                            Text {
+                                                visible: kbTabRoot.customBinds.length === 0
+                                                Layout.fillWidth: true
+                                                text: "No custom keybinds yet — add some in the Edit tab."
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.38)
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                horizontalAlignment: Text.AlignHCenter
+                                                topPadding: 6; bottomPadding: 6
+                                            }
+
+                                            Repeater {
+                                                model: {
+                                                    const f = kbTabRoot.kbFilter
+                                                    if (!f) return kbTabRoot.customBinds
+                                                    return kbTabRoot.customBinds.filter(function(b) {
+                                                        return b.keys.toLowerCase().indexOf(f) !== -1 ||
+                                                               b.desc.toLowerCase().indexOf(f) !== -1 ||
+                                                               b.cmd.toLowerCase().indexOf(f) !== -1
+                                                    })
+                                                }
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    required property int index
+                                                    Layout.fillWidth: true
+                                                    height: 44; radius: 9
+                                                    color: index % 2 === 0
+                                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                  Theme.cInversePrimary.b, 0.12)
+                                                        : "transparent"
+                                                    RowLayout {
+                                                        anchors { fill: parent; leftMargin: 10; rightMargin: 10 }
+                                                        spacing: 8
+                                                        // Key badge (accent for custom)
+                                                        Rectangle {
+                                                            height: 24
+                                                            implicitWidth: _ckbKeyLbl.implicitWidth + 16
+                                                            radius: 6
+                                                            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                           Theme.cInversePrimary.b, 0.38)
+                                                            border.width: 1
+                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                                  Theme.cPrimary.b, 0.40)
+                                                            Text {
+                                                                id: _ckbKeyLbl
+                                                                anchors.centerIn: parent
+                                                                text: modelData.keys
+                                                                color: Theme.cPrimary
+                                                                font.family: Config.labelFont
+                                                                font.pixelSize: 11; font.weight: Font.Medium
+                                                            }
+                                                        }
+                                                        // Description
+                                                        Text {
+                                                            Layout.fillWidth: true
+                                                            text: modelData.desc !== "" ? modelData.desc : modelData.cmd
+                                                            color: Theme.cPrimary
+                                                            font.family: Config.labelFont; font.pixelSize: 12
+                                                            elide: Text.ElideRight
+                                                            opacity: 0.85
+                                                        }
+                                                        // Quick-edit button
+                                                        Rectangle {
+                                                            width: 26; height: 26; radius: 7
+                                                            color: _qeHov.containsMouse
+                                                                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                          Theme.cInversePrimary.b, 0.38)
+                                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                          Theme.cPrimary.b, 0.08)
+                                                            Behavior on color { ColorAnimation { duration: 100 } }
+                                                            Text {
+                                                                anchors.centerIn: parent; text: "󰏫"
+                                                                font.family: Config.fontFamily; font.pixelSize: 13
+                                                                color: Theme.cPrimary
+                                                            }
+                                                            MouseArea {
+                                                                id: _qeHov; anchors.fill: parent
+                                                                hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                                onClicked: {
+                                                                    kbTabRoot.editingIdx = index
+                                                                    kbTabRoot.editKeys   = modelData.keys
+                                                                    kbTabRoot.editCmd    = modelData.cmd
+                                                                    kbTabRoot.editDesc   = modelData.desc
+                                                                    kbSubStack.currentIndex = 1
+                                                                    ccTabSettings.activeKbSubTab = 1
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Item { height: 12 }
+                                        }
+                                    }
+                                }
+
+                                // ── EDIT sub-tab ─────────────────────────────────
+                                Item {
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        anchors.margins: 4
+                                        spacing: 8
+
+                                        // List of custom binds for selection/deletion
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 180
+                                            radius: 11
+                                            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                           Theme.cInversePrimary.b, 0.10)
+                                            border.width: 1
+                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                  Theme.cPrimary.b, 0.16)
+                                            clip: true
+
+                                            Flickable {
+                                                anchors { fill: parent; margins: 4 }
+                                                contentWidth: width
+                                                contentHeight: kbEditList.implicitHeight
+                                                clip: true
+                                                boundsBehavior: Flickable.StopAtBounds
+                                                ScrollBar.vertical: ScrollBar {
+                                                    policy: ScrollBar.AsNeeded
+                                                    contentItem: Rectangle {
+                                                        implicitWidth: 3
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                                        radius: 2
+                                                    }
+                                                    background: Rectangle { color: "transparent" }
+                                                }
+
+                                                ColumnLayout {
+                                                    id: kbEditList
+                                                    width: parent.width - 8
+                                                    spacing: 2
+
+                                                    Text {
+                                                        visible: kbTabRoot.customBinds.length === 0
+                                                        text: "No custom binds — create one below"
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.38)
+                                                        font.family: Config.labelFont; font.pixelSize: 11
+                                                        Layout.fillWidth: true
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                        topPadding: 8
+                                                    }
+
+                                                    Repeater {
+                                                        model: kbTabRoot.customBinds
+                                                        delegate: Rectangle {
+                                                            required property var modelData
+                                                            required property int index
+                                                            Layout.fillWidth: true
+                                                            height: 36; radius: 8
+                                                            color: kbTabRoot.editingIdx === index
+                                                                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                          Theme.cInversePrimary.b, 0.50)
+                                                                : (_kbRowHov.hovered
+                                                                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                              Theme.cInversePrimary.b, 0.22)
+                                                                    : "transparent")
+                                                            Behavior on color { ColorAnimation { duration: 100 } }
+
+                                                            RowLayout {
+                                                                anchors { fill: parent; leftMargin: 8; rightMargin: 6 }
+                                                                spacing: 6
+                                                                Text {
+                                                                    text: modelData.keys
+                                                                    color: Theme.cPrimary
+                                                                    font.family: Config.labelFont
+                                                                    font.pixelSize: 11; font.weight: Font.Medium
+                                                                    Layout.preferredWidth: 130
+                                                                    elide: Text.ElideRight
+                                                                }
+                                                                Text {
+                                                                    Layout.fillWidth: true
+                                                                    text: modelData.desc !== "" ? modelData.desc : modelData.cmd
+                                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.70)
+                                                                    font.family: Config.labelFont; font.pixelSize: 11
+                                                                    elide: Text.ElideRight
+                                                                }
+                                                                // Delete button
+                                                                Rectangle {
+                                                                    width: 22; height: 22; radius: 6
+                                                                    color: _delHov.containsMouse
+                                                                        ? Qt.rgba(1, 0.3, 0.3, 0.35)
+                                                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
+                                                                    Behavior on color { ColorAnimation { duration: 100 } }
+                                                                    Text {
+                                                                        anchors.centerIn: parent; text: "󰅙"
+                                                                        font.family: Config.fontFamily; font.pixelSize: 11
+                                                                        color: _delHov.containsMouse ? "#ff6e6e" : Theme.cPrimary
+                                                                    }
+                                                                    MouseArea {
+                                                                        id: _delHov; anchors.fill: parent
+                                                                        hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                                        onClicked: {
+                                                                            let arr = kbTabRoot.customBinds.slice()
+                                                                            arr.splice(index, 1)
+                                                                            // saveToCustomLua MUST be called before customBinds = arr.
+                                                                            // Assigning customBinds triggers the Repeater to synchronously
+                                                                            // destroy delegates — including this one — tearing down the JS
+                                                                            // execution context so any code after the assignment never runs.
+                                                                            kbTabRoot.saveToCustomLua(kbTabRoot.buildCustomLua(arr))
+                                                                            kbTabRoot.customBinds = arr
+                                                                            if (kbTabRoot.editingIdx === index) {
+                                                                                kbTabRoot.editingIdx = -1
+                                                                                kbTabRoot.editKeys = ""
+                                                                                kbTabRoot.editCmd  = ""
+                                                                                kbTabRoot.editDesc = ""
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            // TapHandler on the delegate itself — fires only when the click
+                                                            // is NOT handled by a child item (e.g. the delete button's MouseArea).
+                                                            // Replaces the full-row MouseArea which sat above _delHov in z-order
+                                                            // and swallowed every click before the delete button could see it.
+                                                            TapHandler {
+                                                                onTapped: {
+                                                                    kbTabRoot.editingIdx = index
+                                                                    kbTabRoot.editKeys   = modelData.keys
+                                                                    kbTabRoot.editCmd    = modelData.cmd
+                                                                    kbTabRoot.editDesc   = modelData.desc
+                                                                }
+                                                            }
+                                                            HoverHandler { id: _kbRowHov }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // ── Entry form ─────────────────────────────────────
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Text {
+                                                text: kbTabRoot.editingIdx >= 0 ? "Editing #" + (kbTabRoot.editingIdx + 1) : "New Bind"
+                                                color: Theme.cPrimary
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                font.weight: Font.Bold
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            // Clear / new button
+                                            Rectangle {
+                                                height: 26
+                                                implicitWidth: _newBtnLbl.implicitWidth + 18
+                                                radius: 8
+                                                color: _newBtnHov.containsMouse
+                                                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                              Theme.cInversePrimary.b, 0.38)
+                                                    : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                              Theme.cInversePrimary.b, 0.18)
+                                                Behavior on color { ColorAnimation { duration: 100 } }
+                                                Text {
+                                                    id: _newBtnLbl; anchors.centerIn: parent
+                                                    text: "󰐕 New"
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 11
+                                                }
+                                                MouseArea {
+                                                    id: _newBtnHov; anchors.fill: parent
+                                                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        kbTabRoot.editingIdx = -1
+                                                        kbTabRoot.editKeys = ""
+                                                        kbTabRoot.editCmd  = ""
+                                                        kbTabRoot.editDesc = ""
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Keys field
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Keys"
+                                                color: Theme.cPrimary
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                Layout.preferredWidth: 64
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 8
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                               Theme.cInversePrimary.b, 0.16)
+                                                border.width: kbKeysInput.activeFocus ? 1 : 0
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
+                                                Item {
+                                                    anchors { left: parent.left; right: parent.right
+                                                              leftMargin: 8; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    height: 20
+                                                    TextInput {
+                                                        id: kbKeysInput
+                                                        anchors.fill: parent
+                                                        text: kbTabRoot.editKeys
+                                                        color: Theme.cPrimary
+                                                        font.family: Config.labelFont; font.pixelSize: 12
+                                                        onTextChanged: kbTabRoot.editKeys = text
+                                                        verticalAlignment: TextInput.AlignVCenter
+                                                    }
+                                                    Text {
+                                                        anchors.fill: parent
+                                                        text: "e.g. SUPER + T"
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.36)
+                                                        font.family: Config.labelFont; font.pixelSize: 12
+                                                        verticalAlignment: Text.AlignVCenter
+                                                        visible: kbKeysInput.text.length === 0
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Command field
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Command"
+                                                color: Theme.cPrimary
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                Layout.preferredWidth: 64
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 8
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                               Theme.cInversePrimary.b, 0.16)
+                                                border.width: kbCmdInput.activeFocus ? 1 : 0
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
+                                                Item {
+                                                    anchors { left: parent.left; right: parent.right
+                                                              leftMargin: 8; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    height: 20
+                                                    TextInput {
+                                                        id: kbCmdInput
+                                                        anchors.fill: parent
+                                                        text: kbTabRoot.editCmd
+                                                        color: Theme.cPrimary
+                                                        font.family: Config.labelFont; font.pixelSize: 12
+                                                        onTextChanged: kbTabRoot.editCmd = text
+                                                        verticalAlignment: TextInput.AlignVCenter
+                                                    }
+                                                    Text {
+                                                        anchors.fill: parent
+                                                        text: "e.g. kitty"
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.36)
+                                                        font.family: Config.labelFont; font.pixelSize: 12
+                                                        verticalAlignment: Text.AlignVCenter
+                                                        visible: kbCmdInput.text.length === 0
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Description field
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Describe"
+                                                color: Theme.cPrimary
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                Layout.preferredWidth: 64
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 8
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                               Theme.cInversePrimary.b, 0.16)
+                                                border.width: kbDescInput.activeFocus ? 1 : 0
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
+                                                Item {
+                                                    anchors { left: parent.left; right: parent.right
+                                                              leftMargin: 8; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    height: 20
+                                                    TextInput {
+                                                        id: kbDescInput
+                                                        anchors.fill: parent
+                                                        text: kbTabRoot.editDesc
+                                                        color: Theme.cPrimary
+                                                        font.family: Config.labelFont; font.pixelSize: 12
+                                                        onTextChanged: kbTabRoot.editDesc = text
+                                                        verticalAlignment: TextInput.AlignVCenter
+                                                    }
+                                                    Text {
+                                                        anchors.fill: parent
+                                                        text: "What does this do?"
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.36)
+                                                        font.family: Config.labelFont; font.pixelSize: 12
+                                                        verticalAlignment: Text.AlignVCenter
+                                                        visible: kbDescInput.text.length === 0
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Save / Cancel row
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 6
+
+                                            Item { Layout.fillWidth: true }
+
+                                            // Save button
+                                            Rectangle {
+                                                height: 32
+                                                implicitWidth: _saveBtnLbl.implicitWidth + 22
+                                                radius: 9
+                                                color: _saveBtnHov.containsMouse
+                                                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                              Theme.cInversePrimary.b, 0.70)
+                                                    : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                              Theme.cInversePrimary.b, 0.45)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                      Theme.cPrimary.b, 0.40)
+                                                Behavior on color { ColorAnimation { duration: 100 } }
+                                                Text {
+                                                    id: _saveBtnLbl; anchors.centerIn: parent
+                                                    text: kbTabRoot.editingIdx >= 0 ? "󰏫 Update" : "󰐕 Add Bind"
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    font.weight: Font.Medium
+                                                }
+                                                MouseArea {
+                                                    id: _saveBtnHov; anchors.fill: parent
+                                                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                    onClicked: {
+                                                        const k = kbTabRoot.editKeys.trim()
+                                                        const c = kbTabRoot.editCmd.trim()
+                                                        const d = kbTabRoot.editDesc.trim()
+                                                        if (k === "" || c === "") return
+                                                        let arr = kbTabRoot.customBinds.slice()
+                                                        const entry = { keys: k, cmd: c, desc: d, raw: "" }
+                                                        if (kbTabRoot.editingIdx >= 0) {
+                                                            arr[kbTabRoot.editingIdx] = entry
+                                                        } else {
+                                                            arr.push(entry)
+                                                        }
+                                                        // Build from arr before assigning to avoid notification timing issues
+                                                        const content = kbTabRoot.buildCustomLua(arr)
+                                                        kbTabRoot.customBinds = arr
+                                                        kbTabRoot.editingIdx  = -1
+                                                        kbTabRoot.editKeys    = ""
+                                                        kbTabRoot.editCmd     = ""
+                                                        kbTabRoot.editDesc    = ""
+                                                        kbTabRoot.saveToCustomLua(content)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Item { Layout.fillHeight: true }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
