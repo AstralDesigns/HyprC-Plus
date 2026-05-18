@@ -1,0 +1,2605 @@
+#!/usr/bin/env gjs
+// HyprCandy App Launcher — GTK4 Layer Shell
+// Replaces rofi -show drun for the hyprcandydock start button.
+//
+// Features:
+//   • Reads dock.pos (0=bottom 1=right 2=top 3=left) and positions itself
+//     2–3 px from the dock edge, centered on the perpendicular axis.
+//   • Search bar + icon grid (same categories / sort as the GTK app list).
+//   • Left-click launches the app; Enter on search launches the first match.
+//   • Right-click → context menu:
+//       – Focus / switch to running instance (one entry per window)
+//       – New Window  (always shown)
+//       – ─────────────────────────
+//       – Pin to Dock / Unpin from Dock
+//   • Styling: uses the same matugen GTK CSS variables as the dock
+//     (@blur_background, @primary, @on_secondary, @on_primary_fixed_variant …)
+//     so it matches your theme automatically.
+//   • ESC or app-launch closes the window.
+//
+// Toggle:  toggle-app-launcher.sh  (kills if running, spawns if not)
+// Signal:  the launcher sends pkill -12 -f "gjs dock-main.js" after any
+//          pin-state change so the dock hot-reloads pinned apps immediately.
+
+'use strict';
+
+imports.gi.versions.Gtk = '4.0';
+imports.gi.versions.Gdk = '4.0';
+
+const { Gtk, Gdk, Gio, GLib, GObject } = imports.gi;
+const GLibUnix       = imports.gi.GLibUnix;   // import before Gtk.Application so GJS
+                                               // routes signal_add to the new namespace
+                                               // instead of the deprecated GLib one
+const Gtk4LayerShell = imports.gi.Gtk4LayerShell;
+
+// ── Paths ──────────────────────────────────────────────────────────────────
+
+const HOME       = GLib.get_home_dir();
+// Resolve SCRIPT_DIR to an absolute path so it works regardless of whether
+// the launcher was invoked with a relative or absolute path to the script.
+// GLib.canonicalize_filename resolves '.' / '..' against cwd correctly.
+const _rawDir    = GLib.path_get_dirname(imports.system.programInvocationName);
+const SCRIPT_DIR = GLib.canonicalize_filename(_rawDir, GLib.get_current_dir());
+
+// Import the dock's config and launcher's own config
+imports.searchPath.unshift(SCRIPT_DIR);
+const DockConfig     = imports.config.DockConfig;
+const LauncherConfig = imports.launcherConfig.LauncherConfig;
+
+// ── Layout constants (read from LauncherConfig) ────────────────────────────
+
+const APP_ICON_SIZE   = LauncherConfig.iconSize       || 48;
+const TEXT_FONT_SIZE  = LauncherConfig.textFontSize   || 11;
+const TILE_WIDTH      = LauncherConfig.fixedTileWidth || 90;
+const TILE_HEIGHT     = LauncherConfig.fixedTileHeight|| 78;
+const GAP_FROM_DOCK   = 3;    // px gap between dock surface edge and launcher
+
+// ── CSS file paths (for hot-reload watcher) ────────────────────────────────
+const GTK4_COLORS_PATH = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
+
+// Horizontal dock (top / bottom) — wide landscape launcher
+const W_HORIZ    = LauncherConfig.frameWidth      || 500;
+const H_HORIZ    = LauncherConfig.frameHeight     || 480;
+// Columns = how many tiles fit in the inner content width.
+// Inner width = frame width minus 2x12 px side padding; tiles separated by 2 px gaps.
+// Math.floor((innerW + gap) / (tileW + gap)) — minimum 2 so the grid never collapses.
+const COLS_HORIZ = Math.max(2, Math.floor((W_HORIZ - 24 + 2) / (TILE_WIDTH + 2)));
+
+// Vertical dock (left / right) — narrower portrait launcher
+const W_VERT     = LauncherConfig.frameWidthVert  || 380;
+const H_VERT     = LauncherConfig.frameHeightVert || 560;
+const COLS_VERT  = Math.max(2, Math.floor((W_VERT  - 24 + 2) / (TILE_WIDTH + 2)));
+
+// ── Small helpers ──────────────────────────────────────────────────────────
+
+const _dec = new TextDecoder();
+const _enc = new TextEncoder();
+
+/** Read dock.pos → 'bottom' | 'right' | 'top' | 'left' */
+function readDockPos() {
+    try {
+        const [ok, raw] = GLib.file_get_contents(`${SCRIPT_DIR}/dock.pos`);
+        if (ok) {
+            const idx = parseInt(_dec.decode(raw).trim(), 10);
+            return ['bottom', 'right', 'top', 'left'][idx] ?? 'bottom';
+        }
+    } catch (_) {}
+    return 'bottom';
+}
+
+/** Read ~/.config/pinned → Set<className> */
+function readPinnedApps() {
+    const set = new Set();
+    try {
+        const [ok, raw] = GLib.file_get_contents(`${HOME}/.config/pinned`);
+        if (ok)
+            _dec.decode(raw).trim().split('\n')
+                .forEach(l => { if (l.trim()) set.add(l.trim()); });
+    } catch (_) {}
+    return set;
+}
+
+/** Write updated Set back to ~/.config/pinned */
+function savePinnedApps(set) {
+    const file = Gio.File.new_for_path(`${HOME}/.config/pinned`);
+    try {
+        file.replace_contents(
+            _enc.encode([...set].join('\n') + '\n'),
+            null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null
+        );
+    } catch (e) { console.error('[launcher] savePinnedApps:', e.message); }
+}
+
+/** Read ~/.config/desktop-pinned → Set<className> */
+function readDesktopPinnedApps() {
+    const set = new Set();
+    try {
+        const [ok, raw] = GLib.file_get_contents(`${HOME}/.config/desktop-pinned`);
+        if (ok)
+            _dec.decode(raw).trim().split('\n')
+                .forEach(l => { if (l.trim()) set.add(l.trim()); });
+    } catch (_) {}
+    return set;
+}
+
+/** Write updated Set back to ~/.config/desktop-pinned */
+function saveDesktopPinnedApps(set) {
+    const file = Gio.File.new_for_path(`${HOME}/.config/desktop-pinned`);
+    try {
+        file.replace_contents(
+            _enc.encode([...set].join('\n') + '\n'),
+            null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null
+        );
+    } catch (e) { console.error('[launcher] saveDesktopPinnedApps:', e.message); }
+    try { GLib.spawn_command_line_async('qs ipc call bar refreshDesktop'); } catch (_) {}
+    // Signal the dock via SIGUSR2 so hotReload() reloads desktopPinnedApps
+    // synchronously — the Gio.FileMonitor in daemon.js is async and can
+    // lose the race against the next context-menu open.
+    signalDockRefresh();
+}
+
+/**
+ * Signal the dock to hot-reload (picks up new pinned-apps state).
+ * The dock listens for SIGUSR2 (signal 12) to run hotReload().
+ */
+function signalDockRefresh() {
+    try { GLib.spawn_command_line_async('pkill -12 -f "gjs dock-main.js"'); } catch (_) {}
+}
+
+/** Spawn an app cleanly (strip LD_PRELOAD, resolve %U %F etc.) */
+function spawnApp(exec) {
+    if (!exec) return;
+    try {
+        const clean = exec.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
+        const [, argv] = GLib.shell_parse_argv(clean);
+        let envp = GLib.environ_unsetenv(GLib.get_environ(), 'LD_PRELOAD');
+        GLib.spawn_async(HOME, argv, envp,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null);
+    } catch (e) { console.error('[launcher] spawnApp:', e.message); }
+}
+
+/** Spawn an app on a specific GPU (extra env vars from switcheroo) */
+function spawnAppOnGPU(exec, envVars) {
+    if (!exec) return;
+    try {
+        const clean = exec.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
+        const [, argv] = GLib.shell_parse_argv(clean);
+        let envp = GLib.environ_unsetenv(GLib.get_environ(), 'LD_PRELOAD');
+        for (const [k, v] of Object.entries(envVars || {}))
+            envp = GLib.environ_setenv(envp, k, String(v), true);
+        GLib.spawn_async(HOME, argv, envp,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null);
+    } catch (e) { console.error('[launcher] spawnAppOnGPU:', e.message); }
+}
+
+/** Focus a Hyprland window by address */
+function focusWindow(address) {
+    try {
+        GLib.spawn_command_line_async(
+            `hyprctl dispatch "hl.dsp.focus({ window = 'address:${address}' })"`
+        );
+    } catch (_) {}
+}
+
+/**
+ * Query running apps via hyprctl clients -j.
+ * Returns Map<lowerCaseClass, [{title, address}]>
+ */
+function getRunningApps() {
+    const running = new Map();
+    try {
+        const [ok, out] = GLib.spawn_command_line_sync('hyprctl clients -j');
+        if (ok) {
+            const clients = JSON.parse(_dec.decode(out));
+            for (const c of clients) {
+                const cls = (c.class || '').toLowerCase();
+                if (!running.has(cls)) running.set(cls, []);
+                running.get(cls).push({ title: c.title || '(no title)', address: c.address });
+            }
+        }
+    } catch (_) {}
+    return running;
+}
+
+/**
+ * Build the full sorted app list from Gio.AppInfo.
+ * Returns [{name, iconName, className, exec, info}]
+ */
+function getAllApps() {
+    const apps = [];
+    const seen = new Set();
+    for (const info of Gio.AppInfo.get_all()) {
+        if (!info.should_show()) continue;
+        const id = info.get_id();
+        if (seen.has(id)) continue;
+        seen.add(id);
+
+        const name  = info.get_display_name() || info.get_name() || id;
+        const gicon = info.get_icon();
+        let iconName = 'application-x-executable';
+        if (gicon) {
+            const names = gicon.get_names && gicon.get_names();
+            if (names && names.length > 0) {
+                iconName = names[0];
+            } else {
+                const f = gicon.get_file && gicon.get_file();
+                iconName = (f && f.get_path && f.get_path()) || gicon.to_string() || iconName;
+            }
+        }
+
+        // Prefer StartupWMClass for pin matching (same key the dock uses).
+        // wmClass is stored separately so pin checks can always test it even
+        // when Gio.AppInfo returns the object without get_startup_wm_class.
+        const wm        = info.get_startup_wm_class && info.get_startup_wm_class();
+        const wmClass   = wm || null;
+        const className = wm || id.replace('.desktop', '');
+        // Desktop file ID — used when writing to desktop-pinned so QML can
+        // resolve the entry via DesktopEntries.byId() without heuristics.
+        const desktopId = id.replace(/\.desktop$/, '');
+
+        const cmd  = info.get_commandline && info.get_commandline();
+        const exec = cmd ? cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim() : null;
+
+        apps.push({ name, iconName, className, desktopId, wmClass, exec, info });
+    }
+    apps.sort((a, b) => a.name.localeCompare(b.name));
+    return apps;
+}
+
+// ── Favorites ──────────────────────────────────────────────────────────────
+
+// nf-md-star_four_points_outline  (U+F06D0 in MDI; mapped in Nerd Fonts 3.x)
+// Replace this literal with the glyph from your Nerd Fonts browser if it
+// doesn't render as expected — the codepoint varies slightly between NF versions.
+const FAV_GLYPH  = '';
+const CHEV_UP    = '󰬬';  // nf-md-chevron_up_circle  (section expanded)
+const CHEV_DOWN  = '󰬦';  // nf-md-chevron_down_circle (section collapsed)
+const GLYPH_INDICATOR = '\u{F09DF}';  //  active-window dot (same glyph as dock)
+
+// FlowBox helpers for arrow-key edge detection
+function flowSelIdx(fb) {
+    const sel = fb.get_selected_children();
+    return sel.length ? sel[0].get_index() : -1;
+}
+function flowCount(fb) {
+    let n = 0, c = fb.get_first_child();
+    while (c) { n++; c = c.get_next_sibling(); }
+    return n;
+}
+
+const FAVORITES_FILE = GLib.build_filenamev([HOME, '.config', 'hyprcandy-launcher-favorites']);
+
+function readFavorites() {
+    const set = new Set();
+    try {
+        const [ok, raw] = GLib.file_get_contents(FAVORITES_FILE);
+        if (ok)
+            _dec.decode(raw).trim().split('\n')
+                .forEach(l => { if (l.trim()) set.add(l.trim()); });
+    } catch (_) {}
+    return set;
+}
+
+function writeFavorites(set) {
+    const file = Gio.File.new_for_path(FAVORITES_FILE);
+    try {
+        // GLib.file_replace_contents requires a non-NULL (non-empty) byte array.
+        // Always write at least a newline so an empty set produces a valid write.
+        const content = set.size ? [...set].join('\n') + '\n' : '\n';
+        file.replace_contents(
+            _enc.encode(content),
+            null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null
+        );
+    } catch (e) { console.error('[launcher] writeFavorites:', e.message); }
+}
+
+// ── Groups ─────────────────────────────────────────────────────────────────
+
+const GROUPS_FILE = GLib.build_filenamev([HOME, '.config', 'hyprcandy-launcher-groups']);
+
+/** Read groups from file. Returns { groupName: [className, ...], ... } */
+function readGroups() {
+    try {
+        const [ok, raw] = GLib.file_get_contents(GROUPS_FILE);
+        if (ok) return JSON.parse(_dec.decode(raw));
+    } catch (_) {}
+    return {};
+}
+
+/** Write groups to file */
+function writeGroups(groups) {
+    const file = Gio.File.new_for_path(GROUPS_FILE);
+    try {
+        file.replace_contents(
+            _enc.encode(JSON.stringify(groups, null, 2) + '\n'),
+            null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null
+        );
+    } catch (e) { console.error('[launcher] writeGroups:', e.message); }
+}
+
+/** Add an app to a group */
+function addAppToGroup(groups, groupName, className) {
+    if (!groups[groupName]) groups[groupName] = [];
+    if (!groups[groupName].includes(className))
+        groups[groupName].push(className);
+    writeGroups(groups);
+}
+
+/** Remove an app from a group */
+function removeAppFromGroup(groups, groupName, className) {
+    if (groups[groupName]) {
+        groups[groupName] = groups[groupName].filter(c => c !== className);
+        if (groups[groupName].length === 0) delete groups[groupName];
+        writeGroups(groups);
+    }
+}
+
+/** Rename a group, preserving its members and insertion order */
+function renameGroup(groups, oldName, newName) {
+    if (!groups[oldName] || oldName === newName || !newName) return;
+    // Rebuild the object so the renamed entry keeps its position
+    const rebuilt = {};
+    for (const [k, v] of Object.entries(groups))
+        rebuilt[k === oldName ? newName : k] = v;
+    writeGroups(rebuilt);
+}
+
+/** Delete a group entirely */
+function deleteGroup(groups, groupName) {
+    delete groups[groupName];
+    writeGroups(groups);
+}
+
+// ── dGPU detection (mirrors daemon.js _querySwitcheroo logic) ─────────────
+
+let _gpuCache = undefined;  // undefined = not yet queried; [] = queried but none
+
+/**
+ * Returns [{name, envVars}] for each discrete GPU reported by
+ * switcheroo-control, or [] on single-GPU / unavailable systems.
+ * Mirrors the double-deep_unpack pattern from daemon.js exactly.
+ */
+function getAvailableDGPUs() {
+    if (_gpuCache !== undefined) return _gpuCache;
+    try {
+        const result = Gio.DBus.system.call_sync(
+            'net.hadess.SwitcherooControl',
+            '/net/hadess/SwitcherooControl',
+            'org.freedesktop.DBus.Properties',
+            'Get',
+            new GLib.Variant('(ss)', ['net.hadess.SwitcherooControl', 'GPUs']),
+            null, Gio.DBusCallFlags.NONE, -1, null
+        );
+        // Properties.Get returns (v). First deep_unpack unwraps the tuple;
+        // raw[0] is still a GLib.Variant wrapping aa{sv}, so unpack again.
+        const raw   = result.deep_unpack();
+        const inner = raw[0];
+        const unpacked = (inner && typeof inner.deep_unpack === 'function')
+            ? inner.deep_unpack() : inner;
+        const gpuList = unpacked ? Object.values(unpacked) : [];
+
+        const _u = v => (v && typeof v.deep_unpack === 'function') ? v.deep_unpack() : v;
+        _gpuCache = [];
+        for (const gpuDict of gpuList) {
+            if (!!_u(gpuDict['Default'])) continue;  // skip iGPU / default GPU
+            const evArr = _u(gpuDict['Environment']);
+            const arr   = Array.isArray(evArr) ? evArr : (evArr ? Object.values(evArr) : []);
+            const envVars = {};
+            for (let i = 0; i + 1 < arr.length; i += 2)
+                envVars[arr[i]] = arr[i + 1];
+            _gpuCache.push({
+                name: _u(gpuDict['Name']) || 'dGPU',
+                envVars,
+            });
+        }
+    } catch (_) {
+        _gpuCache = [];
+    }
+    return _gpuCache;
+}
+
+/** Strip verbose vendor prefixes for compact popover labels (mirrors daemon.js) */
+function abbreviateGpuName(name) {
+    if (!name) return 'dGPU';
+    let s = name
+        .replace(/^Advanced Micro Devices,\s*Inc\.\s*\[AMD\/ATI\]\s*/i, '')
+        .replace(/^NVIDIA\s+Corporation\s*/i, '')
+        .replace(/^Intel\s+Corporation\s*/i, '')
+        .replace(/^Intel\(R\)\s*/i, 'Intel® ')
+        .trim();
+    return s.length > 32 ? s.slice(0, 31) + '…' : s;
+}
+
+// ── CSS ────────────────────────────────────────────────────────────────────
+
+// These rules use the same matugen GTK colour variables the dock uses.
+// They are loaded at APPLICATION priority so they win over the GTK default
+// theme but still sit below the inline popover provider used for transparency.
+// CSS is built dynamically so border-radius / border-width read from LauncherConfig.
+function buildLauncherCSS() {
+    const r  = LauncherConfig.borderRadius     || 20;
+    const bw = LauncherConfig.borderWidth      || 2;
+    const sr = LauncherConfig.searchRadius     ?? LauncherConfig.innerRadius ?? 12;
+    const lr = LauncherConfig.listRadius       ?? LauncherConfig.innerRadius ?? 12;
+    const ib = LauncherConfig.innerBorderWidth || 1;
+    const ip = LauncherConfig.innerPadding     || 10;
+
+    return `
+
+/* ── Window shell ─────────────────────────────────────────────────────── */
+window.hyprcandy-launcher {
+    background-color: @blur_background;
+    border-radius: ${r}px;
+    border-style: solid;
+    border-width: ${bw}px;
+    border-color: @on_primary_fixed_variant;
+}
+
+/* ── Inner section frames (rofi inputbar / listbox equivalent) ────────── */
+/* .search-frame wraps the search bar; .list-frame wraps the app grid.
+   Both have @primary border + @blur_background fill, padded from the
+   window edge — matching rofi's inputbar/listbox visual structure.
+   NOTE: left/right margin on .search-frame is set in JS (search width).
+   No padding here — the border sits flush against the SearchEntry.       */
+
+.search-frame {
+    background-color: @blur_background;
+    border-radius: ${sr}px;
+    border-style: solid;
+    border-width: ${ib}px;
+    border-color: @primary;
+    margin-top: ${ip}px;
+    margin-bottom: ${Math.round(ip / 2)}px;
+}
+
+.list-frame {
+    background-color: @blur_background;
+    border-radius: ${lr}px;
+    border-style: solid;
+    border-width: ${ib}px;
+    border-color: @primary;
+    margin: ${Math.round(ip / 2)}px ${ip}px ${ip}px ${ip}px;
+}
+
+/* ── Search entry — sits inside .search-frame ─────────────────────────── */
+.launcher-search {
+    background-color: transparent;
+    border-radius: ${sr}px;
+    border: none;
+    color: @primary;
+    caret-color: @primary;
+    font-size: 14px;
+    padding: 0px 10px;
+    min-height: 38px;
+    /* Suppress the GTK4 theme focus highlight ring — the .search-frame
+       border IS the visual focus indicator for the search area. */
+    outline: none;
+    box-shadow: none;
+}
+
+.launcher-search:focus,
+.launcher-search:focus-within {
+    background-color: alpha(@primary, 0.05);
+    outline: none;
+    box-shadow: none;
+    border: none;
+}
+
+.launcher-search > text,
+.launcher-search text {
+    background: transparent;
+    color: @primary;
+}
+
+.launcher-search image {
+    color: alpha(@primary, 0.65);
+}
+
+/* ── Arrow-key navigation — FlowBoxChild focus/selected state ─────────── */
+/* flowboxchild is the GTK node wrapping each item appended to FlowBox.
+   :selected fires when the child has keyboard focus in SINGLE/BROWSE mode. */
+flowboxchild {
+    border-radius: 10px;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    outline: none;
+    min-width: ${TILE_WIDTH}px;
+    min-height: ${TILE_HEIGHT}px;
+}
+
+flowboxchild:selected,
+flowboxchild:focus {
+    background-color: @on_primary_fixed_variant;
+    outline: none;
+    border-radius: 10px;
+}
+
+/* Label turns to @primary when the parent child is selected */
+flowboxchild:selected .app-tile-label,
+flowboxchild:focus .app-tile-label {
+    color: @primary;
+}
+
+/* The button inside a selected child should stay transparent so the
+   flowboxchild background colour shows through unobstructed. */
+flowboxchild:selected > button.app-tile,
+flowboxchild:focus > button.app-tile {
+    background-color: transparent;
+    border-color: transparent;
+}
+
+/* ── Scroll area — sits inside .list-frame ────────────────────────────── */
+.launcher-scroll {
+    background: transparent;
+    border-radius: ${lr - 1}px;
+}
+.launcher-scroll undershoot,
+.launcher-scroll overshoot {
+    background: transparent;
+}
+.launcher-scroll scrollbar {
+    background: transparent;
+    padding: 0px;
+}
+.launcher-scroll scrollbar slider {
+    background-color: alpha(@primary, 0.22);
+    border-radius: 4px;
+    min-width: 4px;
+    min-height: 4px;
+}
+.launcher-scroll scrollbar slider:hover {
+    background-color: alpha(@primary, 0.42);
+}
+
+/* ── App grid ─────────────────────────────────────────────────────────── */
+.launcher-grid {
+    background: transparent;
+    padding: 6px 10px 12px 10px;
+}
+
+/* ── App tiles ────────────────────────────────────────────────────────── */
+button.app-tile {
+    background: transparent;
+    background-color: transparent;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    padding: 10px 6px 8px 6px;
+    min-width: ${TILE_WIDTH}px;
+    min-height: ${TILE_HEIGHT}px;
+    outline: none;
+    box-shadow: none;
+}
+
+button.app-tile:hover {
+    background-color: alpha(@primary, 0.09);
+    border-color: alpha(@primary, 0.16);
+}
+
+button.app-tile:active {
+    background-color: alpha(@on_primary_fixed_variant, 0.55);
+    border-color: @primary;
+}
+
+button.app-tile:focus {
+    outline: none;
+    box-shadow: none;
+    border-color: alpha(@primary, 0.3);
+}
+
+.app-tile-label {
+    color: @on_surface;
+    font-size: ${TEXT_FONT_SIZE}px;
+    margin-top: 5px;
+}
+
+/* ── Context menu popovers (fallback — inline provider takes priority) ── */
+popover.launcher-popover {
+    background-color: transparent;
+    border: none;
+    border-radius: 12px;
+    padding: 0px;
+    box-shadow: none;
+}
+
+popover.launcher-popover > contents {
+    background-color: @on_secondary;
+    border: 1px solid alpha(@secondary, 0.5);
+    border-radius: 12px;
+    padding: 0px;
+    min-width: 190px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    color: @primary;
+}
+
+popover.launcher-popover > arrow {
+    background-color: @on_secondary;
+}
+
+popover.launcher-popover > contents separator {
+    background-color: alpha(@secondary, 0.6);
+    min-height: 1px;
+}
+
+popover.launcher-popover .pop-item {
+    background: transparent;
+    background-color: transparent;
+    color: @primary;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: none;
+    box-shadow: none;
+    font-size: 13px;
+}
+
+popover.launcher-popover .pop-item:hover {
+    background-color: alpha(@primary, 0.11);
+}
+
+popover.launcher-popover .pop-section-header {
+    font-size: 11px;
+    font-weight: bold;
+    color: @inverse_primary;
+    padding: 5px 14px 2px 14px;
+}
+
+popover.launcher-popover button {
+    background: none;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    outline: none;
+}
+
+/* ── Favorites section ────────────────────────────────────────────────── */
+.fav-section-row {
+    background: transparent;
+    padding: 6px 12px 2px 12px;
+}
+
+/* Collapse toggle — inherits no button chrome, just the glyph label */
+.fav-toggle-btn {
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+    min-height: 0;
+    outline: none;
+}
+.fav-toggle-btn:hover {
+    background-color: alpha(@primary, 0.10);
+    border-radius: 4px;
+}
+
+.fav-glyph {
+    color: @primary;
+    font-size: ${Math.round(TEXT_FONT_SIZE * 1.27)}px;
+    margin-right: 4px;
+}
+
+.fav-section-label {
+    color: @primary;
+    font-size: ${TEXT_FONT_SIZE}px;
+    font-weight: bold;
+}
+
+.fav-separator {
+    background-color: alpha(@primary, 0.25);
+    margin-left: 12px;
+    margin-right: 12px;
+    margin-top: 2px;
+    margin-bottom: 2px;
+}
+
+/* ── Group drop-target hover highlight ────────────────────────────── */
+.launcher-grid.drag-target-hover {
+    background-color: alpha(@primary, 0.08);
+    border-radius: 10px;
+    outline: 2px dashed alpha(@primary, 0.40);
+    outline-offset: -2px;
+}
+
+/* ── New-group naming dialog ──────────────────────────────────────── */
+window.hyprcandy-group-dialog {
+    background-color: @on_primary_fixed_variant;
+    border-radius: 16px;
+    border-style: solid;
+    border-width: 1px;
+    border-color: alpha(@primary, 0.30);
+}
+
+/* ── Running-app dot indicators (overlaid on tile) ───────────────────── */
+.launcher-indicator {
+    font-size: ${Math.max(5, Math.round(APP_ICON_SIZE * 0.18))}px;
+    color: @primary;
+    margin-bottom: 2px;
+}
+`;
+}
+
+// Inline popover provider — same pattern the dock uses to fix GTK4 popover
+// transparency on Wayland (popover > contents needs an explicit bg rule).
+const POPOVER_INLINE_CSS = `
+popover.launcher-popover {
+    background-color: transparent;
+    border: none;
+    border-radius: 12px;
+}
+popover.launcher-popover > contents {
+    background-color: @on_secondary;
+    border-radius: 12px;
+    border: 1px solid alpha(@secondary, 0.5);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+    color: @primary;
+}
+popover.launcher-popover > arrow {
+    background-color: @on_secondary;
+}
+popover.launcher-popover > contents separator {
+    background-color: alpha(@secondary, 0.6);
+    min-height: 1px;
+}
+popover.launcher-popover .pop-item {
+    background: transparent;
+    background-color: transparent;
+    color: @primary;
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: none;
+    box-shadow: none;
+    font-size: 13px;
+}
+popover.launcher-popover .pop-item:hover {
+    background-color: alpha(@primary, 0.11);
+}
+popover.launcher-popover .pop-section-header {
+    font-size: 11px;
+    font-weight: bold;
+    color: @inverse_primary;
+    padding: 5px 14px 2px 14px;
+}
+popover.launcher-popover button {
+    background: none;
+    background-color: transparent;
+    border: none;
+    box-shadow: none;
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    outline: none;
+}
+`;
+
+// ── AppLauncherWindow ──────────────────────────────────────────────────────
+
+const AppLauncherWindow = GObject.registerClass({
+    GTypeName: 'HyprCandyAppLauncherWindow',
+}, class AppLauncherWindow extends Gtk.Window {
+
+    constructor(application) {
+        super({ title: 'HyprCandy Launcher', decorated: false, application });
+
+        this._dockPos     = readDockPos();
+        this._isVert      = (this._dockPos === 'left' || this._dockPos === 'right');
+        this._allApps     = getAllApps();
+        this._pinnedSet   = readPinnedApps();
+        this._favoritesSet = readFavorites();
+        this._runningApps = getRunningApps();
+        this._popoverCSS              = null;
+        this._popoverOpen             = false;
+        this._postPopoverGrace        = false;
+        this._graceTimer              = 0;
+        this._pendingFavRefreshQuery  = undefined;
+        this._pendingGroupRefresh     = false;   // set by group menu handler; consumed by closed handler
+        this._colorMonitor            = null;   // Gio.FileMonitor for gtk-4.0/colors.css
+        this._colorReloadTimer        = 0;      // debounce source ID
+        this._groupDragClass          = null;   // className being dragged into/within a group
+        this._appDirMonitors          = [];     // Gio.FileMonitor[] for XDG application directories
+        this._appDirReloadTimer       = 0;      // debounce source ID for app-dir changes
+        this._appsDirty               = false;  // true when app directories changed while hidden
+
+        this._loadGlobalCSS();
+        this._setupLayerShell();
+        this._buildUI();
+        this._setupKeyboard();
+        this._setupFocusClose();
+        this._setupColorMonitor();
+        this._setupAppDirMonitors();
+
+        // Daemon mode: close() must hide the window rather than destroy it,
+        // so the process stays alive between toggles and all state is preserved.
+        this.set_hide_on_close(true);
+
+        this.connect('destroy', () => {
+            this._teardownColorMonitor();
+            this._teardownAppDirMonitors();
+        });
+        this.add_css_class('hyprcandy-launcher');
+    }
+
+    // ─── CSS ────────────────────────────────────────────────────────────
+
+    _loadGlobalCSS() {
+        const display  = Gdk.Display.get_default();
+
+        // Load matugen colors (same paths the dock uses) so @primary etc. resolve
+        const paths = [
+            GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors.css']),
+            GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']),
+        ];
+        for (const p of paths) {
+            if (!GLib.file_test(p, GLib.FileTest.EXISTS)) continue;
+            const prov = new Gtk.CssProvider();
+            try {
+                prov.load_from_path(p);
+                Gtk.StyleContext.add_provider_for_display(
+                    display, prov, Gtk.STYLE_PROVIDER_PRIORITY_USER
+                );
+            } catch (_) {}
+        }
+
+        // Launcher-specific rules (built dynamically from LauncherConfig)
+        const launcherProv = new Gtk.CssProvider();
+        try {
+            launcherProv.load_from_data(buildLauncherCSS(), -1);
+            Gtk.StyleContext.add_provider_for_display(
+                display, launcherProv, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            );
+        } catch (e) { console.error('[launcher] CSS load failed:', e.message); }
+    }
+
+    _getPopoverCSSProvider() {
+        if (!this._popoverCSS) {
+            this._popoverCSS = new Gtk.CssProvider();
+            try { this._popoverCSS.load_from_data(POPOVER_INLINE_CSS, -1); } catch (_) {}
+        }
+        return this._popoverCSS;
+    }
+
+    // ─── Layer shell ─────────────────────────────────────────────────────
+
+    // ─── Dock thickness query ────────────────────────────────────────────
+    // Ask Hyprland for the live rendered height/width of the dock surface so
+    // the launcher margin is exact regardless of config edits or innerPadding.
+    // Falls back to a formula-based estimate if hyprctl is unavailable.
+    _queryDockThick(pos) {
+        try {
+            const [ok, out] = GLib.spawn_command_line_sync('hyprctl layers -j');
+            if (!ok) return null;
+            const data = JSON.parse(_dec.decode(out));
+            for (const monData of Object.values(data)) {
+                for (const surfList of Object.values(monData.levels ?? {})) {
+                    for (const s of (Array.isArray(surfList) ? surfList : [])) {
+                        if (s.namespace === 'hyprcandy-dock') {
+                            // w/h are the actual surface pixel dimensions
+                            return (pos === 'left' || pos === 'right') ? s.w : s.h;
+                        }
+                    }
+                }
+            }
+        } catch (_) {}
+        return null;  // caller falls back to formula
+    }
+
+    // ─── Shared margin helper ────────────────────────────────────────────
+    // Computes the margin (screen-edge → launcher edge) needed to clear the
+    // dock, using the live dock size when available.
+    _computeMargin(pos) {
+        const cfg      = DockConfig;
+        const iconPx   = cfg.appIconSize || 20;
+        const borderPx = cfg.borderWidth || 2;
+        const padPx    = cfg.innerPadding || 0;  // actual value, not hardcoded 4
+
+        // Live dock thickness beats the formula; formula is the fallback.
+        const measured  = this._queryDockThick(pos);
+        const dockThick = measured ?? ((iconPx + 8) + 2 * padPx + 2 * borderPx);
+
+        const ov = cfg.positionOverrides?.[pos] ?? {};
+        let edgeMargin;
+        if      (pos === 'bottom') edgeMargin = ov.marginBottom ?? cfg.marginBottom ?? 6;
+        else if (pos === 'top'   ) edgeMargin = ov.marginTop    ?? cfg.marginTop    ?? 2;
+        else if (pos === 'left'  ) edgeMargin = ov.marginLeft   ?? cfg.marginLeft   ?? 6;
+        else                       edgeMargin = ov.marginRight  ?? cfg.marginRight  ?? 6;
+
+        return dockThick + edgeMargin + GAP_FROM_DOCK;
+    }
+
+    _setupLayerShell() {
+        const cfg  = DockConfig;
+        const pos  = this._dockPos;
+
+        Gtk4LayerShell.init_for_window(this);
+        Gtk4LayerShell.set_namespace(this, 'hyprcandy-launcher');
+        // OVERLAY sits above the dock's TOP layer so it renders on top of the dock.
+        Gtk4LayerShell.set_layer(this, Gtk4LayerShell.Layer.OVERLAY);
+        // -1 = don't steal screen real-estate from other windows
+        Gtk4LayerShell.set_exclusive_zone(this, -1);
+        // ON_DEMAND: gets keyboard only when the surface has focus, so other
+        // surfaces still receive input (unlike EXCLUSIVE which grabs everything).
+        Gtk4LayerShell.set_keyboard_mode(this, Gtk4LayerShell.KeyboardMode.ON_DEMAND);
+
+        // Anchor to ONE edge (the dock's edge).  The compositor will centre the
+        // surface on the perpendicular axis because neither opposite anchor is set.
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.BOTTOM, pos === 'bottom');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.TOP,    pos === 'top');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.LEFT,   pos === 'left');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.RIGHT,  pos === 'right');
+
+        // ── Compute margin from the screen edge using live dock size ─────
+        const totalMargin = this._computeMargin(pos);
+
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.BOTTOM, pos === 'bottom' ? totalMargin : 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP,    pos === 'top'    ? totalMargin : 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT,   pos === 'left'   ? totalMargin : 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT,  pos === 'right'  ? totalMargin : 0);
+
+        // Window size — wider for horizontal docks, taller for vertical
+        if (this._isVert) {
+            this.set_size_request(W_VERT, H_VERT);
+            this.set_default_size(W_VERT, H_VERT);
+        } else {
+            this.set_size_request(W_HORIZ, H_HORIZ);
+            this.set_default_size(W_HORIZ, H_HORIZ);
+        }
+    }
+
+    // ─── Live position refresh ───────────────────────────────────────────
+    // Called from the SIGUSR1 show path so the launcher re-anchors to the
+    // current dock edge even when the dock has cycled since last use.
+    // gtk4-layer-shell allows set_anchor / set_margin after init_for_window;
+    // the new values take effect on the next Wayland surface commit.
+
+    _refreshLayerShell() {
+        const newPos  = readDockPos();
+        const newVert = (newPos === 'left' || newPos === 'right');
+
+        // Always re-apply anchors/margins (dock may have moved even if pos
+        // string is the same, e.g. after a restart with stale dock.pos).
+        this._dockPos = newPos;
+        this._isVert  = newVert;
+
+        // ── Anchors — only the dock edge is anchored; compositor centres
+        //             the launcher on the perpendicular axis automatically.
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.BOTTOM, newPos === 'bottom');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.TOP,    newPos === 'top');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.LEFT,   newPos === 'left');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.RIGHT,  newPos === 'right');
+
+        // ── Margin from screen edge (uses live dock size via _computeMargin)
+        const totalMargin = this._computeMargin(newPos);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.BOTTOM, newPos === 'bottom' ? totalMargin : 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP,    newPos === 'top'    ? totalMargin : 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT,   newPos === 'left'   ? totalMargin : 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT,  newPos === 'right'  ? totalMargin : 0);
+
+        // ── Window size and FlowBox column counts
+        const W    = newVert ? W_VERT  : W_HORIZ;
+        const H    = newVert ? H_VERT  : H_HORIZ;
+        const cols = newVert ? COLS_VERT : COLS_HORIZ;
+        this.set_size_request(W, H);
+        this.set_default_size(W, H);
+
+        if (this._flow) {
+            this._flow.set_max_children_per_line(cols);
+            this._flow.set_min_children_per_line(cols);
+        }
+        if (this._favFlow) {
+            this._favFlow.set_max_children_per_line(cols);
+            this._favFlow.set_min_children_per_line(cols);
+        }
+    }
+
+    // ─── Build UI ────────────────────────────────────────────────────────
+
+    _buildUI() {
+        const lc   = LauncherConfig;
+        const winW = this._isVert ? W_VERT : W_HORIZ;
+        const ip   = lc.innerPadding          || 10;
+        const frac = Math.min(1, Math.max(0.2, lc.searchWidthFraction ?? 1.0));
+        // Extra horizontal margin to shrink the search frame when frac < 1
+        const sfExtraH = Math.max(0, Math.floor((winW - Math.round(winW * frac)) / 2));
+
+        const root = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        this.set_child(root);
+
+        // ── Search frame ────────────────────────────────────────────────
+        const searchFrame = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        searchFrame.add_css_class('search-frame');
+        searchFrame.set_margin_start(ip + sfExtraH);
+        searchFrame.set_margin_end(ip + sfExtraH);
+        root.append(searchFrame);
+
+        this._searchEntry = new Gtk.SearchEntry();
+        this._searchEntry.set_placeholder_text(' Search applications…');
+        this._searchEntry.add_css_class('launcher-search');
+        this._searchEntry.set_hexpand(true);
+        searchFrame.append(this._searchEntry);
+
+        // ── List frame ──────────────────────────────────────────────────
+        const listFrame = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        listFrame.add_css_class('list-frame');
+        listFrame.set_vexpand(true);
+        root.append(listFrame);
+
+        // ── Main scroll — wraps Favorites, Groups, and app grid ──────────
+        const scroll = new Gtk.ScrolledWindow();
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
+        scroll.set_vexpand(true);
+        scroll.add_css_class('launcher-scroll');
+        listFrame.append(scroll);
+
+        // Inner box: stacks Favorites + Groups + FlowBox inside the scroll
+        const scrollInner = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        scrollInner.set_vexpand(true);
+        scroll.set_child(scrollInner);
+
+        // ── Favorites section (now inside scroll) ────────────────────────
+        this._favSection = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        scrollInner.append(this._favSection);
+
+        const favHeaderRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        favHeaderRow.add_css_class('fav-section-row');
+        this._favSection.append(favHeaderRow);
+
+        // Full-width toggle button: "Favorites" title left, chevron right.
+        // Clicking anywhere on the row collapses / expands the favorites grid.
+        this._favCollapsed = true;   // collapsed by default on clean launch
+        const favToggleBtn = Gtk.Button.new();
+        favToggleBtn.add_css_class('fav-toggle-btn');
+        favToggleBtn.set_can_focus(false);
+        favToggleBtn.set_hexpand(true);
+
+        const favBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        favBtnBox.set_hexpand(true);
+
+        const favGlyphLbl = Gtk.Label.new(FAV_GLYPH);
+        favGlyphLbl.add_css_class('fav-glyph');
+        favBtnBox.append(favGlyphLbl);
+
+        const favSectionLabel = Gtk.Label.new('Favorites');
+        favSectionLabel.add_css_class('fav-section-label');
+        favSectionLabel.set_halign(Gtk.Align.START);
+        favSectionLabel.set_hexpand(true);
+        favBtnBox.append(favSectionLabel);
+
+        // Chevron on right: CHEV_UP when expanded (click to collapse),
+        // CHEV_UP when collapsed (click to expand) — standard accordion UX.
+        // Start collapsed, so chevron shows CHEV_UP.
+        this._favChevron = Gtk.Label.new(CHEV_UP);
+        this._favChevron.add_css_class('fav-glyph');
+        favBtnBox.append(this._favChevron);
+
+        favToggleBtn.set_child(favBtnBox);
+        favHeaderRow.append(favToggleBtn);
+
+        favToggleBtn.connect('clicked', () => {
+            this._favCollapsed = !this._favCollapsed;
+            this._favFlow.set_visible(!this._favCollapsed);
+            this._favSep.set_visible(!this._favCollapsed);
+            this._favChevron.set_text(this._favCollapsed ? CHEV_UP : CHEV_DOWN);
+        });
+
+        this._favFlow = new Gtk.FlowBox();
+        this._favFlow.set_max_children_per_line(this._isVert ? COLS_VERT : COLS_HORIZ);
+        this._favFlow.set_min_children_per_line(this._isVert ? COLS_VERT : COLS_HORIZ);
+        this._favFlow.set_row_spacing(2);
+        this._favFlow.set_column_spacing(2);
+        this._favFlow.set_homogeneous(true);
+        this._favFlow.set_selection_mode(Gtk.SelectionMode.SINGLE);
+        this._favFlow.add_css_class('launcher-grid');
+        this._favFlow.set_visible(false);   // hidden — collapsed by default
+        this._favSection.append(this._favFlow);
+
+        // Keyboard Enter on a focused favorites item → launch
+        this._favFlow.connect('child-activated', (_fb, child) => {
+            const btn = child.get_child();
+            if (btn && btn._appData) { spawnApp(btn._appData.exec); this.close(); }
+        });
+
+        const favSep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        favSep.add_css_class('fav-separator');
+        favSep.set_visible(false);          // hidden — collapsed by default
+        this._favSep = favSep;
+        this._favSection.append(favSep);
+
+        this._favSection.set_visible(false);  // hidden until populated
+
+        // ── Groups container (collapsible strips, one per group) ─────────
+        this._groupsContainer = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        scrollInner.append(this._groupsContainer);
+
+        // ── Main FlowBox (app grid) ────────────────────────────────────
+        this._flow = new Gtk.FlowBox();
+        this._flow.set_max_children_per_line(this._isVert ? COLS_VERT : COLS_HORIZ);
+        this._flow.set_min_children_per_line(this._isVert ? COLS_VERT : COLS_HORIZ);
+        this._flow.set_row_spacing(2);
+        this._flow.set_column_spacing(2);
+        this._flow.set_homogeneous(true);
+        this._flow.set_valign(Gtk.Align.START);   // prevents rows stretching when content is short
+        this._flow.set_selection_mode(Gtk.SelectionMode.SINGLE);
+        this._flow.add_css_class('launcher-grid');
+        scrollInner.append(this._flow);
+
+        // Keyboard Enter on a focused main-grid item → launch
+        this._flow.connect('child-activated', (_fb, child) => {
+            const btn = child.get_child();
+            if (btn && btn._appData) { spawnApp(btn._appData.exec); this.close(); }
+        });
+
+        // Initial population
+        this._refreshFavorites('');
+        this._refreshGroups('');
+        this._populateApps(this._allApps);
+
+        // ── Search filtering ───────────────────────────────────────────
+        this._searchEntry.connect('search-changed', () => {
+            const q = this._searchEntry.get_text().toLowerCase().trim();
+            this._refreshFavorites(q);
+            this._refreshGroups(q);
+            this._populateApps(
+                q ? this._allApps.filter(a => a.name.toLowerCase().includes(q)) : this._allApps
+            );
+        });
+
+        // Enter on search → launch first filtered result
+        this._searchEntry.connect('activate', () => {
+            const q = this._searchEntry.get_text().toLowerCase().trim();
+            const filtered = q
+                ? this._allApps.filter(a => a.name.toLowerCase().includes(q))
+                : this._allApps;
+            if (filtered.length > 0) {
+                spawnApp(filtered[0].exec);
+                this.close();
+            }
+        });
+    }
+
+
+    _populateApps(apps) {
+        let child = this._flow.get_first_child();
+        while (child) {
+            const next = child.get_next_sibling();
+            this._flow.remove(child);
+            child = next;
+        }
+        for (const app of apps)
+            this._flow.append(this._makeAppTile(app));
+    }
+
+    /**
+     * Rebuild all group strips under _groupsContainer.
+     * Each group is a collapsible accordion strip identical in style to
+     * the Favorites section. Strips are fully recreated on each call so
+     * ordering stays consistent with the JSON object key order.
+     * Each group FlowBox is a drop target — tiles dragged from the main
+     * grid (or other groups) are added to the group on drop.
+     */
+    _refreshGroups(query) {
+        const q = (query ?? '').toLowerCase().trim();
+
+        // Remove all existing strips
+        let ch = this._groupsContainer.get_first_child();
+        while (ch) {
+            const nx = ch.get_next_sibling();
+            this._groupsContainer.remove(ch);
+            ch = nx;
+        }
+
+        const groups = readGroups();   // plain object { name: [className, …] }
+
+        for (const [groupName, members] of Object.entries(groups).sort(([a], [b]) => a.localeCompare(b))) {
+            // All apps that belong to this group (ignoring query).
+            const allGroupApps = this._allApps.filter(a => members.includes(a.className));
+            // Always skip genuinely empty groups (no installed members).
+            if (allGroupApps.length === 0) continue;
+
+            // During search: show ALL group members so the strip is informative
+            // and the drop-target grid is always reachable for drag-and-drop.
+            const groupApps = allGroupApps;
+
+            // Respect stored collapse state during search (collapsed by default);
+            // user can expand manually just as in normal mode.
+            if (!this._groupCollapsed) this._groupCollapsed = {};
+            const collapsed = this._groupCollapsed[groupName] ?? true;
+
+            const strip = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+
+            // ── Header row (identical structure to Favorites header) ────
+            const headerRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+            headerRow.add_css_class('fav-section-row');
+
+            const toggleBtn = Gtk.Button.new();
+            toggleBtn.add_css_class('fav-toggle-btn');
+            toggleBtn.set_can_focus(false);
+            toggleBtn.set_hexpand(true);
+
+            const btnInner = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+            btnInner.set_hexpand(true);
+
+            const glyphLbl = Gtk.Label.new('󰌨');  // nf-md-layers
+            glyphLbl.add_css_class('fav-glyph');
+            btnInner.append(glyphLbl);
+
+            const titleLbl = Gtk.Label.new(groupName);
+            titleLbl.add_css_class('fav-section-label');
+            titleLbl.set_halign(Gtk.Align.START);
+            titleLbl.set_hexpand(true);
+            btnInner.append(titleLbl);
+
+            const chevron = Gtk.Label.new(collapsed ? CHEV_UP : CHEV_DOWN);
+            chevron.add_css_class('fav-glyph');
+            btnInner.append(chevron);
+
+            toggleBtn.set_child(btnInner);
+            headerRow.append(toggleBtn);
+            strip.append(headerRow);
+
+            // ── FlowBox grid ─────────────────────────────────────────────
+            const flow = new Gtk.FlowBox();
+            const cols = this._isVert ? COLS_VERT : COLS_HORIZ;
+            flow.set_max_children_per_line(cols);
+            flow.set_min_children_per_line(2);
+            flow.set_row_spacing(2);
+            flow.set_column_spacing(2);
+            flow.set_homogeneous(true);
+            flow.set_selection_mode(Gtk.SelectionMode.SINGLE);
+            flow.add_css_class('launcher-grid');
+            flow.set_visible(!collapsed);
+            // Pass groupName so tiles show "Remove from <group>" context menu
+            for (const app of groupApps) flow.append(this._makeAppTile(app, groupName));
+            flow.connect('child-activated', (_fb, child) => {
+                const btn = child.get_child();
+                if (btn && btn._appData) { spawnApp(btn._appData.exec); this.close(); }
+            });
+            strip.append(flow);
+
+            // ── Drop target — accept tiles dragged from main grid / other groups ─
+            const dropTarget = new Gtk.DropTarget({ actions: Gdk.DragAction.MOVE });
+            dropTarget.set_gtypes([GObject.TYPE_STRING]);
+            dropTarget.connect('motion', () => {
+                flow.add_css_class('drag-target-hover');
+                return Gdk.DragAction.MOVE;
+            });
+            dropTarget.connect('leave', () => {
+                flow.remove_css_class('drag-target-hover');
+            });
+            dropTarget.connect('drop', (_t, className) => {
+                flow.remove_css_class('drag-target-hover');
+                if (!className || members.includes(className)) return false;
+                addAppToGroup(readGroups(), groupName, className);
+                this._pendingGroupRefresh = true;
+                // Refresh immediately (no open popover to wait for)
+                GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                    const curQ = this._searchEntry
+                        ? this._searchEntry.get_text().toLowerCase().trim() : '';
+                    this._refreshGroups(curQ);
+                    return GLib.SOURCE_REMOVE;
+                });
+                return true;
+            });
+            flow.add_controller(dropTarget);
+
+            // ── Separator ────────────────────────────────────────────────
+            const sep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            sep.add_css_class('fav-separator');
+            sep.set_visible(!collapsed);
+            strip.append(sep);
+
+            // Toggle collapse on header click
+            toggleBtn.connect('clicked', () => {
+                this._groupCollapsed[groupName] = !this._groupCollapsed[groupName];
+                const nowCollapsed = this._groupCollapsed[groupName];
+                flow.set_visible(!nowCollapsed);
+                sep.set_visible(!nowCollapsed);
+                chevron.set_text(nowCollapsed ? CHEV_UP : CHEV_DOWN);
+            });
+
+            // ── Right-click on header → Rename / Delete group popover ────
+            const headerRc = new Gtk.GestureClick();
+            headerRc.set_button(3);
+            headerRc.connect('pressed', () => {
+                this._showGroupHeaderMenu(groupName, headerRow);
+            });
+            headerRow.add_controller(headerRc);
+
+            this._groupsContainer.append(strip);
+        }
+    }
+
+    _makeAppTile(app, groupName) {
+        // groupName — if set, this tile lives inside a group strip.
+        //   Right-click will show "Remove from <groupName>" in place of "New Group…".
+
+        // ── Button ─────────────────────────────────────────────────────
+        const btn = Gtk.Button.new();
+        btn.add_css_class('app-tile');
+        btn.set_tooltip_text(app.name);
+        // Hard-pin dimensions so tiles never stretch when the row is short
+        btn.set_size_request(TILE_WIDTH, TILE_HEIGHT);
+        // Tag the app data so child-activated (Enter key) can retrieve it
+        btn._appData  = app;
+        btn._groupCtx = groupName ?? null;
+        // Don't let the button steal keyboard focus — FlowBoxChild handles
+        // arrow-key selection; the button only reacts to pointer events.
+        btn.set_can_focus(false);
+
+        // ── Icon + label ───────────────────────────────────────────────
+        const col = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        col.set_halign(Gtk.Align.CENTER);
+        col.set_valign(Gtk.Align.CENTER);
+        btn.set_child(col);
+
+        const img = (app.iconName.startsWith('/') || app.iconName.startsWith('~'))
+            ? Gtk.Image.new_from_file(app.iconName)
+            : Gtk.Image.new_from_icon_name(app.iconName);
+        img.set_pixel_size(APP_ICON_SIZE);
+        img.set_halign(Gtk.Align.CENTER);
+        col.append(img);
+
+        const lbl = Gtk.Label.new(app.name);
+        lbl.add_css_class('app-tile-label');
+        lbl.set_halign(Gtk.Align.CENTER);
+        lbl.set_max_width_chars(12);
+        lbl.set_ellipsize(3 /* Pango.EllipsizeMode.END */);
+        lbl.set_wrap(false);
+        col.append(lbl);
+
+        // ── Left-click → launch ────────────────────────────────────────
+        btn.connect('clicked', () => {
+            spawnApp(app.exec);
+            this.close();
+        });
+
+        // ── Right-click → context menu ─────────────────────────────────
+        const rc = new Gtk.GestureClick();
+        rc.set_button(3);
+        rc.connect('pressed', () => this._showContextMenu(app, btn, groupName ?? null));
+        btn.add_controller(rc);
+
+        // ── Drag source (so tiles can be dragged into group strips) ────
+        const dragSrc = new Gtk.DragSource({ actions: Gdk.DragAction.MOVE });
+        dragSrc.connect('prepare', () => {
+            return Gdk.ContentProvider.new_for_value(app.className);
+        });
+        dragSrc.connect('drag-begin', (src) => {
+            this._groupDragClass = app.className;
+            btn.set_opacity(0.4);
+            try { src.set_icon(Gtk.WidgetPaintable.new(btn), 0, 0); } catch (_) {}
+        });
+        dragSrc.connect('drag-end', () => {
+            btn.set_opacity(1.0);
+            this._groupDragClass = null;
+        });
+        btn.add_controller(dragSrc);
+
+        // ── Running-app dot indicators (same pattern as dock-main.js) ─
+        // Check _runningApps for this app's class — 0 dots if not running,
+        // 1 dot for a single instance, 2 dots for 2+ (capped like the dock).
+        const _appKey       = app.className.toLowerCase();
+        const _instances    = this._runningApps.get(_appKey)
+                           ?? this._runningApps.get(app.className)
+                           ?? [];
+        const _instanceCount = _instances.length;
+
+        const dotsBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
+        dotsBox.set_halign(Gtk.Align.CENTER);
+        dotsBox.set_valign(Gtk.Align.END);   // bottom of the tile
+        dotsBox.set_name('launcher-indicator-dots');
+
+        if (_instanceCount >= 1) {
+            const dot1 = Gtk.Label.new(GLYPH_INDICATOR);
+            dot1.add_css_class('launcher-indicator');
+            dotsBox.append(dot1);
+        }
+        if (_instanceCount >= 2) {
+            const dot2 = Gtk.Label.new(GLYPH_INDICATOR);
+            dot2.add_css_class('launcher-indicator');
+            dot2.set_margin_start(3);
+            dotsBox.append(dot2);
+        }
+
+        // Wrap btn + dots in an overlay — no size penalty vs a plain button.
+        // set_measure_overlay(false) prevents dotsBox from expanding the tile;
+        // set_clip_overlay(true) passes pointer events through to the button.
+        const tileOverlay = new Gtk.Overlay();
+        tileOverlay.set_halign(Gtk.Align.CENTER);
+        tileOverlay.set_valign(Gtk.Align.CENTER);
+        tileOverlay.set_child(btn);
+        tileOverlay.add_overlay(dotsBox);
+        tileOverlay.set_measure_overlay(dotsBox, false);
+        tileOverlay.set_clip_overlay(dotsBox, true);
+
+        return tileOverlay;
+    }
+
+    // ─── Context menu ────────────────────────────────────────────────────
+
+    _showContextMenu(app, parentBtn, groupName) {
+        // groupName — if non-null, this tile is inside a group strip.
+        //   The "Groups" section shows "Remove from <groupName>" at the top,
+        //   and "New Group…" is hidden (app is already grouped).
+
+        // Choose popover direction to open away from the dock edge (same logic
+        // the dock uses in _showContextMenu / _showStartMenu)
+        const pos = this._dockPos;
+        let popPos;
+        if   (pos === 'right') popPos = Gtk.PositionType.LEFT;
+	else                   popPos = Gtk.PositionType.RIGHT; // bottom, top, left
+
+        const pop = new Gtk.Popover();
+        // Parent to the launcher window rather than the tile button so that
+        // _refreshFavorites can safely remove tiles (including parentBtn) from
+        // _favFlow without corrupting the popover's parent chain.
+        pop.set_parent(this);
+        pop.set_has_arrow(false);
+        pop.set_position(popPos);
+        // Point at the button so the popover opens in the right place.
+        {
+            const [ok, bx, by] = parentBtn.translate_coordinates(this, 0, 0);
+            if (ok)
+                pop.set_pointing_to(new Gdk.Rectangle({
+                    x: Math.round(bx), y: Math.round(by),
+                    width:  parentBtn.get_width(),
+                    height: parentBtn.get_height(),
+                }));
+        }
+        pop.add_css_class('launcher-popover');
+        // Inline provider to force correct background on Wayland
+        pop.get_style_context().add_provider(
+            this._getPopoverCSSProvider(),
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        );
+        pop.connect('closed', () => {
+            this._popoverOpen = false;
+            // Grace period: block focus-loss close for 600 ms after any popover
+            // closes so that pin/unpin actions (which popdown() the menu) don't
+            // immediately dismiss the launcher when focus briefly returns to it.
+            if (this._graceTimer) {
+                GLib.source_remove(this._graceTimer);
+                this._graceTimer = 0;
+            }
+            this._postPopoverGrace = true;
+            this._graceTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 600, () => {
+                this._postPopoverGrace = false;
+                this._graceTimer = 0;
+                return GLib.SOURCE_REMOVE;
+            });
+            // Unparent the popover first, THEN refresh the favorites grid.
+            // Running _refreshFavorites while GTK4 is still tearing down the
+            // popover surface caused widget-tree corruption that left favorites
+            // stuck and made "Remove from Favorites" appear to do nothing.
+            const pendingQuery = this._pendingFavRefreshQuery;
+            this._pendingFavRefreshQuery = undefined;
+            const pendingGroup = this._pendingGroupRefresh;
+            this._pendingGroupRefresh = false;
+            GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                try { pop.unparent(); } catch (_) {}
+                if (pendingQuery !== undefined) {
+                    this._favoritesSet = readFavorites();
+                    this._refreshFavorites(pendingQuery);
+                    const filtered = pendingQuery
+                        ? this._allApps.filter(a => a.name.toLowerCase().includes(pendingQuery) && !this._favoritesSet.has(a.className))
+                        : this._allApps.filter(a => !this._favoritesSet.has(a.className));
+                    this._populateApps(filtered);
+                }
+                if (pendingGroup) {
+                    const q = this._searchEntry
+                        ? this._searchEntry.get_text().toLowerCase().trim() : '';
+                    this._refreshGroups(q);
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        this._popoverOpen = true;
+
+        // ── Menu content ───────────────────────────────────────────────
+        const menu = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        menu.set_margin_top(6);
+        menu.set_margin_bottom(6);
+        menu.set_margin_start(6);
+        menu.set_margin_end(6);
+
+        // ── Running instances (same-as-dock UX) ────────────────────────
+        const key = app.className.toLowerCase();
+        const instances = this._runningApps.get(key)
+            ?? this._runningApps.get(app.className)
+            ?? [];
+
+        if (instances.length > 0) {
+            // Section header (only when more than one instance)
+            if (instances.length > 1) {
+                const hdr = Gtk.Label.new('Running Windows');
+                hdr.set_halign(Gtk.Align.START);
+                hdr.add_css_class('pop-section-header');
+                menu.append(hdr);
+            }
+
+            for (const inst of instances) {
+                const short = inst.title.length > 34
+                    ? inst.title.slice(0, 34) + '…'
+                    : inst.title;
+                const focBtn = Gtk.Button.new_with_label(
+                    instances.length === 1 ? `Switch to Window` : short
+                );
+                focBtn.add_css_class('pop-item');
+                focBtn.set_halign(Gtk.Align.FILL);
+                focBtn.set_tooltip_text(inst.title);
+                focBtn.connect('clicked', () => {
+                    focusWindow(inst.address);
+                    pop.popdown();
+                    this.close();
+                });
+                menu.append(focBtn);
+            }
+
+            const sep0 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            sep0.set_margin_top(4);
+            sep0.set_margin_bottom(4);
+            menu.append(sep0);
+        }
+
+        // ── New Window (always) — with workspace sub-popover on hover ──
+        // Compute sub-popover direction (same rule as the main popover but
+        // the sub-popover always opens to the opposite side of the launcher).
+        const _launcherPos = this._dockPos;
+        const _subPopPos   = (_launcherPos === 'right')
+            ? Gtk.PositionType.LEFT : Gtk.PositionType.RIGHT;
+
+        // Helper shared by New Window and each dGPU button:
+        // attaches a workspace sub-popover that opens on hover.
+        // Clicking the parent button (without entering the sub-popover)
+        // launches on the current workspace; clicking a WS entry first
+        // switches to that workspace then launches.
+        let _openSubPop = null;  // track which sub-popover is open
+
+        const _attachLauncherWsSub = (parentBtn, launchFn) => {
+            // Parent to parentBtn (inside pop's content tree) so wsSub shares
+            // the same Wayland grab chain as pop.  Parenting to `this` (the
+            // launcher window) gives wsSub its own grab, which immediately
+            // dismisses pop when wsSub.popup() is called — causing the cascade
+            // breakage (pop closes, subsequent right-clicks broken).
+            // NOTE: do NOT call wsSub.unparent() in a 'closed' handler here;
+            // pop's own 'closed' → idle_add(unparent) tears down the whole tree
+            // including parentBtn and wsSub automatically.
+            const wsSub = new Gtk.Popover();
+            wsSub.set_parent(parentBtn);
+            wsSub.set_has_arrow(false);
+            wsSub.set_position(_subPopPos);
+            wsSub.add_css_class('launcher-popover');
+            wsSub.get_style_context().add_provider(
+                this._getPopoverCSSProvider(),
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+            );
+
+            const wsBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+            wsBox.set_margin_start(6);
+            wsBox.set_margin_end(6);
+            wsBox.set_margin_top(6);
+            wsBox.set_margin_bottom(6);
+
+            const wsHdr = Gtk.Label.new('Open on Workspace');
+            wsHdr.set_halign(Gtk.Align.CENTER);
+            wsHdr.add_css_class('pop-section-header');
+            wsBox.append(wsHdr);
+
+            const wsHdrSep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            wsHdrSep.set_margin_top(4);
+            wsHdrSep.set_margin_bottom(4);
+            wsBox.append(wsHdrSep);
+
+            for (let i = 1; i <= 10; i++) {
+                const wsBtn = Gtk.Button.new_with_label('→ WS ' + i);
+                wsBtn.add_css_class('pop-item');
+                wsBtn.set_halign(Gtk.Align.FILL);
+                wsBtn.connect('clicked', () => {
+                    try {
+                        const cmd = app.exec.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
+                        // Combine workspace focus with exec_cmd rule to fix race conditions for apps like Nautilus
+                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ workspace = ${i} })"`);
+                        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+                            GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.exec_cmd('${cmd}', { workspace = ${i} })"`);
+                            return GLib.SOURCE_REMOVE;
+                        });
+                    } catch (_) {}
+                    wsSub.popdown();
+                    pop.popdown();
+                    this.close();
+                });
+                wsBox.append(wsBtn);
+            }
+            wsSub.set_child(wsBox);
+
+            // Open sub-popover on hover; GTK's grab handles close-on-leave
+            // automatically once the pointer exits the popover surface — no
+            // manual leave handler needed (and a leave handler on wsBox would
+            // fire as the cursor crosses the gap between button and popover,
+            // dismissing wsSub before the user can reach it).
+            const hoverCtrl = new Gtk.EventControllerMotion();
+            hoverCtrl.connect('enter', () => {
+                if (_openSubPop && _openSubPop !== wsSub) _openSubPop.popdown();
+                _openSubPop = wsSub;
+                wsSub.popup();
+            });
+            parentBtn.add_controller(hoverCtrl);
+            wsSub.connect('closed', () => {
+                if (_openSubPop === wsSub) _openSubPop = null;
+            });
+        };
+
+        // New Window row with chevron hint
+        const newWinRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        const newWinRowLabel = Gtk.Label.new('New Window');
+        newWinRowLabel.set_halign(Gtk.Align.START);
+        newWinRowLabel.set_hexpand(true);
+        newWinRowBox.append(newWinRowLabel);
+        const newWinChev = Gtk.Label.new('›');
+        newWinChev.set_halign(Gtk.Align.END);
+        newWinChev.set_valign(Gtk.Align.CENTER);
+        newWinChev.set_margin_start(8);
+        newWinRowBox.append(newWinChev);
+
+        const newBtn = Gtk.Button.new();
+        newBtn.set_child(newWinRowBox);
+        newBtn.add_css_class('pop-item');
+        newBtn.set_halign(Gtk.Align.FILL);
+        const _newWinLaunch = () => { spawnApp(app.exec); };
+        newBtn.connect('clicked', () => {
+            _newWinLaunch();
+            pop.popdown();
+            this.close();
+        });
+        _attachLauncherWsSub(newBtn, _newWinLaunch);
+        menu.append(newBtn);
+
+        // ── Separator ──────────────────────────────────────────────────
+        const sep1 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        sep1.set_margin_top(4);
+        sep1.set_margin_bottom(4);
+        menu.append(sep1);
+
+        // ── Pin / Unpin ────────────────────────────────────────────────
+        this._pinnedSet = readPinnedApps();
+        // ~/.config/pinned may store the WMClass ("spotify"), the desktop ID
+        // ("spotify-launcher"), or className (whichever getAllApps() resolved).
+        // Check all three so the button label is always correct regardless of
+        // which form was written at pin time.
+        const dockKey  = app.desktopId || app.className;
+        const isPinned = this._pinnedSet.has(dockKey)
+                         || this._pinnedSet.has(app.className)
+                         || (app.wmClass && this._pinnedSet.has(app.wmClass));
+        const pinBtn    = Gtk.Button.new_with_label(isPinned ? 'Unpin from Dock' : 'Pin to Dock');
+        pinBtn.add_css_class('pop-item');
+        pinBtn.set_halign(Gtk.Align.FILL);
+        pinBtn.connect('clicked', () => {
+            this._pinnedSet = readPinnedApps();
+            if (isPinned) {
+                // Remove whichever form(s) are present.
+                this._pinnedSet.delete(dockKey);
+                this._pinnedSet.delete(app.className);
+                if (app.wmClass) this._pinnedSet.delete(app.wmClass);
+            } else {
+                this._pinnedSet.add(dockKey);
+            }
+            savePinnedApps(this._pinnedSet);
+            signalDockRefresh();
+            pop.popdown();
+        });
+        menu.append(pinBtn);
+
+        // ── Pin / Unpin Desktop ────────────────────────────────────────
+        const desktopPinnedSet  = readDesktopPinnedApps();
+        // Use desktop file ID, not WMClass — QML resolves pinned entries via
+        // DesktopEntries.byId(desktopId), so "spotify-launcher" is correct
+        // whereas the WMClass "spotify" would require heuristic fallbacks.
+        const desktopKey        = app.desktopId || app.className;
+        const isDesktopPinned   = desktopPinnedSet.has(desktopKey)
+                                  || desktopPinnedSet.has(app.className);
+        const desktopPinBtn     = Gtk.Button.new_with_label(isDesktopPinned ? 'Unpin from Desktop' : 'Pin to Desktop');
+        desktopPinBtn.add_css_class('pop-item');
+        desktopPinBtn.set_halign(Gtk.Align.FILL);
+        desktopPinBtn.connect('clicked', () => {
+            const ds = readDesktopPinnedApps();
+            // Remove both possible stored forms (migration: old entries may
+            // have been stored under WMClass; new ones use desktop file ID).
+            ds.delete(app.className);
+            if (desktopKey !== app.className) ds.delete(desktopKey);
+            if (!isDesktopPinned) ds.add(desktopKey);
+            saveDesktopPinnedApps(ds);
+            pop.popdown();
+        });
+        menu.append(desktopPinBtn);
+
+        // ── Favorites ──────────────────────────────────────────────────
+        const sep2 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        sep2.set_margin_top(4);
+        sep2.set_margin_bottom(4);
+        menu.append(sep2);
+
+        this._favoritesSet = readFavorites();
+        const isFav   = this._favoritesSet.has(app.className);
+        const favBtn  = Gtk.Button.new_with_label(isFav ? 'Remove from Favorites' : 'Add to Favorites');
+        favBtn.add_css_class('pop-item');
+        favBtn.set_halign(Gtk.Align.FILL);
+        favBtn.connect('clicked', () => {
+            this._favoritesSet = readFavorites();
+            if (this._favoritesSet.has(app.className))
+                this._favoritesSet.delete(app.className);
+            else
+                this._favoritesSet.add(app.className);
+            writeFavorites(this._favoritesSet);
+            // Capture query now (before popdown clears any state)
+            const q = this._searchEntry
+                ? this._searchEntry.get_text().toLowerCase().trim() : '';
+            // Defer the grid refresh until after the popover is fully unparented
+            // so GTK4 doesn't encounter widget-tree mutations while tearing down
+            // the popover surface (which was the cause of favorites getting "stuck"
+            // and Remove-from-Favorites having no visible effect).
+            this._pendingFavRefreshQuery = q;
+            pop.popdown();
+            // _refreshFavorites will be called from the 'closed' handler once
+            // pop.unparent() has been scheduled via idle_add.
+        });
+        menu.append(favBtn);
+
+        // ── Groups ─────────────────────────────────────────────────────
+        const sep3 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        sep3.set_margin_top(4);
+        sep3.set_margin_bottom(4);
+        menu.append(sep3);
+
+        const groupsHdr = Gtk.Label.new('Groups');
+        groupsHdr.set_halign(Gtk.Align.START);
+        groupsHdr.add_css_class('pop-section-header');
+        menu.append(groupsHdr);
+
+        const currentGroups = readGroups();
+
+        if (groupName) {
+            // ── Tile is INSIDE a group — show "Remove from <groupName>" only ──
+            const removeBtn = Gtk.Button.new_with_label(`Remove from "${groupName}"`);
+            removeBtn.add_css_class('pop-item');
+            removeBtn.set_halign(Gtk.Align.FILL);
+            removeBtn.connect('clicked', () => {
+                removeAppFromGroup(readGroups(), groupName, app.className);
+                this._pendingGroupRefresh = true;
+                pop.popdown();
+            });
+            menu.append(removeBtn);
+        } else {
+            // ── Tile is in main grid — "Remove from X", "Add to X", "New Group…" ──
+
+            // "Remove from <group>" for each group this app already belongs to
+            for (const [gName, members] of Object.entries(currentGroups)) {
+                if (!members.includes(app.className)) continue;
+                const removeBtn = Gtk.Button.new_with_label(`Remove from "${gName}"`);
+                removeBtn.add_css_class('pop-item');
+                removeBtn.set_halign(Gtk.Align.FILL);
+                removeBtn.connect('clicked', () => {
+                    removeAppFromGroup(readGroups(), gName, app.className);
+                    this._pendingGroupRefresh = true;
+                    pop.popdown();
+                });
+                menu.append(removeBtn);
+            }
+
+            // "Add to <group>" for each group this app is NOT yet in
+            for (const [gName, members] of Object.entries(currentGroups)) {
+                if (members.includes(app.className)) continue;
+                const addBtn = Gtk.Button.new_with_label(`Add to "${gName}"`);
+                addBtn.add_css_class('pop-item');
+                addBtn.set_halign(Gtk.Align.FILL);
+                addBtn.connect('clicked', () => {
+                    addAppToGroup(readGroups(), gName, app.className);
+                    this._pendingGroupRefresh = true;
+                    pop.popdown();
+                });
+                menu.append(addBtn);
+            }
+
+            // "New Group…" — opens a naming dialog over the launcher window
+            const newGroupBtn = Gtk.Button.new_with_label('New Group…');
+            newGroupBtn.add_css_class('pop-item');
+            newGroupBtn.set_halign(Gtk.Align.FILL);
+            newGroupBtn.connect('clicked', () => {
+                pop.popdown();
+                // Show naming dialog after the popover finishes closing
+                GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                    this._showNewGroupDialog(app);
+                    return GLib.SOURCE_REMOVE;
+                });
+            });
+            menu.append(newGroupBtn);
+        }
+        const gpus = getAvailableDGPUs();
+        if (gpus.length > 0) {
+            const gpuSepTop = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            gpuSepTop.set_margin_top(4);
+            gpuSepTop.set_margin_bottom(4);
+            menu.append(gpuSepTop);
+
+            const gpuHdr = Gtk.Label.new('Launch on GPU');
+            gpuHdr.set_halign(Gtk.Align.CENTER);
+            gpuHdr.add_css_class('pop-section-header');
+            menu.append(gpuHdr);
+
+            const gpuSepBot = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+            gpuSepBot.set_margin_top(4);
+            gpuSepBot.set_margin_bottom(4);
+            menu.append(gpuSepBot);
+
+            for (const gpu of gpus) {
+                const gpuRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+                const gpuRowLabel = Gtk.Label.new(abbreviateGpuName(gpu.name));
+                gpuRowLabel.set_halign(Gtk.Align.START);
+                gpuRowLabel.set_hexpand(true);
+                gpuRowBox.append(gpuRowLabel);
+                const gpuChev = Gtk.Label.new('›');
+                gpuChev.set_halign(Gtk.Align.END);
+                gpuChev.set_valign(Gtk.Align.CENTER);
+                gpuChev.set_margin_start(8);
+                gpuRowBox.append(gpuChev);
+
+                const gpuBtn = Gtk.Button.new();
+                gpuBtn.set_child(gpuRowBox);
+                gpuBtn.add_css_class('pop-item');
+                gpuBtn.set_halign(Gtk.Align.FILL);
+                const _gpuLaunch = ((_g) => () => { spawnAppOnGPU(app.exec, _g.envVars); })(gpu);
+                gpuBtn.connect('clicked', () => {
+                    _gpuLaunch();
+                    pop.popdown();
+                    this.close();
+                });
+                _attachLauncherWsSub(gpuBtn, _gpuLaunch);
+                menu.append(gpuBtn);
+            }
+        }
+
+        pop.set_child(menu);
+        pop.popup();
+    }
+
+    // ─── Group-header context menu (right-click on group bar) ────────────
+    /**
+     * Shows a small popover anchored to the group header row with:
+     *   • Rename Group… — opens a rename dialog
+     *   • Delete Group   — removes the group from disk and refreshes
+     */
+    _showGroupHeaderMenu(groupName, parentWidget) {
+        const pos = this._dockPos;
+        let popPos;
+        popPos = Gtk.PositionType.TOP; // bottom, top, left,right
+
+        const pop = new Gtk.Popover();
+        pop.set_parent(this);
+        pop.set_has_arrow(false);
+        pop.set_position(popPos);
+        {
+            const [ok, bx, by] = parentWidget.translate_coordinates(this, 0, 0);
+            if (ok)
+                pop.set_pointing_to(new Gdk.Rectangle({
+                    x: Math.round(bx), y: Math.round(by),
+                    width:  parentWidget.get_width(),
+                    height: parentWidget.get_height(),
+                }));
+        }
+        pop.add_css_class('launcher-popover');
+        pop.get_style_context().add_provider(
+            this._getPopoverCSSProvider(),
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        );
+        pop.connect('closed', () => {
+            this._popoverOpen = false;
+            if (this._graceTimer) {
+                GLib.source_remove(this._graceTimer);
+                this._graceTimer = 0;
+            }
+            this._postPopoverGrace = true;
+            this._graceTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 600, () => {
+                this._postPopoverGrace = false;
+                this._graceTimer = 0;
+                return GLib.SOURCE_REMOVE;
+            });
+            const pendingGroup = this._pendingGroupRefresh;
+            this._pendingGroupRefresh = false;
+            GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                try { pop.unparent(); } catch (_) {}
+                if (pendingGroup) {
+                    const q = this._searchEntry
+                        ? this._searchEntry.get_text().toLowerCase().trim() : '';
+                    this._refreshGroups(q);
+                }
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        this._popoverOpen = true;
+
+        const menu = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        menu.set_margin_top(6);
+        menu.set_margin_bottom(6);
+        menu.set_margin_start(6);
+        menu.set_margin_end(6);
+
+        // Group name as header label
+        const hdr = Gtk.Label.new(groupName);
+        hdr.set_halign(Gtk.Align.START);
+        hdr.add_css_class('pop-section-header');
+        menu.append(hdr);
+
+        const sep1 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        sep1.set_margin_top(4);
+        sep1.set_margin_bottom(4);
+        menu.append(sep1);
+
+        // ── Rename Group… ───────────────────────────────────────────────
+        const renameBtn = Gtk.Button.new_with_label('Rename Group…');
+        renameBtn.add_css_class('pop-item');
+        renameBtn.set_halign(Gtk.Align.FILL);
+        renameBtn.connect('clicked', () => {
+            pop.popdown();
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                this._showRenameGroupDialog(groupName);
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+        menu.append(renameBtn);
+
+        const sep2 = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+        sep2.set_margin_top(4);
+        sep2.set_margin_bottom(4);
+        menu.append(sep2);
+
+        // ── Delete Group ────────────────────────────────────────────────
+        const deleteBtn = Gtk.Button.new_with_label('Delete Group');
+        deleteBtn.add_css_class('pop-item');
+        deleteBtn.set_halign(Gtk.Align.FILL);
+        deleteBtn.connect('clicked', () => {
+            deleteGroup(readGroups(), groupName);
+            // Drop stale collapse state for this group
+            if (this._groupCollapsed) delete this._groupCollapsed[groupName];
+            this._pendingGroupRefresh = true;
+            pop.popdown();
+        });
+        menu.append(deleteBtn);
+
+        pop.set_child(menu);
+        pop.popup();
+    }
+
+    // ─── New-group naming dialog ─────────────────────────────────────────
+    /**
+     * Shows a modal-style naming dialog centered over the launcher.
+     * The dialog is a layer-shell OVERLAY window parented to the same app.
+     * On confirm: creates the group, adds the app, refreshes strips.
+     */
+    _showNewGroupDialog(app) {
+        // ── Build a simple dialog window ─────────────────────────────────
+        const dlg = new Gtk.Window({
+            title: 'New Group',
+            decorated: false,
+            modal: true,
+            transient_for: this,
+        });
+        dlg.add_css_class('hyprcandy-launcher');
+        dlg.add_css_class('hyprcandy-group-dialog');
+
+        const thisApp = this.get_application();
+        if (thisApp) thisApp.add_window(dlg);
+
+        // Use layer-shell so it floats above the launcher on Wayland
+        try {
+            Gtk4LayerShell.init_for_window(dlg);
+            Gtk4LayerShell.set_layer(dlg, Gtk4LayerShell.Layer.OVERLAY);
+            Gtk4LayerShell.set_exclusive_zone(dlg, -1);
+            Gtk4LayerShell.set_keyboard_mode(dlg, Gtk4LayerShell.KeyboardMode.ON_DEMAND);
+            // Centre on screen (no anchor = compositor centres it)
+        } catch (_) {}
+
+        // ── Layout ───────────────────────────────────────────────────────
+        const box = Gtk.Box.new(Gtk.Orientation.VERTICAL, 12);
+        box.set_margin_top(20);
+        box.set_margin_bottom(20);
+        box.set_margin_start(24);
+        box.set_margin_end(24);
+        dlg.set_child(box);
+
+        // App name as subtitle
+        const titleLbl = Gtk.Label.new(`New group for "${app.name}"`);
+        titleLbl.add_css_class('fav-section-label');
+        titleLbl.set_halign(Gtk.Align.START);
+        box.append(titleLbl);
+
+        // Name entry wrapped in search-frame style
+        const entryFrame = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        entryFrame.add_css_class('search-frame');
+        box.append(entryFrame);
+
+        const nameEntry = new Gtk.Entry();
+        nameEntry.set_placeholder_text('Group name…');
+        nameEntry.add_css_class('launcher-search');
+        nameEntry.set_hexpand(true);
+        entryFrame.append(nameEntry);
+
+        // Buttons row
+        const btnRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 8);
+        btnRow.set_halign(Gtk.Align.END);
+        box.append(btnRow);
+
+        const cancelBtn = Gtk.Button.new_with_label('Cancel');
+        cancelBtn.add_css_class('pop-item');
+        btnRow.append(cancelBtn);
+
+        const createBtn = Gtk.Button.new_with_label('Create');
+        createBtn.add_css_class('pop-item');
+        btnRow.append(createBtn);
+
+        dlg.set_size_request(320, -1);
+
+        // ── Actions ──────────────────────────────────────────────────────
+        const doCreate = () => {
+            const name = nameEntry.get_text().trim();
+            if (!name) return;
+            addAppToGroup(readGroups(), name, app.className);
+            dlg.close();
+            dlg.destroy();
+            // Expand the new group immediately
+            if (!this._groupCollapsed) this._groupCollapsed = {};
+            this._groupCollapsed[name] = false;
+            const curQ = this._searchEntry
+                ? this._searchEntry.get_text().toLowerCase().trim() : '';
+            this._refreshGroups(curQ);
+        };
+
+        createBtn.connect('clicked', doCreate);
+        nameEntry.connect('activate', doCreate);
+        cancelBtn.connect('clicked', () => { dlg.close(); dlg.destroy(); });
+
+        // ESC closes the dialog
+        const kc = new Gtk.EventControllerKey();
+        kc.connect('key-pressed', (_ctrl, keyval) => {
+            if (keyval === Gdk.KEY_Escape) { dlg.close(); dlg.destroy(); return true; }
+            return false;
+        });
+        dlg.add_controller(kc);
+
+        dlg.set_hide_on_close(false);
+        dlg.present();
+        nameEntry.grab_focus();
+    }
+
+    // ─── Rename-group dialog ──────────────────────────────────────────────
+    /**
+     * Shows a layer-shell dialog pre-filled with the current group name.
+     * On confirm: renames the group in the JSON file and refreshes strips.
+     */
+    _showRenameGroupDialog(groupName) {
+        const dlg = new Gtk.Window({
+            title: 'Rename Group',
+            decorated: false,
+            modal: true,
+            transient_for: this,
+        });
+        dlg.add_css_class('hyprcandy-launcher');
+        dlg.add_css_class('hyprcandy-group-dialog');
+
+        const thisApp = this.get_application();
+        if (thisApp) thisApp.add_window(dlg);
+
+        try {
+            Gtk4LayerShell.init_for_window(dlg);
+            Gtk4LayerShell.set_layer(dlg, Gtk4LayerShell.Layer.OVERLAY);
+            Gtk4LayerShell.set_exclusive_zone(dlg, -1);
+            Gtk4LayerShell.set_keyboard_mode(dlg, Gtk4LayerShell.KeyboardMode.ON_DEMAND);
+            // No anchor → compositor centres the dialog
+        } catch (_) {}
+
+        const box = Gtk.Box.new(Gtk.Orientation.VERTICAL, 12);
+        box.set_margin_top(20);
+        box.set_margin_bottom(20);
+        box.set_margin_start(24);
+        box.set_margin_end(24);
+        dlg.set_child(box);
+
+        const titleLbl = Gtk.Label.new(`Rename group "${groupName}"`);
+        titleLbl.add_css_class('fav-section-label');
+        titleLbl.set_halign(Gtk.Align.START);
+        box.append(titleLbl);
+
+        const entryFrame = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        entryFrame.add_css_class('search-frame');
+        box.append(entryFrame);
+
+        const nameEntry = new Gtk.Entry();
+        nameEntry.set_placeholder_text('New group name…');
+        nameEntry.set_text(groupName);           // pre-fill with current name
+        nameEntry.add_css_class('launcher-search');
+        nameEntry.set_hexpand(true);
+        entryFrame.append(nameEntry);
+
+        const btnRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 8);
+        btnRow.set_halign(Gtk.Align.END);
+        box.append(btnRow);
+
+        const cancelBtn = Gtk.Button.new_with_label('Cancel');
+        cancelBtn.add_css_class('pop-item');
+        btnRow.append(cancelBtn);
+
+        const confirmBtn = Gtk.Button.new_with_label('Rename');
+        confirmBtn.add_css_class('pop-item');
+        btnRow.append(confirmBtn);
+
+        dlg.set_size_request(320, -1);
+
+        const doRename = () => {
+            const newName = nameEntry.get_text().trim();
+            if (!newName) return;
+            if (newName !== groupName)
+                renameGroup(readGroups(), groupName, newName);
+            dlg.close();
+            dlg.destroy();
+            // Migrate collapse state to the new name
+            if (!this._groupCollapsed) this._groupCollapsed = {};
+            this._groupCollapsed[newName] = this._groupCollapsed[groupName] ?? true;
+            delete this._groupCollapsed[groupName];
+            const curQ = this._searchEntry
+                ? this._searchEntry.get_text().toLowerCase().trim() : '';
+            this._refreshGroups(curQ);
+        };
+
+        confirmBtn.connect('clicked', doRename);
+        nameEntry.connect('activate', doRename);
+        cancelBtn.connect('clicked', () => { dlg.close(); dlg.destroy(); });
+
+        const kc = new Gtk.EventControllerKey();
+        kc.connect('key-pressed', (_ctrl, keyval) => {
+            if (keyval === Gdk.KEY_Escape) { dlg.close(); dlg.destroy(); return true; }
+            return false;
+        });
+        dlg.add_controller(kc);
+
+        dlg.set_hide_on_close(false);
+        dlg.present();
+        nameEntry.grab_focus();
+        nameEntry.select_region(0, -1);  // select all so user can type straight away
+    }
+
+    // ─── Keyboard / close ────────────────────────────────────────────────
+
+    _setupKeyboard() {
+        const cols = this._isVert ? COLS_VERT : COLS_HORIZ;
+
+        // ── Search entry key handler ─────────────────────────────────────
+        const kc = new Gtk.EventControllerKey();
+        kc.connect('key-pressed', (_ctrl, keyval) => {
+            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
+            if (keyval === Gdk.KEY_Down) {
+                // Down from search:
+                //   1. Favorites if visible AND expanded
+                //   2. Otherwise main grid
+                const favVisible = this._favSection?.get_visible() && !this._favCollapsed;
+                if (favVisible) {
+                    this._favFlow.grab_focus();
+                } else {
+                    this._flow.grab_focus();
+                }
+                return true;
+            }
+            return false;
+        });
+        this._searchEntry.add_controller(kc);
+
+        // ── _favFlow key handler — arrow-key edge detection ──────────────
+        // Let GTK handle internal FlowBox navigation.  Only intercept when the
+        // selected child is at the boundary of the grid so we can jump to the
+        // adjacent widget instead of stopping at the edge.
+        const favKc = new Gtk.EventControllerKey();
+        favKc.connect('key-pressed', (_ctrl, keyval) => {
+            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
+
+            if (keyval === Gdk.KEY_Down) {
+                const idx   = flowSelIdx(this._favFlow);
+                const total = flowCount(this._favFlow);
+                // Last row starts at the largest multiple of cols ≤ total-1
+                const lastRowStart = total > 0 ? Math.floor((total - 1) / cols) * cols : 0;
+                if (idx < 0 || idx >= lastRowStart) {
+                    // Move to main grid, select first item
+                    this._flow.grab_focus();
+                    const firstChild = this._flow.get_first_child();
+                    if (firstChild) this._flow.select_child(firstChild);
+                    return true;
+                }
+            }
+            if (keyval === Gdk.KEY_Up) {
+                const idx = flowSelIdx(this._favFlow);
+                if (idx < 0 || idx < cols) {
+                    this._searchEntry.grab_focus();
+                    return true;
+                }
+            }
+            // Printable → back to search
+            if (keyval === Gdk.KEY_BackSpace ||
+                (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
+                this._searchEntry.grab_focus();
+                return false;
+            }
+            return false;
+        });
+        this._favFlow.add_controller(favKc);
+
+        // ── _flow key handler — arrow-key edge detection ─────────────────
+        const flowKc = new Gtk.EventControllerKey();
+        flowKc.connect('key-pressed', (_ctrl, keyval) => {
+            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
+
+            if (keyval === Gdk.KEY_Down) {
+                const idx   = flowSelIdx(this._flow);
+                const total = flowCount(this._flow);
+                const lastRowStart = total > 0 ? Math.floor((total - 1) / cols) * cols : 0;
+                if (idx < 0 || idx >= lastRowStart) {
+                    // Wrap around: jump back to the first item
+                    const firstChild = this._flow.get_first_child();
+                    if (firstChild) {
+                        this._flow.select_child(firstChild);
+                        firstChild.grab_focus();
+                    }
+                    return true;
+                }
+            }
+            if (keyval === Gdk.KEY_Up) {
+                const idx = flowSelIdx(this._flow);
+                if (idx < 0 || idx < cols) {
+                    // At top row — go to favorites if visible+expanded, else search
+                    if (this._favSection?.get_visible() && !this._favCollapsed) {
+                        this._favFlow.grab_focus();
+                        // Select last item in favFlow for intuitive Up-from-top feel
+                        const total = flowCount(this._favFlow);
+                        if (total > 0) {
+                            let last = this._favFlow.get_first_child();
+                            while (last?.get_next_sibling()) last = last.get_next_sibling();
+                            if (last) this._favFlow.select_child(last);
+                        }
+                    } else {
+                        this._searchEntry.grab_focus();
+                    }
+                    return true;
+                }
+            }
+            // Printable → back to search
+            if (keyval === Gdk.KEY_BackSpace ||
+                (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
+                this._searchEntry.grab_focus();
+                return false;
+            }
+            return false;
+        });
+        this._flow.add_controller(flowKc);
+
+        // ── Window-level ESC handler (fallback for any focused widget) ───
+        const winKc = new Gtk.EventControllerKey();
+        winKc.connect('key-pressed', (_ctrl, keyval) => {
+            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
+            if (keyval === Gdk.KEY_BackSpace ||
+                (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
+                this._searchEntry.grab_focus();
+                return false;
+            }
+            return false;
+        });
+        this.add_controller(winKc);
+    }
+
+    /**
+     * Close when the launcher window loses compositor focus — gives the
+     * same click-outside-to-dismiss behaviour as rofi.
+     * Guards:
+     *   _popoverOpen      — a context-menu popover is currently visible
+     *   _postPopoverGrace — popover just closed; wait 600 ms before allowing
+     *                       focus-loss to dismiss (keeps launcher alive after
+     *                       "Pin to Dock" which popdowns the menu)
+     */
+    // ── CSS hot-reload (mirrors dock-main.js setupColorMonitor) ─────────────
+
+    _setupColorMonitor() {
+        const file = Gio.File.new_for_path(GTK4_COLORS_PATH);
+        try {
+            this._colorMonitor = file.monitor_file(Gio.FileMonitorFlags.NONE, null);
+            this._colorMonitor.connect('changed', (_m, _f, _o, ev) => {
+                if (ev !== Gio.FileMonitorEvent.CHANGES_DONE_HINT &&
+                    ev !== Gio.FileMonitorEvent.CREATED) return;
+                if (this._colorReloadTimer) {
+                    GLib.source_remove(this._colorReloadTimer);
+                    this._colorReloadTimer = 0;
+                }
+                this._colorReloadTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 300, () => {
+                    this._colorReloadTimer = 0;
+                    this._loadGlobalCSS();
+                    this.queue_draw();
+                    return GLib.SOURCE_REMOVE;
+                });
+            });
+        } catch (e) {
+            console.warn('[launcher] color monitor setup failed:', e.message);
+        }
+    }
+
+    _teardownColorMonitor() {
+        if (this._colorReloadTimer) {
+            GLib.source_remove(this._colorReloadTimer);
+            this._colorReloadTimer = 0;
+        }
+        if (this._colorMonitor) {
+            this._colorMonitor.cancel();
+            this._colorMonitor = null;
+        }
+    }
+
+    // ── App directory hot-reload ─────────────────────────────────────────
+    // Watches XDG application directories so newly installed or removed
+    // apps are reflected without restarting the launcher daemon.
+    // A 500 ms debounce prevents rapid successive refreshes during batch
+    // installs.  If the launcher is hidden the dirty flag is set and the
+    // list is refreshed on the next show (SIGUSR1 path).
+
+    _setupAppDirMonitors() {
+        const dirs = [];
+        // User applications directory
+        try {
+            const userApps = GLib.build_filenamev([GLib.get_user_data_dir(), 'applications']);
+            if (GLib.file_test(userApps, GLib.FileTest.EXISTS)) dirs.push(userApps);
+        } catch (_) {}
+        // System applications directories
+        try {
+            for (const d of GLib.get_system_data_dirs()) {
+                const sysApps = GLib.build_filenamev([d, 'applications']);
+                if (GLib.file_test(sysApps, GLib.FileTest.EXISTS)) dirs.push(sysApps);
+            }
+        } catch (_) {}
+        // Flatpak exports (user + system)
+        try {
+            const flatpakUser = GLib.build_filenamev([HOME, '.local', 'share', 'flatpak', 'exports', 'share', 'applications']);
+            if (GLib.file_test(flatpakUser, GLib.FileTest.EXISTS)) dirs.push(flatpakUser);
+        } catch (_) {}
+        try {
+            const flatpakSystem = '/var/lib/flatpak/exports/share/applications';
+            if (GLib.file_test(flatpakSystem, GLib.FileTest.EXISTS)) dirs.push(flatpakSystem);
+        } catch (_) {}
+
+        for (const dirPath of dirs) {
+            try {
+                const dir = Gio.File.new_for_path(dirPath);
+                const mon = dir.monitor_directory(Gio.FileMonitorFlags.WATCH_MOVES, null);
+                mon.connect('changed', (_m, _f, _other, ev) => {
+                    if (ev !== Gio.FileMonitorEvent.CHANGES_DONE_HINT &&
+                        ev !== Gio.FileMonitorEvent.CREATED &&
+                        ev !== Gio.FileMonitorEvent.DELETED &&
+                        ev !== Gio.FileMonitorEvent.RENAMED) return;
+                    this._appsDirty = true;
+                    // If currently visible, debounced refresh
+                    if (this.get_visible()) {
+                        if (this._appDirReloadTimer) {
+                            GLib.source_remove(this._appDirReloadTimer);
+                            this._appDirReloadTimer = 0;
+                        }
+                        this._appDirReloadTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 500, () => {
+                            this._appDirReloadTimer = 0;
+                            this._reloadAndRefreshApps();
+                            return GLib.SOURCE_REMOVE;
+                        });
+                    }
+                });
+                this._appDirMonitors.push(mon);
+            } catch (e) {
+                console.warn('[launcher] app-dir monitor failed for', dirPath, e.message);
+            }
+        }
+    }
+
+    _teardownAppDirMonitors() {
+        if (this._appDirReloadTimer) {
+            GLib.source_remove(this._appDirReloadTimer);
+            this._appDirReloadTimer = 0;
+        }
+        for (const mon of this._appDirMonitors) {
+            try { mon.cancel(); } catch (_) {}
+        }
+        this._appDirMonitors = [];
+    }
+
+    _reloadAndRefreshApps() {
+        this._allApps = getAllApps();
+        this._appsDirty = false;
+        const q = this._searchEntry ? this._searchEntry.get_text().toLowerCase().trim() : '';
+        this._favoritesSet = readFavorites();
+        this._runningApps = getRunningApps();
+        this._refreshFavorites(q);
+        this._refreshGroups(q);
+        const filtered = q ? this._allApps.filter(a => a.name.toLowerCase().includes(q)) : this._allApps;
+        this._populateApps(filtered);
+        console.log('[launcher] app list refreshed —', this._allApps.length, 'apps');
+    }
+
+
+    _setupFocusClose() {
+        this._bgWin = null;
+
+        // ── 1. TOP-layer transparent click-catcher ─────────────────────
+        // Covers the full screen at the TOP layer (normal windows level.
+        try {
+            const bgWin = new Gtk.Window({ decorated: false });
+            const thisApp = this.get_application();
+            if (thisApp) thisApp.add_window(bgWin);
+
+            Gtk4LayerShell.init_for_window(bgWin);
+            Gtk4LayerShell.set_namespace(bgWin, 'hyprcandy-launcher-bg');
+            Gtk4LayerShell.set_layer(bgWin, Gtk4LayerShell.Layer.TOP);
+            Gtk4LayerShell.set_exclusive_zone(bgWin, -1);
+            // Anchor all four edges → covers the full output
+            Gtk4LayerShell.set_anchor(bgWin, Gtk4LayerShell.Edge.TOP,    true);
+            Gtk4LayerShell.set_anchor(bgWin, Gtk4LayerShell.Edge.BOTTOM, true);
+            Gtk4LayerShell.set_anchor(bgWin, Gtk4LayerShell.Edge.LEFT,   true);
+            Gtk4LayerShell.set_anchor(bgWin, Gtk4LayerShell.Edge.RIGHT,  true);
+
+            // Fully transparent content — must have a child or GTK won't map it
+            bgWin.set_child(new Gtk.Box());
+            bgWin.set_opacity(0.002);  // non-zero so the compositor maps the surface
+
+            const bgClick = new Gtk.GestureClick();
+            bgClick.connect('pressed', () => {
+                // set_visible(false) on the launcher triggers notify::visible
+                // which hides bgWin automatically (see handler below).
+                this.set_visible(false);
+            });
+            bgWin.add_controller(bgClick);
+
+            bgWin.set_visible(false);
+            this._bgWin = bgWin;
+        } catch (e) {
+            console.warn('[launcher] click-catcher setup failed:', e.message);
+        }
+
+        // Sync bgWin visibility with the launcher — single source of truth.
+        // Covers ALL hide paths: ESC, app-tile click, empty-space click,
+        // SIGUSR1 hide, and the bgWin click handler above.
+        this.connect('notify::visible', () => {
+            if (this._bgWin) this._bgWin.set_visible(this.get_visible());
+            // Write launcher state so dock-main.js can suppress autohide
+            // while the launcher is visible.
+            try {
+                const stateDir  = GLib.build_filenamev([HOME, '.cache', 'hyprcandy']);
+                const statePath = GLib.build_filenamev([stateDir, 'launcher.state']);
+                GLib.mkdir_with_parents(stateDir, 0o755);
+                const content  = this.get_visible() ? 'open\n' : 'closed\n';
+                const bytes    = new TextEncoder().encode(content);
+                GLib.file_set_contents(statePath, bytes);
+            } catch (e) {
+                // Non-fatal — dock autohide guard is best-effort
+            }
+        });
+
+        // ── 2. Empty-space-click-to-close (BUBBLE-phase gesture) ─────────
+        // GtkButton and GtkSearchEntry claim their gesture sequences during
+        // BUBBLE propagation, denying parent gestures for the same sequence.
+        // A GestureClick on the root box therefore only fires when the click
+        // lands on blank background / padding that no child widget consumed —
+        // i.e. "empty space" inside the launcher frame.
+        const rootChild = this.get_child();
+        if (rootChild) {
+            const emptyClick = new Gtk.GestureClick();
+            emptyClick.set_button(1);   // primary / left button only
+            emptyClick.connect('released', (_g, _n, x, y) => {
+                if (!this.get_visible())                         return;
+                if (this._popoverOpen || this._postPopoverGrace) return;
+                // pick() returns the deepest widget under the pointer; if it
+                // resolves to something other than the root box (or window),
+                // an interactive child already claimed the sequence — skip.
+                const pick = this.pick(
+                    x + rootChild.get_margin_start(),
+                    y + rootChild.get_margin_top(),
+                    Gtk.PickFlags.DEFAULT
+                );
+                if (pick && pick !== rootChild && pick !== this) return;
+                this.set_visible(false);
+            });
+            rootChild.add_controller(emptyClick);
+        }
+    }
+
+    // ── Fix 1: safe favorites clear ──────────────────────────────────────
+    // Uses get_first_child() each iteration so GTK4 sibling pointer
+    // rebinding after remove() never leaves a stale reference (fixes
+    // the single-last-favorite stuck-tile bug).
+    _refreshFavorites(query) {
+        const q = (query ?? '').toLowerCase().trim();
+        while (true) {
+            const ch = this._favFlow.get_first_child();
+            if (!ch) break;
+            this._favFlow.remove(ch);
+        }
+        // Section header stays visible as long as ANY favorites exist so the
+        // user can see (and drag to) the bar even when the query filters them out.
+        const allFavApps = this._allApps.filter(a => this._favoritesSet.has(a.className));
+        this._favSection.set_visible(allFavApps.length > 0);
+        // Only populate the grid with apps that match the current query.
+        const favApps = q
+            ? allFavApps.filter(a => a.name.toLowerCase().includes(q))
+            : allFavApps;
+        for (const app of favApps)
+            this._favFlow.append(this._makeAppTile(app));
+    }
+
+}); // end GObject.registerClass(AppLauncherWindow)
+
+// ── Daemon Application (Fix 4) ─────────────────────────────────────────────
+// Runs as a persistent daemon. SIGUSR1 (10) toggles visibility.
+// The window is never destroyed between toggles — CSS and app-list are kept.
+
+const LauncherApp = GObject.registerClass({
+    GTypeName: 'HyprCandyLauncherApp',
+}, class LauncherApp extends Gtk.Application {
+    vfunc_activate() {
+        this._win = new AppLauncherWindow(this);
+        this.add_window(this._win);
+        // Start hidden; SIGUSR1 will show it on first toggle
+        this._win.set_visible(false);
+
+        // SIGUSR1 (10): toggle show/hide.
+        // dock-main.js sends pkill -10 -f "gjs app-launcher.js" instead of
+        // spawning toggle-app-launcher.sh, which is faster (no shell fork).
+        try {
+            GLibUnix.signal_add_full(GLib.PRIORITY_DEFAULT, 10, () => {
+                if (this._win.get_visible()) {
+                    this._win.set_visible(false);
+                } else {
+                    // Re-anchor to the current dock edge (user may have cycled
+                    // positions since the launcher daemon last showed).
+                    this._win._refreshLayerShell();
+                    // Refresh app list and running apps from disk on each show
+                    this._win._allApps     = this._win._appsDirty ? getAllApps() : this._win._allApps;
+                    this._win._appsDirty   = false;
+                    this._win._runningApps = getRunningApps();
+                    // Reset collapse state — favorites and groups start collapsed
+                    // on every fresh open; the user expands what they want.
+                    this._win._favCollapsed  = true;
+                    this._win._favFlow.set_visible(false);
+                    this._win._favSep.set_visible(false);
+                    this._win._favChevron.set_text(CHEV_UP);
+                    this._win._groupCollapsed = {};
+                    this._win.set_visible(true);
+                    this._win.present();
+                    GLib.idle_add(GLib.PRIORITY_HIGH, () => {
+                        this._win._searchEntry.set_text('');
+                        this._win._refreshFavorites('');
+                        this._win._refreshGroups('');
+                        this._win._populateApps(this._win._allApps);
+                        this._win._searchEntry.grab_focus();
+                        return GLib.SOURCE_REMOVE;
+                    });
+                }
+                return GLib.SOURCE_CONTINUE;
+            });
+        } catch (e) {
+            console.warn('[launcher] SIGUSR1 handler failed:', e.message);
+        }
+
+        // Keep the application alive indefinitely (daemon mode)
+        this.hold();
+    }
+}); // end GObject.registerClass(LauncherApp)
+
+const app = new LauncherApp({
+    application_id: 'org.hyprcandy.AppLauncher',
+    // NON_UNIQUE so multiple invocations don't conflict; only one daemon
+    // should run at a time — managed by autostart.sh / dock-main.js.
+    flags: Gio.ApplicationFlags.NON_UNIQUE,
+});
+
+app.run([imports.system.programInvocationName, ...ARGV]);
