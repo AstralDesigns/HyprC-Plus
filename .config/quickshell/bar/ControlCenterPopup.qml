@@ -3145,7 +3145,7 @@ PanelWindow {
                     CCScrollPane {
                         ColumnLayout {
                             width: parent.width; spacing: 5
-                            CCSection { text: "󰞒 Dock" }
+                            CCSection { text: "󰇜 Dock" }
 
                             CCSection { text: "Screen Margin" }
                             CCSlider {
@@ -3155,18 +3155,29 @@ PanelWindow {
                                 onMoved: function(v) {
                                     _dockMarginVal = v
                                     Config.dockMargin = v
-                                    const cmd =
-                                        "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
-                                        "mkdir -p \"$(dirname $f)\"; " +
-                                        "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
-                                        "grep -q '^margin_from_edge=' \"$f\" || sed -i '/^\\[dock\\]/a margin_from_edge=6' \"$f\"; " +
-                                        "sed -i '/^\\[dock\\]/,/^\\[/{s/^margin_from_edge=.*/margin_from_edge=" + v + "/}' \"$f\"; " +
-                                        "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
-                                    if (_confWriteProc.running) {
-                                        _confWriteProc._pendingCmd = cmd
+                                    // Dedicated queued process — decoupled from both
+                                    // _confWriteProc (Hyprland Lua state writer) and
+                                    // _dockWrite (config.js writer). Queue ensures rapid
+                                    // slider drags never drop the final value.
+                                    const args = [scriptDir + "/dock-set.sh", "marginFromEdge", v.toString()]
+                                    if (_dockMarginWrite.running) {
+                                        _dockMarginWrite._pending = args
                                     } else {
-                                        _confWriteProc._cmd = cmd
-                                        _confWriteProc.running = true
+                                        _dockMarginWrite.command = args
+                                        _dockMarginWrite.running = true
+                                    }
+                                }
+                            }
+                            Process {
+                                id: _dockMarginWrite
+                                property var _pending: null
+                                running: false
+                                onExited: {
+                                    running = false
+                                    if (_pending !== null) {
+                                        command = _pending
+                                        _pending = null
+                                        running = true
                                     }
                                 }
                             }
