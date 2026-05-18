@@ -80,7 +80,7 @@ Item {
                             id: discGlyph
                             visible: MediaPlayerState.artPath === ""
                             anchors.centerIn: parent
-                            text: Config.mediaToggleGlyph
+                            text: "󰎆"
                             color: Config.glyphColor
                             font.family: Config.fontFamily
                             font.pixelSize: MediaPlayerState.thumbSize - 2
