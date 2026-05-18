@@ -89,7 +89,36 @@ Item {
     }
 
 
+    // ── Workspace scroll (shared by root MouseArea) ─────────────────────────
+    function _scrollWorkspace(delta) {
+        if (!Config.wsScrollSwitch) return
+        const cur = Hyprland.focusedMonitor?.activeWorkspace?.id ?? 1
+        const maxOccupied = Hyprland.workspaces?.values
+            ? Hyprland.workspaces.values.reduce((max, w) => {
+                  return (w.id > 0 && w.name !== "hidden" && w.id > max) ? w.id : max
+              }, Config.wsCount)
+            : Config.wsCount
+        let target
+        if (delta > 0) {
+            target = cur - 1
+            if (target < 1) target = maxOccupied
+        } else {
+            target = cur + 1
+            if (target > maxOccupied) target = 1
+        }
+        Hyprland.dispatch("hl.dsp.focus({ workspace = " + target + " })")
+    }
+
     // ── Horizontal layout ────────────────────────────────────────────────────
+
+    // Full-module scroll — covers gaps between buttons and margin spacers.
+    // Clicks pass through (propagateComposedEvents) so per-button click still works.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        onWheel: ev => root._scrollWorkspace(ev.angleDelta.y)
+    }
+
     Row {
         id: wsRow
         visible: !root.vertical
@@ -111,7 +140,7 @@ Item {
 
                 // ── Optional separator before this button (skip index 0) ────
                 Item {
-                    visible: Config.wsSeparators && parent.index > 0
+                    visible: Config.wsSeparators && root._wsModel.length > 1 && parent.index > 0
                     // Total width = pad-left + glyph + pad-right
                     implicitWidth:  Config.wsSeparatorPadLeft + sepTxt.implicitWidth + Config.wsSeparatorPadRight
                     implicitHeight: Config.moduleHeight
@@ -150,11 +179,8 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: Hyprland.dispatch("workspace " + wsBtn.parent._slot)
-                        onWheel: function(ev) {
-                            if (!Config.wsScrollSwitch) return
-                            Hyprland.dispatch(ev.angleDelta.y > 0 ? "workspace -1" : "workspace +1")
-                        }
+                        onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + wsBtn.parent._slot + " })")
+                        onWheel: ev => root._scrollWorkspace(ev.angleDelta.y)
                     }
                 }
             }
@@ -192,7 +218,7 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: Hyprland.dispatch("workspace " + parent.modelData.id)
+                    onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + parent.modelData.id + " })")
                 }
             }
         }

@@ -98,7 +98,7 @@ Item {
                     Repeater {
                         model: [
                             { label: "Lock",     icon: "\uf023", cmd: "hyprlock" },
-                            { label: "Logout",   icon: "\uf2f5", cmd: "hyprctl dispatch exit" },
+                            { label: "Logout",   icon: "\uf2f5", cmd: "hyprctl dispatch 'hl.dsp.exit()'" },
                             { label: "Shutdown", icon: "\uf011", cmd: "systemctl poweroff" },
                             { label: "Reboot",   icon: "\uf021", cmd: "systemctl reboot" },
                         ]

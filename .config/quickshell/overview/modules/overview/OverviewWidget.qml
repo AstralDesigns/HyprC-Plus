@@ -185,7 +185,7 @@ Item {
                 }
                 GlobalStates.resetWinFocus();
                 GlobalStates.resetStripScroll();
-                Hyprland.dispatch("workspace " + targetId);
+                Hyprland.dispatch("hl.dsp.focus({ workspace = " + targetId + " })");
             }
         }
 
@@ -287,7 +287,7 @@ Item {
                     wsRow.isDragTarget = false
                     const addr = drop.source?.windowAddress
                     if (addr && drop.source?.sourceWorkspaceId !== wsRow.wsId) {
-                        Hyprland.dispatch(`movetoworkspacesilent ${wsRow.wsId},address:${addr}`)
+                        Hyprland.dispatch(`hl.dsp.window.move({ window = 'address:${addr}', workspace = ${wsRow.wsId} })`)
                     }
                 }
             }
@@ -357,7 +357,7 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
                             GlobalStates.overviewOpen = false
-                            Hyprland.dispatch(`workspace ${wsRow.wsId}`)
+                            Hyprland.dispatch(`hl.dsp.focus({ workspace = ${wsRow.wsId} })`)
                         }
                     }
                 }
@@ -541,42 +541,44 @@ Item {
 
                                         onEntered: winCell.hovered = true
                                         onExited:  winCell.hovered = false
-                                        onPressed: (mouse) => {
-                                            winCell.pressed = true
-                                            pressOffsetX = mouse.x
-                                            pressOffsetY = mouse.y
-                                            winPreview.Drag.hotSpot.x = mouse.x
-                                            winPreview.Drag.hotSpot.y = mouse.y
-                                            const p = winPreview.mapToItem(overviewBackground, 0, 0)
-                                            winPreview.parent = overviewBackground
-                                            winPreview.x = p.x
-                                            winPreview.y = p.y
-                                            winPreview.z = 99999
-                                        }
-                                        onPositionChanged: (mouse) => {
-                                            if (!winCell.pressed || winPreview.parent !== overviewBackground) return
-                                            const p = dragArea.mapToItem(overviewBackground, mouse.x, mouse.y)
-                                            winPreview.x = p.x - pressOffsetX
-                                            winPreview.y = p.y - pressOffsetY
-                                        }
-                                        onReleased: (mouse) => {
-                                            winPreview.Drag.drop()
-                                            winCell.pressed = false
-                                            dragProxy.x = winPreview.initX
-                                            dragProxy.y = winPreview.initY
-                                            winPreview.parent = winCell
-                                            winPreview.z = 0
-                                            winPreview.x = winPreview.initX
-                                            winPreview.y = winPreview.initY
-                                        }
+onPressed: (mouse) => {
+	                                            if (mouse.button !== Qt.LeftButton) return
+	                                            winCell.pressed = true
+	                                            pressOffsetX = mouse.x
+	                                            pressOffsetY = mouse.y
+	                                            winPreview.Drag.hotSpot.x = mouse.x
+	                                            winPreview.Drag.hotSpot.y = mouse.y
+	                                            const p = winPreview.mapToItem(overviewBackground, 0, 0)
+	                                            winPreview.parent = overviewBackground
+	                                            winPreview.x = p.x
+	                                            winPreview.y = p.y
+	                                            winPreview.z = 99999
+	                                        }
+onPositionChanged: (mouse) => {
+	                                            if (!winCell.pressed || winPreview.parent !== overviewBackground || (mouse.buttons & Qt.LeftButton) === 0) return
+	                                            const p = dragArea.mapToItem(overviewBackground, mouse.x, mouse.y)
+	                                            winPreview.x = p.x - pressOffsetX
+	                                            winPreview.y = p.y - pressOffsetY
+	                                        }
+onReleased: (mouse) => {
+	                                            if (mouse.button !== Qt.LeftButton) return
+	                                            winPreview.Drag.drop()
+	                                            winCell.pressed = false
+	                                            dragProxy.x = winPreview.initX
+	                                            dragProxy.y = winPreview.initY
+	                                            winPreview.parent = winCell
+	                                            winPreview.z = 0
+	                                            winPreview.x = winPreview.initX
+	                                            winPreview.y = winPreview.initY
+	                                        }
                                         onClicked: event => {
                                             if (!winCell.winData) return
                                             if (event.button === Qt.LeftButton) {
                                                 GlobalStates.overviewOpen = false
-                                                Hyprland.dispatch(`focuswindow address:${winCell.winData.address}`)
+                                                Hyprland.dispatch(`hl.dsp.focus({ window = 'address:${winCell.winData.address}' })`)
                                                 event.accepted = true
                                             } else if (event.button === Qt.MiddleButton) {
-                                                Hyprland.dispatch(`closewindow address:${winCell.winData.address}`)
+                                                Hyprland.dispatch(`hl.dsp.window.close({ window = 'address:${winCell.winData.address}' })`)
                                                 event.accepted = true
                                             }
                                         }
@@ -600,10 +602,10 @@ Item {
                                             if (!srcAddr || srcAddr === dstAddr) return
                                             const srcWs = drop.source?.sourceWorkspaceId
                                             if (srcWs === wsRow.wsId) {
-                                                Hyprland.dispatch(`focuswindow address:${srcAddr}`)
-                                                Hyprland.dispatch(`swapwindow address:${dstAddr}`)
+                                                Hyprland.dispatch(`hl.dsp.focus({ window = 'address:${srcAddr}' })`)
+                                                Hyprland.dispatch(`hl.dsp.window.swap({ target = 'address:${dstAddr}' })`)
                                             } else {
-                                                Hyprland.dispatch(`movetoworkspacesilent ${wsRow.wsId},address:${srcAddr}`)
+                                                Hyprland.dispatch(`hl.dsp.window.move({ window = 'address:${srcAddr}', workspace = ${wsRow.wsId} })`)
                                             }
                                         }
                                     }

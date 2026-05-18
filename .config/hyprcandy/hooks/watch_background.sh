@@ -65,7 +65,7 @@ execute_hooks() {
         echo "🚫 Auto-relaunch disabled by user, skipping dock relaunch"
     fi
     
-    "$HOOKS_DIR/clear_swww.sh"
+    "$HOOKS_DIR/clear_awww.sh"
     "$HOOKS_DIR/update_background.sh"
 }
 

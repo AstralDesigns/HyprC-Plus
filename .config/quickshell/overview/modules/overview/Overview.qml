@@ -100,7 +100,7 @@ Scope {
                                 GlobalStates.overviewOpen = false;
                                 // Then dispatch focus after overview has closed
                                 Qt.callLater(() => {
-                                    Hyprland.dispatch(`focuswindow address:${targetAddr}`);
+                                    Hyprland.dispatch(`hl.dsp.focus({ window = 'address:${targetAddr}' })`);
                                 });
                             } else {
                                 GlobalStates.overviewOpen = false;
@@ -163,7 +163,7 @@ Scope {
                     }
 
                     if (targetId !== null) {
-                        Hyprland.dispatch("workspace " + targetId);
+                        Hyprland.dispatch("hl.dsp.focus({ workspace = " + targetId + " })");
                         event.accepted = true;
                     }
                 }
@@ -185,7 +185,7 @@ Scope {
                     }
                     GlobalStates.resetWinFocus();
                     GlobalStates.resetStripScroll();
-                    Hyprland.dispatch("workspace " + targetId);
+                    Hyprland.dispatch("hl.dsp.focus({ workspace = " + targetId + " })");
                 }
             }
 

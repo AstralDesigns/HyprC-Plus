@@ -1,18 +1,14 @@
 #!/bin/bash
-# Set opacity value directly
-HYPR_CONF="$HOME/.config/hypr/hyprviz.conf"
-
-value="$1"
-
-if [ -n "$value" ] && [ -f "$HYPR_CONF" ]; then
-    # Validate and clamp between 0 and 1
-    nv=$(echo "$value" | grep -oP '[0-9.]+')
-    if [ -n "$nv" ]; then
-        if (( $(echo "$nv < 0" | bc -l) )); then nv="0"; fi
-        if (( $(echo "$nv > 1" | bc -l) )); then nv="1"; fi
-        sed -i "s/active_opacity = .*/active_opacity = $nv/" "$HYPR_CONF"
-        sed -i "s/inactive_opacity = .*/inactive_opacity = $nv/" "$HYPR_CONF"
-        hyprctl reload
-        echo "ok"
-    fi
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HELPER="$SCRIPT_DIR/hyprland-lua-state.sh"
+# Set window opacity in hyprviz-state.lua.
+value="${1:-}"
+[ -n "$value" ] || exit 1
+if [[ "$value" =~ ^[+-][0-9]+([.][0-9]+)?$ ]]; then
+    "$HELPER" adjust opacity "$value" >/dev/null
+else
+    "$HELPER" set opacity "$value" >/dev/null
 fi
+hyprctl reload 2>/dev/null || true
+echo "ok"

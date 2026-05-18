@@ -1,17 +1,24 @@
 #!/bin/bash
-# X-Ray toggle with state persistence
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+HELPER="$SCRIPT_DIR/hyprland-lua-state.sh"
+# X-Ray toggle/status with Lua state persistence.
 STATE_FILE="$HOME/.config/hyprcandy/xray.state"
-XRAY_SCRIPT="$HOME/.config/hypr/scripts/xray.sh"
-
-if [ "$1" = "toggle" ]; then
-    bash "$XRAY_SCRIPT"
-    if [ -f "$STATE_FILE" ]; then
-        rm -f "$STATE_FILE"
-        echo "off"
-    else
-        echo "enabled" > "$STATE_FILE"
-        echo "on"
-    fi
-elif [ "$1" = "status" ]; then
-    [ -f "$STATE_FILE" ] && echo "on" || echo "off"
-fi
+case "${1:-toggle}" in
+    status)
+        [ -f "$STATE_FILE" ] && echo "on" || echo "off"
+        ;;
+    toggle|*)
+        if [ -f "$STATE_FILE" ]; then
+            rm -f "$STATE_FILE"
+            "$HELPER" set xray false >/dev/null
+            echo "off"
+        else
+            mkdir -p "$(dirname '$STATE_FILE')"
+            echo "enabled" > "$STATE_FILE"
+            "$HELPER" set xray true >/dev/null
+            echo "on"
+        fi
+        hyprctl reload 2>/dev/null || true
+        ;;
+esac

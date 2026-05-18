@@ -178,7 +178,7 @@ function spawnAppOnGPU(exec, envVars) {
 function focusWindow(address) {
     try {
         GLib.spawn_command_line_async(
-            `hyprctl dispatch focuswindow address:${address}`
+            `hyprctl dispatch "hl.dsp.focus({ window = 'address:${address}' })"`
         );
     } catch (_) {}
 }
@@ -1603,9 +1603,14 @@ const AppLauncherWindow = GObject.registerClass({
                 wsBtn.set_halign(Gtk.Align.FILL);
                 wsBtn.connect('clicked', () => {
                     try {
-                        GLib.spawn_command_line_async('hyprctl dispatch workspace ' + i);
+                        const cmd = app.exec.replace(/%[UuFfIiDdNnVvKk]/g, '').trim();
+                        // Combine workspace focus with exec_cmd rule to fix race conditions for apps like Nautilus
+                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ workspace = ${i} })"`);
+                        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+                            GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.exec_cmd('${cmd}', { workspace = ${i} })"`);
+                            return GLib.SOURCE_REMOVE;
+                        });
                     } catch (_) {}
-                    launchFn();
                     wsSub.popdown();
                     pop.popdown();
                     this.close();

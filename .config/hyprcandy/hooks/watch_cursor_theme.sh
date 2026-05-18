@@ -2,7 +2,7 @@
 
 GTK3_FILE="$HOME/.config/gtk-3.0/settings.ini"
 GTK4_FILE="$HOME/.config/gtk-4.0/settings.ini"
-HYPRCONF="$HOME/.config/hypr/hyprviz.conf"
+HYPRLUA="$HOME/.config/hypr/hyprviz.lua"
 
 get_value() {
     grep -E "^$1=" "$1" 2>/dev/null | cut -d'=' -f2 | tr -d ' '
@@ -23,11 +23,11 @@ update_hypr_cursor_env() {
     [ -z "$theme" ] && return
     [ -z "$size" ] && return
 
-    # Replace each env line using sed
-    sed -i "s|^env = XCURSOR_THEME,.*|env = XCURSOR_THEME,$theme|" "$HYPRCONF"
-    sed -i "s|^env = XCURSOR_SIZE,.*|env = XCURSOR_SIZE,$size|" "$HYPRCONF"
-    sed -i "s|^env = HYPRCURSOR_THEME,.*|env = HYPRCURSOR_THEME,$theme|" "$HYPRCONF"
-    sed -i "s|^env = HYPRCURSOR_SIZE,.*|env = HYPRCURSOR_SIZE,$size|" "$HYPRCONF"
+    # Replace each hl.env line in hyprviz.lua
+    sed -i "s|hl.env(\"XCURSOR_THEME\", \".*\")|hl.env(\"XCURSOR_THEME\", \"$theme\")|" "$HYPRLUA"
+    sed -i "s|hl.env(\"XCURSOR_SIZE\", \".*\")|hl.env(\"XCURSOR_SIZE\", \"$size\")|" "$HYPRLUA"
+    sed -i "s|hl.env(\"HYPRCURSOR_THEME\", \".*\")|hl.env(\"HYPRCURSOR_THEME\", \"$theme\")|" "$HYPRLUA"
+    sed -i "s|hl.env(\"HYPRCURSOR_SIZE\", \".*\")|hl.env(\"HYPRCURSOR_SIZE\", \"$size\")|" "$HYPRLUA"
     
     # Sync GTK4 with GTK3
     sed -i "s|^gtk-cursor-theme-name=.*|gtk-cursor-theme-name=$theme|" "$GTK4_FILE"
@@ -47,8 +47,6 @@ apply_cursor_changes() {
     local theme="$1"
     local size="$2"
     
-    # Method 1: Reload Hyprland config
-    hyprctl reload 2>/dev/null
     # Apply cursor changes immediately using hyprctl
     hyprctl setcursor "$theme" "$size" 2>/dev/null || {
         echo "⚠️  hyprctl setcursor failed, falling back to reload"

@@ -1018,12 +1018,24 @@ const HyprCandyDock = GObject.registerClass({
             const freshClientData = this.daemon.getClientData();
             const freshData = freshClientData.find(d => d.className === data.className);
             const instances = freshData ? freshData.instances : data.instances;
-            if (instances.length > 0) {
-                this.daemon.focusWindow(instances[0].address);
-            } else {
+            if (instances.length === 0) {
                 // Pinned but not running — launch via desktop entry
                 const lookupClass = (freshData || data).iconClass || data.className;
                 this.daemon.launchApp(lookupClass);
+            } else if (instances.length === 1) {
+                // Single instance — restore if minimized, focus if visible
+                const inst = instances[0];
+                const isMinimized = inst.workspace &&
+                    String(inst.workspace.name) === 'hidden';
+                if (isMinimized) {
+                    this.daemon.restoreWindow(inst.address);
+                } else {
+                    this.daemon.focusWindow(inst.address);
+                }
+            } else {
+                // Multiple instances — show a compact picker popover so the
+                // user can choose which specific window to raise or restore.
+                this._showInstancePicker(freshData || data, btn);
             }
         });
 
@@ -1141,6 +1153,110 @@ const HyprCandyDock = GObject.registerClass({
         }
     }
 
+    // --- Instance Picker Popover (left-click on multi-instance app icons) ---
+    // Shows a compact stacked list of all open windows for the app.
+    // Clicking a row restores the window if it is minimized on special:*,
+    // or focuses it directly if it is on a normal workspace.
+    _showInstancePicker(data, parentButton) {
+        // Reuse the same directional logic as _showContextMenu
+        const _pos = DockConfig.position;
+        const _gap = DockConfig.popoverGapDock || 12;
+        let popPos, offX, offY;
+        if (_pos === 'top') {
+            popPos = Gtk.PositionType.BOTTOM; offX = 0;    offY = _gap;
+        } else if (_pos === 'left') {
+            popPos = Gtk.PositionType.RIGHT;  offX = _gap; offY = 0;
+        } else if (_pos === 'right') {
+            popPos = Gtk.PositionType.LEFT;   offX = -_gap; offY = 0;
+        } else {
+            popPos = Gtk.PositionType.TOP;    offX = 0;    offY = -_gap;
+        }
+
+        const picker = new Gtk.Popover();
+        picker.set_parent(parentButton);
+        picker.set_has_arrow(false);
+        picker.set_position(popPos);
+        picker.add_css_class('dock-popover');
+        picker.set_offset(offX, offY);
+        picker.connect('closed', () => {
+            _ahPopoverClosed();
+            GLib.idle_add(GLib.PRIORITY_LOW, () => {
+                try { picker.unparent(); } catch (_) {}
+                return GLib.SOURCE_REMOVE;
+            });
+        });
+
+        const styleCtx = picker.get_style_context();
+        styleCtx.add_provider(this._getPopoverCSSProvider(), Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+        const box = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        box.set_margin_start(6);
+        box.set_margin_end(6);
+        box.set_margin_top(6);
+        box.set_margin_bottom(6);
+
+        data.instances.forEach((instance, idx) => {
+            const isMinimized = instance.workspace &&
+                String(instance.workspace.name) === 'hidden';
+
+            // Row: small icon + title + workspace hint + restore/focus glyph
+            const rowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 8);
+
+            const iconName = this.daemon.getIcon(data.iconClass || data.className);
+            const icon = (iconName.startsWith('/') || iconName.startsWith('~'))
+                ? Gtk.Image.new_from_file(iconName)
+                : Gtk.Image.new_from_icon_name(iconName);
+            icon.set_pixel_size(16);
+            rowBox.append(icon);
+
+            const title = instance.title.length > 28
+                ? instance.title.substring(0, 28) + '…'
+                : instance.title;
+            const wsName = instance.workspace
+                ? (instance.workspace.name || instance.workspace.id || '?')
+                : '?';
+            const wsDisplay = isMinimized ? '🗕' : ('WS ' + wsName);
+            const labelText = title + '  ' + wsDisplay;
+
+            const label = Gtk.Label.new(labelText);
+            label.set_halign(Gtk.Align.START);
+            label.set_hexpand(true);
+            rowBox.append(label);
+
+            // Small state glyph on the right — ↩ for restore, ⤴ for focus
+            const stateLabel = Gtk.Label.new(isMinimized ? '↩' : '⤴');
+            stateLabel.set_halign(Gtk.Align.END);
+            stateLabel.set_margin_start(6);
+            rowBox.append(stateLabel);
+
+            const rowBtn = Gtk.Button.new();
+            rowBtn.set_child(rowBox);
+            rowBtn.add_css_class('popover-item');
+            rowBtn.set_halign(Gtk.Align.FILL);
+            rowBtn.connect('clicked', () => {
+                if (isMinimized) {
+                    this.daemon.restoreWindow(instance.address);
+                } else {
+                    this.daemon.focusWindow(instance.address);
+                }
+                picker.popdown();
+            });
+            box.append(rowBtn);
+
+            // Separator between rows
+            if (idx < data.instances.length - 1) {
+                const sep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
+                sep.set_margin_top(3);
+                sep.set_margin_bottom(3);
+                box.append(sep);
+            }
+        });
+
+        picker.set_child(box);
+        _ahPopoverOpened();
+        picker.popup();
+    }
+
     // --- Context Menu (GTK4 Popover with nwg-style side menu) ---------
     _showContextMenu(data, parentButton) {
         // Compute popover directions so the menu always opens away from the
@@ -1216,7 +1332,10 @@ const HyprCandyDock = GObject.registerClass({
                 const wsName = instance.workspace
                     ? (instance.workspace.name || instance.workspace.id || '?')
                     : '?';
-                const headerLabel = Gtk.Label.new(title + ' (' + wsName + ')');
+                // Show a visible hint when the window is on a special (minimized) workspace
+                const _instMinimized = wsName === 'hidden';
+                const wsDisplay = _instMinimized ? '🗕 minimized' : wsName;
+                const headerLabel = Gtk.Label.new(title + ' (' + wsDisplay + ')');
                 headerLabel.set_halign(Gtk.Align.START);
                 headerLabel.set_hexpand(true);
                 headerBox.append(headerLabel);
@@ -1227,13 +1346,21 @@ const HyprCandyDock = GObject.registerClass({
                 chevronLabel.set_margin_start(8);
                 headerBox.append(chevronLabel);
 
-                // Focus button
+                // Detect minimized state for this specific instance
+                const _isMinimized = instance.workspace &&
+                    String(instance.workspace.name) === 'hidden';
+
+                // Focus button — restores if minimized, focuses if visible
                 const focusBtn = Gtk.Button.new();
                 focusBtn.set_child(headerBox);
                 focusBtn.add_css_class('popover-item');
                 focusBtn.set_halign(Gtk.Align.FILL);
                 focusBtn.connect('clicked', () => {
-                    this.daemon.focusWindow(instance.address);
+                    if (_isMinimized) {
+                        this.daemon.restoreWindow(instance.address);
+                    } else {
+                        this.daemon.focusWindow(instance.address);
+                    }
                     mainPopover.popdown();
                 });
 
@@ -1264,11 +1391,14 @@ const HyprCandyDock = GObject.registerClass({
                 actionsBox.set_margin_top(6);
                 actionsBox.set_margin_bottom(6);
 
-                // Window actions
+                // Window actions — Minimize/Restore first, then the rest
                 const windowActions = [
+                    _isMinimized
+                        ? { label: 'Restore', fn: () => this.daemon.restoreWindow(instance.address) }
+                        : { label: 'Minimize', fn: () => this.daemon.minimizeWindow(instance.address) },
                     { label: 'Close Window', fn: () => this.daemon.closeWindow(instance.address) },
-                    { label: 'Toggle Floating', fn: () => this.daemon.hyprctl('dispatch togglefloating address:' + instance.address) },
-                    { label: 'Fullscreen', fn: () => this.daemon.hyprctl('dispatch fullscreen address:' + instance.address) },
+                    { label: 'Toggle Floating', fn: () => GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.window.float({ window = 'address:${instance.address}', action = 'toggle' })"`) },
+                    { label: 'Fullscreen', fn: () => GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.window.fullscreen({ window = 'address:${instance.address}', action = 'toggle' })"`) },
                 ];
 
                 for (const wa of windowActions) {
@@ -1305,11 +1435,11 @@ const HyprCandyDock = GObject.registerClass({
                     wsBtn.add_css_class('popover-item');
                     wsBtn.add_css_class('popover-action');
                     wsBtn.set_halign(Gtk.Align.FILL);
-                    wsBtn.connect('clicked', () => {
-                        this.daemon.hyprctl('dispatch movetoworkspace ' + i + ',address:' + instance.address);
-                        sidePopover.popdown();
-                        mainPopover.popdown();
-                    });
+wsBtn.connect('clicked', () => {
+	                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.window.move({ window = 'address:${instance.address}', workspace = ${i} })"`);
+	                        sidePopover.popdown();
+	                        mainPopover.popdown();
+	                    });
                     actionsBox.append(wsBtn);
                 }
 
@@ -1396,13 +1526,24 @@ const HyprCandyDock = GObject.registerClass({
                 wsBtn.add_css_class('popover-item');
                 wsBtn.add_css_class('popover-action');
                 wsBtn.set_halign(Gtk.Align.FILL);
-                wsBtn.connect('clicked', () => {
-                    // Dispatch to workspace first, then launch
-                    this.daemon.hyprctl('dispatch workspace ' + i);
-                    launchFn();
-                    wsSubPop.popdown();
-                    mainPopover.popdown();
-                });
+wsBtn.connect('clicked', () => {
+	                    // Combine workspace focus with exec_cmd rule to fix race conditions for apps like Nautilus
+	                    const raw = this.daemon._resolveExec(data.iconClass || data.className);
+	                    if (raw) {
+	                        // Focus workspace first, then launch with rule
+	                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ workspace = ${i} })"`);
+	                        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+	                            GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.exec_cmd('${raw}', { workspace = ${i} })"`);
+	                            return GLib.SOURCE_REMOVE;
+	                        });
+	                    } else {
+	                        // Fallback: focus workspace then launch
+	                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ workspace = ${i} })"`);
+	                        launchFn();
+	                    }
+	                    wsSubPop.popdown();
+	                    mainPopover.popdown();
+	                });
                 wsBox.append(wsBtn);
             }
             wsSubPop.set_child(wsBox);

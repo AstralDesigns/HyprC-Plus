@@ -274,20 +274,21 @@ PanelWindow {
     // Read hyprland config values
     Process {
         id: _hyprlandValReader
-        // Use grep -A 25 for blur so the block lookup doesn't depend on ^} matching indented braces.
+        // Read from the Lua-aware helper. It resolves Control Center state first,
+        // then falls back to the migrated/static Hyprland defaults.
         command: ["bash", "-c",
-            'f="$HOME/.config/hypr/hyprviz.conf"; ' +
-            'grep "active_opacity = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9.]+"; ' +
-            'grep -A 25 "blur {" "$f" 2>/dev/null | grep "size = " | head -1 | grep -oP "[0-9]+"; ' +
-            'grep -A 25 "blur {" "$f" 2>/dev/null | grep "passes = " | head -1 | grep -oP "[0-9]+"; ' +
-            'grep "gaps_in = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
-            'grep "gaps_out = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
-            'grep "border_size = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
-            'grep "rounding = " "$f" 2>/dev/null | head -1 | grep -oP "[0-9]+"; ' +
-            'grep "col.active_border" "$f" 2>/dev/null | head -1 | sed "s/.*= *//" | xargs; ' +
-            'grep "col.inactive_border" "$f" 2>/dev/null | head -1 | sed "s/.*= *//" | xargs; ' +
-            'hyprctl getoption general:layout -j 2>/dev/null | grep -oP "(?<=\"str\": \")[^\"]+\" || ' +
-            'grep "layout = " "$f" 2>/dev/null | head -1 | grep -oP "(?<=layout = )\\S+"']
+            'h="$HOME/.config/quickshell/bar/scripts/hyprland-lua-state.sh"; ' +
+            '"$h" get opacity; ' +
+            '"$h" get blur_size; ' +
+            '"$h" get blur_passes; ' +
+            '"$h" get gaps_in; ' +
+            '"$h" get gaps_out; ' +
+            '"$h" get border_size; ' +
+            '"$h" get rounding; ' +
+            '"$h" get active_border; ' +
+            '"$h" get inactive_border; ' +
+            'hyprctl getoption general:layout -j 2>/dev/null | grep -oP "(?<=\\\"str\\\": \\\")[^\\\"]+" || ' +
+            'hyprctl getoption general:layout 2>/dev/null | awk "/^str:/{print \\$2}"']
         running: false
         property string _output: ""
         stdout: SplitParser {
@@ -493,13 +494,12 @@ PanelWindow {
         }
     }
 
-    // ── Read kb_layout from hyprviz.conf (only used if state file has no entry) ─
+    // ── Read kb_layout from Lua-aware Hyprland state/defaults ─
     Process {
         id: _kbLayoutReader
         command: ["bash", "-c",
-            "f=\"$HOME/.config/hypr/hyprviz.conf\"; " +
-            "[ -f \"$f\" ] || exit 0; " +
-            "grep -m1 'kb_layout' \"$f\" | grep -oP '(?<=kb_layout = )\\S*'"]
+            "h=\"$HOME/.config/quickshell/bar/scripts/hyprland-lua-state.sh\"; " +
+            "[ -x \"$h\" ] && \"$h\" get kb_layout"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -543,16 +543,12 @@ PanelWindow {
         }
     }
 
-    // Helper: write a hyprland value to the state file (queued, non-blocking)
+    // Helper: write a hyprland value to both hyprcandy-bar.conf and hyprviz-state.lua.
+    // The helper preserves the legacy CC state file while rendering Lua overrides.
     function _writeHyprState(key, val) {
-        const cmd = "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
-            "mkdir -p \"$(dirname \"$f\")\"; " +
-            "grep -q '^\\[hyprland\\]' \"$f\" 2>/dev/null || printf '\\n[hyprland]\\n' >> \"$f\"; " +
-            "if grep -q '^" + key + "=' \"$f\" 2>/dev/null; then " +
-            "  sed -i 's|^" + key + "=.*|" + key + "=" + val + "|' \"$f\"; " +
-            "else " +
-            "  sed -i '/^\\[hyprland\\]/a " + key + "=" + val + "' \"$f\"; " +
-            "fi"
+        const safeVal = String(val).replace(/'/g, "'\\''")
+        const cmd = "h=\"$HOME/.config/quickshell/bar/scripts/hyprland-lua-state.sh\"; " +
+            "[ -x \"$h\" ] && \"$h\" set " + key + " '" + safeVal + "' >/dev/null"
         if (_confWriteProc.running) {
             _confWriteProc._pendingCmd = cmd
         } else {
@@ -1713,6 +1709,9 @@ PanelWindow {
                                     ColumnLayout {
                                         width: parent.width; spacing: 5
 
+                                        CCSection { text: "Workspace Slots" }
+                                        CCSlider { label:"Slot Count"; from:1;to:10;stepSize:1;decimals:0; value:Config.wsCount; onMoved:function(v){Config.wsCount=v} }
+
                                         CCSection { text: "Display Mode" }
                                         // "dot" mode removed as requested — only number & icon
                                         CCSegmented {
@@ -2340,7 +2339,7 @@ PanelWindow {
                                         onClicked: {
                                             ccWin._currentLayout = modelData.key
                                             _layoutProc.command = ["bash", "-c",
-                                                "hyprctl keyword general:layout " + modelData.key + " 2>/dev/null"]
+                                                "hyprctl eval \"hl.config({ general = { layout = '" + modelData.key + "' } })\""]
                                             _layoutProc.running = true
                                         }
                                     }
@@ -2402,11 +2401,9 @@ PanelWindow {
                                             const v = text.trim()
                                             if (v.length === 0) return
                                             ccWin._kbLayout = v
-                                            _kbLayoutSetProc.command = ["bash", "-c",
-                                                "f=\"$HOME/.config/hypr/hyprviz.conf\"; " +
-                                                "sed -i 's|^\\(\\s*kb_layout\\s*=\\s*\\).*|\\1" + v + "|' \"$f\""]
-                                            _kbLayoutSetProc.running = true
                                             ccWin._writeHyprState("kb_layout", v)
+                                            _kbLayoutSetProc.command = ["bash", "-c", "hyprctl reload 2>/dev/null || true"]
+                                            _kbLayoutSetProc.running = true
                                         }
                                         Connections {
                                             target: ccWin
@@ -3965,6 +3962,17 @@ PanelWindow {
         Behavior on scale   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
         Behavior on opacity { NumberAnimation { duration: 140 } }
 
+        // Block all mouse/wheel events from reaching the CC panel behind this overlay.
+        // Without this, scroll and drag gestures on the picker pass through to whatever
+        // slider happens to sit at the same screen position, silently changing settings.
+        MouseArea {
+            anchors.fill: parent
+            enabled: wpPickerOverlay.visible
+            // Accept all buttons + wheel so nothing leaks through
+            acceptedButtons: Qt.AllButtons
+            onWheel: function(e) { e.accepted = true }
+        }
+
         function open() {
             visible = true
             if (wpSettings.wallpaperDir) {
@@ -4523,8 +4531,9 @@ PanelWindow {
                                     id: wpItemHov; anchors.fill: parent; hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
-                                        _wpAsIcon.command = [scriptDir+"/set-user-icon.sh", wpThumbItem.modelData]
-                                        _wpAsIcon.running = true
+                                        // Open the avatar crop overlay instead of applying directly,
+                                        // so the user can pan/position the image before committing.
+                                        avatarCropOverlay.openWith(wpThumbItem.modelData)
                                         wpPickerOverlay.close()
                                     }
                                 }
@@ -4567,6 +4576,327 @@ PanelWindow {
         FocusScope {
             visible: wpPickerOverlay.visible
             Keys.onEscapePressed: wpPickerOverlay.close()
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Avatar Crop Overlay
+    //  Opens ABOVE the control center (z:11) after the user picks an image
+    //  in the wallpaper picker.  Displays the full image inside a Flickable
+    //  so the user can drag to pan, with a fixed circular 96×96 "aperture"
+    //  that shows exactly what will become the avatar.
+    //  "Set as avatar" computes the NorthWest-gravity offsets that reproduce
+    //  the visible crop position and passes them to set-user-icon.sh.
+    // ═══════════════════════════════════════════════════════════════════════
+    Rectangle {
+        id: avatarCropOverlay
+        anchors.fill: panel
+        z: 11
+        visible: false
+        radius: 20
+        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                       Theme.cOnSecondary.b, 0.97)
+        border.width: 1
+        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g,
+                              Theme.cOutVar.b, 0.40)
+        clip: true
+
+        scale: visible ? 1.0 : 0.94
+        transformOrigin: Item.Top
+        opacity: visible ? 1.0 : 0.0
+        Behavior on scale   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 140 } }
+
+        // Block all mouse/wheel events from reaching the CC panel behind this overlay.
+        MouseArea {
+            anchors.fill: parent
+            enabled: avatarCropOverlay.visible
+            acceptedButtons: Qt.AllButtons
+            onWheel: function(e) { e.accepted = true }
+        }
+
+        // ── Internal state ──────────────────────────────────────────────
+        property string _srcPath: ""   // absolute path of source image
+        property real   _imgNatW: 1    // natural (original) image dimensions
+        property real   _imgNatH: 1
+        // Scale factor applied by -resize 96x96^ (covers 96 px on shorter axis)
+        // We mirror this in QML: the Flickable content is rendered at _scaledW × _scaledH
+        // so that one display pixel = one ImageMagick pixel after the resize step.
+        // The aperture is always 96×96 display px, matching the output size exactly.
+        readonly property int   _aperture: 240          // display size of circular viewport
+        readonly property real  _scaleFactor: {
+            // Same maths as IM -resize 96x96^ : scale so the smaller dimension = 96
+            // but we render bigger for a comfortable preview, so we use _aperture instead.
+            if (_imgNatW <= 0 || _imgNatH <= 0) return 1
+            return _aperture / Math.min(_imgNatW, _imgNatH)
+        }
+        readonly property real  _scaledW: _imgNatW * _scaleFactor
+        readonly property real  _scaledH: _imgNatH * _scaleFactor
+
+        // ── API ─────────────────────────────────────────────────────────
+        function openWith(path) {
+            _srcPath = path
+            visible  = true
+            // Reset pan to centre (mirrors IM -gravity center -extent 96x96)
+            Qt.callLater(function() {
+                // Centre the flickable so the middle of the image is inside
+                // the aperture at startup — matches the old "centre crop" default.
+                const maxX = Math.max(0, _scaledW - _aperture)
+                const maxY = Math.max(0, _scaledH - _aperture)
+                cropFlick.contentX = maxX / 2
+                cropFlick.contentY = maxY / 2
+            })
+        }
+        function _close() { visible = false; _srcPath = "" }
+
+        // ── Probe image dimensions when src changes ─────────────────────
+        // We use a hidden Image to read naturalWidth/naturalHeight.
+        Image {
+            id: _dimProbe
+            source: avatarCropOverlay._srcPath
+                ? ("file://" + avatarCropOverlay._srcPath)
+                : ""
+            visible: false
+            fillMode: Image.Pad
+            asynchronous: true
+            cache: false
+            onStatusChanged: {
+                if (status === Image.Ready) {
+                    avatarCropOverlay._imgNatW = sourceSize.width  || 1
+                    avatarCropOverlay._imgNatH = sourceSize.height || 1
+                }
+            }
+        }
+
+        // ── Layout ──────────────────────────────────────────────────────
+        ColumnLayout {
+            anchors { fill: parent; margins: 16 }
+            spacing: 12
+
+            // ── Header ─────────────────────────────────────────────────
+            RowLayout {
+                Layout.fillWidth: true; spacing: 8
+                Text {
+                    text: "Crop Avatar"
+                    color: Theme.cPrimary
+                    font.family: Config.labelFont
+                    font.pixelSize: 16; font.weight: Font.Bold
+                }
+                Item { Layout.fillWidth: true }
+                // Close / cancel
+                Rectangle {
+                    width: 28; height: 28; radius: 14
+                    color: _cropCloseHov.containsMouse
+                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.07)
+                    Text {
+                        anchors.centerIn: parent; text: "󰅙"
+                        font.family: Config.fontFamily; font.pixelSize: 15
+                        color: Theme.cPrimary
+                    }
+                    MouseArea {
+                        id: _cropCloseHov; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: avatarCropOverlay._close()
+                    }
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                }
+            }
+
+            // Hint
+            Text {
+                Layout.fillWidth: true
+                text: "Drag the image to frame your avatar. The circle shows what will be saved."
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+                font.family: Config.labelFont; font.pixelSize: 11
+                wrapMode: Text.Wrap
+            }
+
+            // Separator
+            Rectangle {
+                Layout.fillWidth: true; height: 1
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                               Theme.cPrimary.b, 0.18)
+            }
+
+            // ── Crop viewport — centred ─────────────────────────────────
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                // Flickable sits behind the aperture mask
+                Flickable {
+                    id: cropFlick
+                    anchors.centerIn: parent
+                    // Viewport is exactly aperture × aperture; clip hides what's outside
+                    width:  avatarCropOverlay._aperture
+                    height: avatarCropOverlay._aperture
+                    clip: true
+
+                    contentWidth:  avatarCropOverlay._scaledW
+                    contentHeight: avatarCropOverlay._scaledH
+
+                    // Clamp panning so the aperture never shows outside the image
+                    boundsBehavior: Flickable.StopAtBounds
+                    flickDeceleration: 3000
+
+                    // The full image scaled to _scaledW × _scaledH
+                    Image {
+                        id: _cropImg
+                        width:  avatarCropOverlay._scaledW
+                        height: avatarCropOverlay._scaledH
+                        source: avatarCropOverlay._srcPath
+                            ? ("file://" + avatarCropOverlay._srcPath)
+                            : ""
+                        fillMode: Image.Stretch   // already sized explicitly
+                        smooth: true; mipmap: true; asynchronous: true; cache: false
+                    }
+                }
+
+                // ── Circular aperture mask (drawn over the Flickable) ───
+                // Outer dim — darkens everything outside the circle
+                Canvas {
+                    id: _apertureCanvas
+                    anchors.centerIn: parent
+                    width:  avatarCropOverlay._aperture + 4   // tiny bleed for antialiasing
+                    height: avatarCropOverlay._aperture + 4
+                    // Redraws whenever theme changes
+                    property color dimColor: Qt.rgba(0, 0, 0, 0.52)
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        const cx  = width  / 2
+                        const cy  = height / 2
+                        const r   = avatarCropOverlay._aperture / 2
+                        ctx.clearRect(0, 0, width, height)
+                        // Fill everything
+                        ctx.fillStyle = Qt.rgba(0, 0, 0, 0.52)
+                        ctx.fillRect(0, 0, width, height)
+                        // Cut out the circle (destination-out)
+                        ctx.globalCompositeOperation = "destination-out"
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, r, 0, Math.PI * 2)
+                        ctx.fill()
+                        ctx.globalCompositeOperation = "source-over"
+                    }
+                    onDimColorChanged: requestPaint()
+                }
+
+                // Circle border ring drawn on top
+                Rectangle {
+                    anchors.centerIn: parent
+                    width:  avatarCropOverlay._aperture
+                    height: avatarCropOverlay._aperture
+                    radius: avatarCropOverlay._aperture / 2
+                    color: "transparent"
+                    border.width: 2
+                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                         Theme.cPrimary.b, 0.75)
+                }
+
+                // Crosshair centre guides (subtle)
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: avatarCropOverlay._aperture; height: 1
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                   Theme.cPrimary.b, 0.15)
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 1; height: avatarCropOverlay._aperture
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                   Theme.cPrimary.b, 0.15)
+                }
+            }
+
+            // ── Confirm button ──────────────────────────────────────────
+            RowLayout {
+                Layout.fillWidth: true; spacing: 10
+                Item { Layout.fillWidth: true }
+                // Reset to centre button (secondary action)
+                Rectangle {
+                    height: 36
+                    implicitWidth: _resetLbl.implicitWidth + 22; radius: 10
+                    color: _resetHov.containsMouse
+                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                  Theme.cInversePrimary.b, 0.38)
+                        : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                  Theme.cInversePrimary.b, 0.16)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                          Theme.cPrimary.b, 0.28)
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Text {
+                        id: _resetLbl; anchors.centerIn: parent
+                        text: "󰒔  Reset"; color: Theme.cPrimary
+                        font.family: Config.labelFont; font.pixelSize: 12
+                    }
+                    MouseArea {
+                        id: _resetHov; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            const maxX = Math.max(0, avatarCropOverlay._scaledW - avatarCropOverlay._aperture)
+                            const maxY = Math.max(0, avatarCropOverlay._scaledH - avatarCropOverlay._aperture)
+                            cropFlick.contentX = maxX / 2
+                            cropFlick.contentY = maxY / 2
+                        }
+                    }
+                }
+                // Primary confirm button
+                Rectangle {
+                    height: 36
+                    implicitWidth: _setLbl.implicitWidth + 28; radius: 10
+                    color: _setHov.containsMouse
+                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                  Theme.cInversePrimary.b, 0.82)
+                        : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                  Theme.cInversePrimary.b, 0.55)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                          Theme.cPrimary.b, 0.55)
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    Text {
+                        id: _setLbl; anchors.centerIn: parent
+                        text: "󰀄  Set as avatar"; color: Theme.cPrimary
+                        font.family: Config.labelFont; font.pixelSize: 13
+                        font.weight: Font.Medium
+                    }
+                    MouseArea {
+                        id: _setHov; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            // Compute NorthWest pixel offsets in the IM-resized image.
+                            // cropFlick.contentX/Y are display pixels in our _scaledW×_scaledH
+                            // coordinate space.  Divide by _scaleFactor to get the pixel
+                            // position in the IM-resized 96×96^ image (same scale IM uses),
+                            // then multiply back to the native IM output coordinate.
+                            // IM -resize 96x96^ produces an image where min(w,h)=96;
+                            // our _scaleFactor = _aperture / min(natW, natH) with _aperture=240.
+                            // So the IM scale is 96 / min(natW, natH) = _scaleFactor * (96/_aperture).
+                            const imScale = 96.0 / Math.min(
+                                avatarCropOverlay._imgNatW,
+                                avatarCropOverlay._imgNatH)
+                            // Convert display-pixel pan → IM-output-pixel offset
+                            const xOff = Math.round(cropFlick.contentX / avatarCropOverlay._scaleFactor * imScale)
+                            const yOff = Math.round(cropFlick.contentY / avatarCropOverlay._scaleFactor * imScale)
+                            _wpAsIcon.command = [
+                                scriptDir + "/set-user-icon.sh",
+                                avatarCropOverlay._srcPath,
+                                xOff.toString(),
+                                yOff.toString()
+                            ]
+                            _wpAsIcon.running = true
+                            avatarCropOverlay._close()
+                        }
+                    }
+                }
+                Item { Layout.fillWidth: true }
+            }
+        }
+
+        // Keyboard dismiss
+        FocusScope {
+            visible: avatarCropOverlay.visible
+            Keys.onEscapePressed: avatarCropOverlay._close()
         }
     }
 

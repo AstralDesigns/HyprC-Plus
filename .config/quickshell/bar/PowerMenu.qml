@@ -78,7 +78,7 @@ Item {
                     }
                     const key = event.text.toLowerCase();
                     if (key === "l")      executeAction("hyprlock");
-                    else if (key === "e") executeAction("hyprctl dispatch exit");
+                    else if (key === "e") executeAction("hyprctl dispatch 'hl.dsp.exit()'");
                     else if (key === "s") executeAction("systemctl poweroff");
                     else if (key === "r") executeAction("systemctl reboot");
                 }
@@ -99,7 +99,7 @@ Item {
                 }
                 PowerMenuButton {
                     label: "Logout";   iconGlyph: "\uf2f5"
-                    onActivated: root.executeAction("hyprctl dispatch exit")
+                    onActivated: root.executeAction("hyprctl dispatch 'hl.dsp.exit()'")
                 }
                 PowerMenuButton {
                     label: "Shutdown"; iconGlyph: "\uf011"

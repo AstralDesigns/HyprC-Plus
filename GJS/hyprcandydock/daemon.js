@@ -697,7 +697,8 @@ var Daemon = class {
                 }
             }
         } else if (event.includes('openwindow') || event.includes('closewindow') ||
-                   event.includes('movewindow')  || event.includes('workspace')) {
+                   event.includes('movewindow')  || event.includes('workspace') ||
+                   event.includes('specialworkspace')) {
             this._scheduleRefresh();
         }
     }
@@ -742,21 +743,54 @@ var Daemon = class {
     }
     
     // Focus window
-    focusWindow(address) {
-        this.hyprctl(`dispatch focuswindow address:${address}`).then(() => {
+focusWindow(address) {
+        try {
+            GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ window = 'address:${address}' })"`);
             console.log(`🎯 Focused: ${address}`);
-        }).catch(e => {
+        } catch (e) {
             console.error('❌ Error focusing window:', e);
-        });
+        }
     }
     
+    // Minimize window — moves to the "hidden" workspace defined in hyprviz.lua.
+    // This is a plain named workspace, not a special/scratchpad workspace, so the
+    // window is truly invisible and does not overlay or follow the user across workspaces.
+    minimizeWindow(address) {
+        try {
+            GLib.spawn_command_line_async(
+                `hyprctl dispatch "hl.dsp.window.move({ window = 'address:${address}', workspace = 'name:hidden', silent = true, follow = false })"`
+            );
+            console.log(`🗕 Minimized: ${address}`);
+        } catch (e) {
+            console.error('❌ Error minimizing window:', e);
+        }
+    }
+
+    // Restore a minimized window back to the currently active workspace.
+    // No silent/follow flags — this is an intentional visible change.
+    // focus runs immediately after; hl.dsp processes commands sequentially.
+    restoreWindow(address) {
+        try {
+            GLib.spawn_command_line_async(
+                `hyprctl dispatch "hl.dsp.window.move({ window = 'address:${address}', workspace = 'e+0' })"`
+            );
+            GLib.spawn_command_line_async(
+                `hyprctl dispatch "hl.dsp.focus({ window = 'address:${address}' })"`
+            );
+            console.log(`🗖 Restored: ${address}`);
+        } catch (e) {
+            console.error('❌ Error restoring window:', e);
+        }
+    }
+
     // Close window
-    closeWindow(address) {
-        this.hyprctl(`dispatch closewindow address:${address}`).then(() => {
+closeWindow(address) {
+        try {
+            GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.window.close({ window = 'address:${address}' })"`);
             console.log(`❌ Closed: ${address}`);
-        }).catch(e => {
+        } catch (e) {
             console.error('❌ Error closing window:', e);
-        });
+        }
     }
     
     // Toggle pin

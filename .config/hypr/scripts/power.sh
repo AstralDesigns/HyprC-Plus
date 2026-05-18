@@ -5,6 +5,8 @@
 # /_/   \___/__,__/\__/_/   
 #                           
 
+USERNAME=$(whoami)
+
 terminate_clients() {
   TIMEOUT=5
   # Get a list of all client PIDs in the current Hyprland session
@@ -40,7 +42,7 @@ if [[ "$1" == "exit" ]]; then
   echo ":: Exit"
   terminate_clients
   sleep 2
-  loginctl terminate-user $USER
+  hyprctl dispatch 'hl.dsp.exit()'
 fi
 
 if [[ "$1" == "lock" ]]; then

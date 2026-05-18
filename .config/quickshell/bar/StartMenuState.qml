@@ -762,7 +762,7 @@ Item {
     }
 
     // ── Power/logout ──────────────────────────────────────────────────────
-    Process { id: logoutProc; command:["bash","-c","hyprctl dispatch exit"] }
+    Process { id: logoutProc; command:["bash","-c",Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh exit"] }
     Process { id: powerProc; property string _cmd:""; command:["bash","-c",powerProc._cmd] }
 
     function runPowerCmd(cmd) {

@@ -50,6 +50,7 @@ fi
 
 # Do not restart quickshell instances here.
 # They hot-reload config; this hook only synchronizes theme config and env for new launches.
+pkill -f "qs -c overview"
 
 dbus-send --session --type=signal /kdeglobals \
     org.kde.kconfig.notify.ConfigChanged \

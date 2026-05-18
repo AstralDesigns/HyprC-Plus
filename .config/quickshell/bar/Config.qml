@@ -88,6 +88,7 @@ QtObject {
         v = _settings.value("trayItemSpacing"); if (v !== undefined && v !== null) trayItemSpacing = v
         v = _settings.value("ccGlyph"); if (v !== undefined && v !== null) ccGlyph = v
         v = _settings.value("ccGlyphColorA"); if (v !== undefined && v !== null) ccGlyphOpacity = Math.min(1, Math.max(0, parseFloat(v)))
+        v = _settings.value("wsCount"); if (v !== undefined && v !== null) wsCount = Math.min(10, Math.max(1, parseInt(v)))
         v = _settings.value("wsIconMode"); if (v !== undefined && v !== null) wsIconMode = v
         v = _settings.value("wsGlyphSize"); if (v !== undefined && v !== null) wsGlyphSize = v
         v = _settings.value("wsSpacing"); if (v !== undefined && v !== null) wsSpacing = v
@@ -235,6 +236,7 @@ QtObject {
         _settings.setValue("trayItemSpacing", trayItemSpacing)
         _settings.setValue("ccGlyph", ccGlyph)
         _settings.setValue("ccGlyphColorA", ccGlyphOpacity)
+        _settings.setValue("wsCount", wsCount)
         _settings.setValue("wsIconMode", wsIconMode)
         _settings.setValue("wsGlyphSize", wsGlyphSize)
         _settings.setValue("wsSpacing", wsSpacing)
@@ -927,7 +929,7 @@ QtObject {
 
     readonly property bool wsScrollSwitch:  true
     readonly property int  weatherInterval: 300    // seconds
-    readonly property int  wsCount:         5      // persistent workspace slots
+    property int  wsCount:         5      // persistent workspace slots (1–10)
     readonly property int  hoverDuration:   300    // ms — hover animation
 
     // ═══════════════════════════════════════════════════════════════════════

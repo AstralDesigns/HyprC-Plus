@@ -1,5 +1,5 @@
 #!/bin/bash
-set +e
+#set +e
 
 # Update ROFI background 
 ROFI_RASI="$HOME/.config/rofi/colors.rasi"
