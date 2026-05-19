@@ -23,7 +23,7 @@ Item {
     Text {
         id: icon
         anchors.centerIn: parent
-        text:  "󱊔"   // nf-md-dots_grid  — generic "system tray" glyph
+        text:  "󰧈"   // nf-md-dots_grid 󱗼 — generic "system tray" glyph 󰧈 󱊔
         color: SysTrayPopupState.visible ? Theme.cPrimary : Config.glyphColor
         font.family:    Config.fontFamily
         font.pixelSize: Config.fontSize
