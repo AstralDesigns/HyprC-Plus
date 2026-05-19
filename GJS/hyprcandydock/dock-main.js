@@ -163,11 +163,44 @@ function _injectGlyphSizeCSS(display) {
     const borderR  = DockConfig.borderRadius;
     const padPx    = DockConfig.innerPadding;
 
+    // Gradient style mirrors the Bar / Tri rect gradient: inversePrimary → scrim.
+    // GTK4 CSS @-variable references work in background-image just like in color.
+    //
+    // Direction is position-aware so the 3D depth illusion works on all four edges:
+    //   bottom dock → light from top    → to bottom  (inverse_primary top, scrim bottom)
+    //   top dock    → light from bottom → to top     (inverse_primary bottom, scrim top)
+    //   right dock  → light from right  → to right   (scrim left, inverse_primary right)
+    //   left dock   → light from left   → to left    (scrim right, inverse_primary left)
+    // For left/right the stop order is reversed so inverse_primary always sits at the
+    // screen-edge side and scrim faces the interior of the desktop.
+    let bgStyle;
+    if (DockConfig.rectBgStyle === 'gradient') {
+        const pos = DockConfig.position;
+        let gradientRule;
+        if (pos === 'right') {
+            // inverse_primary on the right (screen edge), scrim on the left (desktop side)
+            gradientRule = 'linear-gradient(to right, @scrim, @inverse_primary)';
+        } else if (pos === 'left') {
+            // inverse_primary on the left (screen edge), scrim on the right (desktop side)
+            gradientRule = 'linear-gradient(to left, @scrim, @inverse_primary)';
+        } else if (pos === 'top') {
+            // inverse_primary on the bottom (desktop-facing), scrim on the top (screen edge)
+            gradientRule = 'linear-gradient(to bottom, @inverse_primary, @scrim)';
+        } else {
+            // bottom (default): inverse_primary on top, scrim on bottom — original behaviour
+            gradientRule = 'linear-gradient(to bottom, @inverse_primary, @scrim)';
+        }
+        bgStyle = `background-image: ${gradientRule}; background-color: transparent;`;
+    } else {
+        bgStyle = 'background-image: none; background-color: @blur_background;';
+    }
+
     const css = `
         /* Config-driven values — updated in-place on SIGUSR2 hot-reload */
         window.background {
             border-width: ${borderW}px;
             border-radius: ${borderR}px;
+            ${bgStyle}
         }
         #box {
             padding: ${padPx}px;
@@ -1223,7 +1256,7 @@ const HyprCandyDock = GObject.registerClass({
             label.set_hexpand(true);
             rowBox.append(label);
 
-            // Small state glyph on the right — ↩ for restore,  for focus
+            // Small state glyph on the right — ↩ for restore,  for focus
             const stateLabel = Gtk.Label.new(isMinimized ? '' : '');
             stateLabel.set_halign(Gtk.Align.END);
             stateLabel.set_margin_start(6);

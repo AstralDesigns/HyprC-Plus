@@ -9,6 +9,9 @@ if [ -f "$CONFIG" ]; then
         appIconSize|buttonSpacing|innerPadding|borderWidth|borderRadius)
             grep -oP "${key}:\s*\K[0-9]+" "$CONFIG" | head -1
             ;;
+        rectBgStyle)
+            grep -oP "${key}:\s*'\K[^']+" "$CONFIG" | head -1
+            ;;
         *)
             grep -oP "${key}:\s*\K[^,]+" "$CONFIG" | head -1 | tr -d " '"
             ;;

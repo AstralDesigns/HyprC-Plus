@@ -56,6 +56,11 @@ var DockConfig = {
     // Space between the icons and the dock outer edges (px).
     innerPadding: 0,               // @HCD:innerPadding
 
+    // ── Background fill style ─────────────────────────────────────────────
+    // 'glass'    → solid @blur_background (default, matches style.css)
+    // 'gradient' → vertical linear-gradient: @inverse_primary → @scrim
+    rectBgStyle: 'glass',          // @HCD:rectBgStyle
+
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 1,                // @HCD:borderWidth
     borderRadius: 20,              // @HCD:borderRadius

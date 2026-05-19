@@ -2,7 +2,8 @@
 
 /* Main dock window */
 window.background {
-    background-color: @blur_background;
+    background-color: @blur_background; /* overridden by dock-main.js dynamic provider when rectBgStyle=gradient */
+    background-image: none;             /* ditto — dynamic provider sets linear-gradient in gradient mode */
     border-radius: 20px;    /* config: borderRadius */
     border-style: solid;
     border-width: 2px;      /* config: borderWidth  */

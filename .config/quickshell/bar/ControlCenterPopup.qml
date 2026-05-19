@@ -56,6 +56,7 @@ PanelWindow {
     property string _dockBorderRVal:    "20"
     property string _dockIconSizeVal:   "24"
     property string _dockStartIconVal:  ""
+    property string _dockRectBgStyle:   "glass"
     // Auto-hide + layer + margin — bar values come from Config directly;
     // dock values still need _confReadProc since GJS is a separate process
     property bool   _barAhEnabled:  Config.barAutoHide
@@ -709,6 +710,14 @@ PanelWindow {
         }
         onExited: running = false
     }
+    // Dock background style writer — called from the Bar:Background switch so both
+    // bar and dock rect fill stay in sync from a single control.
+    Process {
+        id: _dockRectBgWrite
+        running: false
+        onExited: running = false
+    }
+
     // Geocoding search process — queries Open-Meteo geocoding API
     Process {
         id: _weatherGeoProc
@@ -2184,7 +2193,7 @@ PanelWindow {
                                         CCSection { text: "Island Pill Style" }
                                         Text {
                                             Layout.fillWidth: true
-                                            text: "Fill style for island pills in all modes. Gradient uses cInversePrimary → cScrim; Flat uses the solid cOnSecondary tint."
+                                            text: "Background fill style → glass vs gradient tint"
                                             color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                            Theme.cPrimary.b, 0.48)
                                             font.family: Config.labelFont; font.pixelSize: 11
@@ -2200,20 +2209,26 @@ PanelWindow {
 
                                         Item { height: 4 }
 
-                                        CCSection { text: "Bar / Tri Rect Style" }
+                                        CCSection { text: "Bar / Tri + Dock Fill Style" }
                                         Text {
                                             Layout.fillWidth: true
-                                            text: "Fill style for the outer bar strip (bar mode) and tri-bar rectangles. Independent of island pills."
+                                            text: "Background fill style for the outer bar strip in 'bar' mode and 'tri'-island mode + dock."
                                             color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                            Theme.cPrimary.b, 0.48)
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             wrapMode: Text.Wrap
                                         }
                                         CCSegmented {
-                                            label: "Rect Fill"
+                                            label: "Background"
                                             options: ["glass", "gradient"]
                                             current: Config.barRectBgStyle
-                                            onPicked: function(v) { Config.barRectBgStyle = v }
+                                            onPicked: function(v) {
+                                                Config.barRectBgStyle = v
+                                                // Mirror to dock so both rect fills stay in sync
+                                                _dockRectBgStyle = v
+                                                _dockRectBgWrite.command = [scriptDir + "/dock-set.sh", "rectBgStyle", v]
+                                                _dockRectBgWrite.running = true
+                                            }
                                         }
 
                                         Item { height: 4 }
@@ -3342,6 +3357,15 @@ PanelWindow {
                                     }
                                 }
                             }
+                            Process { id: _dockReadRectBg; command: [scriptDir+"/dock-get.sh", "rectBgStyle"]; running: false
+                                stdout: SplitParser {
+                                    splitMarker: "\n"
+                                    onRead: function(l) {
+                                        const v = l.trim()
+                                        if (v === "glass" || v === "gradient") _dockRectBgStyle = v
+                                    }
+                                }
+                            }
 
                             // Start all dock reads on component complete
                             Timer {
@@ -3353,6 +3377,7 @@ PanelWindow {
                                     _dockReadBorderR.running  = true
                                     _dockReadIconSize.running = true
                                     _dockReadStartIcon.running = true
+                                    _dockReadRectBg.running   = true
                                     _confReadProc.running     = true
                                 }
                             }

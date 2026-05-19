@@ -109,8 +109,8 @@ Item {
                     // Card surface
                     Rectangle {
                         anchors.fill:parent; radius:parent._radius
-                        color: _hov ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.40)
-                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.10)
+                        color: _hov ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
+                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.25)
                         border.width:1
                         border.color: notif.urgency>=2 ? Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.6)
                             : notif.category==="bt" ? Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.5)

@@ -30,6 +30,15 @@ if [ "$key" = "marginFromEdge" ]; then
 fi
 
 if [ -n "$key" ] && [ -n "$value" ] && [ -f "$CONFIG" ]; then
-    sed -i "s/${key}: [0-9]*/${key}: ${value}/" "$CONFIG"
+    case "$key" in
+        rectBgStyle)
+            # String key — replace the quoted value
+            sed -i "s/rectBgStyle: '[^']*'/rectBgStyle: '${value}'/" "$CONFIG"
+            ;;
+        *)
+            # Numeric keys
+            sed -i "s/${key}: [0-9]*/${key}: ${value}/" "$CONFIG"
+            ;;
+    esac
     pkill -SIGUSR2 -f 'gjs dock-main.js'
 fi
