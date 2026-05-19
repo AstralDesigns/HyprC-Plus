@@ -257,7 +257,7 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent; radius: parent.radius
             visible: Config.barMode === "bar" && Config.barRectBgStyle === "gradient"
-            opacity: Config.islandBgOpacityIsland
+            opacity: 1.0
             gradient: Gradient {
                 orientation: Gradient.Vertical
                 GradientStop { position: 0.0; color: Theme.cInversePrimary }
@@ -516,7 +516,7 @@ PanelWindow {
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
                 visible: Config.barRectBgStyle === "gradient"
-                opacity: Config.islandBgOpacityIsland
+                opacity: 1.0
                 gradient: Gradient {
                     orientation: Gradient.Vertical
                     GradientStop { position: 0.0; color: Theme.cInversePrimary }
@@ -584,7 +584,7 @@ PanelWindow {
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
                 visible: Config.barRectBgStyle === "gradient"
-                opacity: Config.islandBgOpacityIsland
+                opacity: 1.0
                 gradient: Gradient {
                     orientation: Gradient.Vertical
                     GradientStop { position: 0.0; color: Theme.cInversePrimary }
@@ -640,7 +640,7 @@ PanelWindow {
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
                 visible: Config.barRectBgStyle === "gradient"
-                opacity: Config.islandBgOpacityIsland
+                opacity: 1.0
                 gradient: Gradient {
                     orientation: Gradient.Vertical
                     GradientStop { position: 0.0; color: Theme.cInversePrimary }
