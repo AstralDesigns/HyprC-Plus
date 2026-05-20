@@ -352,7 +352,7 @@ PanelWindow {
         id: _hcStateClearProc
         command: [
             "bash", "-c",
-            "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state" + " && " + "rm -rf " + Quickshell.env("HOME") + "/.hyprcandy/.config/candyinstall"
+            "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
         ]
         running: false
         onExited: {
