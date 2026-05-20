@@ -360,6 +360,21 @@ PanelWindow {
             // Rescan — hc-update-check.sh will find no state file and run a
             // fresh git pull which should report up to date.
             UpdatesPopupState.requestRescan()
+            // Regen matugen + pywal colors from the user's current wallpaper
+            // now that the update script has finished and dotfiles are in place.
+            if (!_hcReColorProc.running)
+                _hcReColorProc.running = true
         }
+    }
+
+    // ── Post-update color regeneration ───────────────────────────────────────
+    // Runs wallpaper_integration.sh as the real user after HC+ update completes.
+    // QS is already running in the user session so HOME, WAYLAND_DISPLAY and
+    // DBUS_SESSION_BUS_ADDRESS are all correct — no pkexec env juggling needed.
+    Process {
+        id: _hcReColorProc
+        command: [Quickshell.env("HOME") + "/.config/hyprcandy/hooks/wallpaper_integration.sh"]
+        running: false
+        onExited: running = false
     }
 }
