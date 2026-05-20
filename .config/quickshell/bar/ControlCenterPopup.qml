@@ -4107,6 +4107,17 @@ PanelWindow {
                         Process {
                             id: _kbCustomWriter
                             running: false
+                            onExited: {
+                                running = false
+                                _kbReloadProc.running = true
+                            }
+                        }
+
+                        // Reload Hyprland so new/edited/removed custom binds take effect immediately
+                        Process {
+                            id: _kbReloadProc
+                            command: ["hyprctl", "reload"]
+                            running: false
                             onExited: running = false
                         }
 
