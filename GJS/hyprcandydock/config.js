@@ -59,7 +59,7 @@ var DockConfig = {
     // ── Background fill style ─────────────────────────────────────────────
     // 'glass'    → solid @blur_background (default, matches style.css)
     // 'gradient' → vertical linear-gradient: @inverse_primary → @scrim
-    rectBgStyle: 'gradient',          // @HCD:rectBgStyle
+    rectBgStyle: 'glass',          // @HCD:rectBgStyle
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 1,                // @HCD:borderWidth
