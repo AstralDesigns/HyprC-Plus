@@ -92,7 +92,19 @@ QtObject {
     // ── Apply a full open-meteo JSON response ─────────────────────────────
     function applyData(d) {
         _lastRaw = d          // cache in memory for instant unit re-renders
-        const c    = d.current
+        let c = d.current
+        
+        // Use 15-minutely data for current conditions if available for better accuracy
+        if (d.minutely_15) {
+            const now = new Date().toISOString().slice(0, 16)
+            let idx = d.minutely_15.time.findIndex(t => t >= now)
+            if (idx === -1) idx = d.minutely_15.time.length - 1
+            if (idx >= 0) {
+                c.temperature_2m = d.minutely_15.temperature_2m[idx]
+                c.weather_code = d.minutely_15.weather_code[idx]
+            }
+        }
+
         const info = _cond(c.weather_code, c.is_day, c.relative_humidity_2m)
         icon    = info.i
         condStr = info.t
@@ -232,7 +244,8 @@ QtObject {
                 "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,precipitation" +
                 "&hourly=temperature_2m,weather_code,precipitation_probability,is_day" +
                 "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
-                "&forecast_days=7&timezone=auto"
+                "&minutely_15=temperature_2m,weather_code,is_day" +
+                "&forecast_days=7&timezone=auto&models=best_match"
             if (!running) running = true
         }
         stdout: StdioCollector {
