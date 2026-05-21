@@ -9,7 +9,7 @@ USERNAME=$(whoami)
 
 if [[ "$1" == "exit" ]]; then
   echo ":: Exit"
-  hyprshutdown > /dev/null 2>&1 -t 'Logging out...' --post-cmd "hyprctl dispatch hl.dsp.exit()"
+  hyprshutdown -t 'Logging out...' --post-cmd "hyprctl dispatch hl.dsp.exit()" > /dev/null 2>&1
 fi
 
 if [[ "$1" == "lock" ]]; then
@@ -19,12 +19,12 @@ fi
 
 if [[ "$1" == "reboot" ]]; then
   echo ":: Reboot"
-  hyprshutdown > /dev/null 2>&1 -t 'Restarting...' --post-cmd 'reboot'
+  hyprshutdown -t 'Restarting...' --post-cmd 'reboot' > /dev/null 2>&1
 fi
 
 if [[ "$1" == "shutdown" ]]; then
   echo ":: Shutdown"
-  hyprshutdown > /dev/null 2>&1 -t 'Shutting down...' --post-cmd 'shutdown -P 0'
+  hyprshutdown -t 'Shutting down...' --post-cmd 'shutdown -P 0' > /dev/null 2>&1
 fi
 
 if [[ "$1" == "suspend" ]]; then
