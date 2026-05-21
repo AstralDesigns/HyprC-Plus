@@ -125,45 +125,59 @@ ShellRoot {
     }}
 
     // ── Weather ───────────────────────────────────────────────────────────────
+    // Logic mirrors WeatherPopupState exactly:
+    //   • same _pinnedLocFile (~/.config/hyprcandy/weather-location.conf)
+    //   • same cache files (/tmp/astal-weather-cache.json, waybar-weather-unit)
+    //   • same _cond() icon map (WMO codes → Nerd Font glyphs)
+    //   • same open-meteo URL parameters
+    //   • same 300 s poll interval (Config.weatherInterval)
+    // Pipeline: unit → pinned loc → ipinfo fallback → open-meteo → cache fallback
     property string weatherUnit: "metric"
     property string weatherIcon: "󰖐"
     property string weatherTemp: "--°"
     property real   _wxTempC: 0; property real _wxHumidity: 0
     property int    _wxCode: 0;  property int  _wxIsDay: 1
+    readonly property string _pinnedLocFile: Quickshell.env("HOME") + "/.config/hyprcandy/weather-location.conf"
+    readonly property string _weatherCache:  "/tmp/astal-weather-cache.json"
+    readonly property string _locationCache: "/tmp/waybar-weather-ipinfo.json"
 
+    // Watch unit file for live changes (same source as bar/WeatherPopupState)
     FileView {
         path: "/tmp/waybar-weather-unit"
-        watchChanges:true; onFileChanged:reload()
+        watchChanges: true; onFileChanged: reload()
         onLoaded: {
-            const u=text().trim()
-            if(u==="imperial"||u==="metric") root.weatherUnit=u
+            const u = text().trim()
+            if (u === "imperial" || u === "metric") root.weatherUnit = u
             root._updateWeatherDisplay()
         }
     }
 
-    function wmoIcon(code, isDay, humidity) {
-        if(code===0)  return isDay?"󰖙":"󰖔"                           // clear day/night
-        if(code<=2)   return isDay?"󰖕":"󰼱"                           // mainly clear
-        if(code===3)  return humidity>=85
-            ?(isDay?"":"")                                            // overcast+humid (rainy)
-            :(isDay?"󰼰":"󰖑")                                          // overcast
-        if(code<=48)  return isDay?"":""                             // fog
-        if(code<=55)  return "󰖗"                                                  // drizzle
-        if(code<=57)  return "󰖒"                                                  // freezing drizzle
-        if(code===61) return "󰖗"                                                  // slight rain
-        if(code<=63)  return "󰖖"                                                  // moderate rain
-        if(code<=65)  return "󰙾"                                                  // heavy rain
-        if(code<=67)  return "󰙿"                                                  // freezing rain
-        if(code===77) return "󰖘"                                                  // snow grains
-        if(code<=77)  return "󰜗"                                                  // snow
-        if(code<=82)  return "󰙾"                                                  // rain showers
-        if(code<=86)  return "󰼶"                                                  // snow showers
-        if(code<=99)  return "󰖓"                                                  // thunderstorm
-        return "󰖐"                                                                 // unknown
+    // Identical icon mapping to WeatherPopupState._cond()
+    function _wxCond(code, isDay, h) {
+        if (code===0)             return isDay ? "󰖙" : "󰖔"
+        if (code===1)             return isDay ? "󰖕" : "󰼱"
+        if (code===2)             return isDay ? "󰖕" : "󰼱"
+        if (code===3)             return h >= 85
+            ? (isDay ? "":"")
+            : (isDay ? "󰼰" : "󰖑")
+        if (code===45||code===48) return isDay ? "":""
+        if (code>=51&&code<=55)   return "󰖗"
+        if (code===56||code===57) return "󰖒"
+        if (code===61)            return "󰖗"
+        if (code===63)            return "󰖖"
+        if (code===65)            return "󰙾"
+        if (code===66||code===67) return "󰙿"
+        if (code>=71&&code<=75)   return "󰜗"
+        if (code===77)            return "󰖘"
+        if (code>=80&&code<=82)   return "󰙾"
+        if (code===85||code===86) return "󰼶"
+        if (code===95)            return "󰖓"
+        if (code===96||code===99) return isDay ? "":""
+        return "󰖐"
     }
 
     function _updateWeatherDisplay() {
-        root.weatherIcon = root.wmoIcon(root._wxCode, root._wxIsDay, root._wxHumidity)
+        root.weatherIcon = root._wxCond(root._wxCode, root._wxIsDay, root._wxHumidity)
         if (root._wxTempC === 0 && root._wxCode === 0 && root._wxHumidity === 0) {
             root.weatherTemp = "--°"; return
         }
@@ -173,33 +187,139 @@ ShellRoot {
             root.weatherTemp = Math.round(root._wxTempC) + "°C"
         }
     }
+
+    // Step 1 — read unit preference
     Process {
-        id:wxProc; property var _b:[]
-        command:["bash","-c",
-            "WF=/tmp/astal-weather-cache.json; LF=/tmp/waybar-weather-ipinfo.json; " +
-            "AGE=$(($(date +%s)-$(stat -c%Y \"$WF\" 2>/dev/null||echo 0))); " +
-            "[ -f \"$WF\" ]&&[ $AGE -lt 300 ]&&{ cat \"$WF\"; exit 0; }; " +
-            "[ -f \"$LF\" ]&&LOC=$(jq -r '.loc//\"0,0\"' \"$LF\" 2>/dev/null)||LOC=$(curl -sf --max-time 5 'https://ipinfo.io/json'|jq -r '.loc//\"0,0\"'); " +
-            "LAT=${LOC%,*}; LON=${LOC#*,}; " +
-            "curl -sf --max-time 12 \"https://api.open-meteo.com/v1/forecast?latitude=$LAT&longitude=$LON&current=temperature_2m,relative_humidity_2m,is_day,weather_code&timezone=auto\" -o \"$WF\" 2>/dev/null&&cat \"$WF\""]
-        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){ wxProc._b.push(l) } }
-        onRunningChanged: if(running) _b=[]
-        onExited: function(){
-            try {
-                const w = JSON.parse(_b.join(""))
-                if (w.current) {
-                    root._wxTempC    = w.current.temperature_2m    || 0
-                    root._wxCode     = w.current.weather_code      || 0
-                    root._wxIsDay    = (w.current.is_day !== undefined ? w.current.is_day : 1)
-                    root._wxHumidity = w.current.relative_humidity_2m || 0
-                    root._updateWeatherDisplay()
-                }
-            } catch(e) {}
-            _b=[]
+        id: wxUnitProc
+        command: ["bash", "-c", "cat /tmp/waybar-weather-unit 2>/dev/null || echo metric"]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.weatherUnit = this.text.trim() !== "imperial" ? "metric" : "imperial"
+                wxLocProc.running = true
+            }
         }
-        Component.onCompleted: running=true
     }
-    Timer { interval:300000; repeat:true; running:true; onTriggered:if(!wxProc.running) wxProc.running=true }
+
+    // Step 2 — resolve location: pinned file → ipinfo cache → live ipinfo
+    Process {
+        id: wxLocProc
+        command: ["bash", "-c",
+            "P=\"$1\"; C=\"$2\"; " +
+            "if [ -f \"$P\" ]; then source \"$P\" 2>/dev/null && printf '%s,%s,%s' \"$LAT\" \"$LON\" \"$NAME\" && echo; " +
+            "elif [ -f \"$C\" ]; then jq -r '(.loc)+\",\"+(.city//\"Unknown\")' \"$C\" 2>/dev/null; " +
+            "else echo FETCH; fi",
+            "--", root._pinnedLocFile, root._locationCache]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const t = this.text.trim()
+                if (!t || t === "FETCH") { wxIpinfoProc.running = true; return }
+                const p   = t.split(",")
+                const lat = parseFloat(p[0])
+                const lon = parseFloat(p[1])
+                if (p.length >= 2 && !isNaN(lat) && lat !== 0) {
+                    wxFetchProc._lat = lat
+                    wxFetchProc._lon = lon
+                    wxFetchProc._doFetch()
+                } else {
+                    wxIpinfoProc.running = true
+                }
+            }
+        }
+    }
+
+    // Step 3a — live ipinfo fallback (no pinned loc, no cache)
+    Process {
+        id: wxIpinfoProc
+        command: ["bash", "-c",
+            "curl -sf --max-time 8 https://ipinfo.io/json | tee \"$1\"",
+            "--", root._locationCache]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(this.text)
+                    const c = (d.loc || "0,0").split(",")
+                    wxFetchProc._lat = parseFloat(c[0]) || 0
+                    wxFetchProc._lon = parseFloat(c[1]) || 0
+                    wxFetchProc._doFetch()
+                } catch(e) {}
+            }
+        }
+    }
+
+    // Step 3b — open-meteo fetch (same URL params as WeatherPopupState._fetchProc)
+    Process {
+        id: wxFetchProc
+        property real _lat: 0
+        property real _lon: 0
+        running: false
+        function _buildUrl() {
+            return "https://api.open-meteo.com/v1/forecast" +
+                "?latitude="  + _lat + "&longitude=" + _lon +
+                "&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m,precipitation" +
+                "&hourly=temperature_2m,weather_code,precipitation_probability,is_day" +
+                "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+                "&minutely_15=temperature_2m,weather_code,is_day" +
+                "&forecast_days=7&timezone=auto&models=best_match"
+        }
+        function _doFetch() {
+            if (_lat === 0 && _lon === 0) { wxCacheProc.running = true; return }
+            command = ["bash", "-c",
+                "curl -sf --max-time 12 \"$1\" | tee \"$2\"",
+                "--", _buildUrl(), root._weatherCache]
+            if (!running) running = true
+        }
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(this.text)
+                    if (d && d.current) { root._applyWeather(d); return }
+                } catch(e) {}
+                wxCacheProc.running = true
+            }
+        }
+    }
+
+    // Step 3c — disk cache fallback
+    Process {
+        id: wxCacheProc
+        command: ["bash", "-c", "cat \"$1\" 2>/dev/null", "--", root._weatherCache]
+        running: false
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const d = JSON.parse(this.text)
+                    if (d && d.current) root._applyWeather(d)
+                } catch(e) {}
+            }
+        }
+    }
+
+    // Apply parsed open-meteo response — mirrors WeatherPopupState.applyData()
+    function _applyWeather(d) {
+        let c = d.current
+        if (d.minutely_15) {
+            const now = new Date().toISOString().slice(0, 16)
+            let idx = d.minutely_15.time.findIndex(t => t >= now)
+            if (idx === -1) idx = d.minutely_15.time.length - 1
+            if (idx >= 0) {
+                c = Object.assign({}, c)
+                c.temperature_2m = d.minutely_15.temperature_2m[idx]
+                c.weather_code   = d.minutely_15.weather_code[idx]
+            }
+        }
+        root._wxTempC    = c.temperature_2m       || 0
+        root._wxCode     = c.weather_code          || 0
+        root._wxIsDay    = (c.is_day !== undefined ? c.is_day : 1)
+        root._wxHumidity = c.relative_humidity_2m || 0
+        root._updateWeatherDisplay()
+    }
+
+    // Kick the pipeline on startup and every 300 s (matches Config.weatherInterval)
+    Component.onCompleted: wxUnitProc.running = true
+    Timer { interval: 300000; repeat: true; running: true; onTriggered: if (!wxUnitProc.running) wxUnitProc.running = true }
 
     // ── System monitor ────────────────────────────────────────────────────────
     property real cpuUsage:0; property real memUsage:0; property real tempC:0; property bool tempOk:false
