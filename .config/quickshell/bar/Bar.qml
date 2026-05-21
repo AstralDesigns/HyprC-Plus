@@ -359,13 +359,6 @@ PanelWindow {
         }
     }
 
-    // ── Rofi process (shared, declared at bar level) ─────────────────────────
-    Process {
-        id: rofiProc
-        command: [Config.hyprScripts + "/rofi-menus.sh"]
-        running: false
-    }
-
     // ── Root layout ─────────────────────────────────────────────────────────
     Item {
         id: barLayout
@@ -465,26 +458,10 @@ PanelWindow {
 
             Island {
                 bgType: "rightgroup"
-                visible_: Config.showUpdates || Config.showPowerProfiles || Config.showIdleInhibitor || Config.showRofi || Config.showTray
+                visible_: Config.showUpdates || Config.showPowerProfiles || Config.showIdleInhibitor || Config.showTray
                 Modules.Updates       { visible: Config.showUpdates }
                 Modules.IdleInhibitor { visible: Config.showIdleInhibitor }
                 Modules.PowerProfiles { visible: Config.showPowerProfiles }
-                Item {
-                    visible: Config.showRofi
-                    implicitWidth: _rofiIcon.implicitWidth + Config.modPadH * 2
-                    implicitHeight: Config.moduleHeight
-                    Text {
-                        id: _rofiIcon; anchors.centerIn: parent
-                        text: "󰓐"; color: Config.glyphColor
-                        font.family: Config.fontFamily; font.pixelSize: Config.fontSize
-                    }
-                    ToolTip.visible: false; ToolTip.text: ""; ToolTip.delay: 500
-                    opacity: _rofiMa.containsMouse ? 0.7 : 1.0
-                    Behavior on opacity { NumberAnimation { duration: 150 } }
-                    MouseArea { id: _rofiMa; anchors.fill: parent; hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: if (!rofiProc.running) rofiProc.running = true }
-                }
                 Modules.SystemTray { visible: Config.showTray; rootWindow: bar }
             }
             Island { bgType: "activewindow"; visible_: Config.showWindow; Modules.ActiveWindow {} }
@@ -665,28 +642,10 @@ PanelWindow {
 
                 Island {
                     bgType: "rightgroup"
-                    visible_: Config.showUpdates || Config.showPowerProfiles || Config.showIdleInhibitor || Config.showRofi || Config.showTray
+                    visible_: Config.showUpdates || Config.showPowerProfiles || Config.showIdleInhibitor || Config.showTray
                     Modules.Updates       { visible: Config.showUpdates }
                     Modules.IdleInhibitor { visible: Config.showIdleInhibitor }
                     Modules.PowerProfiles { visible: Config.showPowerProfiles }
-                    Item {
-                        visible: Config.showRofi
-                        implicitWidth: _triRofiIcon.implicitWidth + Config.modPadH * 2
-                        implicitHeight: Config.moduleHeight
-                        Text {
-                            id: _triRofiIcon; anchors.centerIn: parent
-                            text: "󰓐"; color: Config.glyphColor
-                            font.family: Config.fontFamily; font.pixelSize: Config.fontSize
-                        }
-                        ToolTip.visible: false; ToolTip.text: ""; ToolTip.delay: 500
-                        opacity: _triRofiMa.containsMouse ? 0.7 : 1.0
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-                        MouseArea {
-                            id: _triRofiMa; anchors.fill: parent; hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: if (!rofiProc.running) rofiProc.running = true
-                        }
-                    }
                     Modules.SystemTray { visible: Config.showTray; rootWindow: bar }
                 }
                 Island { bgType: "activewindow"; visible_: Config.showWindow; Modules.ActiveWindow {} }

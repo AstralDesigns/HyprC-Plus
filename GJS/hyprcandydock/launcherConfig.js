@@ -22,12 +22,12 @@ var LauncherConfig = {
     tileHeight: 0,                  // @LC:tileHeight
 
     // ── Main frame — horizontal dock (bottom / top) ───────────────────
-    frameWidth:  700,               // @LC:frameWidth
-    frameHeight: 620,               // @LC:frameHeight
+    frameWidth:  1150,               // @LC:frameWidth
+    frameHeight: 675,               // @LC:frameHeight
 
     // ── Main frame — vertical dock (left / right) ─────────────────────
-    frameWidthVert:  700,           // @LC:frameWidthVert
-    frameHeightVert: 620,           // @LC:frameHeightVert
+    frameWidthVert:  770,           // @LC:frameWidthVert
+    frameHeightVert: 675,           // @LC:frameHeightVert
 
     // ── Border ────────────────────────────────────────────────────────
     borderRadius: 20,               // @LC:borderRadius

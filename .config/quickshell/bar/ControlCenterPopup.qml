@@ -1108,9 +1108,32 @@ PanelWindow {
             //  LEFT SIDEBAR — standalone rounded rect, left-anchored
             // ═══════════════════════════════════════════════════════════════
             Item {
+                
                 id: sidebar
                 anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
                 width: 190
+
+                MouseArea {
+                    anchors.fill: parent
+                    onWheel: function(wheel) {
+                        const tabs = [1, 0, 2, 3, 4, 5, 7, 8]
+                        let currIdx = tabs.indexOf(ccTabSettings.activeTab)
+                        if (currIdx === -1) currIdx = 0
+                        
+                        if (wheel.angleDelta.y > 0) {
+                            // Scroll up -> Previous tab
+                            currIdx = (currIdx - 1 + tabs.length) % tabs.length
+                        } else {
+                            // Scroll down -> Next tab
+                            currIdx = (currIdx + 1) % tabs.length
+                        }
+                        
+                        const nextTab = tabs[currIdx]
+                        mainStack.currentIndex = nextTab
+                        ccTabSettings.activeTab = nextTab
+                    }
+                }
+
 
                 // Full sidebar background — panel.radius rounds all four
                 // corners; the clip wrapper above trims the right two.
@@ -1213,7 +1236,8 @@ PanelWindow {
                             { icon: "󰇜", label: "Dock",      idx: 3 },
                             { icon: "󰮫", label: "Menus",     idx: 4 },
                             { icon: "󰍂", label: "SDDM",      idx: 5 },
-                            { icon: "󰌌", label: "Keybinds",  idx: 7 }
+                            { icon: "󰌌", label: "Keybinds",  idx: 7 },
+                            { icon: "󰗘", label: "Animations", idx: 8 }
                         ]
 
                         delegate: Rectangle {
@@ -2301,7 +2325,6 @@ PanelWindow {
                                         CCToggle { label:"Battery";        value:Config.showBattery;        onToggled:function(v){Config.showBattery=v} }
                                         CCToggle { label:"Media Player";   value:Config.showMediaPlayer;    onToggled:function(v){Config.showMediaPlayer=v} }
                                         CCToggle { label:"Idle Inhibitor"; value:Config.showIdleInhibitor;  onToggled:function(v){Config.showIdleInhibitor=v} }
-                                        CCToggle { label:"Rofi";           value:Config.showRofi;           onToggled:function(v){Config.showRofi=v} }
                                         CCToggle { label:"Updates";        value:Config.showUpdates;        onToggled:function(v){Config.showUpdates=v} }
                                         CCToggle { label:"Power Profiles"; value:Config.showPowerProfiles;  onToggled:function(v){Config.showPowerProfiles=v} }
                                         CCToggle { label:"Overview";       value:Config.showOverview;       onToggled:function(v){Config.showOverview=v} }
@@ -4818,6 +4841,303 @@ PanelWindow {
                                         }
 
                                         Item { Layout.fillHeight: true }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // ── TAB 8: Animations ───────────────────────────────────
+                    Item {
+                        id: animationsTabRoot
+
+                        property var animations: []
+                        property string currentAnimation: ""
+                        property string applyingAnimation: ""
+                        property string statusText: ""
+                        property bool applyBusy: _animApplyProc.running
+
+                        function reloadAnimations() {
+                            if (_animListProc.running) _animListProc.running = false
+                            Qt.callLater(function() { _animListProc.running = true })
+                        }
+
+                        Process {
+                            id: _animListProc
+                            command: [scriptDir + "/hyprcandy-animations.sh", "list"]
+                            running: false
+                            property var _buf: []
+                            stdout: SplitParser {
+                                splitMarker: "\n"
+                                onRead: function(l) {
+                                    const t = l.trim()
+                                    if (t) _animListProc._buf.push(t)
+                                }
+                            }
+                            onRunningChanged: if (running) _buf = []
+                            onExited: function() {
+                                const parsed = []
+                                let current = ""
+                                for (let i = 0; i < _buf.length; i++) {
+                                    const parts = _buf[i].split("|")
+                                    if (parts.length < 4) continue
+                                    const row = {
+                                        file: parts[0],
+                                        label: parts[1],
+                                        desc: parts[2],
+                                        current: parts[3] === "true"
+                                    }
+                                    if (row.current) current = row.file
+                                    parsed.push(row)
+                                }
+                                animationsTabRoot.animations = parsed
+                                animationsTabRoot.currentAnimation = current
+                                if (parsed.length === 0)
+                                    animationsTabRoot.statusText = "No animation presets found in ~/.config/hypr/conf/animations."
+                                else if (animationsTabRoot.statusText.indexOf("Applied ") !== 0)
+                                    animationsTabRoot.statusText = "Select a preset to write ~/.config/hypr/animations.lua and reload Hyprland."
+                            }
+                        }
+
+                        Process {
+                            id: _animApplyProc
+                            running: false
+                            property string _target: ""
+                            onExited: function(code) {
+                                running = false
+                                if (code === 0) {
+                                    animationsTabRoot.currentAnimation = _target
+                                    animationsTabRoot.statusText = "Applied " + _target + "."
+                                } else {
+                                    animationsTabRoot.statusText = "Failed to apply " + _target + "."
+                                }
+                                animationsTabRoot.applyingAnimation = ""
+                                animationsTabRoot.reloadAnimations()
+                            }
+                        }
+
+                        function applyAnimation(file) {
+                            if (!file || _animApplyProc.running) return
+                            applyingAnimation = file
+                            statusText = "Applying " + file + "..."
+                            _animApplyProc._target = file
+                            _animApplyProc.command = [scriptDir + "/hyprcandy-animations.sh", "apply", file]
+                            _animApplyProc.running = true
+                        }
+
+                        Connections {
+                            target: ccTabSettings
+                            function onActiveTabChanged() {
+                                if (ccTabSettings.activeTab === 8)
+                                    animationsTabRoot.reloadAnimations()
+                            }
+                        }
+
+                        Component.onCompleted: reloadAnimations()
+
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 6
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Text {
+                                    text: "󰗘 Animations"
+                                    color: Theme.cPrimary
+                                    font.family: Config.labelFont
+                                    font.pixelSize: 14
+                                    font.weight: Font.Bold
+                                }
+
+                                Rectangle {
+                                    Layout.fillWidth: true
+                                    height: 1
+                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
+                                }
+
+                                Rectangle {
+                                    height: 30
+                                    implicitWidth: _animRefreshLbl.implicitWidth + 18
+                                    radius: 9
+                                    color: _animRefreshHov.containsMouse
+                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                  Theme.cInversePrimary.b, 0.38)
+                                        : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                  Theme.cInversePrimary.b, 0.16)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                          Theme.cPrimary.b, 0.20)
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    Text {
+                                        id: _animRefreshLbl
+                                        anchors.centerIn: parent
+                                        text: _animListProc.running ? "󰔟 Loading" : "󰑐 Refresh"
+                                        color: Theme.cPrimary
+                                        font.family: Config.labelFont
+                                        font.pixelSize: 12
+                                    }
+                                    MouseArea {
+                                        id: _animRefreshHov
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: animationsTabRoot.reloadAnimations()
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                            }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: animationsTabRoot.statusText
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                               Theme.cPrimary.b, 0.55)
+                                font.family: Config.labelFont
+                                font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                                bottomPadding: 4
+                            }
+
+                            Item {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+
+                                Flickable {
+                                    anchors.fill: parent
+                                    contentWidth: width
+                                    contentHeight: animationsListCol.implicitHeight + 20
+                                    clip: true
+                                    boundsBehavior: Flickable.StopAtBounds
+                                    ScrollBar.vertical: ScrollBar {
+                                        policy: ScrollBar.AsNeeded
+                                        contentItem: Rectangle {
+                                            implicitWidth: 4
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                            radius: 2
+                                        }
+                                        background: Rectangle { color: "transparent" }
+                                    }
+
+                                    ColumnLayout {
+                                        id: animationsListCol
+                                        width: parent.width - 8
+                                        anchors { left: parent.left; leftMargin: 2; top: parent.top; topMargin: 8 }
+                                        spacing: 0
+
+                                        Text {
+                                            visible: animationsTabRoot.animations.length === 0
+                                            Layout.fillWidth: true
+                                            text: _animListProc.running
+                                                ? "Loading animation presets..."
+                                                : "No .conf animation presets were found."
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                           Theme.cPrimary.b, 0.38)
+                                            font.family: Config.labelFont
+                                            font.pixelSize: 12
+                                            horizontalAlignment: Text.AlignHCenter
+                                            topPadding: 18
+                                            bottomPadding: 10
+                                        }
+
+                                        Repeater {
+                                            model: animationsTabRoot.animations
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                required property int index
+                                                Layout.fillWidth: true
+                                                height: 46
+                                                radius: 9
+                                                color: modelData.current
+                                                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                              Theme.cInversePrimary.b, 0.46)
+                                                    : (_animRowHov.containsMouse
+                                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                  Theme.cInversePrimary.b, 0.22)
+                                                        : (index % 2 === 0
+                                                            ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                      Theme.cInversePrimary.b, 0.10)
+                                                            : "transparent"))
+                                                border.width: modelData.current ? 1 : 0
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                      Theme.cPrimary.b, 0.38)
+                                                Behavior on color { ColorAnimation { duration: 100 } }
+
+                                                RowLayout {
+                                                    anchors { fill: parent; leftMargin: 10; rightMargin: 10 }
+                                                    spacing: 8
+
+                                                    Rectangle {
+                                                        height: 26
+                                                        implicitWidth: _animNameLbl.implicitWidth + 16
+                                                        radius: 7
+                                                        color: modelData.current
+                                                            ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                      Theme.cInversePrimary.b, 0.50)
+                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                      Theme.cPrimary.b, 0.14)
+                                                        border.width: 1
+                                                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                              Theme.cPrimary.b, 0.30)
+                                                        Text {
+                                                            id: _animNameLbl
+                                                            anchors.centerIn: parent
+                                                            text: modelData.label
+                                                            color: Theme.cPrimary
+                                                            font.family: Config.labelFont
+                                                            font.pixelSize: 11
+                                                            font.weight: Font.Medium
+                                                        }
+                                                    }
+
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text: modelData.desc
+                                                        color: Theme.cPrimary
+                                                        font.family: Config.labelFont
+                                                        font.pixelSize: 12
+                                                        elide: Text.ElideRight
+                                                        opacity: 0.85
+                                                    }
+
+                                                    Text {
+                                                        visible: animationsTabRoot.applyingAnimation === modelData.file
+                                                        text: "󰔟"
+                                                        color: Theme.cPrimary
+                                                        font.family: Config.fontFamily
+                                                        font.pixelSize: 14
+                                                        opacity: 0.7
+                                                    }
+
+                                                    Text {
+                                                        visible: modelData.current && animationsTabRoot.applyingAnimation !== modelData.file
+                                                        text: "current"
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                       Theme.cPrimary.b, 0.50)
+                                                        font.family: Config.labelFont
+                                                        font.pixelSize: 10
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: _animRowHov
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: _animApplyProc.running ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                                                    enabled: !_animApplyProc.running
+                                                    onClicked: animationsTabRoot.applyAnimation(modelData.file)
+                                                }
+                                            }
+                                        }
+
+                                        Item { height: 12 }
                                     }
                                 }
                             }

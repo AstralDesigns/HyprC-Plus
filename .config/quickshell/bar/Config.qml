@@ -156,7 +156,6 @@ QtObject {
         v = _settings.value("showBattery"); if (v !== undefined && v !== null) showBattery = _toBool(v)
         v = _settings.value("showMediaPlayer"); if (v !== undefined && v !== null) showMediaPlayer = _toBool(v)
         v = _settings.value("showIdleInhibitor"); if (v !== undefined && v !== null) showIdleInhibitor = _toBool(v)
-        v = _settings.value("showRofi"); if (v !== undefined && v !== null) showRofi = _toBool(v)
         v = _settings.value("showUpdates"); if (v !== undefined && v !== null) showUpdates = _toBool(v)
         v = _settings.value("showPowerProfiles"); if (v !== undefined && v !== null) showPowerProfiles = _toBool(v)
         v = _settings.value("showOverview"); if (v !== undefined && v !== null) showOverview = _toBool(v)
@@ -876,7 +875,6 @@ QtObject {
     property bool showBattery:       true
     property bool showMediaPlayer:   true
     property bool showIdleInhibitor: true
-    property bool showRofi:          true
     property bool showUpdates:       true
     property bool showPowerProfiles: true
     property bool showOverview:      true
