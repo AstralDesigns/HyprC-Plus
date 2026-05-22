@@ -441,8 +441,14 @@ function hotReload() {
             log('[dock] hot-reload: pinned apps refreshed from disk');
         }
     }
-    // Refresh hotspot anchors in case dock position changed
-    if (_ahHotspot) _ahHotspot._refreshAnchors();
+    // Refresh hotspot anchors in case dock position changed.
+    // Also re-apply hotspot color: re-asserts background-image:none so the
+    // display-level gradient rule (injected by _injectGlyphSizeCSS above)
+    // cannot bleed onto the hotspot surface.
+    if (_ahHotspot) {
+        _ahHotspot._refreshAnchors();
+        _ahHotspot._applyHotspotColor();
+    }
     log('[dock] hot-reload complete');
 }
 
@@ -2026,10 +2032,9 @@ const HotspotWindow = GObject.registerClass({
 
         Gtk4LayerShell.init_for_window(this);
         Gtk4LayerShell.set_namespace(this, 'hyprcandy-dock-hotspot');
-        const hotspotCss = new Gtk.CssProvider();
-        hotspotCss.load_from_data(
-            'window.background { background-color: @blur; border: none; box-shadow: none; }', -1);
-        this.get_style_context().add_provider(hotspotCss,
+        this._hotspotCss = new Gtk.CssProvider();
+        this._applyHotspotColor();
+        this.get_style_context().add_provider(this._hotspotCss,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 10);
         Gtk4LayerShell.set_layer(this, Gtk4LayerShell.Layer.TOP);
         Gtk4LayerShell.set_exclusive_zone(this, 0);
@@ -2060,6 +2065,19 @@ const HotspotWindow = GObject.registerClass({
 
         // Start hidden; shown by _ahStartTimer() when the dock hides
         this.set_visible(false);
+    }
+
+    // Update hotspot background to match the current rectBgStyle.
+    // The CC Bar:Background fill toggle controls the dock surface — the hotspot
+    // always stays @blur so it remains invisible regardless of dock style.
+    // Called at construction and by hotReload() so live changes take effect.
+    _applyHotspotColor() {
+        // background-image: none is required here — without it the display-level
+        // dynamicConfigProvider (APP+1) bleeds its gradient rule onto this window
+        // when rectBgStyle=gradient.  The hotspot always stays @blur regardless
+        // of dock fill style; the explicit none at widget-level (APP+10) wins.
+        this._hotspotCss.load_from_data(
+            'window.background { background-color: @blur; background-image: none; border: none; box-shadow: none; }', -1);
     }
 
     _refreshAnchors() {

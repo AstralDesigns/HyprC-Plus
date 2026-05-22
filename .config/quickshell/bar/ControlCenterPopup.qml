@@ -3238,7 +3238,8 @@ PanelWindow {
                                         "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
                                         "mkdir -p \"$(dirname $f)\"; " +
                                         "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
-                                        "grep -q '^autohide=' \"$f\" || sed -i '/^\\[dock\\]/a autohide=false' \"$f\"; " +
+                                        "grep -q '^\\[dock\\]' \"$f\" || printf '\\n[dock]\\nautohide=false\\nautohide_delay=5\\nlayer=top\\nmargin_from_edge=6\\n' >> \"$f\"; " +
+                                        "grep -q '^autohide=' <(awk '/^\\[dock\\]/{s=1;next}/^\\[/{s=0}s' \"$f\") || sed -i '/^\\[dock\\]/a autohide=false' \"$f\"; " +
                                         "sed -i '/^\\[dock\\]/,/^\\[/{s/^autohide=.*/autohide=" + (v ? "true" : "false") + "/}' \"$f\"; " +
                                         "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
                                     if (_confWriteProc.running) {
@@ -3263,7 +3264,8 @@ PanelWindow {
                                         "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
                                         "mkdir -p \"$(dirname $f)\"; " +
                                         "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
-                                        "grep -q '^autohide_delay=' \"$f\" || sed -i '/^\\[dock\\]/a autohide_delay=5' \"$f\"; " +
+                                        "grep -q '^\\[dock\\]' \"$f\" || printf '\\n[dock]\\nautohide=false\\nautohide_delay=5\\nlayer=top\\nmargin_from_edge=6\\n' >> \"$f\"; " +
+                                        "grep -q '^autohide_delay=' <(awk '/^\\[dock\\]/{s=1;next}/^\\[/{s=0}s' \"$f\") || sed -i '/^\\[dock\\]/a autohide_delay=5' \"$f\"; " +
                                         "sed -i '/^\\[dock\\]/,/^\\[/{s/^autohide_delay=.*/autohide_delay=" + v + "/}' \"$f\"; " +
                                         "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
                                     if (_confWriteProc.running) {
