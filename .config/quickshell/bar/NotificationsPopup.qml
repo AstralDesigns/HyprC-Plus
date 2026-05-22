@@ -38,7 +38,7 @@ Item {
         margins {
             top:    _barAtBottom ? 6 : (Config.barHeight + Config.outerMarginTop + 6)
             bottom: _barAtBottom ? (Config.barHeight + Config.outerMarginBottom + 6) : 6
-            left:   _panelMargin
+            left:   10 // changed from '_panelMargin' because toasts don't need margin tracking but keep pos tracking
         }
         implicitWidth:  364
         implicitHeight: toastCol.implicitHeight + 4

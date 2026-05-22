@@ -1669,7 +1669,7 @@ PanelWindow {
                                         CCSection { text: "Screen Margins" }
                                         CCSlider { label:"Top Margin";    from:0;to:30; value:Config.outerMarginTop;    onMoved:function(v){Config.outerMarginTop=v} }
                                         CCSlider { label:"Bottom Margin"; from:0;to:30; value:Config.outerMarginBottom; onMoved:function(v){Config.outerMarginBottom=v} }
-                                        CCSlider { label:"Side Margin";   from:0;to:80; value:Config.outerMarginSide;   onMoved:function(v){Config.outerMarginSide=v} }
+                                        CCSlider { label:"Side Margin";   from:0;to:200; value:Config.outerMarginSide;   onMoved:function(v){Config.outerMarginSide=v} }
                                         CCSlider { label:"Edge Pad Left"; from:0;to:30; value:Config.barEdgePaddingLeft; onMoved:function(v){Config.barEdgePaddingLeft=v} }
                                         CCSlider { label:"Edge Pad Right";from:0;to:30; value:Config.barEdgePaddingRight;onMoved:function(v){Config.barEdgePaddingRight=v} }
 

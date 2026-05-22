@@ -11,9 +11,9 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell:systraypopup"
 
     readonly property bool _barAtBottom:  Config.barPosition === "bottom"
-    readonly property real _barGap:       Config.outerMarginTop    + Config.barHeight + 6
-    readonly property real _barGapBot:    Config.outerMarginBottom + Config.barHeight + 6
-    readonly property real _panelMargin:  Config.outerMarginSide * 2
+    readonly property real _barGap:       Config.outerMarginTop    + Config.barHeight + 4
+    readonly property real _barGapBot:    Config.outerMarginBottom + Config.barHeight + 4
+    readonly property real _panelMargin:  Config.outerMarginSide * 2 
 
     anchors { top: !_barAtBottom; bottom: _barAtBottom; right: true }
     margins {
@@ -24,7 +24,7 @@ PanelWindow {
     // _pad drives symmetric padding on all sides, sourced from bar's outerMarginTop
     readonly property real _pad: Config.outerMarginTop
     // Minimum slot = 24px icon + pad on both sides so pill never collapses when empty
-    readonly property real _minSlot: 24 + _pad * 2
+    readonly property real _minSlot: 26 + _pad * 2
 
     implicitHeight: _minSlot
     implicitWidth:  popupRect.implicitWidth
@@ -47,7 +47,7 @@ PanelWindow {
 
         radius: implicitHeight / 2
         color:  Theme.cPanelBg
-        border.width: 2
+        border.width: 1
         border.color : Qt.rgba(Theme.cOnPrimaryFixedVariant.r,
                                Theme.cOnPrimaryFixedVariant.g,
                                Theme.cOnPrimaryFixedVariant.b,
