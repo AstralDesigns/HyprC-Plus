@@ -322,16 +322,25 @@ function applyMarginsToLayerShell(win) {
 
 
 // --- Read hyprcandy-bar.conf [dock] section ---------------------------
-// Returns { autoHide, autoHideDelay (ms), layer, marginFromEdge } with safe defaults.
+// Returns { autoHide, autoHideDelay (ms), layer, marginFromEdge, licenseActive } with safe defaults.
 function readHyprCandyConf() {
-    const defaults = { autoHide: false, autoHideDelay: 5000, layer: 'top', marginFromEdge: null };
+    const defaults = { autoHide: false, autoHideDelay: 5000, layer: 'top', marginFromEdge: null, licenseActive: false };
     try {
         const [ok, bytes] = GLib.file_get_contents(HYPRCANDY_CONF_PATH);
         if (!ok) return defaults;
         const txt = new TextDecoder().decode(bytes);
+
+        // Extract licenseStatus from [cc-license-v1] section (written by Qt Settings / QuickShell bar).
+        // Parsed first — independently of [dock] — so a missing [dock] section never blocks the check.
+        // Value is 'active' on a valid HyprCandy+ subscription; empty / 'invalid' / anything else = false.
+        const licMatch = txt.match(/\[cc-license-v1\]([\s\S]*?)(?=\n\[|$)/i);
+        const licSection = licMatch ? licMatch[1] : '';
+        const licStatusMatch = licSection.match(/^\s*licenseStatus\s*=\s*(\S+)/im);
+        const licenseActive = licStatusMatch ? licStatusMatch[1].toLowerCase() === 'active' : false;
+
         // Extract [dock] section (up to the next [section] or end of file)
         const dockMatch = txt.match(/\[dock\]([\s\S]*?)(?=\n\[|$)/i);
-        if (!dockMatch) return defaults;
+        if (!dockMatch) return { ...defaults, licenseActive };
         const section = dockMatch[1];
         const ahMatch     = section.match(/^\s*autohide\s*=\s*(true|false)/im);
         const delayMatch  = section.match(/^\s*autohide_delay\s*=\s*(\d+)/im);
@@ -342,6 +351,7 @@ function readHyprCandyConf() {
             autoHideDelay:  delayMatch  ? parseInt(delayMatch[1]) * 1000       : 5000,
             layer:          layerMatch  ? layerMatch[1].toLowerCase()          : 'top',
             marginFromEdge: marginMatch ? parseInt(marginMatch[1])             : null,
+            licenseActive,
         };
     } catch (e) {
         log('[dock] conf read error: ' + e.message);
@@ -807,9 +817,15 @@ const HyprCandyDock = GObject.registerClass({
         btn.set_child(label);
         btn.set_tooltip_text('Applications');
 
-        // Left click — toggle the HyprCandy App Launcher
-        // (replaces rofi -show drun; the launcher tracks dock.pos itself)
+        // Left click — toggle the HyprCandy App Launcher (HyprCandy+ only)
+        // Reads licenseStatus from [cc-license-v1] in hyprcandy-bar.conf each
+        // click so de/reactivation takes effect immediately without a dock restart.
         btn.connect('clicked', () => {
+            const conf = readHyprCandyConf();
+            if (!conf.licenseActive) {
+                log('[dock] app-launcher blocked — HyprCandy+ licence not active');
+                return;
+            }
             _spawnCleanCmd(`bash "${LAUNCHER_TOGGLE_PATH}"`);
         });
 

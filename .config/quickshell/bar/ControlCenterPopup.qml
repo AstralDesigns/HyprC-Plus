@@ -1116,10 +1116,13 @@ PanelWindow {
                 MouseArea {
                     anchors.fill: parent
                     onWheel: function(wheel) {
+                        // When not activated, scrolling is locked to tab 6 (activation tab)
+                        if (!LicenseState.activated) return
+
                         const tabs = [1, 0, 2, 3, 4, 5, 7, 8]
                         let currIdx = tabs.indexOf(ccTabSettings.activeTab)
                         if (currIdx === -1) currIdx = 0
-                        
+
                         if (wheel.angleDelta.y > 0) {
                             // Scroll up -> Previous tab
                             currIdx = (currIdx - 1 + tabs.length) % tabs.length
@@ -1127,7 +1130,7 @@ PanelWindow {
                             // Scroll down -> Next tab
                             currIdx = (currIdx + 1) % tabs.length
                         }
-                        
+
                         const nextTab = tabs[currIdx]
                         mainStack.currentIndex = nextTab
                         ccTabSettings.activeTab = nextTab
@@ -1674,9 +1677,9 @@ PanelWindow {
                                         CCSlider { label:"Bar Radius";    from:0;to:40; value:Config.barRadius;    onMoved:function(v){Config.barRadius=v} }
                                         CCSlider { label:"Island Radius"; from:0;to:40; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
 
-                                        CCSection { text: "Borders" }
-                                        CCSlider { label:"Bar Border";        from:0;to:8; value:Config.barBorderWidth;    onMoved:function(v){Config.barBorderWidth=v} }
-                                        CCSlider { label:"Bar Border Alpha";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
+                                        CCSection { text: "Border" }
+                                        CCSlider { label:"Border W";        from:0;to:8; value:Config.barBorderWidth;    onMoved:function(v){Config.barBorderWidth=v} }
+                                        CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
 
                                         CCSection { text: "Spacing & Padding" }
                                         CCSlider { label:"Island Spacing";  from:0;to:24; value:Config.islandSpacing;  onMoved:function(v){Config.islandSpacing=v} }
