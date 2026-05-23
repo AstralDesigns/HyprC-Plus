@@ -81,7 +81,7 @@ update_hypr_group_text() {
     elif (( LUMINANCE_INT > 150 && SATURATION >= 20 && SATURATION < 40 )); then
         local TEXT_COLOR="secondary_container,"
     else
-        local TEXT_COLOR="on_primary_fixed_variant,"
+        local TEXT_COLOR="primary_container,"
     fi
 
     sed -i "s|^\(\s*text_color\s*=\).*|\1 $TEXT_COLOR|" "$HYPRVIZ_CONF"

@@ -7,11 +7,10 @@
 #
 # Usage:
 #   theme-set.sh light                 → Light mode (any scheme)
-#   theme-set.sh scheme-fidelity       → Dark, Fidelity branch
 #   theme-set.sh scheme-monochrome     → Dark, Monochrome branch
 #   theme-set.sh scheme-content        → Dark, else branch
 #   theme-set.sh scheme-expressive     → Dark, else branch
-#   (etc. — anything not "light", "scheme-fidelity", "scheme-monochrome")
+#   (etc. — anything not "light", "scheme-monochrome")
 
 WI="$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh"
 G3="$HOME/.config/matugen/templates/gtk3.css"
