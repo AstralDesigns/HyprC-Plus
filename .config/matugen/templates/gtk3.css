@@ -161,3 +161,24 @@ messagedialog > box > box {
   border-radius: 0 0 10px 10px;
   padding: 10px;
 }
+
+/*************
+ * Hyprland *
+*************/
+ 
+.sidebar-pane, .sidebar-pane:backdrop,
+.sidebar,
+.sidebar:backdrop,
+.navigation-sidebar,
+.navigation-sidebar:backdrop,
+placessidebar,
+placessidebar:backdrop {
+  background: alpha(@inverse_primary, 0.10); }
+.sidebar-pane .top-bar, .sidebar-pane .top-bar headerbar,
+.sidebar .top-bar,
+.sidebar .top-bar headerbar,
+.navigation-sidebar .top-bar,
+.navigation-sidebar .top-bar headerbar,
+placessidebar .top-bar,
+placessidebar .top-bar headerbar {
+  background: alpha(@inverse_primary, 0.10); }
