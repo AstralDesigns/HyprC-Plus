@@ -2251,9 +2251,17 @@ PanelWindow {
                                             current: Config.barRectBgStyle
                                             onPicked: function(v) {
                                                 Config.barRectBgStyle = v
-                                                // Mirror to dock so both rect fills stay in sync
                                                 _dockRectBgStyle = v
-                                                _dockRectBgWrite.command = [scriptDir + "/dock-set.sh", "rectBgStyle", v]
+                                                // Write rectBgStyle and borderWidth in one sed pass so the dock
+                                                // reloads once with both values already in place — no stagger.
+                                                // Gradient → border 0; glass → restore exact _dockBorderWVal.
+                                                const bw = (v === "gradient") ? "0" : _dockBorderWVal
+                                                _dockRectBgWrite.command = ["bash", "-c",
+                                                    "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\"; " +
+                                                    "sed -i \"s/rectBgStyle: '[^']*'/rectBgStyle: '" + v + "'/;" +
+                                                             "s/borderWidth: [0-9]*/borderWidth: " + bw + "/\" \"$f\" && " +
+                                                    "pkill -SIGUSR2 -f 'gjs dock-main.js'"
+                                                ]
                                                 _dockRectBgWrite.running = true
                                             }
                                         }
