@@ -672,15 +672,34 @@ Item {
     }
 
     // ── File send ─────────────────────────────────────────────────────────────
-    Process { id: btSendProc; property string _cmd: ""
+    Process { id: btSendProc; property string _cmd: ""; property string _pendingMac: ""; property string _selectedFile: ""
         command: ["bash", "-c", btSendProc._cmd]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            const p = l.trim()
+            if (p) btSendProc._selectedFile = p
+        }}
+        onExited: function(code) {
+            const filePath = btSendProc._selectedFile.trim()
+            const mac = btSendProc._pendingMac
+            btSendProc._selectedFile = ""
+            btSendProc._pendingMac = ""
+            if (code === 0 && filePath && mac) {
+                // Route file send through bt-agent.py via FIFO — the agent uses
+                // the D-Bus OBEX client API (CreateSession + ObjectPush1.SendFile)
+                // and monitors Transfer1.Status for completion. This avoids the
+                // broken bluetooth-sendto approach where the D-Bus session dies
+                // as soon as the bash -c subprocess exits.
+                NotificationsState.btAgentSend("send_file " + mac + " " + filePath)
+            }
+        }
     }
     function btSendFile(mac) {
-        const esc = mac.replace(/'/g, "'\\''")
+        btSendProc._pendingMac = mac
+        btSendProc._selectedFile = ""
         btSendProc._cmd =
             "FILE=$(zenity --file-selection --title='Send via Bluetooth' 2>/dev/null) && " +
             "[ -n \"$FILE\" ] && " +
-            "bluetooth-sendto --device='" + esc + "' \"$FILE\" &"
+            "printf '%s\\n' \"$FILE\""
         if (!btSendProc.running) btSendProc.running = true
     }
 

@@ -36,6 +36,27 @@ Item {
     property var notifications: []   // active toasts
     property var history: []         // persistent history
     property int _nextId: 1
+    property var _notifAppMap: ({})
+
+    // ── Model mutation ────────────────────────────────────────────────────
+    function dismissNotification(id) {
+        ns.notifications = ns.notifications.filter(function(n) { return n.id !== id })
+    }
+
+    function removeHistory(id) {
+        ns.history = ns.history.filter(function(n) { return n.id !== id })
+    }
+
+    function clearHistory() {
+        ns.history = []
+    }
+
+    function invokeAction(notif, key) {
+        if (!notif._daemonId) return
+        actionInvokerProc._nid = notif._daemonId
+        actionInvokerProc._key = key
+        if (!actionInvokerProc.running) actionInvokerProc.running = true
+    }
 
     // ── Icon glyph resolver ───────────────────────────────────────────────
     function iconGlyph(notif) {
@@ -52,10 +73,10 @@ Item {
         if (ic.includes("record") || ap.includes("record") || ap.includes("obs")) return "󰑋"
         if (ic.includes("mail") || ap.includes("mail") || ap.includes("thunderbird")) return "󰇮"
         if (ic.includes("discord") || ap.includes("discord"))              return "󰙯"
-        if (ic.includes("telegram") || ap.includes("telegram"))            return ""
+        if (ic.includes("telegram") || ap.includes("telegram"))            return "󰀪"
         if (ic.includes("spotify") || ap.includes("spotify"))              return "󰓇"
         if (ic.includes("firefox") || ap.includes("firefox"))              return "󰈹"
-        if (ic.includes("chrome") || ic.includes("chromium"))              return ""
+        if (ic.includes("chrome") || ic.includes("chromium"))              return "󰊯"
         if (ic.includes("update") || ic.includes("package") || ap.includes("pacman")) return "󰏖"
         if (ic.includes("calendar") || ap.includes("calendar"))            return "󰃭"
         if (ic.includes("download"))                                        return "󰇚"
@@ -138,9 +159,6 @@ Item {
     Process { id: urlOpenerProc; property string _url: ""
         command: ["xdg-open", urlOpenerProc._url] }
 
-    // ── Smart redirect launcher ───────────────────────────────────────────
-    // Opens a path in Nautilus, navigating to the containing folder and
-    // selecting the file. Used for screenshot/recording save notifications.
     // ── Smart redirect ────────────────────────────────────────────────────
     // Opens a path in Nautilus with the file selected (screenshot/recording).
     Process { id: nautilusSelectProc; property string _path: ""
@@ -192,13 +210,6 @@ Item {
     }
 
     // ── Primary redirect entry point ──────────────────────────────────────
-    // 1. Screenshot/recording path → Nautilus select
-    // 2. Screenshot/recording app  → open save folder
-    // 3. Look up NotifAppState for stored desktopId + url:
-    //    a. Try Hyprland.windows scan by address, then by class/desktopId
-    //    b. If running → focuswindow (+ togglespecialworkspace if needed)
-    //    c. If not running → DesktopEntries.byId(desktopId).execute() or bash
-    //    d. If URL present → also/instead xdg-open the URL
     function redirectNotification(notif) {
         const ic = (notif.icon    || "").toLowerCase()
         const ap = (notif.appName || "").toLowerCase()
@@ -248,12 +259,10 @@ Item {
         }
 
         // 3. Resolve via NotifAppState.
-        // desktopEntry is the authoritative key written by _writeNotifAppState.
         const deKey  = (notif.desktopEntry || "").toLowerCase()
         const stored = NotifAppState.lookup(deKey) || NotifAppState.lookup(ap) || {}
         const desktopId = stored.desktopId || ""
         const storedUrl = stored.url || ""
-        // Priority: _sourceUrl on notif (from daemon hints) > body URL > stored URL
         const bodyUrl   = (notif.body || "").match(/https?:\/\/[^\s"'<>]+/)
         const url       = (notif._sourceUrl || "").trim()
                        || (bodyUrl ? bodyUrl[0] : "")
@@ -270,7 +279,6 @@ Item {
                 if (!w) continue
                 const wc = (w.class        || "").toLowerCase()
                 const wi = (w.initialClass || "").toLowerCase()
-                const wt = (w.title        || "").toLowerCase()
                 if (wc.includes(normAp) || wi.includes(normAp) ||
                     (normId && (wc.includes(normId) || wi.includes(normId)))) {
                     client = w
@@ -281,133 +289,33 @@ Item {
 
         if (client) {
             // 3b. Focus running window
-            const wsName = (client.workspace?.name || "")
-            if (wsName.startsWith("special:")) {
-                Hyprland.dispatch("togglespecialworkspace " + wsName.replace(/^special:/, ""))
-            }
-            Hyprland.dispatch("focuswindow address:" + client.address)
-            // Open URL in the already-running instance via xdg-open (reuses existing process)
-            if (url) {
-                urlOpenerProc._url = url
-                Qt.callLater(function() { if (!urlOpenerProc.running) urlOpenerProc.running = true })
-            }
-            return
-        }
-
-        // 3c. Not running — launch via DesktopEntries or bash
-        if (url && !desktopId) {
-            // Pure URL with no known app → xdg-open (lets the default handler decide)
-            urlOpenerProc._url = url
-            if (!urlOpenerProc.running) urlOpenerProc.running = true
-            return
-        }
-        if (desktopId) {
+            Hyprland.dispatch("focuswindow", "address:" + client.address)
+        } else if (desktopId) {
+            // 3c. Launch via DesktopEntry
             const entry = DesktopEntries.byId(desktopId)
             if (entry) {
-                // Always pass URL to the entry so the browser opens the right tab,
-                // not a new window on its default page.
-                if (url) {
-                    const clean = (entry.execString || "").replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
-                    _notifLaunchProc._cmd = clean + " " + JSON.stringify(url) + " &"
-                    _notifLaunchTimer.restart()
-                } else {
-                    entry.execute()
-                }
-                return
-            }
-        }
-        // 3d. Fallback — try the resolved entry via NotifAppState directly
-        const fallbackEntry = NotifAppState._findEntry(notif.appName || notif.icon || "")
-        if (fallbackEntry) {
-            if (url) {
-                const clean = (fallbackEntry.execString || "").replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
-                _notifLaunchProc._cmd = clean + " " + JSON.stringify(url) + " &"
-                _notifLaunchTimer.restart()
+                entry.execute()
             } else {
-                fallbackEntry.execute()
+                _notifLaunchProc._cmd = desktopId.replace(".desktop","")
+                _notifLaunchTimer.restart()
             }
-            return
         }
+
+        // 4. URL fallback
         if (url) {
             urlOpenerProc._url = url
             if (!urlOpenerProc.running) urlOpenerProc.running = true
         }
     }
 
-    function invokeAction(notif, actionKey) {
-        const daemonId = notif._daemonId || notif.id
-        actionInvokerProc._nid = daemonId
-        actionInvokerProc._key = actionKey
-        if (!actionInvokerProc.running) actionInvokerProc.running = true
-        if (actionKey === "default") {
-            const m = (notif.body || "").match(/https?:\/\/\S+/)
-            if (m) {
-                urlOpenerProc._url = m[0]
-                if (!urlOpenerProc.running) urlOpenerProc.running = true
-            }
-        }
-    }
-
-    function dismissNotification(id) {
-        ns.notifications = ns.notifications.filter(function(n) { return n.id !== id })
-    }
-    function clearHistory() {
-        ns.history = []
-        ns._notifAppMap = ({})
-        const scriptPath = Config.barDir + "/scripts/notif-app-write.sh"
-        _notifWriteProc.command = [scriptPath]
-        _notifWriteProc.running = false
-        _notifWriteProc.running = true
-    }
-
-    // ═════════════════════════════════════════════════════════════════════
-    //  NOTIFICATION DAEMON  (claims org.freedesktop.Notifications)
-    // ═════════════════════════════════════════════════════════════════════
-    Process { id: notifDaemonProc
-        command: ["python3", "-u",
-            Quickshell.env("HOME") + "/.config/quickshell/notifications/notify-daemon.py"]
-        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
-            if (!l.trim()) return
-            try { ns._handleNotifEvent(JSON.parse(l)) } catch(e) {}
-        }}
-        stderr: SplitParser { splitMarker: "\n"; onRead: function(l) {
-            if (l.trim()) console.warn("notify-daemon:", l)
-        }}
-        Component.onCompleted: running = true
-        onExited: function(code, status) {
-            console.warn("notify-daemon exited code=" + code + " status=" + status)
-            Qt.callLater(function() { if (!running) running = true })
-        }
-    }
-
-    // In-memory map — mirrors what's on disk, avoids re-reading the file
-    property var _notifAppMap: ({})
-
     function _writeNotifAppState(appName, iconName, summary, body, sourceUrl) {
-        if (!appName) return
-
-        // Screenshot, recorder, and storage/unmount notifications → Nautilus; skip.
-        const apLow = appName.toLowerCase()
         const icLow = (iconName || "").toLowerCase()
-        const _skipCls = ["screenshot", "recorder", "grimblast", "grim",
-                          "flameshot", "spectacle", "wf-recorder", "kooha",
-                          "obs", "obs-studio",
-                          "nautilus", "org.gnome.nautilus",
-                          "udisks", "gvfs", "devicekit"]
-        for (const sc of _skipCls) {
-            if (apLow.includes(sc) || icLow.includes(sc)) return
-        }
+        const apLow = (appName  || "").toLowerCase()
         const _skipIcons = ["media-removable", "drive-removable-media",
                             "drive-harddisk", "media-flash", "media-optical"]
         if (_skipIcons.includes(icLow)) return
 
         const cls = apLow
-
-        // desktopId: daemon already resolved this via _resolve_app_entry
-        // (StartupWMClass → binary → name scan in Python with full .desktop access),
-        // so appName when called as _writeNotifAppState(desktopEntry || appName, ...)
-        // is either the verified desktop entry id or the resolved display name.
-        // Try a direct id lookup first; fall back to _findEntry for app-native notifs.
         let desktopId = ""
         const directEntry = DesktopEntries.byId(appName)
         if (directEntry) {
@@ -424,8 +332,6 @@ Item {
             }
         }
 
-        // URL: prefer sourceUrl from daemon (has access to Chromium hints),
-        // fall back to body/summary scraping.
         function _extractUrl(text) {
             if (!text) return ""
             const hrefM = text.match(/href=["']?(https?:\/\/[^"'\s<>]+)/)
@@ -442,10 +348,7 @@ Item {
         }
 
         const existing = ns._notifAppMap[cls]
-        // Skip only exact repeats; new url or resolved desktopId always writes
-        if (existing &&
-            existing.desktopId === desktopId &&
-            existing.url === url) return
+        if (existing && existing.desktopId === desktopId && existing.url === url) return
 
         ns._notifAppMap[cls] = { cls, desktopId, url, realName: appName }
 
@@ -462,8 +365,6 @@ Item {
     function _handleNotifEvent(ev) {
         if (ev.type !== "notify") return
         const urgMap = { "low": 0, "normal": 1, "critical": 2 }
-        // The daemon now resolves app_name and desktop_entry via _resolve_app_entry,
-        // so these are already the correct display name and desktop entry id.
         const appName      = ev.app_name      || ""
         const body         = ev.body          || ""
         const icon         = ev.icon          || ""
@@ -490,19 +391,68 @@ Item {
     //  BLUETOOTH AGENT
     // ═════════════════════════════════════════════════════════════════════
     property bool btAgentReady: false
-    property bool btReceiving:  false   // mirrors auto_accept mode in bt-agent.py
+    property bool btReceiving:  false
 
     function btToggleReceive() {
         const target = !ns.btReceiving
-        // Optimistically update — the auto_accept event from bt-agent will
-        // confirm this. If the agent isn't ready, we'll resync on agent_ready.
         ns.btReceiving = target
         ns.btAgentSend("set_auto_accept " + (target ? "1" : "0"))
     }
 
+    // ── Daemon startup ──────────────────────────────────────────────────────
+    Process { id: notifDaemonProc
+        command: ["python3", "-u",
+            Quickshell.env("HOME") +
+            "/.config/quickshell/notifications/notify-daemon.py"]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            if (!l.trim()) return
+            try { ns._handleNotifEvent(JSON.parse(l)) } catch(e) {}
+        }}
+        Component.onCompleted: running = true
+        onRunningChanged: if (!running) notifDaemonRestartTimer.restart()
+    }
+    Timer { id: notifDaemonRestartTimer; interval: 3000; repeat: false
+        onTriggered: { if (!notifDaemonProc.running) notifDaemonProc.running = true }
+    }
+
+    // ── Volume/Backlight listeners ──────────────────────────────────────────
+    // Listens to pactl/brightnessctl events via a bash script that outputs JSON
+    Process { id: sysEventProc
+        command: ["bash", "-c",
+            "pactl subscribe | while read -r line; do " +
+            "  if echo \"$line\" | grep -q \"'change' on sink\"; then " +
+            "    VOL=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -Po '\\d+(?=%)' | head -1); " +
+            "    MUTE=$(pactl get-sink-mute @DEFAULT_SINK@ | grep -q 'yes' && echo 'true' || echo 'false'); " +
+            "    echo \"{\\\"type\\\":\\\"volume\\\",\\\"value\\\":$VOL,\\\"mute\\\":$MUTE}\"; " +
+            "  fi; " +
+            "done & " +
+            "brightnessctl s -m | while read -r line; do " +
+            "  CUR=$(echo \"$line\" | cut -d, -f4 | tr -d '%'); " +
+            "  echo \"{\\\"type\\\":\\\"brightness\\\",\\\"value\\\":$CUR}\"; " +
+            "done"]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            if (!l.trim()) return
+            try {
+                const ev = JSON.parse(l)
+                if (ev.type === "volume") {
+                    ns.addNotification({
+                        summary: ev.mute ? "Muted" : "Volume: " + ev.value + "%",
+                        body: "", icon: ev.mute ? "audio-volume-muted" : "audio-volume-high",
+                        urgency: 0, category: "system.volume"
+                    })
+                } else if (ev.type === "brightness") {
+                    ns.addNotification({
+                        summary: "Brightness: " + ev.value + "%",
+                        body: "", icon: "display-brightness",
+                        urgency: 0, category: "system.brightness"
+                    })
+                }
+            } catch(e) {}
+        }}
+        Component.onCompleted: running = true
+    }
+
     // ── BT agent startup ────────────────────────────────────────────────────
-    // bt-agent.py creates its own FIFO and kills stale instances.
-    // We just need a holder process to keep the FIFO open for reading.
     Process { id: btFifoHolderProc
         command: ["bash", "-c",
             "[ -p /tmp/qs_bt_cmd ] || (rm -f /tmp/qs_bt_cmd && mkfifo /tmp/qs_bt_cmd); " +
@@ -538,7 +488,6 @@ Item {
         onTriggered: { if (!btAgentProc.running) btAgentProc.running = true }
     }
 
-    // Send a command to bt-agent.py via the fifo.
     Process { id: btAgentStdinProc; property string _cmd: ""
         command: ["bash", "-c", "printf '%s\\n' " + btAgentStdinProc._cmd + " >> /tmp/qs_bt_cmd"]
     }
@@ -551,7 +500,6 @@ Item {
         switch (ev.type) {
         case "agent_ready":
             ns.btAgentReady = true
-            // Sync the receiving mode with the freshly started agent
             ns.btAgentSend("set_auto_accept " + (ns.btReceiving ? "1" : "0"))
             break
         case "pair_confirm":
@@ -597,26 +545,40 @@ Item {
             ns.addNotification({ summary: "Bluetooth", body: "File transfer cancelled",
                 icon: "bluetooth", urgency: 1, category: "bt" })
             break
-        case "file_auto_accepted":
-            // This event is now deprecated — use file_receiving instead
-            break
         case "file_receiving":
-            // A file transfer has started (either auto-accepted or manually accepted)
-            // The actual file will be moved by the OBEX session monitor → file_saved event
             ns.addNotification({ summary: "Receiving file…",
                 body: (ev.name || ev.mac) + " → " + (ev.filename || "file") +
                       (ev.size ? " (" + ev.size + ")" : ""),
                 icon: "bluetooth", urgency: 1, category: "bt" })
             break
         case "file_saved":
-            // OBEX session monitor completed the file move to ~/Downloads
             ns.addNotification({ summary: "File received",
                 body: (ev.name || ev.mac) + " → " + (ev.filename || "file") +
                       (ev.size ? " (" + ev.size + ")" : "") + " saved to Downloads",
                 icon: "bluetooth", urgency: 1, category: "bt" })
             break
+        case "file_send_started":
+            ns.addNotification({ summary: "Sending file…",
+                body: (ev.filename || "file") + " → " + (ev.mac || "device"),
+                icon: "bluetooth", urgency: 1, category: "bt" })
+            break
+        case "file_send_retrying":
+            ns.addNotification({ summary: "Bluetooth: waiting for device…",
+                body: (ev.msg || "Tap Accept on your phone") +
+                      (ev.attempt && ev.max ? " (attempt " + ev.attempt + "/" + ev.max + ")" : ""),
+                icon: "bluetooth", urgency: 1, category: "bt" })
+            break
+        case "file_sent":
+            ns.addNotification({ summary: "File sent",
+                body: (ev.filename || "file") + " sent successfully",
+                icon: "bluetooth", urgency: 1, category: "bt" })
+            break
+        case "file_send_error":
+            ns.addNotification({ summary: "Bluetooth send failed",
+                body: (ev.filename || ev.mac || "file") + (ev.msg ? ": " + ev.msg : ""),
+                icon: "bluetooth", urgency: 1, category: "bt" })
+            break
         case "auto_accept":
-            // bt-agent confirmed the mode change — keep our flag in sync
             ns.btReceiving = ev.enabled === true
             break
         case "error":
@@ -639,7 +601,7 @@ Item {
     }
 
     // ═════════════════════════════════════════════════════════════════════
-    //  WAYBAR STATE (write state file for the Notifications module)
+    //  WAYBAR STATE
     // ═════════════════════════════════════════════════════════════════════
     property bool inhibitorActive: false
     FileView {
@@ -655,7 +617,7 @@ Item {
         if (!dnd && !inh) return has ? "notification"          : "none"
         if ( dnd && !inh) return has ? "dnd-notification"      : "dnd-none"
         if (!dnd &&  inh) return has ? "inhibited-notification" : "inhibited-none"
-        /* dnd && inh */  return has ? "dnd-inhibited-notification" : "dnd-inhibited-none"
+        return has ? "dnd-inhibited-notification" : "dnd-inhibited-none"
     }
     function _waybarIconGlyph(key) {
         const map = {
