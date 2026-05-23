@@ -26,7 +26,7 @@ reload_colors() {
 
 update_hypr_group_text() {
     local COLORS_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/colors.conf"
-    local HYPRVIZ_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprviz.conf"
+    local HYPRVIZ_CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprviz.lua"
 
     if [[ ! -f "$COLORS_CONF" ]]; then
         echo "update_hypr_group_text: colors.conf not found at $COLORS_CONF"
@@ -73,18 +73,19 @@ update_hypr_group_text() {
     fi
 
     if (( LUMINANCE_INT > 150 && SATURATION >= 40 )); then
-        local TEXT_COLOR="\$inverse_primary"
+        local TEXT_COLOR="inverse_primary,"
     elif (( LUMINANCE_INT <= 150 && SATURATION <= 20 )); then
-        local TEXT_COLOR="\$surface_tint"
+        local TEXT_COLOR="surface_tint,"
     elif (( LUMINANCE_INT <= 150 && SATURATION > 20 )); then
-        local TEXT_COLOR="\$surface_tint"
+        local TEXT_COLOR="surface_tint,"
     elif (( LUMINANCE_INT > 150 && SATURATION >= 20 && SATURATION < 40 )); then
-        local TEXT_COLOR="\$secondary_container"
+        local TEXT_COLOR="secondary_container,"
     else
-        local TEXT_COLOR="\$on_primary_fixed_variant"
+        local TEXT_COLOR="on_primary_fixed_variant,"
     fi
 
     sed -i "s|^\(\s*text_color\s*=\).*|\1 $TEXT_COLOR|" "$HYPRVIZ_CONF"
+    hyprctl reload
     echo "update_hypr_group_text: source_color luminance=${LUMINANCE_INT}/255 saturation=${SATURATION}% → text_color = $TEXT_COLOR"
 }
 
