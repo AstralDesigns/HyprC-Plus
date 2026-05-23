@@ -46,7 +46,7 @@ PanelWindow {
         implicitWidth:  Math.max(win._minSlot, trayRow.implicitWidth + win._pad * 2)
 
         radius: implicitHeight / 2
-        color:  Theme.cPanelBg
+        color:  Theme.background
         border.width: 1
         border.color : Qt.rgba(Theme.cOnPrimaryFixedVariant.r,
                                Theme.cOnPrimaryFixedVariant.g,
