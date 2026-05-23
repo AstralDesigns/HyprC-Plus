@@ -150,6 +150,7 @@ ShellRoot {
     Loader { active: LicenseState.activated && SystemMonitorPopupState.visible;  source: "SystemMonitorPopup.qml"  }
     Loader { active: LicenseState.activated && (NotificationsState.historyVisible || NotificationsState.notifications.length > 0); source: "NotificationsPopup.qml" }
     Loader { active: StartMenuState.menuVisible;    source: "StartMenuPopup.qml"    }
+    Loader { active: LicenseState.activated && ScreenshotPopupState.visible; source: "ScreenshotPopup.qml" }
 
     // ── Idle-inhibitor anchor — always mapped so the Wayland protocol object
     //    survives bar autohide (bar.visible = false unmaps the bar surface).
@@ -242,5 +243,7 @@ ShellRoot {
         function toggleStartMenu() { StartMenuState.toggle() }
         function openStartMenu()   { StartMenuState.open() }
         function closeStartMenu()  { StartMenuState.close() }
+        // Screenshot
+        function toggleScreenshot() { if (LicenseState.activated) ScreenshotPopupState.toggle() }
     }
 }

@@ -50,3 +50,7 @@ SliderBg 1.0 SliderBg.qml
 ProfilePill 1.0 ProfilePill.qml
 DesktopLayer 1.0 DesktopLayer.qml
 singleton NotifAppState 1.0 NotifAppState.qml
+
+singleton ScreenshotPopupState 1.0 ScreenshotPopupState.qml
+ScreenshotPopup 1.0 ScreenshotPopup.qml
+SsBtn 1.0 SsBtn.qml

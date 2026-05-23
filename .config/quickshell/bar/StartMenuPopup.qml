@@ -117,7 +117,7 @@ PanelWindow {
                     Behavior on color { ColorAnimation { duration: 100 } }
                     Text { anchors.centerIn: parent; text: "󰹑"; font.pixelSize: 15; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                     MouseArea { id: ssh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: StartMenuState.takeScreenshot() }
+                        onClicked: { StartMenuState.close(); ScreenshotPopupState.toggle() } }
                 }
             }
 

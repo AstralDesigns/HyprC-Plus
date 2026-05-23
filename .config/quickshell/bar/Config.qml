@@ -303,7 +303,7 @@ QtObject {
         _settings.setValue("showBattery", showBattery)
         _settings.setValue("showMediaPlayer", showMediaPlayer)
         _settings.setValue("showIdleInhibitor", showIdleInhibitor)
-        _settings.setValue("showRofi", showRofi)
+
         _settings.setValue("showUpdates", showUpdates)
         _settings.setValue("showPowerProfiles", showPowerProfiles)
         _settings.setValue("showOverview", showOverview)

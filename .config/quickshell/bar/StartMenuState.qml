@@ -772,14 +772,6 @@ Item {
         }
     }
 
-    // ── Screenshot ───────────────────────────────────────────────────────────────
-    Process { id: ssProc; command: ["setsid", "-f",
-        Quickshell.env("HOME") + "/.config/hypr/scripts/screenshot.sh"] }
-    function takeScreenshot(){
-        sm.menuVisible = false
-        if (!ssProc.running) ssProc.running = true
-    }
-
     // ── Power/logout ──────────────────────────────────────────────────────
     Process { id: logoutProc; command:["bash","-c",Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh exit"] }
     Process { id: powerProc; property string _cmd:""; command:["bash","-c",powerProc._cmd] }
