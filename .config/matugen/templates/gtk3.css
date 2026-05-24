@@ -11,7 +11,7 @@
 @define-color accent_color {{colors.primary.default.hex}};
 @define-color accent_fg_color {{colors.on_secondary.default.hex}};
 @define-color accent_bg_color {{colors.primary.default.hex}};
-@define-color window_bg_color @on_secondary;
+@define-color window_bg_color alpha(@on_secondary, 1.00);
 @define-color window_fg_color @primary;
 @define-color view_bg_color @window_bg_color;
 @define-color view_fg_color @primary;
@@ -40,7 +40,7 @@
 @define-color thumbnail_fg_color @primary;
 @define-color shade_color rgba(0, 0, 6, 0.25);
 @define-color scrollbar_outline_color rgba(0, 0, 12, 0.95);
-@define-color popover_bg_color @window_bg_color;
+@define-color popover_bg_color @on_secondary;
 @define-color popover_fg_color @primary;
 @define-color popover_shade_color rgba(0, 0, 6, 0.25);
 

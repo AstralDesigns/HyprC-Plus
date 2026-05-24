@@ -161,4 +161,10 @@ fi
 echo "Config updated → wallpaper = $TARGET_STORED"
 
 # ── Trigger color regeneration ────────────────────────────────────────────────
-[[ -x "$INTEGRATION" ]] && nohup "$INTEGRATION" >/dev/null 2>&1 &
+if [[ -x "$INTEGRATION" ]] ;then
+    nohup "$INTEGRATION" >/dev/null 2>&1 && sleep 10 && nohup "$INTEGRATION" >/dev/null 2>&1 &
+else
+    pkill -f /usr/bin/bash "$INTEGRATION"
+    sleep 0.5
+    nohup "$INTEGRATION" >/dev/null 2>&1 && sleep 10 && nohup "$INTEGRATION" >/dev/null 2>&1 &
+fi

@@ -105,6 +105,7 @@ PanelWindow {
     // ── Hyprland slider real-number backing (used by CCSlider; seeded from
     //    hyprcandy-bar.conf [hyprland] on open, or Config.hyprDefault* if unset) ──
     property real _hyprOpacSlider:    -1   // -1 = not yet loaded from state file
+    property real _winBgAlpha:       -1   // -1 = not yet read from gtk template
     property int  _hyprBlurSzSlider:  -1
     property int  _hyprBlurPsSlider:  -1
     property int  _hyprGapsInSlider:  -1
@@ -270,6 +271,10 @@ PanelWindow {
         _weatherLocReader.running  = true
         _hyprStateReader.running   = true
         _kbLayoutReader.running    = true
+        _winBgAlphaReader.running  = true
+        // Seed from persisted value immediately; reader overrides only on first-ever launch
+        if (ccAppearanceSettings.winBgAlpha > 0)
+            ccWin._winBgAlpha = ccAppearanceSettings.winBgAlpha
     }
 
     // Read hyprland config values
@@ -511,6 +516,23 @@ PanelWindow {
                     ccWin._kbLayout = v
             }
         }
+    }
+
+    // Reads current alpha from gtk4 matugen template so the slider seeds correctly on open.
+    Process {
+        id: _winBgAlphaReader
+        command: ["bash", "-c",
+            "grep -oP '(?<=alpha\\(@on_secondary, )\\d+\\.?\\d*(?=\\))'" +
+            " \"$HOME/.config/matugen/templates/gtk4.css\" 2>/dev/null | head -1"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) {
+                const f = parseFloat(l.trim())
+                if (!isNaN(f)) ccWin._winBgAlpha = Math.round(f * 20) / 20
+            }
+        }
+        onExited: running = false
     }
 
     // ── Write one key=value into hyprcandy-bar.conf [hyprland] section ───────
@@ -842,6 +864,12 @@ PanelWindow {
         id: ccThemeSettings
         category: "cc-theme-v1"
         property string currentTheme: "scheme-content"
+    }
+    // ── Appearance persistence (window alpha) ─────────────────────────────────
+    Settings {
+        id: ccAppearanceSettings
+        category: "cc-appearance-v1"
+        property real winBgAlpha: 1.00
     }
     // ── HyprCandy+ licence persistence ───────────────────────────────────────
     Settings {
@@ -2390,7 +2418,15 @@ PanelWindow {
                                         onClicked: {
                                             ccWin._currentLayout = modelData.key
                                             _layoutProc.command = ["bash", "-c",
-                                                "hyprctl eval \"hl.config({ general = { layout = '" + modelData.key + "' } })\""]
+                                                // Persist to hyprviz.lua so the layout survives reload
+                                                "f=\"$HOME/.config/hypr/hyprviz.lua\";" +
+                                                "[ -f \"$f\" ] && sed -i" +
+                                                "  's/\\(layout[[:space:]]*=[[:space:]]*\\)\"[^\"]*\"/\\1\"" + modelData.key + "\"/' \"$f\";" +
+                                                // Apply immediately at runtime and reload so the
+                                                // persisted value in hyprviz.lua takes effect
+                                                "hyprctl keyword general:layout \"" + modelData.key + "\" 2>/dev/null;" +
+                                                "hyprctl reload"
+                                            ]
                                             _layoutProc.running = true
                                         }
                                     }
@@ -3188,6 +3224,52 @@ PanelWindow {
                                     }
                                 }
                             }
+
+                            // ── Window Background Alpha ────────────────────────────────────────
+                            // Patches alpha(@on_secondary, N.NN) in both GTK matugen templates.
+                            // Also derives the on_secondary RGB from the already-rendered
+                            // qt5ct/qt6ct colors/matugen.conf (position 10 = Window role) and
+                            // writes a matching rgba() into a window-alpha.qss stylesheet that
+                            // qt5ct and qt6ct load via their stylesheets= key — giving Qt apps
+                            // the same glass transparency without needing Darkly or KDE globals.
+                            CCSection { text: "GTK Background Alpha" }
+                            Text {
+                                Layout.fillWidth: true
+                                text: "GTK app window background color opacity via GTK colors. Use with Hyprland blur for a glass effect when direct color opacity is decreased independent of Hyprland opacity. Wait around 3 seconds before the next value change"
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                               Theme.cPrimary.b, 0.55)
+                                font.family: Config.labelFont; font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                            CCSlider {
+                                label: "Window Alpha"
+                                from: 0.10; to: 1.00; stepSize: 0.05; decimals: 2
+                                value: ccWin._winBgAlpha >= 0 ? ccWin._winBgAlpha : 1.00
+                                onMoved: function(v) {
+                                    ccWin._winBgAlpha = v
+                                    ccAppearanceSettings.winBgAlpha = v
+                                    const a = v.toFixed(2)
+                                    _winBgAlphaProc.command = ["bash", "-c",
+                                        // ── GTK matugen templates ─────────────────────────────
+                                        "for f in" +
+                                        " \"$HOME/.config/matugen/templates/gtk3.css\"" +
+                                        " \"$HOME/.config/matugen/templates/gtk4.css\"; do" +
+                                        "  [ -f \"$f\" ] && sed -i -E" +
+                                        "    \"s/alpha\\\\(@on_secondary, [0-9]+(\\\\.[0-9]+)?\\\\)/alpha(@on_secondary, " + a + ")/g\"" +
+                                        "  \"$f\";" +
+                                        "done;" +
+                                        // ── Trigger GTK color rebuild ─────────────────────────
+                                        "bash \"$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh\""
+                                    ]
+                                    _winBgAlphaProc.running = true
+                                }
+                            }
+                            Process {
+                                id: _winBgAlphaProc
+                                running: false
+                                onExited: running = false
+                            }
+
                             Item { height:10 }
                         }
                     }
