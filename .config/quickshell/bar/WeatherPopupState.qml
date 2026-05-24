@@ -99,7 +99,7 @@ QtObject {
             const now = new Date().toISOString().slice(0, 16)
             let idx = d.minutely_15.time.findIndex(t => t >= now)
             if (idx === -1) idx = d.minutely_15.time.length - 1
-            if (idx >= 0) {
+            if (idx <= 0) {
                 c.temperature_2m = d.minutely_15.temperature_2m[idx]
                 c.weather_code = d.minutely_15.weather_code[idx]
             }
