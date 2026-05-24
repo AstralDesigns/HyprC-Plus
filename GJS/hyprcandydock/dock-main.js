@@ -838,7 +838,7 @@ const HyprCandyDock = GObject.registerClass({
         // Right click - show settings menu
         const gesture = new Gtk.GestureClick();
         gesture.set_button(3); // Right click
-        gesture.connect('pressed', () => {
+        gesture.connect('released', () => {
             this._showStartMenu(btn);
         });
         btn.add_controller(gesture);
@@ -1096,7 +1096,7 @@ const HyprCandyDock = GObject.registerClass({
 
         const gesture = new Gtk.GestureClick();
         gesture.set_button(3);
-        gesture.connect('pressed', () => {
+        gesture.connect('released', () => {
             const freshClientData = this.daemon.getClientData();
             const freshData = freshClientData.find(d => d.className === data.className) || data;
             this._showContextMenu(freshData, btn);

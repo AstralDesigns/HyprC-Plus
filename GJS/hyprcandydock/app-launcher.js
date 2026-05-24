@@ -13953,7 +13953,7 @@ const EMOJI_ALL = [
             // ── Right-click on header → Rename / Delete group popover ────
             const headerRc = new Gtk.GestureClick();
             headerRc.set_button(3);
-            headerRc.connect('pressed', () => {
+            headerRc.connect('released', () => {
                 this._showGroupHeaderMenu(groupName, headerRow);
             });
             headerRow.add_controller(headerRc);
@@ -14009,7 +14009,7 @@ const EMOJI_ALL = [
         // ── Right-click → context menu ─────────────────────────────────
         const rc = new Gtk.GestureClick();
         rc.set_button(3);
-        rc.connect('pressed', () => this._showContextMenu(app, btn, groupName ?? null));
+        rc.connect('released', () => this._showContextMenu(app, btn, groupName ?? null));
         btn.add_controller(rc);
 
         // ── Drag source (so tiles can be dragged into group strips) ────

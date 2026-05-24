@@ -3235,7 +3235,7 @@ PanelWindow {
                             CCSection { text: "GTK Background Alpha" }
                             Text {
                                 Layout.fillWidth: true
-                                text: "GTK app window background color opacity via GTK colors. Use with Hyprland blur for a glass effect when direct color opacity is decreased independent of Hyprland opacity. Wait around 3 seconds before the next value change"
+                                text: "GTK app window background color opacity via GTK colors. Use with Hyprland blur for a glass effect when direct color opacity is decreased independent of Hyprland opacity. Wait around 5 seconds before the next value change"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                Theme.cPrimary.b, 0.55)
                                 font.family: Config.labelFont; font.pixelSize: 11
