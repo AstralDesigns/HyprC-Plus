@@ -925,23 +925,136 @@ const HyprCandyDock = GObject.registerClass({
         btn.connect('clicked', () => {
             if (_trashCount === 0) return;
 
-            try {
-                Gio.DBus.session.call(
-                    'org.gnome.Nautilus',
-                    '/org/gnome/Nautilus/FileOperations2',
-                    'org.gnome.Nautilus.FileOperations2',
-                    'EmptyTrash',
-                    new GLib.Variant('(ba{sv})', [true, {}]),
-                    null,
-                    Gio.DBusCallFlags.NONE,
-                    -1,
-                    null,
-                    (conn, res) => {
-                        try { conn.call_finish(res); }
-                        catch (e) { console.error('[dock] EmptyTrash D-Bus call failed:', e.message); }
-                    }
-                );
-            } catch (e) { console.error('[dock] EmptyTrash D-Bus error:', e.message); }
+            // ── Layer shell confirmation dialog ───────────────────────────────
+            // Single OVERLAY surface — no backdrop needed. Focus loss (clicking
+            // outside) is detected via notify::is-active and closes the dialog.
+            const itemWord = _trashCount === 1 ? 'item' : 'items';
+
+            // Dialog surface
+            const dlg = new Gtk.Window({ decorated: false, resizable: false });
+            Gtk4LayerShell.init_for_window(dlg);
+            Gtk4LayerShell.set_layer(dlg, Gtk4LayerShell.Layer.OVERLAY);
+            Gtk4LayerShell.set_keyboard_mode(dlg, Gtk4LayerShell.KeyboardMode.ON_DEMAND);
+
+            const closeBoth = () => dlg.close();
+            Gtk4LayerShell.set_exclusive_zone(dlg, -1);
+            Gtk4LayerShell.set_namespace(dlg, 'hyprcandy-trash-dialog');
+            // No anchors → compositor centers the surface on screen
+            dlg.set_default_size(340, -1);
+
+            // CSS — matches existing popover palette
+            const dlgCss = new Gtk.CssProvider();
+            dlgCss.load_from_data(`
+                window.background {
+                    background-color: @on_secondary;
+                    border-radius: 14px;
+                    border: 1px solid alpha(@primary, 0.15);
+                    box-shadow: none;
+                }
+                .dlg-title {
+                    font-size: 13px;
+                    font-weight: bold;
+                    color: @primary;
+                }
+                .dlg-body {
+                    font-size: 12px;
+                    color: alpha(@primary, 0.75);
+                }
+                .dlg-btn {
+                    border-radius: 8px;
+                    padding: 6px 18px;
+                    font-size: 12px;
+                    min-width: 80px;
+                }
+                .dlg-btn-cancel {
+                    background-color: alpha(@primary, 0.10);
+                    color: @primary;
+                }
+                .dlg-btn-cancel:hover { background-color: alpha(@primary, 0.18); }
+                .dlg-btn-confirm {
+                    background-color: @error;
+                    color: @on_error;
+                }
+                .dlg-btn-confirm:hover { background-color: alpha(@error, 0.80); }
+            `, -1);
+            dlg.get_style_context().add_provider(
+                dlgCss, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+            // Layout
+            const root = new Gtk.Box({
+                orientation: Gtk.Orientation.VERTICAL,
+                spacing: 16,
+                margin_top: 22, margin_bottom: 18,
+                margin_start: 24, margin_end: 24,
+            });
+
+            const title = new Gtk.Label({ label: '󰩹  Empty Trash?' });
+            title.add_css_class('dlg-title');
+            title.set_halign(Gtk.Align.START);
+
+            const body = new Gtk.Label({
+                label: `Permanently delete ${_trashCount} ${itemWord}?\nThis action cannot be undone.`,
+                wrap: true,
+            });
+            body.add_css_class('dlg-body');
+            body.set_halign(Gtk.Align.START);
+
+            const btnRow = new Gtk.Box({
+                orientation: Gtk.Orientation.HORIZONTAL,
+                spacing: 10,
+                halign: Gtk.Align.END,
+            });
+
+            const cancelBtn = new Gtk.Button({ label: 'Cancel' });
+            cancelBtn.add_css_class('dlg-btn');
+            cancelBtn.add_css_class('dlg-btn-cancel');
+            cancelBtn.connect('clicked', () => closeBoth());
+
+            const confirmBtn = new Gtk.Button({ label: 'Empty Trash' });
+            confirmBtn.add_css_class('dlg-btn');
+            confirmBtn.add_css_class('dlg-btn-confirm');
+            confirmBtn.connect('clicked', () => {
+                closeBoth();
+                try {
+                    Gio.DBus.session.call(
+                        'org.gnome.Nautilus',
+                        '/org/gnome/Nautilus/FileOperations2',
+                        'org.gnome.Nautilus.FileOperations2',
+                        'EmptyTrash',
+                        new GLib.Variant('(ba{sv})', [false, {}]),
+                        null,
+                        Gio.DBusCallFlags.NONE,
+                        -1,
+                        null,
+                        (conn, res) => {
+                            try { conn.call_finish(res); }
+                            catch (e) { console.error('[dock] EmptyTrash failed:', e.message); }
+                        }
+                    );
+                } catch (e) { console.error('[dock] EmptyTrash error:', e.message); }
+            });
+
+            // Escape to cancel
+            const escCtrl = new Gtk.EventControllerKey();
+            escCtrl.connect('key-pressed', (_c, keyval) => {
+                if (keyval === 65307) { closeBoth(); return true; }
+                return false;
+            });
+            dlg.add_controller(escCtrl);
+
+            btnRow.append(cancelBtn);
+            btnRow.append(confirmBtn);
+            root.append(title);
+            root.append(body);
+            root.append(btnRow);
+            dlg.set_child(root);
+
+            // Close on focus loss (click outside)
+            dlg.connect('notify::is-active', () => {
+                if (!dlg.is_active()) dlg.close();
+            });
+
+            dlg.present();
         });
 
         this.mainBox.append(btn);

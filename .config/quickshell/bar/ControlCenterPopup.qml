@@ -2282,14 +2282,31 @@ PanelWindow {
                                                 _dockRectBgStyle = v
                                                 // Write rectBgStyle and borderWidth in one sed pass so the dock
                                                 // reloads once with both values already in place — no stagger.
-                                                // Gradient → border 0; glass → restore exact _dockBorderWVal.
-                                                const bw = (v === "gradient") ? "0" : _dockBorderWVal
-                                                _dockRectBgWrite.command = ["bash", "-c",
-                                                    "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\"; " +
-                                                    "sed -i \"s/rectBgStyle: '[^']*'/rectBgStyle: '" + v + "'/;" +
-                                                             "s/borderWidth: [0-9]*/borderWidth: " + bw + "/\" \"$f\" && " +
-                                                    "pkill -SIGUSR2 -f 'gjs dock-main.js'"
-                                                ]
+                                                // Gradient → border 0.
+                                                // Glass → read from dock-border-w.state (written by the Border W
+                                                // slider on every non-zero move) so a wallpaper change that resets
+                                                // config.js to its template defaults doesn't leave the border at
+                                                // zero when switching back to glass. Falls back to _dockBorderWVal
+                                                // if the state file doesn't exist yet.
+                                                if (v === "gradient") {
+                                                    _dockRectBgWrite.command = ["bash", "-c",
+                                                        "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\"; " +
+                                                        "sed -i \"s/rectBgStyle: '[^']*'/rectBgStyle: 'gradient'/;" +
+                                                                 "s/borderWidth: [0-9]*/borderWidth: 0/\" \"$f\" && " +
+                                                        "pkill -SIGUSR2 -f 'gjs dock-main.js'"
+                                                    ]
+                                                } else {
+                                                    const fallback = _dockBorderWVal
+                                                    _dockRectBgWrite.command = ["bash", "-c",
+                                                        "sf=\"$HOME/.hyprcandy/GJS/hyprcandydock/dock-border-w.state\";" +
+                                                        "bw=$(cat \"$sf\" 2>/dev/null | tr -dc '0-9' | head -c4);" +
+                                                        "[ -z \"$bw\" ] && bw='" + fallback + "';" +
+                                                        "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\"; " +
+                                                        "sed -i \"s/rectBgStyle: '[^']*'/rectBgStyle: 'glass'/;" +
+                                                                 "s/borderWidth: [0-9]*/borderWidth: $bw/\" \"$f\" && " +
+                                                        "pkill -SIGUSR2 -f 'gjs dock-main.js'"
+                                                    ]
+                                                }
                                                 _dockRectBgWrite.running = true
                                             }
                                         }
@@ -3406,8 +3423,17 @@ PanelWindow {
                                     _dockBorderWVal = v.toString()
                                     _dockWrite.command = [scriptDir + "/dock-set.sh", "borderWidth", v.toString()]
                                     _dockWrite.running = true
+                                    // Always persist to state file — including 0 — so the restore
+                                    // on glass switch reflects the user's actual last-set value.
+                                    _dockBorderWStateWrite.command = ["bash", "-c",
+                                        "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/dock-border-w.state\";" +
+                                        "mkdir -p \"$(dirname \"$f\")\";" +
+                                        "printf '%s\\n' '" + v.toString() + "' > \"$f\""
+                                    ]
+                                    _dockBorderWStateWrite.running = true
                                 }
                             }
+                            Process { id: _dockBorderWStateWrite; running: false; onExited: running = false }
                             CCSlider {
                                 label: "Border R"
                                 from: 0; to: 100; stepSize: 1
