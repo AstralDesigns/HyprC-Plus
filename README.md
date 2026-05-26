@@ -1,1 +1,1 @@
-# HyprC-Plus
+# HC+
