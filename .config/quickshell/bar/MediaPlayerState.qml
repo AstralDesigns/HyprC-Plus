@@ -43,8 +43,10 @@ Item {
                 const url  = p.length > 1 ? p[1].trim() : ""
                 if (url !== root.artUrl) {
                     root.artUrl  = url
-                    root.artPath = ""
-                    if (url) artProc.launch(url)
+                    // Don't clear artPath immediately to avoid flickering; 
+                    // only clear if we have no URL at all.
+                    if (!url) root.artPath = ""
+                    else artProc.launch(url)
                 }
                 root.title  = p.length > 2 ? (p[2].trim() || "") : ""
                 root.artist = p.length > 3 ? (p[3].trim() || "") : ""
@@ -66,6 +68,11 @@ Item {
             const r   = Math.round(s / 2)
             const src = url.startsWith("file://") ? url.substring(7) : url
             const esc = src.replace(/'/g, "'\\''")
+            // Use a unique destination per URL to avoid race conditions and 
+            // ensure Qt sees a fresh file path.
+            const hash = Math.abs(url.split('').reduce((a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0)).toString(16)
+            _dst = "/tmp/qs_bar_art_" + hash + ".png"
+            
             _cmd = "SRC='" + esc + "'; DST='" + _dst + "'; S=" + s + "; R=" + r + "; " +
                 "[ -f \"$SRC\" ] || { curl -sf --max-time 8 \"$SRC\" -o /tmp/qs_art_raw.png 2>/dev/null && SRC=/tmp/qs_art_raw.png; }; " +
                 "magick \"$SRC\" -resize ${S}x${S}^ -gravity center -extent ${S}x${S} " +
@@ -75,7 +82,7 @@ Item {
             if (!running) running = true
         }
         onExited: function(code) {
-            if (code === 0) root.artPath = artProc._dst + "?" + Date.now()
+            if (code === 0) root.artPath = artProc._dst
         }
     }
 

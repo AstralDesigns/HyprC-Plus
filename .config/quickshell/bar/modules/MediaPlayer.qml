@@ -78,7 +78,7 @@ Item {
                         // Placeholder: spinning music-note glyph (visible when no art)
                         Text {
                             id: discGlyph
-                            visible: MediaPlayerState.artPath === ""
+                            visible: MediaPlayerState.artPath === "" || artImage.status !== Image.Ready
                             anchors.centerIn: parent
                             text: "󰎆"
                             color: Config.glyphColor

@@ -125,12 +125,15 @@ Item {
                 : h.findIndex(function(x) { return x.groupKey === n.groupKey })
             if (hi >= 0) {
                 const updated = Object.assign({}, h[hi], {
-                    summary:   n.summary,
-                    body:      n.body,
-                    iconPath:  n.iconPath || h[hi].iconPath,
-                    icon:      n.icon,
-                    timestamp: n.timestamp,
-                    count:     isMedia ? (h[hi].count || 1) : (h[hi].count || 1) + 1
+                    appName:      isMedia ? n.appName : h[hi].appName,
+                    desktopEntry: isMedia ? n.desktopEntry : h[hi].desktopEntry,
+                    source_url:   isMedia ? n.source_url : h[hi].source_url,
+                    summary:      n.summary,
+                    body:         n.body,
+                    iconPath:     n.iconPath || h[hi].iconPath,
+                    icon:         n.icon,
+                    timestamp:    n.timestamp,
+                    count:        isMedia ? (h[hi].count || 1) : (h[hi].count || 1) + 1
                 })
                 if (isMedia) {
                     h[hi] = updated

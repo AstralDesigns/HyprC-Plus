@@ -254,8 +254,8 @@ def _fetch_art_circle(art_url: str) -> str:
         src_path = art_url[7:]
     elif art_url.startswith("http"):
         try:
-            import urllib.request
-            urllib.request.urlretrieve(art_url, _art_tmp_raw)
+            # Use curl for better timeout and redirect handling
+            subprocess.run(["curl", "-sfL", "--max-time", "10", art_url, "-o", _art_tmp_raw], timeout=12)
             src_path = _art_tmp_raw
         except Exception:
             return ""
