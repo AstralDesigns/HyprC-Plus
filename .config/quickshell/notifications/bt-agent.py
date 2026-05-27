@@ -499,6 +499,31 @@ def main():
     session_bus = dbus.SessionBus()
 
     bt_agent = QuickshellBTAgent(system_bus, AGENT_PATH)
+    
+    # System-wide device connection monitor
+    def device_prop_changed(interface, changed, invalidated, path):
+        if interface != "org.bluez.Device1": return
+        if "Connected" in changed:
+            connected = bool(changed["Connected"])
+            # Extract MAC and name
+            try:
+                part = path.split("/")[-1]
+                mac = part.replace("dev_","").replace("_",":")
+                # Try to get real name from props
+                try:
+                    dev_obj = system_bus.get_object(BLUEZ_SERVICE, path)
+                    props = dbus.Interface(dev_obj, "org.freedesktop.DBus.Properties")
+                    name = str(props.Get("org.bluez.Device1", "Name"))
+                except:
+                    name = mac
+                emit({"type": "device_connection", "mac": mac, "name": name, "connected": connected})
+            except: pass
+
+    system_bus.add_signal_receiver(device_prop_changed,
+                                   dbus_interface="org.freedesktop.DBus.Properties",
+                                   signal_name="PropertiesChanged",
+                                   path_keyword="path")
+
     try:
         mgr = dbus.Interface(system_bus.get_object(BLUEZ_SERVICE, MANAGER_PATH), MANAGER_IFACE)
         try: mgr.UnregisterAgent(dbus.ObjectPath(AGENT_PATH))

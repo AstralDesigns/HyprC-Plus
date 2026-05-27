@@ -419,6 +419,7 @@ Item {
     // Listens to pactl/brightnessctl events via a bash script that outputs JSON
     Process { id: sysEventProc
         command: ["bash", "-c",
+            "sleep 1.5; " +
             "pactl subscribe | while read -r line; do " +
             "  if echo \"$line\" | grep -q \"'change' on sink\"; then " +
             "    VOL=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -Po '\\d+(?=%)' | head -1); " +
@@ -577,6 +578,14 @@ Item {
             ns.addNotification({ summary: "Bluetooth send failed",
                 body: (ev.filename || ev.mac || "file") + (ev.msg ? ": " + ev.msg : ""),
                 icon: "bluetooth", urgency: 1, category: "bt" })
+            break
+        case "device_connection":
+            ns.addNotification({
+                summary: "Bluetooth",
+                body: ev.name + (ev.connected ? " connected" : " disconnected"),
+                icon: ev.connected ? "bluetooth-online" : "bluetooth-offline",
+                urgency: 1, category: "bt"
+            })
             break
         case "auto_accept":
             ns.btReceiving = ev.enabled === true

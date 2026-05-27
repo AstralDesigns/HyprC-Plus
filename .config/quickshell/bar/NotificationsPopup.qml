@@ -170,7 +170,7 @@ Item {
                                     Rectangle { id:toastArtMask; anchors.fill:parent; radius:width/2; color:"white"; opacity:0; layer.enabled:true }
                                     Image { id:toastIcImg; anchors.fill:parent
                                         source: notif.iconPath ? "file://"+notif.iconPath : ""
-                                        fillMode:Image.PreserveAspectCrop; smooth:true; mipmap:true } }
+                                        fillMode:Image.PreserveAspectCrop; smooth:true; mipmap:true; cache:false } }
                                 // Fallback glyph
                                 Text { anchors.centerIn:parent; visible:!toastIcImg.visible
                                     text: NotificationsState.iconGlyph(notif)
@@ -546,7 +546,7 @@ Item {
                                         Image{id:hcIcImg
                                             anchors{fill:parent;margins:notif.category==="media.playing"?0:1}
                                             source:{const ic=notif.icon||"";if(ic.startsWith("/")||ic.startsWith("file://"))return"";return notif.iconPath?"file://"+notif.iconPath:""}
-                                            fillMode:notif.category==="media.playing"?Image.PreserveAspectCrop:Image.PreserveAspectFit;smooth:true;mipmap:true;visible:status===Image.Ready
+                                            fillMode:notif.category==="media.playing"?Image.PreserveAspectCrop:Image.PreserveAspectFit;smooth:true;mipmap:true;visible:status===Image.Ready;cache:false
                                             layer.enabled:notif.category==="media.playing"
                                             layer.effect:MultiEffect{maskEnabled:true;maskSource:hcArtMask;maskThresholdMin:0.5;maskSpreadAtMin:1.0}
                                             Rectangle{id:hcArtMask;anchors.fill:parent;radius:width/2;color:"white";opacity:0;layer.enabled:true}}

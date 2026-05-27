@@ -98,7 +98,7 @@ Item {
                             anchors.fill: parent
                             visible: MediaPlayerState.artPath !== ""
                             source: MediaPlayerState.artPath !== ""
-                                ? ("file://" + MediaPlayerState.artPath.split("?")[0])
+                                ? ("file://" + MediaPlayerState.artPath)
                                 : ""
                             fillMode: Image.PreserveAspectCrop
                             smooth: true; cache: false; asynchronous: true

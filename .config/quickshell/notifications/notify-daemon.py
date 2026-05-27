@@ -246,7 +246,8 @@ def _fetch_art_circle(art_url: str) -> str:
         return ""
     import hashlib
     art_hash  = hashlib.md5(art_url.encode()).hexdigest()[:10]
-    dest_path = f"/tmp/qs_media_art_{art_hash}.png"
+    # Include timestamp in filename for robust cache-busting
+    dest_path = f"/tmp/qs_media_art_{art_hash}_{int(time.time())}.png"
 
     src_path = art_url
     if art_url.startswith("file://"):
