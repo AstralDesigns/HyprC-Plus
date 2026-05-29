@@ -4108,7 +4108,7 @@ PanelWindow {
                             }
                             Process {
                                 id: _openGumroad
-                                command: ["xdg-open", "https://mirukai.gumroad.com/l/mmnrfq"]
+                                command: ["xdg-open", "https://mirukai.gumroad.com/l/cxsyj"]
                                 running: false
                                 onExited: running = false
                             }
