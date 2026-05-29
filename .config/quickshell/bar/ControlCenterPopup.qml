@@ -1171,8 +1171,8 @@ PanelWindow {
                 Rectangle {
                     anchors.fill: parent
                     radius: panel.radius
-                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                                   Theme.cOnSecondary.b, 0.55)
+                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g,
+                                                       Theme.cBackground.b, 0.80)
                 }
 
                 ColumnLayout {
@@ -5806,8 +5806,8 @@ PanelWindow {
 
                                 Rectangle {
                                     anchors.fill: parent; radius: 10
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                   Theme.cInversePrimary.b, 0.18)
+                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                   			Theme.cOnSecondary.b, 0.50)
                                     border.width: wpItemHov.containsMouse || wpThumbItem._isFocused ? 2 : 1
                                     border.color: wpItemHov.containsMouse || wpThumbItem._isFocused
                                         ? Theme.cPrimary
@@ -5828,8 +5828,8 @@ PanelWindow {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: 10
-                                        color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g,
-                                                       Theme.cBackground.b, 0.5)
+                                        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                   Theme.cInversePrimary.b, 0.18)
                                         visible: parent.children[0].status !== Image.Ready
                                               || wpThumbItem.thumbSrc === ""
                                         Text {
