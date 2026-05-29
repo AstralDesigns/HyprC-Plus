@@ -11,7 +11,7 @@
 @define-color accent_color {{colors.primary.default.hex}};
 @define-color accent_fg_color {{colors.on_secondary.default.hex}};
 @define-color accent_bg_color {{colors.primary.default.hex}};
-@define-color window_bg_color alpha(@on_secondary, 0.90);
+@define-color window_bg_color alpha(@background, 0.90);
 @define-color window_fg_color @primary;
 @define-color view_bg_color @window_bg_color;
 @define-color view_fg_color @primary;
