@@ -9,9 +9,9 @@
 @define-color error_bg_color @red_4;
 @define-color error_fg_color @primary;
 @define-color accent_color {{colors.primary.default.hex}};
-@define-color accent_fg_color {{colors.on_secondary.default.hex}};
+@define-color accent_fg_color {{colors.background.default.hex}};
 @define-color accent_bg_color {{colors.primary.default.hex}};
-@define-color window_bg_color alpha(@background, 0.90);
+@define-color window_bg_color alpha(@on_secondary, 0.90);
 @define-color window_fg_color @primary;
 @define-color view_bg_color @window_bg_color;
 @define-color view_fg_color @primary;
@@ -34,7 +34,7 @@
 @define-color card_bg_color @window_bg_color;
 @define-color card_fg_color @primary;
 @define-color card_shade_color rgba(0, 0, 6, 0.36);
-@define-color dialog_bg_color @on_secondary;
+@define-color dialog_bg_color @background;
 @define-color dialog_fg_color @primary;
 @define-color thumbnail_bg_color @window_bg_color;
 @define-color thumbnail_fg_color @primary;
@@ -46,7 +46,7 @@
 
 /* More customizations */
 
-windowcontrols > button > image { /* GTK4 */
+windowcontrols>button>image { /* GTK4 */
   color: @inverse_primary;
   min-width: 1px;
   min-height: 1px;
@@ -80,25 +80,25 @@ button.titlebutton.close:hover,
 }
 
 button.titlebutton.maximize,
-  windowcontrols > button.maximize > image {
+windowcontrols>button.maximize>image {
   background-color: #33c848;
   border: 1px solid #3e9948;
 }
 
 button.titlebutton.maximize:hover,
-  windowcontrols > button.maximize:hover > image {
+windowcontrols>button.maximize:hover>image {
   color: #0b650d;
   opacity: 0.5;
 }
 
 button.titlebutton.minimize,
-  windowcontrols > button.minimize > image {
+windowcontrols>button.minimize>image {
   background-color: #ffba40;
   border: 1px solid #dd9d30;
 }
 
 button.titlebutton.minimize:hover,
-  windowcontrols > button.minimize:hover > image {
+windowcontrols>button.minimize:hover>image {
   color: #9a5711;
   opacity: 0.5;
 }
@@ -139,18 +139,18 @@ tooltip {
 }
 
 tooltip.background {
-  background-color: @on_secondary;
+  background-color: @background;
   background-clip: padding-box;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 tooltip decoration {
-  background-color: @on_secondary;
+  background-color: @background;
 }
 
 tooltip * {
   padding: 2px;
-  background-color: @on_secondary;
+  background-color: @background;
   color: @primary;
 }
 
@@ -173,7 +173,7 @@ messagedialog > box > box {
 .navigation-sidebar:backdrop,
 placessidebar,
 placessidebar:backdrop {
-  background: alpha(@inverse_primary, 0.10); }
+  background: alpha(@background, 0.10); }
 .sidebar-pane .top-bar, .sidebar-pane .top-bar headerbar,
 .sidebar .top-bar,
 .sidebar .top-bar headerbar,
@@ -181,4 +181,4 @@ placessidebar:backdrop {
 .navigation-sidebar .top-bar headerbar,
 placessidebar .top-bar,
 placessidebar .top-bar headerbar {
-  background: alpha(@inverse_primary, 0.10); }
+  background: alpha(@background, 0.10); }
