@@ -58,7 +58,7 @@ Item {
                 // Animate width only on active↔inactive transitions, not on art changes
                 implicitWidth: MediaPlayerState.active
                     ? (discContainer.implicitWidth + Config.modPadH + ctlRow.implicitWidth + Config.modPadH)
-                    : 0
+                    : (discContainer.implicitWidth + Config.modPadH + ctlRow.implicitWidth + Config.modPadH) //0
                 implicitHeight: Config.moduleHeight
                 clip: true
                 Behavior on implicitWidth { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
