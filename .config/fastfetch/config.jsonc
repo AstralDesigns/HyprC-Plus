@@ -25,7 +25,7 @@
             "format": " {host-name}"
         },
         {
-            "key": "│ {#32}󰇄 device  {#keys}││ ",
+            "key": "│ {#37}󰇄 device  {#keys}││ ",
             "type": "host",
             "format": "{5} {2}"
         },
@@ -80,11 +80,11 @@
             "format": "{days} days"
         },
         {
-            "key": "│ {#35}󰅐 uptime  {#keys}││ ",
+            "key": "│ {#36}󰅐 uptime  {#keys}││ ",
             "type": "uptime"
         },
         {
-            "key": "│ {#36}󰍛 cpu     {#keys}││ ",
+            "key": "│ {#37}󰍛 cpu     {#keys}││ ",
             "type": "cpu",
             "showPeCoreCount": true
         },
