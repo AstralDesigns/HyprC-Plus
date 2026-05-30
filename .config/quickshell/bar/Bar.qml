@@ -244,8 +244,8 @@ PanelWindow {
         }
         color:        Config.barMode === "bar" ? Theme.blurBackground : "transparent"
         border.color: Config.barMode === "bar"
-            ? Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g,
-                      Theme.cOnPrimaryFixedVariant.b, Config.barBorderAlpha)
+            ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                      Theme.cOnSecondary.b, Config.barBorderAlpha)
             : "transparent"
         border.width: Config.barMode === "bar" ? Config.barBorderWidth : 0
         // tri mode uses its own three sub-bar rectangles; barBg is invisible
@@ -345,8 +345,8 @@ PanelWindow {
                 opacity: isl._bgOpacity
                 gradient: Gradient {
                     orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: Theme.cOnSecondary }
-                    GradientStop { position: 1.0; color: Theme.cScrim }
+                    GradientStop { position: 0.0; color: Theme.cOnPrimaryFixedVariant }
+                    GradientStop { position: 1.0; color: Theme.cSurface }
                 }
                 Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
             }
@@ -405,14 +405,6 @@ PanelWindow {
             Island { bgType: "workspace"; visible_: Config.showWorkspaces; Modules.Workspaces {} }
 
             Island {
-                bgType: "leftgroup"
-                visible_: Config.showNotifications || Config.showWallpaper || Config.showOverview
-                Modules.Notifications { visible: Config.showNotifications }
-                Modules.WallpaperBtn  { visible: Config.showWallpaper }
-                Modules.OverviewBtn   { visible: Config.showOverview }
-            }
-
-            Island {
                 bgType: "media"
                 visible_: Config.showMediaPlayer
                 Modules.MediaPlayer {
@@ -420,6 +412,14 @@ PanelWindow {
                     mediaMaxW: barLayout.mediaMaxWidth
                     property bool mediaActive: MediaPlayerState.active
                 }
+            }
+            
+            Island {
+                bgType: "leftgroup"
+                visible_: Config.showNotifications || Config.showWallpaper || Config.showOverview
+                Modules.Notifications { visible: Config.showNotifications }
+                Modules.WallpaperBtn  { visible: Config.showWallpaper }
+                Modules.OverviewBtn   { visible: Config.showOverview }
             }
         }
 
@@ -483,9 +483,9 @@ PanelWindow {
             radius:        Config.barRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
-            border.color:  Qt.rgba(Theme.cOnPrimaryFixedVariant.r,
-                                   Theme.cOnPrimaryFixedVariant.g,
-                                   Theme.cOnPrimaryFixedVariant.b,
+            border.color:  Qt.rgba(Theme.cOnSecondary.r,
+                                   Theme.cOnSecondary.g,
+                                   Theme.cOnSecondary.b,
                                    Config.barBorderAlpha)
             clip: false
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
@@ -513,13 +513,6 @@ PanelWindow {
 
                 Island { bgType: "workspace"; visible_: Config.showWorkspaces; Modules.Workspaces {} }
                 Island {
-                    bgType: "leftgroup"
-                    visible_: Config.showNotifications || Config.showWallpaper || Config.showOverview
-                    Modules.Notifications { visible: Config.showNotifications }
-                    Modules.WallpaperBtn  { visible: Config.showWallpaper }
-                    Modules.OverviewBtn   { visible: Config.showOverview }
-                }
-                Island {
                     bgType: "media"
                     visible_: Config.showMediaPlayer
                     Modules.MediaPlayer {
@@ -533,6 +526,13 @@ PanelWindow {
                             return Math.max(0, triLeft.width + available - (Config.barEdgePaddingLeft + Config.barEdgePaddingRight + Config.islandSpacing * 2))
                         }
                     }
+                }
+                Island {
+                    bgType: "leftgroup"
+                    visible_: Config.showNotifications || Config.showWallpaper || Config.showOverview
+                    Modules.Notifications { visible: Config.showNotifications }
+                    Modules.WallpaperBtn  { visible: Config.showWallpaper }
+                    Modules.OverviewBtn   { visible: Config.showOverview }
                 }
             }
         }
@@ -552,9 +552,9 @@ PanelWindow {
             radius:        Config.barRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
-            border.color:  Qt.rgba(Theme.cOnPrimaryFixedVariant.r,
-                                   Theme.cOnPrimaryFixedVariant.g,
-                                   Theme.cOnPrimaryFixedVariant.b,
+            border.color:  Qt.rgba(Theme.cOnSecondary.r,
+                                   Theme.cOnSecondary.g,
+                                   Theme.cOnSecondary.b,
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
@@ -608,9 +608,9 @@ PanelWindow {
             radius:        Config.barRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
-            border.color:  Qt.rgba(Theme.cOnPrimaryFixedVariant.r,
-                                   Theme.cOnPrimaryFixedVariant.g,
-                                   Theme.cOnPrimaryFixedVariant.b,
+            border.color:  Qt.rgba(Theme.cOnSecondary.r,
+                                   Theme.cOnSecondary.g,
+                                   Theme.cOnSecondary.b,
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 

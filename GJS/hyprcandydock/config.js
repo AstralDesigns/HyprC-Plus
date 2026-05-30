@@ -62,7 +62,7 @@ var DockConfig = {
     rectBgStyle: 'glass',          // @HCD:rectBgStyle
 
     // ── Border ────────────────────────────────────────────────────────────
-    borderWidth: 1,                // @HCD:borderWidth
+    borderWidth: 2,                // @HCD:borderWidth
     borderRadius: 20,              // @HCD:borderRadius
 
     // ── External margins (dock edge ↔ screen / window edge) ──────────────
@@ -96,7 +96,7 @@ var DockConfig = {
     // from the base config above.
     //
     // Example: if you want a thicker border for left dock:
-    //   positionOverrides: { left: { borderWidth: 1 } }
+    //   positionOverrides: { left: { borderWidth: 2 } }
     positionOverrides: {
         left: {
             marginLeft:   6,   // screen edge gap

@@ -31,7 +31,7 @@ Item {
 
         Text {
             text: WeatherPopupState.icon
-            color: Config.glyphColor
+            color: Config.batteryIconColor
             font.family: Config.fontFamily
             font.pixelSize: Config.infoGlyphSize
             font.weight: Config.fontWeight

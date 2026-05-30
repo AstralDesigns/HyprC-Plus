@@ -192,7 +192,7 @@ Item {
                                 visible: appIcon.status !== Image.Ready
                                 text:    ""
                                 font.pixelSize: Config.desktopIconSize * 0.6
-                                color:   Theme.cPrimary
+                                color:   Theme.cScrim
                             }
                         }
 
@@ -213,7 +213,7 @@ Item {
                                 width:            parent.width - 10
                                 text:             iconItem._name
                                 font.pixelSize:   Config.desktopLabelSize
-                                color:            Theme.cPrimary
+                                color:            Theme.cScrim
                                 elide:            Text.ElideRight
                                 maximumLineCount: 1
                                 horizontalAlignment: Text.AlignHCenter

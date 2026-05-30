@@ -25,8 +25,8 @@ QtObject {
 
     // ── File paths ────────────────────────────────────────────────────────
     readonly property string _pinnedLocFile: Quickshell.env("HOME") + "/.config/hyprcandy/weather-location.conf"
-    readonly property string _locationCache: "/tmp/waybar-weather-ipinfo.json"
-    readonly property string _weatherCache:  "/tmp/astal-weather-cache.json"
+    readonly property string _locationCache: Quickshell.env("HOME") + "/.config/hyprcandy/waybar-weather-ipinfo.json"
+    readonly property string _weatherCache:  Quickshell.env("HOME") + "/.config/hyprcandy/astal-weather-cache.json"
 
     // ── Location + unit state ─────────────────────────────────────────────
     property bool   _metric:   true

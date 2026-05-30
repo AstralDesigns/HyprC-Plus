@@ -445,7 +445,7 @@ window.hyprcandy-launcher {
    No padding here — the border sits flush against the SearchEntry.       */
 
 .search-frame {
-    background-color: @blur_background;
+    background-color: @blur_background8;
     border-radius: ${sr}px;
     border-style: solid;
     border-width: ${ib}px;
@@ -455,7 +455,7 @@ window.hyprcandy-launcher {
 }
 
 .list-frame {
-    background-color: @blur_background;
+    background-color: @blur_background8;
     border-radius: ${lr}px;
     border-style: solid;
     border-width: ${ib}px;
@@ -730,9 +730,9 @@ window.hyprcandy-group-dialog {
    pillWrap margin-start: 2px  → 2px from the list-frame left inner edge.
    pillWrap margin-end:   2px  → 2px gap between pill and stack content.  */
 .tab-pill {
-    background-color: alpha(@inverse_primary, 0.45);
+    background-color: alpha(@primary_fixed_dim, 0.45);
     border-radius: 30px;
-    border: 1px solid alpha(@on_primary_fixed_variant, 1.00);
+    border: 1px solid alpha(@scrim, 1.00);
     padding: 1px 0;
     min-width: 44px;
     max-width: 44px;
@@ -755,11 +755,11 @@ window.hyprcandy-group-dialog {
 }
 
 .tab-btn:hover {
-    background-color: alpha(@primary, 0.12);
+    background-color: alpha(@on_secondary, 0.4);
 }
 
 .tab-btn.active {
-    background-color: alpha(@on_secondary, 0.4);
+    background-color: alpha(@on_secondary, 0.8);
 }
 
 .tab-btn:active {

@@ -25,6 +25,7 @@ QtObject {
     property string _primaryContainer:          "#346985"
     property string _onPrimaryContainer:        "#ffffff"
     property string _secondary:                 "#aec4d2"
+    property string _secondaryFixed:            "#dbe0e3"
     property string _onSecondary:               "#091218"
     property string _secondaryContainer:        "#455763"
     property string _onSecondaryContainer:      "#ffffff"
@@ -50,6 +51,7 @@ QtObject {
     property string _onError:                   "#160000"
     property string _tertiary:                  "#e0b3eb"
     property string _tertiaryContainer:         "#7d5a88"
+    property string _tertiaryFixedDim:          "#dcb9ab"
     property string _onTertiary:                "#230f2b"
     property string _onTertiaryContainer:       "#f7d8ff"
     property string _primaryFixed:              "#c6e7ff"
@@ -64,6 +66,7 @@ QtObject {
     readonly property color cPrimaryContainer:     Qt.color(_primaryContainer)
     readonly property color cOnPrimaryContainer:   Qt.color(_onPrimaryContainer)
     readonly property color cSecondary:            Qt.color(_secondary)
+    readonly property color cSecondaryFixed:       Qt.color(_secondaryFixed)
     readonly property color cOnSecondary:          Qt.color(_onSecondary)
     readonly property color cSecondaryContainer:   Qt.color(_secondaryContainer)
     readonly property color cOnSecondaryContainer: Qt.color(_onSecondaryContainer)
@@ -88,6 +91,7 @@ QtObject {
     readonly property color cErrContainer:         Qt.color(_errorContainer)
     readonly property color cTertiary:             Qt.color(_tertiary)
     readonly property color cTertiaryContainer:    Qt.color(_tertiaryContainer)
+    readonly property color cTertiaryFixedDim:    Qt.color(_tertiaryFixedDim)
     readonly property color cOnTertiaryContainer:   Qt.color(_onTertiaryContainer)
     readonly property color cPrimaryFixed:         Qt.color(_primaryFixed)
     readonly property color cPrimaryFixedDim:      Qt.color(_primaryFixedDim)
@@ -95,15 +99,15 @@ QtObject {
     readonly property color cOnPrimaryFixedVariant: Qt.color(_onPrimaryFixedVariant)
 
     // ── Semantic composites ────────────────────────────────────────────────
-    // blur_background: matches waybar colors.css  alpha(rgba(bg), 0.4)
+    // blur_background: matches waybar colors.css  alpha(rgba(bg), 0.35)
     readonly property color blurBackground: Qt.rgba(
-        Qt.color(_onSecondary).r, Qt.color(_onSecondary).g, Qt.color(_onSecondary).b, 0.45)
+        Qt.color(_inversePrimary).r, Qt.color(_inversePrimary).g, Qt.color(_inversePrimary).b, 0.35)
 
-    // Desktop icon label background — onSecondary @ 0.4 opacity.
+    // Desktop icon label background — onSecondary @ 0.35 opacity.
     // Blurred by Hyprland layerrule on quickshell:desktop so labels stay
     // readable against any wallpaper color.
     readonly property color cPanelBg: Qt.rgba(
-        Qt.color(_onSecondary).r, Qt.color(_onSecondary).g, Qt.color(_onSecondary).b, 0.40)
+        Qt.color(_inversePrimary).r, Qt.color(_inversePrimary).g, Qt.color(_inversePrimary).b, 0.50)
 
     // Island gradient: inverse_primary → scrim  (matches waybar island CSS)
     // Use in ShaderEffect or as gradient stops in a LinearGradient
@@ -193,6 +197,7 @@ QtObject {
                 case "primaryContainer":          root._primaryContainer = hex; break
                 case "onPrimaryContainer":        root._onPrimaryContainer = hex; break
                 case "secondary":                 root._secondary = hex; break
+                case "secondaryFixed":            root._secondaryFixed = hex; break
                 case "onSecondary":               root._onSecondary = hex; break
                 case "secondaryContainer":        root._secondaryContainer = hex; break
                 case "onSecondaryContainer":      root._onSecondaryContainer = hex; break
@@ -216,6 +221,7 @@ QtObject {
                 case "errorContainer":            root._errorContainer = hex; break
                 case "tertiary":                  root._tertiary = hex; break
                 case "tertiaryContainer":         root._tertiaryContainer = hex; break
+                case "tertiaryFixedDim":          root._tertiaryFixedDim = hex; break
                 case "onTertiary":                root._onTertiary = hex; break
                 case "primaryFixed":               root._primaryFixed = hex; break
                 case "primaryFixedDim":            root._primaryFixedDim = hex; break

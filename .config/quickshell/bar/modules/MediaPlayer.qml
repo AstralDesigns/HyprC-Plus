@@ -81,7 +81,7 @@ Item {
                             visible: MediaPlayerState.artPath === "" || artImage.status !== Image.Ready
                             anchors.centerIn: parent
                             text: "󰎆"
-                            color: Config.glyphColor
+                            color: Config.discGlyphColor
                             font.family: Config.fontFamily
                             font.pixelSize: MediaPlayerState.thumbSize - 2
                         }
@@ -129,7 +129,7 @@ Item {
                                     id: ctlGlyph
                                     anchors.centerIn: parent
                                     text:  modelData.glyph
-                                    color: ctlMa.containsMouse ? Config.mediaGlyphColor : Config.glyphColor
+                                    color: ctlMa.containsMouse ? Config.mediaGlyphColor : Config.mediabtGlyphColor
                                     font.family:    Config.fontFamily
                                     font.pixelSize: Config.mediaCtlSize
                                     font.weight:    Config.fontWeight

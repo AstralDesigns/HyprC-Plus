@@ -460,13 +460,13 @@ PanelWindow {
                     value:    smWin._ram;  glyph: "󰍛"; label: "RAM"
                     valStr:   Math.round(smWin._ram * 100) + "%"
                     sub:      smWin._fmtBytes(smWin._ramUsed)
-                    arcColor: Theme.cPrimaryContainer
+                    arcColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                 }
                 ArcGauge {
                     value:    smWin._tempOk ? Math.min(smWin._temp / 100, 1) : 0
                     glyph:    "󰔏"; label: "Temp"
                     valStr:   smWin._tempOk ? Math.round(smWin._temp) + "°" : "N/A"
-                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cSourceColor.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                 }
                 ArcGauge {
                     visible:  smWin._swapOk
@@ -486,7 +486,7 @@ PanelWindow {
                         label:    (modelData.isIgpu ? "iGPU" : "dGPU") + (smWin._gpus.length > 1 ? "" : "")
                         valStr:   modelData.pct + "%"
                         sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
-                        arcColor: modelData.isIgpu ? Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 1.00)
+                        arcColor: modelData.isIgpu ? Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                     }
                 }
 

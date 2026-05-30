@@ -129,9 +129,9 @@ Item {
         anchors.centerIn: parent
         text:  root._anyChecking ? root._loaderFrames[root._loaderIdx]
                                  : (root._anyUpdates ? "󰏖" : "󰏗")
-        color: root._anyChecking ? Theme.cPrimary
-             : root._anyUpdates  ? Theme.cOnSurfVar
-             :                     Theme.cPrimary
+        color: root._anyChecking ? Config.rightGroupColor
+             : root._anyUpdates  ? Theme.cOnSurf
+             :                     Config.rightGroupColor
         font.family:    Config.fontFamily
         font.pixelSize: Config.fontSize
         font.weight:    Config.fontWeight

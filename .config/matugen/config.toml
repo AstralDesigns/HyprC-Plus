@@ -3,8 +3,8 @@ version_check = false
 
 [templates.kitty]
 input_path = '~/.config/matugen/templates/kitty-colors.conf'
-output_path = '~/.config/wal/templates/colors-kitty.conf'
-#post_hook = 'pkill -SIGUSR1 kitty'
+output_path = '~/.config/kitty/colors.conf'
+post_hook = 'pkill -SIGUSR1 kitty'
 
 [templates.hyprland]
 input_path = '~/.config/matugen/templates/hyprland-colors.conf'

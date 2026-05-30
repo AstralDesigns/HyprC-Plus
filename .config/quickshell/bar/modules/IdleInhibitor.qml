@@ -20,7 +20,7 @@ Item {
         id: icon
         anchors.centerIn: parent
         text: root._active ? "󰅶" : "󰾪"
-        color: root._active ? Theme.cPrimary : Theme.cOnSurfVar
+        color: root._active ? Config.rightGroupColor : Theme.cOnSurf
         font.family: Config.fontFamily
         font.pixelSize: Config.fontSize
         font.weight: Config.fontWeight

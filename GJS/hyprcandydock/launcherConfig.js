@@ -13,7 +13,7 @@ var LauncherConfig = {
     iconSize: 40,                   // @LC:iconSize
 
     // ── Label font size ───────────────────────────────────────────────
-    textFontSize: 11,               // @LC:textFontSize
+    textFontSize: 12,               // @LC:textFontSize
 
     // ── App tile cell size ────────────────────────────────────────────
     // 0 = auto (iconSize + padding). The grid reflows to more columns
@@ -22,18 +22,18 @@ var LauncherConfig = {
     tileHeight: 0,                  // @LC:tileHeight
 
     // ── Main frame — horizontal dock (bottom / top) ───────────────────
-    frameWidth:  1150,               // @LC:frameWidth
+    frameWidth:  780,               // @LC:frameWidth
     frameHeight: 675,               // @LC:frameHeight
 
     // ── Main frame — vertical dock (left / right) ─────────────────────
-    frameWidthVert:  770,           // @LC:frameWidthVert
+    frameWidthVert:  780,           // @LC:frameWidthVert
     frameHeightVert: 675,           // @LC:frameHeightVert
 
     // ── Border ────────────────────────────────────────────────────────
-    borderRadius: 20,               // @LC:borderRadius
+    borderRadius: 18,               // @LC:borderRadius
     borderWidth:  1,                // @LC:borderWidth
     searchRadius: 19,               // @LC:searchRadius
-    listRadius:   12,               // @LC:listRadius
+    listRadius:   10,               // @LC:listRadius
     innerBorderWidth: 1,            // @LC:innerBorderWidth
 
     // ── Inner frame padding ───────────────────────────────────────────

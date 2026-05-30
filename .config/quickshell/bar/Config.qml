@@ -445,18 +445,19 @@ QtObject {
     //  textColor   → info text (time, date, weather value, battery %)
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
-    readonly property color glyphColor:  Theme.cPrimary
-    readonly property color textColor:   Theme.cInverseSurface
-    readonly property color activeColor: Theme.cPrimary
+    readonly property color glyphColor:  Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    readonly property color textColor:   Theme.cOnSurf
+    readonly property color activeColor: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
     readonly property color dimColor:    Theme.cOnSurfVar
 
     // ── Per-module color overrides ───────────────────────────────────────
-    property color batteryIconColor:     Theme.cPrimary
-    property color batteryTextColor:     Theme.cInverseSurface
-    property color batteryChargingColor: Theme.cPrimary
+    property color batteryIconColor:     Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color batteryTextColor:     Theme.cOnSurf
+    property color batteryChargingColor: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
     property color batteryLowColor:      Theme.cErr
-    property color clockIconColor:       Theme.cPrimary
-    property color clockTextColor:       Theme.cInverseSurface
+    property color clockIconColor:       Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color clockTextColor:       Theme.cOnSurf
+    property color rightGroupColor:      Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
 
     // ── Clock popup sizing ────────────────────────────────────────────────
     property int clockTextSize: 38   // C059 Bold Italic time font size in ClockPopup
@@ -472,13 +473,15 @@ QtObject {
         { "city": "Dubai",     "timezone": "Asia/Dubai"       }
     ]
 
-    property color dateIconColor:        Theme.cPrimary
-    property color dateTextColor:        Theme.cInverseSurface
-    property color mediaGlyphColor:      Theme.cPrimary
-    property color powerGlyphColor:      Theme.cPrimary
+    property color dateIconColor:        Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color dateTextColor:        Theme.cOnSurf
+    property color mediaGlyphColor:      Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color discGlyphColor:       Theme.cPrimary
+    property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.80)
+    property color powerGlyphColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
-    readonly property color ccGlyphColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, ccGlyphOpacity)
+    readonly property color ccGlyphColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, ccGlyphOpacity)
 
     // ── Battery radial indicator ─────────────────────────────────────────
     property bool batteryRadialVisible: true
@@ -532,9 +535,9 @@ QtObject {
     property real wsActiveOpacity:     1.0
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
-    readonly property color wsActiveColor:     Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsActiveOpacity)
-    readonly property color wsPersistentColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsPersistentOpacity)
-    readonly property color wsEmptyColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsEmptyOpacity)
+    readonly property color wsActiveColor:     Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, wsActiveOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, wsPersistentOpacity)
+    readonly property color wsEmptyColor:      Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
     //  wsGlyphSize controls the font size of workspace button icons.
@@ -556,7 +559,7 @@ QtObject {
     property bool   wsSeparators:        false  // show glyph separator between buttons
     property string wsSeparatorGlyph:    ""
     property real   wsSeparatorOpacity:  0.3
-    readonly property color wsSeparatorColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsSeparatorOpacity)
+    readonly property color wsSeparatorColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, wsSeparatorOpacity)
     property int    wsSeparatorSize:     10    // px — font size of the separator glyph
     property int    wsSeparatorPadLeft:  2     // px — space between left ws button and separator
     property int    wsSeparatorPadRight: 2     // px — space between separator and right ws button
@@ -602,7 +605,7 @@ QtObject {
         "bars":           "▁▂▃▄▅▆▇█",
         "braille_fill":   "⠂⠃⠇⡇⣇⣧⣷⣿",
         "braille_hollow": "⠂⠂⠃⠃⡃⡇⡇⣇",
-        "blocks":         "░▒▓█",
+        "blocks":         "░░▒▒▓▓██",
         "thin_bars":      "⡀⡄⡆⡇⣇⣧⣷⣿"
     })
 

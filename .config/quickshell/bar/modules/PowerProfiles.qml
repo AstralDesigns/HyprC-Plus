@@ -24,7 +24,7 @@ Item {
         switch (root._profile) {
             case "performance": return Theme.cSecondary
             case "power-saver":  return Theme.cOnSurf
-            default:             return Theme.cPrimary
+            default:             return Config.rightGroupColor
         }
     }
 

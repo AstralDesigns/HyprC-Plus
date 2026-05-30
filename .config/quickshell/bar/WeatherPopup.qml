@@ -141,7 +141,7 @@ PanelWindow {
                     spacing: 2; Layout.alignment: Qt.AlignVCenter
                     Text {
                         text: WeatherPopupState.icon
-                        color: Theme.cPrimary
+                        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                         font.pixelSize: 52; font.family: Config.fontFamily
                         horizontalAlignment: Text.AlignHCenter
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -176,7 +176,7 @@ PanelWindow {
                             required property var modelData
                             spacing: 6
                             Text {
-                                text: modelData.glyph; color: Theme.cPrimary
+                                text: modelData.glyph; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80)
                                 font.pixelSize: 14; font.family: Config.fontFamily
                                 anchors.verticalCenter: parent.verticalCenter
                             }
@@ -217,14 +217,14 @@ PanelWindow {
                                 spacing: 2
                                 Text {
                                     text: WeatherPopupState.hrTimes[index] || "--"
-                                    color: index === 0 ? Theme.cPrimary : Theme.cOnSurfVar
+                                    color: index === 0 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurfVar
                                     font.pixelSize: 11; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text {
                                     text: WeatherPopupState.hrIcons[index] || "󰖐"
-                                    color: Theme.cPrimary; font.pixelSize: 14; font.family: Config.fontFamily
+                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80); font.pixelSize: 14; font.family: Config.fontFamily
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
@@ -266,7 +266,7 @@ PanelWindow {
                             spacing: 3
                             Text {
                                 text: WeatherPopupState.fcDays[index] || "--"
-                                color: index === 0 ? Theme.cPrimary : Theme.cOnSurfVar
+                                color: index === 0 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurfVar
                                 font.pixelSize: 11; font.weight: index === 0 ? Font.Medium : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -274,7 +274,7 @@ PanelWindow {
                             }
                             Text {
                                 text: WeatherPopupState.fcIcons[index] || "󰖐"
-                                color: Theme.cPrimary; font.pixelSize: 14; font.family: Config.fontFamily
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80); font.pixelSize: 14; font.family: Config.fontFamily
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -286,7 +286,7 @@ PanelWindow {
                             }
                             Text {
                                 text: WeatherPopupState.fcLo[index] || "--"
-                                color: Theme.cOnSurfVar; font.pixelSize: 11; font.family: Config.labelFont
+                                color: Theme.cSecondary; font.pixelSize: 11; font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }

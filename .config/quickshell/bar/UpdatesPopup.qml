@@ -154,14 +154,14 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
                 Text {
                     text: UpdatesPopupState.hcHasUpdates ? "󰏖" : "󰏗"
-                    color: UpdatesPopupState.hcHasUpdates ? Theme.cTertiary : Theme.cOnSurfVar
+                    color: UpdatesPopupState.hcHasUpdates ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00) : Theme.cOnSurfVar
                     font.family:    Config.fontFamily
                     font.pixelSize: Config.fontSize + 2
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
                     text: UpdatesPopupState.hcHasUpdates ? "HC+ Updates Available" : "HC+ Is Up To Date"
-                    color: UpdatesPopupState.hcHasUpdates ? Theme.cTertiary : Theme.cPrimary
+                    color: UpdatesPopupState.hcHasUpdates ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00) : Theme.cPrimary
                     font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1
                     font.weight:    Font.Medium
@@ -219,7 +219,7 @@ PanelWindow {
                 height: UpdatesPopupState.hcHasUpdates ? 36 : 0
                 radius: 10
                 color: hcUpdateHover.containsMouse
-                    ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.12)
+                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.12)
                     : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
                 visible: UpdatesPopupState.hcHasUpdates
                 clip: true
@@ -230,7 +230,7 @@ PanelWindow {
                     // Show "Running" during both the git-clone phase and the
                     // detached Candy_Update.sh phase (even after a QS reload).
                     text:  (_hcUpdateProc.running || _hcScriptRunning) ? "󰑓  Running …" : "󰇚 HC+ Updates"
-                    color: Theme.cTertiary
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
                     font.family:    Config.labelFont
                     font.pixelSize: 13
                 }
