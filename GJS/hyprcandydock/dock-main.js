@@ -67,7 +67,7 @@ const ICON_SIZE = APP_ICON_SIZE;
 
 // Glyph icons — Nerd Font Unicode codepoints (NF font required)
 const GLYPH_START      = '󱗼';   //  Linux / start
-const GLYPH_INDICATOR  = '\u{F09DF}';  //  active-window dot
+const GLYPH_INDICATOR  = '\u{F09DF}';  //  active-window dot "\u{F09DF}"
 const GLYPH_TRASH_EMPTY = '󰩺';   //  nf-md-trash_can_outline — no files in trash
 const GLYPH_TRASH_FULL  = '󰩹';   //  nf-md-trash_can         — files present (replaces delete_empty)
 const GLYPH_TRASH_HEAVY = '󰆴';   //  nf-md-delete            — heavily loaded (>20 items)
