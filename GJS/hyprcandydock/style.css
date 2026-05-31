@@ -24,7 +24,7 @@ window.background {
    INDICATOR_FONT_SIZE = round(ICON_SIZE * indicatorSizeFraction).
    The rule here is a safe default; the JS-injected rule overrides it. */
 #active-indicator {
-    color: @on_surface;
+    color: @primary;
     font-size: 4px;
     padding: 0px;
     margin: 0px;
@@ -43,7 +43,7 @@ window.background {
    Uses the Hyprland NF glyph (\u{F30F}).
    font-size is overridden at runtime from ICON_SIZE. */
 .fallback-icon {
-    color: @on_surface;
+    color: @primary_fixed_dim;
     font-size: 22px;        /* overridden at runtime from ICON_SIZE */
     padding: 0px;
     margin: 0px;
