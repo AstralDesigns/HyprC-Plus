@@ -63,7 +63,7 @@ var DockConfig = {
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 2,                // @HCD:borderWidth
-    borderRadius: 14,              // @HCD:borderRadius
+    borderRadius: 30,              // @HCD:borderRadius
 
     // ── External margins (dock edge ↔ screen / window edge) ──────────────
     // The exclusive zone is auto-calculated from the rendered content height:
