@@ -33,7 +33,7 @@ window.background {
 /* Start and trash icons — font-size matches ICON_SIZE.
    JS injects an override rule so this stays in sync automatically. */
 #start-icon, #trash-icon {
-    color: @on_surface;
+    color: @primary_fixed_dim;
     font-size: 22px;        /* overridden at runtime from ICON_SIZE */
     padding: 0px;
     margin: 0px;
