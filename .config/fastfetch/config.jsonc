@@ -25,16 +25,16 @@
             "format": " {host-name}"
         },
         {
-            "key": "│ {#37}󰇄 device  {#keys}││ ",
+            "key": "│ {#32}󰇄 device  {#keys}││ ",
             "type": "host",
             "format": "{5} {2}"
         },
         {
-            "key": "│ {#36}{icon} distro  {#keys}││ ",
+            "key": "│ {#37}{icon} distro  {#keys}││ ",
             "type": "os"
         },
         {
-            "key": "│ {#35} kernel  {#keys}││ ",
+            "key": "│ {#36} kernel  {#keys}││ ",
             "type": "kernel"
         },
         {
