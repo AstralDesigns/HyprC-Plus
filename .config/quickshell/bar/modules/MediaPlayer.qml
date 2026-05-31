@@ -140,7 +140,7 @@ Item {
                                     id: ctlglyph
                                     anchors.centerIn: parent
                                     text:  modelData.glyphplay
-                                    color: ctlMa.containsMouse ? Config.powerGlyphColor : Config.textColor; opacity: 0.8
+                                    color: ctlMa.containsMouse ? Config.powerGlyphColor : Theme.cPrimaryFixedDim; opacity: 0.8
                                     font.family:    Config.fontFamily
                                     font.pixelSize: Config.mediaCtlSize
                                     font.weight:    Config.fontWeight

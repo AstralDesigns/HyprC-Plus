@@ -446,17 +446,17 @@ QtObject {
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
     readonly property color glyphColor:  Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
-    readonly property color textColor:   Theme.cPrimaryFixedDim
+    readonly property color textColor:   Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.9)
     readonly property color activeColor: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
     readonly property color dimColor:    Theme.cOnSurfVar
 
     // ── Per-module color overrides ───────────────────────────────────────
     property color batteryIconColor:     Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
-    property color batteryTextColor:     Theme.cPrimaryFixedDim
+    property color batteryTextColor:     Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.9)
     property color batteryChargingColor: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
     property color batteryLowColor:      Theme.cErr
     property color clockIconColor:       Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
-    property color clockTextColor:       Theme.cPrimaryFixedDim
+    property color clockTextColor:       Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.9)
     property color rightGroupColor:      Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
 
     // ── Clock popup sizing ────────────────────────────────────────────────
@@ -474,7 +474,7 @@ QtObject {
     ]
 
     property color dateIconColor:        Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
-    property color dateTextColor:        Theme.cPrimaryFixedDim
+    property color dateTextColor:        Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.9)
     property color mediaGlyphColor:      Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
     property color discGlyphColor:       Theme.cPrimary
     property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.80)
