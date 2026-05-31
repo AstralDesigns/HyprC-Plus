@@ -730,7 +730,7 @@ window.hyprcandy-group-dialog {
    pillWrap margin-start: 2px  → 2px from the list-frame left inner edge.
    pillWrap margin-end:   2px  → 2px gap between pill and stack content.  */
 .tab-pill {
-    background-color: alpha(@primary_fixed_dim, 0.45);
+    background-color: alpha(@inverse_primary, 0.35);
     border-radius: 30px;
     border: 1px solid alpha(@scrim, 1.00);
     padding: 1px 0;
@@ -769,7 +769,7 @@ window.hyprcandy-group-dialog {
 /* Glyph label — same fixed size as button so it never widens the circle. */
 .tab-glyph {
     font-family: 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
-    color: alpha(@primary, 0.55);
+    color: alpha(@on_surface, 0.55);
     font-size: 17px;
     min-width: 36px;
     min-height: 36px;
