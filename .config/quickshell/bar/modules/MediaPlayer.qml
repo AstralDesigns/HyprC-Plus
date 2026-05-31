@@ -116,7 +116,7 @@ Item {
                         Repeater {
                             model: [
                                 { glyph: "󰒮", cmd: "previous"   },
-                                { glyph: MediaPlayerState.playing ? "󰏤" : "󰐊", cmd: "play-pause" },
+                                { glyphplay: MediaPlayerState.playing ? "󰏤" : "󰐊", cmd: "play-pause" },
                                 { glyph: "󰒭", cmd: "next"       }
                             ]
                             delegate: Item {
@@ -129,7 +129,18 @@ Item {
                                     id: ctlGlyph
                                     anchors.centerIn: parent
                                     text:  modelData.glyph
-                                    color: ctlMa.containsMouse ? Config.mediaGlyphColor : Config.mediabtGlyphColor
+                                    color: ctlMa.containsMouse ? Config.powerGlyphColor : Config.mediabtGlyphColor; opacity: 0.8
+                                    font.family:    Config.fontFamily
+                                    font.pixelSize: Config.mediaCtlSize
+                                    font.weight:    Config.fontWeight
+                                    Behavior on color { ColorAnimation { duration: 80 } }
+                                }
+                                
+                                Text {
+                                    id: ctlglyph
+                                    anchors.centerIn: parent
+                                    text:  modelData.glyphplay
+                                    color: ctlMa.containsMouse ? Config.powerGlyphColor : Config.mediaGlyphColor; opacity: 0.8
                                     font.family:    Config.fontFamily
                                     font.pixelSize: Config.mediaCtlSize
                                     font.weight:    Config.fontWeight

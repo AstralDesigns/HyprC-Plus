@@ -8,3 +8,6 @@
 <* for name, value in colors *>
     @define-color {{name}} {{value.default.hex}};
 <* endfor *>
+<* for name, value in base16 *>
+    @define-color {{name}} {{value.default.hex}};
+<* endfor *>

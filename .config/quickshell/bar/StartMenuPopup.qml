@@ -125,7 +125,7 @@ PanelWindow {
 
             // ── Brightness ────────────────────────────────────────────
             RowLayout { Layout.fillWidth: true; spacing: 10
-                Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cPrimary }
+                Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
                 Text { text: "Brightness"; color: Theme.cOnSurfVar; font.pixelSize: 13; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
@@ -141,7 +141,7 @@ PanelWindow {
             RowLayout { Layout.fillWidth: true; spacing: 10
                 Text {
                     text: StartMenuState.volumeMuted ? "󰖁" : "󰕾"
-                    font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cPrimary
+                    font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
                 }
                 Text { text: "Volume"; color: Theme.cOnSurfVar; font.pixelSize: 13; Layout.preferredWidth: 72 }
@@ -751,7 +751,7 @@ PanelWindow {
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
                                 font.pixelSize: 18; font.family: Config.fontFamily
-                                color: ph.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
+                                color: ph.containsMouse ? Config.powerGlyphColor : Theme.cOnSurfVar
                                 Behavior on color { ColorAnimation { duration: 120 } } }
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.l
                                 color: Theme.cOnSurfVar; font.pixelSize: 9 }
@@ -775,7 +775,7 @@ PanelWindow {
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
                     Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"
-                        color: logh.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
+                        color: logh.containsMouse ? Config.powerGlyphColor : Theme.cOnSurfVar
                         Behavior on color { ColorAnimation { duration: 120 } } }
                     Text { text: "Logout"; color: logh.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
                         font.pixelSize: 12; font.weight: Font.Medium

@@ -106,7 +106,7 @@ PanelWindow {
 
             Text {
                 text: clkWin._icon
-                color: Theme.cPrimary
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80)
                 font.family: Config.fontFamily
                 font.pixelSize: Config.clockIconSize !== undefined ? Config.clockIconSize : 32
                 anchors.verticalCenter: parent.verticalCenter
@@ -114,7 +114,7 @@ PanelWindow {
 
             Text {
                 text: clkWin._time
-                color: Theme.cInverseSurface
+                color: Theme.cOnSurf
                 font.family: "C059"
                 font.italic: true
                 font.weight: Font.Bold
