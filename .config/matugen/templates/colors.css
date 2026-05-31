@@ -4,7 +4,7 @@
 */
 @define-color blur  alpha({{colors.on_secondary.default.rgba}}, 0.1);
 @define-color blur_background  alpha({{colors.inverse_primary.default.rgba}}, 0.35);
-@define-color blur_background8 alpha({{colors.on_secondary.default.rgba}}, 0.35);
+@define-color blur_background8 alpha({{colors.on_secondary.default.rgba}}, 0.8);
 <* for name, value in colors *>
     @define-color {{name}} {{value.default.hex}};
 <* endfor *>
