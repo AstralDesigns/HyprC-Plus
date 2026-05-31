@@ -116,7 +116,9 @@ Item {
                         Repeater {
                             model: [
                                 { glyph: "󰒮", cmd: "previous"   },
+                                { glyph: ""   },
                                 { glyphplay: MediaPlayerState.playing ? "󰏤" : "󰐊", cmd: "play-pause" },
+                                { glyph: ""   },
                                 { glyph: "󰒭", cmd: "next"       }
                             ]
                             delegate: Item {
