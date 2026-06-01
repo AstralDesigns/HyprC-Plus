@@ -1202,7 +1202,7 @@ ShellRoot {
                             width: 44; height: 44
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maSusp.containsMouse ? Qt.rgba(root.cPrimaryContainer.r,root.cSourceColor.g,root.cSourceColor.b,0.10) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
+                                color:        _maSusp.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.80) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
                                 border.width: 1
                                 border.color: _maSusp.containsMouse ? Qt.rgba(root.cPrimaryContainer.r,root.cSourceColor.g,root.cSourceColor.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
@@ -1226,7 +1226,7 @@ ShellRoot {
                             width: 44; height: 44
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maRebt.containsMouse ? Qt.rgba(root.cInvPrimary.r, root.cSourceColor.g, root.cSourceColor.b,0.10) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
+                                color:        _maRebt.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.80) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
                                 border.width: 1
                                 border.color: _maRebt.containsMouse ? Qt.rgba(root.cInvPrimary.r, root.cSourceColor.g, root.cSourceColor.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
@@ -1251,7 +1251,7 @@ ShellRoot {
                             visible: root._hibernateAvailable
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.10) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
+                                color:        _maHib.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.80) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
                                 border.width: 1
                                 border.color: _maHib.containsMouse ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
@@ -1275,7 +1275,7 @@ ShellRoot {
                             width: 44; height: 44
                             Rectangle {
                                 anchors.fill: parent; radius: 22
-                                color:        _maShut.containsMouse ? Qt.rgba(root.cPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 0.10) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
+                                color:        _maShut.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.80) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.40)
                                 border.width: 1
                                 border.color: _maShut.containsMouse ? Qt.rgba(root.cPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
