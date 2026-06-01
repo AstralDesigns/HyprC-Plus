@@ -3525,6 +3525,14 @@ PanelWindow {
                                     _confReadProc.running     = true
                                 }
                             }
+                            
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Hit the 'Dock Reload' button when done making icon size changes"
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
+                                font.family: Config.labelFont; font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
 
                             CCSlider {
                                 label: "Icon Size"
@@ -3537,6 +3545,15 @@ PanelWindow {
                                 }
                             }
                             Process { id: _dockIcon; running: false; onExited: running = false }
+                            
+                            CCPillBtn {
+                                text: "󰑓 Dock Reload"
+                                onClicked: {
+                                    _dockReload.command = [scriptDir + "/dock-reload.sh"]
+                                    _dockReload.running = true
+                                }
+                            }
+                            Process { id: _dockReload; running: false; onExited: running = false }
 
                             CCEntryRow {
                                 label: "Start Icon"
