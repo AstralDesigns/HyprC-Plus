@@ -1299,7 +1299,7 @@ PanelWindow {
                                 Text {
                                     text: modelData.icon
                                     font.family: Config.fontFamily; font.pixelSize: 15
-                                    color: Config.mediabtGlyphColor
+                                    color: Config.powerGlyphColor
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
@@ -1315,7 +1315,7 @@ PanelWindow {
                                 anchors { right: parent.right; rightMargin: 4
                                           verticalCenter: parent.verticalCenter }
                                 width: 3; height: 20; radius: 2
-                                color: Theme.cPrimary
+                                color: Config.glyphColor
                                 visible: parent._stackIdx === modelData.idx
                             }
 
