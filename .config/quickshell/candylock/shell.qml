@@ -735,12 +735,12 @@ ShellRoot {
                                                 Layout.fillWidth:true; spacing:4; Layout.alignment:Qt.AlignVCenter
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherTemp; color:root.cPrimary
+                                                    text:root.weatherTemp; color:root.cPrimary; opacity: 0.60
                                                     font.family:"C059"; font.pixelSize:24; font.italic:true; font.weight:Font.DemiBold
                                                 }
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherIcon; color:root.cPrimary
+                                                    text:root.weatherIcon; color:root.cPrimary; opacity: 0.60
                                                     font.pixelSize:24; font.family:"Symbols Nerd Font Mono"
                                                 }
                                             }
@@ -761,7 +761,7 @@ ShellRoot {
                                                 border.color: root.authFailed ? root.cErr
                                                     : (root.authChecking
                                                         ? Qt.rgba(root.cPrimaryContainer.r,root.cPrimaryContainer.g,root.cPrimaryContainer.b,0.40)
-                                                        : Qt.rgba(root.cPrimaryContainer.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
+                                                        : Qt.rgba(root.cInvPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00))
                                                 Behavior on border.color { ColorAnimation{duration:250} }
                                             }
                                             RowLayout {
