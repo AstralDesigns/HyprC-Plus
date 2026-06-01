@@ -473,7 +473,7 @@ PanelWindow {
                     value:    smWin._swap; glyph: "󰾴"; label: "Swap"
                     valStr:   Math.round(smWin._swap * 100) + "%"
                     sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
-                    arcColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 1.00)
+                    arcColor: Theme.cPrimaryFixedDim; opacity: 0.8
                 }
 
                 // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
@@ -502,7 +502,7 @@ PanelWindow {
                     sub:      smWin._batStatus
                     arcColor: smWin._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
                               : smWin._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
-                              : Theme.cSourceColor
+                              : Config.powerGlyphColor
                 }
             }
 
