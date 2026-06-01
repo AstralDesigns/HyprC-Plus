@@ -76,7 +76,7 @@ PanelWindow {
                         font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                 }
                 ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    Text { text: Quickshell.env("USER"); color: Theme.cOnSurf; font.pixelSize: 13; font.weight: Font.Medium }
+                    Text { text: Quickshell.env("USER"); color: Config.powerGlyphColor; font.pixelSize: 13; font.weight: Font.Medium }
                     Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm")
                         color: Theme.cOnSurfVar; font.pixelSize: 10 }
                 }
@@ -313,7 +313,7 @@ PanelWindow {
                                             : netDelegate.modelData.signal > 40 ? "󰤥"
                                             : netDelegate.modelData.signal > 20 ? "󰤢" : "󰤟"
                                         font.pixelSize: 12; font.family: Config.fontFamily
-                                        color: netDelegate.modelData.active ? Theme.cPrimary : Theme.cOnSurfVar
+                                        color: netDelegate.modelData.active ? Config.powerGlyphColor : Theme.cOnSurfVar
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
                                     Text {
@@ -550,7 +550,7 @@ PanelWindow {
                                 RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 6
                                     Text {
                                         font.pixelSize: 13; font.family: Config.fontFamily
-                                        color: btDelegate.modelData.connected ? Theme.cPrimary : Theme.cOnSurfVar
+                                        color: btDelegate.modelData.connected ? Config.powerGlyphColor : Theme.cOnSurfVar
                                         text: {
                                             const ic = (btDelegate.modelData.icon || "").toLowerCase()
                                             if (ic === "audio-headset" || ic === "audio-headphones" || ic === "audio-headset-gateway") return "󰋎"
@@ -751,7 +751,7 @@ PanelWindow {
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
                                 font.pixelSize: 18; font.family: Config.fontFamily
-                                color: ph.containsMouse ? Config.powerGlyphColor : Theme.cOnSurfVar
+                                color: ph.containsMouse ? Config.powerGlyphColor : Config.mediabtGlyphColor
                                 Behavior on color { ColorAnimation { duration: 120 } } }
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.l
                                 color: Theme.cOnSurfVar; font.pixelSize: 9 }
@@ -775,7 +775,7 @@ PanelWindow {
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
                     Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"
-                        color: logh.containsMouse ? Config.powerGlyphColor : Theme.cOnSurfVar
+                        color: logh.containsMouse ? Config.powerGlyphColor : Config.mediabtGlyphColor
                         Behavior on color { ColorAnimation { duration: 120 } } }
                     Text { text: "Logout"; color: logh.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
                         font.pixelSize: 12; font.weight: Font.Medium
