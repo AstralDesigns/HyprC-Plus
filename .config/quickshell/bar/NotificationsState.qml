@@ -429,7 +429,7 @@ Item {
             "    MUTE=$(pactl get-sink-mute @DEFAULT_SINK@ | grep -q 'yes' && echo 'true' || echo 'false'); " +
             "    echo \"{\\\"type\\\":\\\"volume\\\",\\\"value\\\":$VOL,\\\"mute\\\":$MUTE}\"; " +
             "  fi; " +
-            "done & " +
+            "done " +
             "brightnessctl s -m | while read -r line; do " +
             "  CUR=$(echo \"$line\" | cut -d, -f4 | tr -d '%'); " +
             "  echo \"{\\\"type\\\":\\\"brightness\\\",\\\"value\\\":$CUR}\"; " +

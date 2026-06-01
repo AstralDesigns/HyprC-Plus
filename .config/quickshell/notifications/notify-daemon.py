@@ -254,8 +254,8 @@ def _fetch_art_circle(art_url: str) -> str:
         src_path = art_url[7:]
     elif art_url.startswith("http"):
         try:
-            # Use curl for better timeout and redirect handling
-            subprocess.run(["curl", "-sfL", "--max-time", "10", art_url, "-o", _art_tmp_raw], timeout=12)
+            import urllib.request
+            urllib.request.urlretrieve(art_url, _art_tmp_raw)
             src_path = _art_tmp_raw
         except Exception:
             return ""
@@ -610,7 +610,30 @@ class NotificationService(dbus.service.Object):
         pass
 
 
+PIDFILE = "/tmp/qs_notify_daemon.pid"
+
+
+def _kill_previous_instance():
+    """Kill any previous notify-daemon instance before starting a new one.
+    Prevents brief overlaps during bar reloads where two daemons both try
+    to claim org.freedesktop.Notifications simultaneously."""
+    try:
+        if os.path.exists(PIDFILE):
+            with open(PIDFILE, "r") as f:
+                old_pid = int(f.read().strip())
+            os.kill(old_pid, 15)   # SIGTERM
+            time.sleep(0.2)
+    except Exception:
+        pass
+    try:
+        with open(PIDFILE, "w") as f:
+            f.write(str(os.getpid()))
+    except Exception:
+        pass
+
+
 def main():
+    _kill_previous_instance()
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     session_bus = dbus.SessionBus()
 
@@ -635,6 +658,12 @@ def main():
         loop.run()
     except KeyboardInterrupt:
         pass
+    finally:
+        try:
+            if os.path.exists(PIDFILE):
+                os.unlink(PIDFILE)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()
