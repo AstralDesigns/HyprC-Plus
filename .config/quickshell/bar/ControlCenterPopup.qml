@@ -1944,7 +1944,7 @@ PanelWindow {
                                                             required property string modelData
                                                             property bool _sel: Config.cavaStartMode === modelData
                                                             width: (parent.width - 4) / 2; height: parent.height; radius: 7
-                                                            color: _sel ? Qt.rgba(Theme.cInversePrimaryr, Theme.cInversePrimary.g,
+                                                            color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                                   Theme.cInversePrimary.b, 0.82) : "transparent"
                                                             border.width: _sel ? 1 : 0
                                                             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
@@ -2083,7 +2083,7 @@ PanelWindow {
                                                             required property string modelData
                                                             property bool _sel: Config.cavaEndMode === modelData
                                                             width: (parent.width - 4) / 2; height: parent.height; radius: 7
-                                                            color: _sel ? Qt.rgba(Theme.cInversePrimaryr, Theme.cInversePrimary.g,
+                                                            color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                                   Theme.cInversePrimary.b, 0.82) : "transparent"
                                                             border.width: _sel ? 1 : 0
                                                             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
@@ -2745,7 +2745,7 @@ PanelWindow {
                                                 required property string modelData
                                                 property bool _sel: ccWin._activeBorderMode === modelData
                                                 width: (parent.width - 4) / 2; height: parent.height; radius: 7
-                                                color: _sel ? Qt.rgba(Theme.cInversePrimaryr, Theme.cInversePrimary.g,
+                                                color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                       Theme.cInversePrimary.b, 0.82) : "transparent"
                                                 border.width: _sel ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
@@ -2910,7 +2910,7 @@ PanelWindow {
                                                 required property string modelData
                                                 property bool _sel: ccWin._inactiveBorderMode === modelData
                                                 width: (parent.width - 4) / 2; height: parent.height; radius: 7
-                                                color: _sel ? Qt.rgba(Theme.cInversePrimaryr, Theme.cInversePrimary.g,
+                                                color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                       Theme.cInversePrimary.b, 0.82) : "transparent"
                                                 border.width: _sel ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
@@ -3528,7 +3528,7 @@ PanelWindow {
                             
                             Text {
                                 Layout.fillWidth: true
-                                text: "Hit the 'Dock Reload' button when done making icon size changes"
+                                text: "Toggle the 'Dock Reload' button when done you're making icon size changes"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
                                 font.family: Config.labelFont; font.pixelSize: 11
                                 wrapMode: Text.Wrap
@@ -6485,7 +6485,7 @@ PanelWindow {
             id: _pill
             width: 46; height: 26; radius: 13
             color: value
-                ? Qt.rgba(Theme.cInversePrimaryr, Theme.cInversePrimary.g,
+                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                       Theme.cInversePrimary.b, 0.82)
                 : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
             border.width: 1
@@ -6546,7 +6546,7 @@ PanelWindow {
                         width: (parent.width - (options.length - 1) * 2) / options.length
                         height: parent.height; radius: 7
                         color: _isCurrent
-                            ? Qt.rgba(Theme.cInversePrimaryr, Theme.cInversePrimary.g,
+                            ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                       Theme.cInversePrimary.b, 0.82)
                             : "transparent"
                         border.width: _isCurrent ? 1 : 0
@@ -6580,7 +6580,7 @@ PanelWindow {
         implicitWidth: _pbt.implicitWidth + 22
         implicitHeight: 30; radius: 9
         color: active
-            ? Qt.rgba(Theme.cInversePrimaryr, Theme.cInversePrimary.g,
+            ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                       Theme.cInversePrimary.b, 0.82)
             : (pbma.containsMouse
                 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
