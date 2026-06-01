@@ -1250,7 +1250,7 @@ PanelWindow {
                                 id: userNameText
                                 Layout.alignment: Qt.AlignHCenter
                                 text: "—"
-                                color: Theme.cPrimary
+                                color: Config.powerGlyphColor
                                 font.family: Config.labelFont
                                 font.pixelSize: 13
                                 font.weight: Font.Medium
@@ -1299,7 +1299,7 @@ PanelWindow {
                                 Text {
                                     text: modelData.icon
                                     font.family: Config.fontFamily; font.pixelSize: 15
-                                    color: Theme.cPrimary
+                                    color: Config.mediabtGlyphColor
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
@@ -1340,10 +1340,10 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "hyprcandy"
+                            text: "hyprcandy ♥️"
                             color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                            Theme.cPrimary.b,
-                                           hcTextHov.containsMouse ? 0.75 : 0.35)
+                                           hcTextHov.containsMouse ? 0.85 : 0.65)
                             font.family: Config.labelFont; font.pixelSize: 10
                             Behavior on color { ColorAnimation { duration: 120 } }
                             MouseArea {
@@ -6314,7 +6314,7 @@ PanelWindow {
         Layout.bottomMargin: 4
         Text {
             id: _sh
-            color: Theme.cPrimary
+            color: Config.powerGlyphColor
             font.family: Config.labelFont
             font.pixelSize: 12
             font.weight: Font.Bold
@@ -6456,7 +6456,7 @@ PanelWindow {
         Text {
             id: _tl
             Layout.preferredWidth: 130
-            color: Theme.cPrimary
+            color: Config.glyphColor
             font.family: Config.labelFont; font.pixelSize: 13
             elide: Text.ElideRight
         }
@@ -6468,8 +6468,7 @@ PanelWindow {
             id: _pill
             width: 46; height: 26; radius: 13
             color: value
-                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                          Theme.cInversePrimary.b, 0.9)
+                ? Theme.cInversePrimary
                 : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
@@ -6529,7 +6528,7 @@ PanelWindow {
                         width: (parent.width - (options.length - 1) * 2) / options.length
                         height: parent.height; radius: 7
                         color: _isCurrent
-                            ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                            ? Qt.rgba(Theme.cInversePrimaryr, Theme.cInversePrimary.g,
                                       Theme.cInversePrimary.b, 0.82)
                             : "transparent"
                         border.width: _isCurrent ? 1 : 0
