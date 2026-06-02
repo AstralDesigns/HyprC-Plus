@@ -283,7 +283,10 @@ PanelWindow {
         id: _hcUpdateProc
         command: [
             "bash", "-ic",
-            "rm -rf ~/.hyprcandy/candyinstall && " +
+            "rm -rf ~/.hyprcandy/candyinstall && " + 
+            "cd ~/.HCUpdates && " +
+            "git pull && " +
+            "cd .. && " +
             "git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && " +
             "cd ~/.hyprcandy/candyinstall && " +
             "chmod +x Candy_Update.sh && " +
