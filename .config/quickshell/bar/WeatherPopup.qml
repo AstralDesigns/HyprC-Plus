@@ -217,7 +217,7 @@ PanelWindow {
                                 spacing: 2
                                 Text {
                                     text: WeatherPopupState.hrTimes[index] || "--"
-                                    color: index === 0 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurfVar
+                                    color: index === 0 ? Config.glyphColor : Theme.cOnSurfVar
                                     font.pixelSize: 11; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -266,7 +266,7 @@ PanelWindow {
                             spacing: 3
                             Text {
                                 text: WeatherPopupState.fcDays[index] || "--"
-                                color: index === 0 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurfVar
+                                color: index === 0 ? Config.glyphColor : Theme.cOnSurfVar
                                 font.pixelSize: 11; font.weight: index === 0 ? Font.Medium : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
