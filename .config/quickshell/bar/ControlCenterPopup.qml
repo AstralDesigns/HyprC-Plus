@@ -3528,7 +3528,7 @@ PanelWindow {
                             
                             Text {
                                 Layout.fillWidth: true
-                                text: "Toggle the 'Dock Reload' button when done you're making icon size changes"
+                                text: "Toggle the 'Dock Reload' button when you're done making icon size changes"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
                                 font.family: Config.labelFont; font.pixelSize: 11
                                 wrapMode: Text.Wrap
