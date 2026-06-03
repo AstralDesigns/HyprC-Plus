@@ -218,13 +218,13 @@ PanelWindow {
                                 Text {
                                     text: WeatherPopupState.hrTimes[index] || "--"
                                     color: index === 0 ? Config.glyphColor : Theme.cOnSurfVar
-                                    font.pixelSize: 11; font.family: Config.labelFont
+                                    font.pixelSize: 14; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text {
                                     text: WeatherPopupState.hrIcons[index] || "󰖐"
-                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80); font.pixelSize: 14; font.family: Config.fontFamily
+                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80); font.pixelSize: 24; font.family: Config.fontFamily
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
@@ -267,14 +267,14 @@ PanelWindow {
                             Text {
                                 text: WeatherPopupState.fcDays[index] || "--"
                                 color: index === 0 ? Config.glyphColor : Theme.cOnSurfVar
-                                font.pixelSize: 11; font.weight: index === 0 ? Font.Medium : Font.Normal
+                                font.pixelSize: 14; font.weight: index === 0 ? Font.Medium : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: WeatherPopupState.fcIcons[index] || "󰖐"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80); font.pixelSize: 14; font.family: Config.fontFamily
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80); font.pixelSize: 24; font.family: Config.fontFamily
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
