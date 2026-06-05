@@ -10,7 +10,7 @@ var LauncherConfig = {
     searchWidthFraction: 0.25,       // @LC:searchWidthFraction
 
     // ── Icon size ─────────────────────────────────────────────────────
-    iconSize: 52,                   // @LC:iconSize
+    iconSize: 44,                   // @LC:iconSize
 
     // ── Label font size ───────────────────────────────────────────────
     textFontSize: 12,               // @LC:textFontSize
