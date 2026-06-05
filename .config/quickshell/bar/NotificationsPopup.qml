@@ -425,7 +425,7 @@ Item {
             id: histPanel
             anchors { top: parent.top; left: parent.left; bottom: parent.bottom }
             width: 380
-            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.40)
+            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
             radius: historyWindow._panelRadius
             border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
             scale: NotificationsState.historyVisible ? 1.0 : 0.92

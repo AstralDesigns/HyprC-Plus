@@ -51,7 +51,7 @@ PanelWindow {
         id: panelRect
         anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
         width: 340
-        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.40)
+        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
         radius: startMenuPanel._panelRadius
         focus: true
         border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
@@ -76,7 +76,7 @@ PanelWindow {
                         font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                 }
                 ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    Text { text: Quickshell.env("USER"); color: Config.powerGlyphColor; font.pixelSize: 13; font.weight: Font.Medium }
+                    Text { text: Quickshell.env("USER"); color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00); font.pixelSize: 13; font.weight: Font.Medium }
                     Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm")
                         color: Theme.cOnSurfVar; font.pixelSize: 10 }
                 }
@@ -744,8 +744,8 @@ PanelWindow {
                     delegate: Rectangle {
                         required property var modelData
                         Layout.fillWidth: true; height: 52; radius: 12
-                        color: ph.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
-                            : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
+                        color: ph.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                         border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
                         Behavior on color { ColorAnimation { duration: 120 } }
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
@@ -769,8 +769,8 @@ PanelWindow {
             // Logout button (full width)
             Rectangle {
                 Layout.fillWidth: true; height: 36; radius: 12
-                color: logh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
-                    : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
+                color: logh.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                 border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8

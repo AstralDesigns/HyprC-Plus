@@ -1422,9 +1422,9 @@ PanelWindow {
                                         radius: 9
                                         color: _subIdx === index
                                             ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                      Theme.cInversePrimary.b, 0.72)
-                                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                      Theme.cInversePrimary.b, 0.16)
+                                                      Theme.cInversePrimary.b, 1.00)
+                                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                      Theme.cOnSecondary.b, 0.16)
                                         border.width: _subIdx === index ? 1 : 0
                                         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                               Theme.cPrimary.b, 0.42)
@@ -1708,6 +1708,8 @@ PanelWindow {
                                         CCSection { text: "Border" }
                                         CCSlider { label:"Border W";        from:0;to:8; value:Config.barBorderWidth;    onMoved:function(v){Config.barBorderWidth=v} }
                                         CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
+                                        CCSlider { label:"Island Border";     from:0;to:8; value:Config.islandBorder;      onMoved:function(v){Config.islandBorder=v} }
+                                        CCSlider { label:"Island Border α";   from:0;to:1;stepSize:0.05;decimals:2; value:Config.islandBorderAlpha;  onMoved:function(v){Config.islandBorderAlpha=v} }
 
                                         CCSection { text: "Spacing & Padding" }
                                         CCSlider { label:"Island Spacing";  from:0;to:24; value:Config.islandSpacing;  onMoved:function(v){Config.islandSpacing=v} }
@@ -6490,7 +6492,7 @@ PanelWindow {
                 : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                  Theme.cPrimary.b, value ? 0.6 : 0.2)
+                                  Theme.cPrimary.b, value ? 0.6 : 0.0)
 
             Rectangle {
                 width: 20; height: 20; radius: 10
@@ -6589,7 +6591,7 @@ PanelWindow {
                           Theme.cInversePrimary.b, 0.16))
         border.width: 1
         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                              Theme.cPrimary.b, active ? 0.55 : 0.2)
+                              Theme.cPrimary.b, active ? 0.6 : 0.0)
 
         Text {
             id: _pbt; anchors.centerIn: parent

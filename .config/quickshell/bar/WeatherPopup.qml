@@ -60,7 +60,7 @@ PanelWindow {
         implicitHeight: wxCol.implicitHeight + 32
 
         radius: Config.barMode === "island" ? Config.islandRadius : Config.barRadius
-        color:  Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.42)
+        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
 
@@ -141,7 +141,7 @@ PanelWindow {
                     spacing: 2; Layout.alignment: Qt.AlignVCenter
                     Text {
                         text: WeatherPopupState.icon
-                        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                         font.pixelSize: 52; font.family: Config.fontFamily
                         horizontalAlignment: Text.AlignHCenter
                         anchors.horizontalCenter: parent.horizontalCenter
@@ -176,7 +176,7 @@ PanelWindow {
                             required property var modelData
                             spacing: 6
                             Text {
-                                text: modelData.glyph; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80)
+                                text: modelData.glyph; color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                                 font.pixelSize: 14; font.family: Config.fontFamily
                                 anchors.verticalCenter: parent.verticalCenter
                             }
@@ -217,14 +217,14 @@ PanelWindow {
                                 spacing: 2
                                 Text {
                                     text: WeatherPopupState.hrTimes[index] || "--"
-                                    color: index === 0 ? Theme.cPrimary : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.75)
+                                    color: index === 0 ? Theme.cOnSurf : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.65)
                                     font.pixelSize: 15; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text {
                                     text: WeatherPopupState.hrIcons[index] || "󰖐"
-                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00); font.pixelSize: 24; font.family: Config.fontFamily
+                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00); font.pixelSize: 24; font.family: Config.fontFamily
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
@@ -266,7 +266,7 @@ PanelWindow {
                             spacing: 3
                             Text {
                                 text: WeatherPopupState.fcDays[index] || "--"
-                                color: index === 0 ? Theme.cPrimary : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.75)
+                                color: index === 0 ? Theme.cOnSurf : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.65)
                                 font.pixelSize: 15; font.weight: index === 0 ? Font.Medium : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -274,7 +274,7 @@ PanelWindow {
                             }
                             Text {
                                 text: WeatherPopupState.fcIcons[index] || "󰖐"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00); font.pixelSize: 24; font.family: Config.fontFamily
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00); font.pixelSize: 24; font.family: Config.fontFamily
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
