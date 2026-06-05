@@ -59,7 +59,12 @@ QtObject {
         v = _settings.value("outerMarginSide"); if (v !== undefined && v !== null) outerMarginSide = v
         v = _settings.value("barEdgePaddingLeft");  if (v !== undefined && v !== null) barEdgePaddingLeft  = v
         v = _settings.value("barEdgePaddingRight"); if (v !== undefined && v !== null) barEdgePaddingRight = v
-        v = _settings.value("barRadius"); if (v !== undefined && v !== null) barRadius = v
+        var oldRadius = 20
+        v = _settings.value("barRadius"); if (v !== undefined && v !== null) oldRadius = parseInt(v)
+        v = _settings.value("barTopLeftRadius");    barTopLeftRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
+        v = _settings.value("barTopRightRadius");   barTopRightRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
+        v = _settings.value("barBottomLeftRadius"); barBottomLeftRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
+        v = _settings.value("barBottomRightRadius");barBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
         v = _settings.value("islandRadius"); if (v !== undefined && v !== null) islandRadius = v
         v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
         v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
@@ -184,6 +189,12 @@ QtObject {
         // Bar autohide + dock runtime state
         v = _settings.value("barAutoHide");      if (v !== undefined && v !== null) barAutoHide      = _toBool(v)
         v = _settings.value("barAutoHideDelay"); if (v !== undefined && v !== null) barAutoHideDelay = parseInt(v) || 5
+        v = _settings.value("triLeftAutoHide");       if (v !== undefined && v !== null) triLeftAutoHide       = _toBool(v)
+        v = _settings.value("triLeftAutoHideDelay");  if (v !== undefined && v !== null) triLeftAutoHideDelay  = parseInt(v) || 5
+        v = _settings.value("triCenterAutoHide");     if (v !== undefined && v !== null) triCenterAutoHide     = _toBool(v)
+        v = _settings.value("triCenterAutoHideDelay");if (v !== undefined && v !== null) triCenterAutoHideDelay = parseInt(v) || 5
+        v = _settings.value("triRightAutoHide");      if (v !== undefined && v !== null) triRightAutoHide      = _toBool(v)
+        v = _settings.value("triRightAutoHideDelay"); if (v !== undefined && v !== null) triRightAutoHideDelay = parseInt(v) || 5
         v = _settings.value("dockAutoHide");     if (v !== undefined && v !== null) dockAutoHide     = _toBool(v)
         v = _settings.value("dockAutoHideDelay");if (v !== undefined && v !== null) dockAutoHideDelay= parseInt(v) || 5
         v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v) || 6
@@ -206,7 +217,10 @@ QtObject {
         _settings.setValue("outerMarginSide", outerMarginSide)
         _settings.setValue("barEdgePaddingLeft",  barEdgePaddingLeft)
         _settings.setValue("barEdgePaddingRight", barEdgePaddingRight)
-        _settings.setValue("barRadius", barRadius)
+        _settings.setValue("barTopLeftRadius",     barTopLeftRadius)
+        _settings.setValue("barTopRightRadius",    barTopRightRadius)
+        _settings.setValue("barBottomLeftRadius",  barBottomLeftRadius)
+        _settings.setValue("barBottomRightRadius", barBottomRightRadius)
         _settings.setValue("islandRadius", islandRadius)
         _settings.setValue("islandBorder", islandBorder)
         _settings.setValue("islandBorderAlpha", islandBorderAlpha)
@@ -332,6 +346,12 @@ QtObject {
         // Bar autohide + dock runtime state
         _settings.setValue("barAutoHide",      barAutoHide)
         _settings.setValue("barAutoHideDelay", barAutoHideDelay)
+        _settings.setValue("triLeftAutoHide",        triLeftAutoHide)
+        _settings.setValue("triLeftAutoHideDelay",   triLeftAutoHideDelay)
+        _settings.setValue("triCenterAutoHide",      triCenterAutoHide)
+        _settings.setValue("triCenterAutoHideDelay", triCenterAutoHideDelay)
+        _settings.setValue("triRightAutoHide",       triRightAutoHide)
+        _settings.setValue("triRightAutoHideDelay",  triRightAutoHideDelay)
         _settings.setValue("dockAutoHide",     dockAutoHide)
         _settings.setValue("dockAutoHideDelay",dockAutoHideDelay)
         _settings.setValue("dockMargin",       dockMargin)
@@ -376,7 +396,11 @@ QtObject {
     property int barEdgePaddingRight: 2   // px
 
     // ── Radii ────────────────────────────────────────────────────────────
-    property int barRadius:    20   // px — whole-bar corner radius (bar mode)
+    property int barTopLeftRadius:     20
+    property int barTopRightRadius:    20
+    property int barBottomLeftRadius:  20
+    property int barBottomRightRadius: 20
+    readonly property int barRadius: barTopLeftRadius
     property int islandRadius: 20   // px — island pill corner radius
 
     // ── Island border ────────────────────────────────────────────────────
@@ -899,6 +923,12 @@ QtObject {
     // ═══════════════════════════════════════════════════════════════════════
     property bool barAutoHide:      false
     property int  barAutoHideDelay: 5       // seconds
+    property bool triLeftAutoHide:       false
+    property int  triLeftAutoHideDelay:  5
+    property bool triCenterAutoHide:     false
+    property int  triCenterAutoHideDelay: 5
+    property bool triRightAutoHide:      false
+    property int  triRightAutoHideDelay: 5
 
     // ═══════════════════════════════════════════════════════════════════════
     //  Dock runtime state (source of truth for CC display; GJS dock reads

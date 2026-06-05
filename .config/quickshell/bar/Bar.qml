@@ -73,36 +73,165 @@ PanelWindow {
                                        || UpdatesPopupState.visible
 
     onAnyPanelOpenChanged: {
-        if (!bar._ahEnabled) return
+        if (bar._ahEnabled) {
+            if (bar.anyPanelOpen) {
+                _ahHideTimer.stop()
+                if (bar._ahHidden) { bar._ahHidden = false; bar.visible = true }
+            } else {
+                _ahHideTimer.restart()
+            }
+        }
+
         if (bar.anyPanelOpen) {
-            _ahHideTimer.stop()
-            if (bar._ahHidden) { bar._ahHidden = false; bar.visible = true }
+            triLeftHideTimer.stop()
+            triCenterHideTimer.stop()
+            triRightHideTimer.stop()
+            if (bar._triLeftAhHidden)   bar._triLeftAhHidden = false
+            if (bar._triCenterAhHidden) bar._triCenterAhHidden = false
+            if (bar._triRightAhHidden)  bar._triRightAhHidden = false
         } else {
-            _ahHideTimer.restart()
+            if (bar._triLeftAhEnabled && !triLeftHover.hovered)     triLeftHideTimer.restart()
+            if (bar._triCenterAhEnabled && !triCenterHover.hovered) triCenterHideTimer.restart()
+            if (bar._triRightAhEnabled && !triRightHover.hovered)   triRightHideTimer.restart()
         }
     }
 
     // Sync from Config on startup and react to live changes from CC
     Connections {
         target: Config
+        function onBarModeChanged() {
+            bar._ahEnabled = Config.barAutoHide && Config.barMode !== "tri"
+            if (!bar._ahEnabled) {
+                _ahHideTimer.stop()
+                if (bar._ahHidden) { bar._ahHidden = false }
+            } else {
+                if (!bar._ahHidden && !bar.anyPanelOpen) _ahHideTimer.restart()
+            }
+            updateBarVisibility()
+        }
         function onBarAutoHideChanged() {
-            bar._ahEnabled = Config.barAutoHide
+            bar._ahEnabled = Config.barAutoHide && Config.barMode !== "tri"
             if (bar._ahEnabled) {
                 if (!bar._ahHidden && !bar.anyPanelOpen) _ahHideTimer.restart()
             } else {
                 _ahHideTimer.stop()
-                if (bar._ahHidden) { bar._ahHidden = false; bar.visible = true }
+                if (bar._ahHidden) { bar._ahHidden = false }
             }
+            updateBarVisibility()
         }
         function onBarAutoHideDelayChanged() {
             bar._ahDelaySec = Config.barAutoHideDelay
         }
     }
     Component.onCompleted: {
-        bar._ahEnabled  = Config.barAutoHide
+        bar._ahEnabled  = Config.barAutoHide && Config.barMode !== "tri"
         bar._ahDelaySec = Config.barAutoHideDelay
         if (bar._ahEnabled) _ahHideTimer.restart()
         barStateTimer.start()
+        updateBarVisibility()
+    }
+
+    on_AhHiddenChanged: updateBarVisibility()
+
+    function updateBarVisibility() {
+        if (Config.barMode === "tri") {
+            const leftVisible   = !Config.triLeftAutoHide   || !_triLeftAhHidden
+            const centerVisible = !Config.triCenterAutoHide || !_triCenterAhHidden
+            const rightVisible  = !Config.triRightAutoHide  || !_triRightAhHidden
+            bar.visible = leftVisible || centerVisible || rightVisible
+        } else {
+            bar.visible = !bar._ahHidden
+        }
+    }
+
+    // ── Tri Left Auto-Hide ──
+    property bool _triLeftAhEnabled: Config.triLeftAutoHide && Config.barMode === "tri"
+    property int  _triLeftAhDelaySec: Config.triLeftAutoHideDelay
+    property bool _triLeftAhHidden: false
+
+    on_TriLeftAhHiddenChanged: updateBarVisibility()
+
+    on_TriLeftAhEnabledChanged: {
+        if (_triLeftAhEnabled) {
+            if (!_triLeftAhHidden && !bar.anyPanelOpen) triLeftHideTimer.restart()
+        } else {
+            triLeftHideTimer.stop()
+            _triLeftAhHidden = false
+        }
+    }
+    on_TriLeftAhDelaySecChanged: {
+        if (_triLeftAhEnabled && !_triLeftAhHidden && !bar.anyPanelOpen) triLeftHideTimer.restart()
+    }
+
+    Timer {
+        id: triLeftHideTimer
+        interval: bar._triLeftAhDelaySec * 1000
+        repeat: false
+        onTriggered: {
+            const mon = bar._monitor
+            if (mon && mon.activeWindow && mon.activeWindow.fullscreen) return
+            bar._triLeftAhHidden = true
+        }
+    }
+
+    // ── Tri Center Auto-Hide ──
+    property bool _triCenterAhEnabled: Config.triCenterAutoHide && Config.barMode === "tri"
+    property int  _triCenterAhDelaySec: Config.triCenterAutoHideDelay
+    property bool _triCenterAhHidden: false
+
+    on_TriCenterAhHiddenChanged: updateBarVisibility()
+
+    on_TriCenterAhEnabledChanged: {
+        if (_triCenterAhEnabled) {
+            if (!_triCenterAhHidden && !bar.anyPanelOpen) triCenterHideTimer.restart()
+        } else {
+            triCenterHideTimer.stop()
+            _triCenterAhHidden = false
+        }
+    }
+    on_TriCenterAhDelaySecChanged: {
+        if (_triCenterAhEnabled && !_triCenterAhHidden && !bar.anyPanelOpen) triCenterHideTimer.restart()
+    }
+
+    Timer {
+        id: triCenterHideTimer
+        interval: bar._triCenterAhDelaySec * 1000
+        repeat: false
+        onTriggered: {
+            const mon = bar._monitor
+            if (mon && mon.activeWindow && mon.activeWindow.fullscreen) return
+            bar._triCenterAhHidden = true
+        }
+    }
+
+    // ── Tri Right Auto-Hide ──
+    property bool _triRightAhEnabled: Config.triRightAutoHide && Config.barMode === "tri"
+    property int  _triRightAhDelaySec: Config.triRightAutoHideDelay
+    property bool _triRightAhHidden: false
+
+    on_TriRightAhHiddenChanged: updateBarVisibility()
+
+    on_TriRightAhEnabledChanged: {
+        if (_triRightAhEnabled) {
+            if (!_triRightAhHidden && !bar.anyPanelOpen) triRightHideTimer.restart()
+        } else {
+            triRightHideTimer.stop()
+            _triRightAhHidden = false
+        }
+    }
+    on_TriRightAhDelaySecChanged: {
+        if (_triRightAhEnabled && !_triRightAhHidden && !bar.anyPanelOpen) triRightHideTimer.restart()
+    }
+
+    Timer {
+        id: triRightHideTimer
+        interval: bar._triRightAhDelaySec * 1000
+        repeat: false
+        onTriggered: {
+            const mon = bar._monitor
+            if (mon && mon.activeWindow && mon.activeWindow.fullscreen) return
+            bar._triRightAhHidden = true
+        }
     }
 
     // Hide timer — fires after the pointer has been outside the bar
@@ -250,12 +379,19 @@ PanelWindow {
         border.width: Config.barMode === "bar" ? Config.barBorderWidth : 0
         // tri mode uses its own three sub-bar rectangles; barBg is invisible
         visible: Config.barMode !== "tri"
-        radius:       Config.barRadius
+        topLeftRadius:     Config.barTopLeftRadius
+        topRightRadius:    Config.barTopRightRadius
+        bottomLeftRadius:  Config.barBottomLeftRadius
+        bottomRightRadius: Config.barBottomRightRadius
         Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
         // Gradient child — only visible when barRectBgStyle === "gradient" in bar mode
         Rectangle {
-            anchors.fill: parent; radius: parent.radius
+            anchors.fill: parent
+            topLeftRadius:     parent.topLeftRadius
+            topRightRadius:    parent.topRightRadius
+            bottomLeftRadius:  parent.bottomLeftRadius
+            bottomRightRadius: parent.bottomRightRadius
             visible: Config.barMode === "bar" && Config.barRectBgStyle === "gradient"
             opacity: 1.0
             gradient: Gradient {
@@ -470,7 +606,7 @@ PanelWindow {
         // ── TRI LEFT BAR ──────────────────────────────────────────────────
         Rectangle {
             id: triLeft
-            visible: bar._isHorizontal && Config.barMode === "tri"
+            visible: bar._isHorizontal && Config.barMode === "tri" && !bar._triLeftAhHidden
             anchors {
                 left:           parent.left
                 leftMargin:     Config.outerMarginSide
@@ -480,7 +616,10 @@ PanelWindow {
             implicitWidth: triLeftRow.implicitWidth
                            + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
                            + Config.islandSpacing * 2
-            radius:        Config.barRadius
+            topLeftRadius:     Config.barTopLeftRadius
+            topRightRadius:    Config.barTopRightRadius
+            bottomLeftRadius:  Config.barBottomLeftRadius
+            bottomRightRadius: Config.barBottomRightRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
             border.color:  Qt.rgba(Theme.cOnSecondary.r,
@@ -490,8 +629,27 @@ PanelWindow {
             clip: false
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
+            HoverHandler {
+                id: triLeftHover
+                onHoveredChanged: {
+                    if (!bar._triLeftAhEnabled) return
+                    if (hovered) {
+                        triLeftHideTimer.stop()
+                        if (bar._triLeftAhHidden) {
+                            bar._triLeftAhHidden = false
+                        }
+                    } else {
+                        if (!bar.anyPanelOpen) triLeftHideTimer.restart()
+                    }
+                }
+            }
+
             Rectangle {
-                anchors.fill: parent; radius: parent.radius
+                anchors.fill: parent
+                topLeftRadius:     parent.topLeftRadius
+                topRightRadius:    parent.topRightRadius
+                bottomLeftRadius:  parent.bottomLeftRadius
+                bottomRightRadius: parent.bottomRightRadius
                 visible: Config.barRectBgStyle === "gradient"
                 opacity: 1.0
                 gradient: Gradient {
@@ -540,7 +698,7 @@ PanelWindow {
         // ── TRI CENTER BAR ─────────────────────────────────────────────────
         Rectangle {
             id: triCenter
-            visible: bar._isHorizontal && Config.barMode === "tri"
+            visible: bar._isHorizontal && Config.barMode === "tri" && !bar._triCenterAhHidden
             anchors {
                 horizontalCenter: parent.horizontalCenter
                 verticalCenter:   parent.verticalCenter
@@ -549,7 +707,10 @@ PanelWindow {
             implicitWidth: triCenterRow.implicitWidth
                            + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
                            + Config.islandSpacing * 2
-            radius:        Config.barRadius
+            topLeftRadius:     Config.barTopLeftRadius
+            topRightRadius:    Config.barTopRightRadius
+            bottomLeftRadius:  Config.barBottomLeftRadius
+            bottomRightRadius: Config.barBottomRightRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
             border.color:  Qt.rgba(Theme.cOnSecondary.r,
@@ -558,8 +719,27 @@ PanelWindow {
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
+            HoverHandler {
+                id: triCenterHover
+                onHoveredChanged: {
+                    if (!bar._triCenterAhEnabled) return
+                    if (hovered) {
+                        triCenterHideTimer.stop()
+                        if (bar._triCenterAhHidden) {
+                            bar._triCenterAhHidden = false
+                        }
+                    } else {
+                        if (!bar.anyPanelOpen) triCenterHideTimer.restart()
+                    }
+                }
+            }
+
             Rectangle {
-                anchors.fill: parent; radius: parent.radius
+                anchors.fill: parent
+                topLeftRadius:     parent.topLeftRadius
+                topRightRadius:    parent.topRightRadius
+                bottomLeftRadius:  parent.bottomLeftRadius
+                bottomRightRadius: parent.bottomRightRadius
                 visible: Config.barRectBgStyle === "gradient"
                 opacity: 1.0
                 gradient: Gradient {
@@ -595,7 +775,7 @@ PanelWindow {
         // ── TRI RIGHT BAR ──────────────────────────────────────────────────
         Rectangle {
             id: triRight
-            visible: bar._isHorizontal && Config.barMode === "tri"
+            visible: bar._isHorizontal && Config.barMode === "tri" && !bar._triRightAhHidden
             anchors {
                 right:          parent.right
                 rightMargin:    Config.outerMarginSide
@@ -605,7 +785,10 @@ PanelWindow {
             implicitWidth: triRightRow.implicitWidth
                            + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
                            + Config.islandSpacing * 2
-            radius:        Config.barRadius
+            topLeftRadius:     Config.barTopLeftRadius
+            topRightRadius:    Config.barTopRightRadius
+            bottomLeftRadius:  Config.barBottomLeftRadius
+            bottomRightRadius: Config.barBottomRightRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
             border.color:  Qt.rgba(Theme.cOnSecondary.r,
@@ -614,8 +797,27 @@ PanelWindow {
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
+            HoverHandler {
+                id: triRightHover
+                onHoveredChanged: {
+                    if (!bar._triRightAhEnabled) return
+                    if (hovered) {
+                        triRightHideTimer.stop()
+                        if (bar._triRightAhHidden) {
+                            bar._triRightAhHidden = false
+                        }
+                    } else {
+                        if (!bar.anyPanelOpen) triRightHideTimer.restart()
+                    }
+                }
+            }
+
             Rectangle {
-                anchors.fill: parent; radius: parent.radius
+                anchors.fill: parent
+                topLeftRadius:     parent.topLeftRadius
+                topRightRadius:    parent.topRightRadius
+                bottomLeftRadius:  parent.bottomLeftRadius
+                bottomRightRadius: parent.bottomRightRadius
                 visible: Config.barRectBgStyle === "gradient"
                 opacity: 1.0
                 gradient: Gradient {
@@ -651,6 +853,112 @@ PanelWindow {
                 Island { bgType: "activewindow"; visible_: Config.showWindow; Modules.ActiveWindow {} }
             }
         }
+
+    // ── Hotspots for individual tri panels ──
+    PanelWindow {
+        id: triLeftHotspot
+        readonly property bool _fullscreen: {
+            const mon = bar._monitor
+            return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
+        }
+        visible: Config.barMode === "tri" && bar._triLeftAhEnabled && bar._triLeftAhHidden && !_fullscreen
+
+        WlrLayershell.layer:     WlrLayer.Top
+        WlrLayershell.namespace: "quickshell:tri-left-autohide-hotspot"
+        exclusionMode:           ExclusionMode.Ignore
+        exclusiveZone:           0
+        color:                   "transparent"
+
+        anchors {
+            top:    bar._isTop
+            bottom: bar._isBottom
+            left:   true
+        }
+        margins {
+            left: barLayout.mapToItem(null, triLeft.x, 0).x
+        }
+        implicitWidth:  triLeft.width
+        implicitHeight: 4
+
+        HoverHandler {
+            onHoveredChanged: {
+                if (hovered && bar._triLeftAhEnabled) {
+                    bar._triLeftAhHidden = false
+                    triLeftHideTimer.stop()
+                }
+            }
+        }
+    }
+
+    PanelWindow {
+        id: triCenterHotspot
+        readonly property bool _fullscreen: {
+            const mon = bar._monitor
+            return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
+        }
+        visible: Config.barMode === "tri" && bar._triCenterAhEnabled && bar._triCenterAhHidden && !_fullscreen
+
+        WlrLayershell.layer:     WlrLayer.Top
+        WlrLayershell.namespace: "quickshell:tri-center-autohide-hotspot"
+        exclusionMode:           ExclusionMode.Ignore
+        exclusiveZone:           0
+        color:                   "transparent"
+
+        anchors {
+            top:    bar._isTop
+            bottom: bar._isBottom
+            left:   true
+        }
+        margins {
+            left: barLayout.mapToItem(null, triCenter.x, 0).x
+        }
+        implicitWidth:  triCenter.width
+        implicitHeight: 2
+
+        HoverHandler {
+            onHoveredChanged: {
+                if (hovered && bar._triCenterAhEnabled) {
+                    bar._triCenterAhHidden = false
+                    triCenterHideTimer.stop()
+                }
+            }
+        }
+    }
+
+    PanelWindow {
+        id: triRightHotspot
+        readonly property bool _fullscreen: {
+            const mon = bar._monitor
+            return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
+        }
+        visible: Config.barMode === "tri" && bar._triRightAhEnabled && bar._triRightAhHidden && !_fullscreen
+
+        WlrLayershell.layer:     WlrLayer.Top
+        WlrLayershell.namespace: "quickshell:tri-right-autohide-hotspot"
+        exclusionMode:           ExclusionMode.Ignore
+        exclusiveZone:           0
+        color:                   "transparent"
+
+        anchors {
+            top:    bar._isTop
+            bottom: bar._isBottom
+            left:   true
+        }
+        margins {
+            left: barLayout.mapToItem(null, triRight.x, 0).x
+        }
+        implicitWidth:  triRight.width
+        implicitHeight: 2
+
+        HoverHandler {
+            onHoveredChanged: {
+                if (hovered && bar._triRightAhEnabled) {
+                    bar._triRightAhHidden = false
+                    triRightHideTimer.stop()
+                }
+            }
+        }
+    }
 
         // ── VERTICAL BAR ──────────────────────────────────────────────────
         Column {

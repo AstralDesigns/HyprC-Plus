@@ -1676,6 +1676,13 @@ PanelWindow {
                                             Layout.fillWidth: true
                                         }
 
+                                        CCSection { text: "Shape" }
+                                        CCSlider { label:"Top-Left Radius";     from:0;to:40; value:Config.barTopLeftRadius;     onMoved:function(v){Config.barTopLeftRadius=v} }
+                                        CCSlider { label:"Top-Right Radius";    from:0;to:40; value:Config.barTopRightRadius;    onMoved:function(v){Config.barTopRightRadius=v} }
+                                        CCSlider { label:"Bottom-Left Radius";  from:0;to:40; value:Config.barBottomLeftRadius;  onMoved:function(v){Config.barBottomLeftRadius=v} }
+                                        CCSlider { label:"Bottom-Right Radius"; from:0;to:40; value:Config.barBottomRightRadius; onMoved:function(v){Config.barBottomRightRadius=v} }
+                                        CCSlider { label:"Island Radius";       from:0;to:40; value:Config.islandRadius;         onMoved:function(v){Config.islandRadius=v} }
+
                                         CCSection { text: "Mode & Position" }
                                         CCSegmented {
                                             label: "Bar Mode"
@@ -1700,10 +1707,6 @@ PanelWindow {
                                         CCSlider { label:"Side Margin";   from:0;to:200; value:Config.outerMarginSide;   onMoved:function(v){Config.outerMarginSide=v} }
                                         CCSlider { label:"Edge Pad Left"; from:0;to:30; value:Config.barEdgePaddingLeft; onMoved:function(v){Config.barEdgePaddingLeft=v} }
                                         CCSlider { label:"Edge Pad Right";from:0;to:30; value:Config.barEdgePaddingRight;onMoved:function(v){Config.barEdgePaddingRight=v} }
-
-                                        CCSection { text: "Shape" }
-                                        CCSlider { label:"Bar Radius";    from:0;to:40; value:Config.barRadius;    onMoved:function(v){Config.barRadius=v} }
-                                        CCSlider { label:"Island Radius"; from:0;to:40; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
 
                                         CCSection { text: "Border" }
                                         CCSlider { label:"Border W";        from:0;to:8; value:Config.barBorderWidth;    onMoved:function(v){Config.barBorderWidth=v} }
@@ -2348,6 +2351,7 @@ PanelWindow {
                                         CCToggle {
                                             id: _barAhToggle
                                             label: "Auto-Hide Bar"
+                                            visible: Config.barMode !== "tri"
                                             value: _barAhEnabled
                                             onToggled: function(v) {
                                                 _barAhEnabled = v
@@ -2357,6 +2361,7 @@ PanelWindow {
 
                                         CCSlider {
                                             label: "Delay (s)"
+                                            visible: Config.barMode !== "tri"
                                             from: 1; to: 60; stepSize: 1
                                             value: Config.barAutoHideDelay
                                             opacity: _barAhEnabled ? 1.0 : 0.4
@@ -2364,6 +2369,72 @@ PanelWindow {
                                             onMoved: function(v) {
                                                 _barAhDelay = v.toString()
                                                 Config.barAutoHideDelay = v
+                                            }
+                                        }
+
+                                        CCToggle {
+                                            id: _triLeftAhToggle
+                                            label: "Auto-Hide Left Panel"
+                                            visible: Config.barMode === "tri"
+                                            value: Config.triLeftAutoHide
+                                            onToggled: function(v) {
+                                                Config.triLeftAutoHide = v
+                                            }
+                                        }
+
+                                        CCSlider {
+                                            label: "Left Delay (s)"
+                                            visible: Config.barMode === "tri"
+                                            from: 1; to: 60; stepSize: 1
+                                            value: Config.triLeftAutoHideDelay
+                                            opacity: Config.triLeftAutoHide ? 1.0 : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            onMoved: function(v) {
+                                                Config.triLeftAutoHideDelay = v
+                                            }
+                                        }
+
+                                        CCToggle {
+                                            id: _triCenterAhToggle
+                                            label: "Auto-Hide Center Panel"
+                                            visible: Config.barMode === "tri"
+                                            value: Config.triCenterAutoHide
+                                            onToggled: function(v) {
+                                                Config.triCenterAutoHide = v
+                                            }
+                                        }
+
+                                        CCSlider {
+                                            label: "Center Delay (s)"
+                                            visible: Config.barMode === "tri"
+                                            from: 1; to: 60; stepSize: 1
+                                            value: Config.triCenterAutoHideDelay
+                                            opacity: Config.triCenterAutoHide ? 1.0 : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            onMoved: function(v) {
+                                                Config.triCenterAutoHideDelay = v
+                                            }
+                                        }
+
+                                        CCToggle {
+                                            id: _triRightAhToggle
+                                            label: "Auto-Hide Right Panel"
+                                            visible: Config.barMode === "tri"
+                                            value: Config.triRightAutoHide
+                                            onToggled: function(v) {
+                                                Config.triRightAutoHide = v
+                                            }
+                                        }
+
+                                        CCSlider {
+                                            label: "Right Delay (s)"
+                                            visible: Config.barMode === "tri"
+                                            from: 1; to: 60; stepSize: 1
+                                            value: Config.triRightAutoHideDelay
+                                            opacity: Config.triRightAutoHide ? 1.0 : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            onMoved: function(v) {
+                                                Config.triRightAutoHideDelay = v
                                             }
                                         }
 
