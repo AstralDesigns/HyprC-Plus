@@ -406,7 +406,11 @@ PanelWindow {
                   top: parent.top; bottom: parent.bottom }
         width: 504
 
-        radius: Config.barMode === "island" ? Config.islandRadius : Config.barRadius
+        //radius: startMenuPanel._panelRadius
+        topLeftRadius: 20
+        topRightRadius: 20
+        bottomLeftRadius: 20
+        bottomRightRadius: 20
         color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)

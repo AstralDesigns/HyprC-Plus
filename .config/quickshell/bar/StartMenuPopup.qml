@@ -52,7 +52,11 @@ PanelWindow {
         anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
         width: 340
         color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
-        radius: startMenuPanel._panelRadius
+        //radius: startMenuPanel._panelRadius
+        topLeftRadius: 20
+        topRightRadius: 20
+        bottomLeftRadius: 20
+        bottomRightRadius: 20
         focus: true
         border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
         scale: StartMenuState.menuVisible ? 1.0 : 0.92

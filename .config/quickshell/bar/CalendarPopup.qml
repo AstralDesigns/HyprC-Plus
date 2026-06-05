@@ -379,7 +379,7 @@ PanelWindow {
                                     color: _isToday
                                         ? Theme.cPrimary
                                         : _isWeekend
-                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80)
+                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
                                             : Theme.cOnSurf
                                     font.family: Config.labelFont
                                     font.pixelSize: 12
