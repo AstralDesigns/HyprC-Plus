@@ -147,6 +147,21 @@ function loadCSS() {
     _injectGlyphSizeCSS(display);
 }
 
+// Remap canonical (bottom-dock) corner radii → widget-local CSS corners.
+//   top*    = desktop-facing edge  |  bottom* = screen-attached edge
+function _mapCornersForPosition(edge, storedTL, storedTR, storedBL, storedBR) {
+    switch (edge) {
+    case 'top':
+        return { tl: storedBL, tr: storedBR, bl: storedTL, br: storedTR };
+    case 'left':
+        return { tl: storedBL, tr: storedTL, bl: storedBR, br: storedTR };
+    case 'right':
+        return { tl: storedTR, tr: storedBR, bl: storedTL, br: storedBL };
+    default: // bottom
+        return { tl: storedTL, tr: storedTR, bl: storedBL, br: storedBR };
+    }
+}
+
 function _injectGlyphSizeCSS(display) {
     // Read live from DockConfig so hot-reload (SIGUSR2) picks up new values.
     // Do NOT use the baked consts (APP_ICON_SIZE etc.) here — they are frozen
@@ -160,7 +175,17 @@ function _injectGlyphSizeCSS(display) {
         : Math.max(4, Math.round(appPx * DockConfig.indicatorSizeFraction));
     const btnSize  = appPx + 8;
     const borderW  = DockConfig.borderWidth;
-    const borderR  = DockConfig.borderRadius;
+    const fallbackR = DockConfig.borderRadius;
+    const storedTL = DockConfig.borderTopLeftRadius     ?? fallbackR;
+    const storedTR = DockConfig.borderTopRightRadius    ?? fallbackR;
+    const storedBL = DockConfig.borderBottomLeftRadius  ?? fallbackR;
+    const storedBR = DockConfig.borderBottomRightRadius ?? fallbackR;
+    const mapped = _mapCornersForPosition(
+        DockConfig.position || 'bottom', storedTL, storedTR, storedBL, storedBR);
+    const borderTL = mapped.tl;
+    const borderTR = mapped.tr;
+    const borderBL = mapped.bl;
+    const borderBR = mapped.br;
     const padPx    = DockConfig.innerPadding;
 
     // Gradient style mirrors the Bar / Tri rect gradient: inversePrimary → scrim.
@@ -199,7 +224,7 @@ function _injectGlyphSizeCSS(display) {
         /* Config-driven values — updated in-place on SIGUSR2 hot-reload */
         window.background {
             border-width: ${borderW}px;
-            border-radius: ${borderR}px;
+            border-radius: ${borderTL}px ${borderTR}px ${borderBR}px ${borderBL}px;
             ${bgStyle}
         }
         #box {
@@ -367,7 +392,7 @@ function readHyprCandyConf() {
 //                   widget size_request needs a dock restart for structural rebuild)
 //   innerPadding  → #box { padding }          (CSS re-inject)
 //   borderWidth   → window.background border  (CSS re-inject)
-//   borderRadius  → window.background radius  (CSS re-inject)
+//   borderRadius / border*Radius → window.background radius  (CSS re-inject)
 //   marginBottom/Top/Left/Right → Gtk4LayerShell.set_margin (live)
 function hotReload() {
     log('[dock] SIGUSR2 received — hot-reloading config');
@@ -932,6 +957,7 @@ const HyprCandyDock = GObject.registerClass({
 
             // Dialog surface
             const dlg = new Gtk.Window({ decorated: false, resizable: false });
+            dlg.add_css_class('hc-trash-dialog');
             Gtk4LayerShell.init_for_window(dlg);
             Gtk4LayerShell.set_layer(dlg, Gtk4LayerShell.Layer.OVERLAY);
             Gtk4LayerShell.set_keyboard_mode(dlg, Gtk4LayerShell.KeyboardMode.ON_DEMAND);
@@ -945,9 +971,9 @@ const HyprCandyDock = GObject.registerClass({
             // CSS — matches existing popover palette
             const dlgCss = new Gtk.CssProvider();
             dlgCss.load_from_data(`
-                window.background {
-                    background-color: @on_secondary;
-                    border-radius: 14px;
+                window.hc-trash-dialog {
+                    background-color: alpha(@on_secondary, 0.60);
+                    border-radius: 20px;
                     border: 1px solid alpha(@primary, 0.15);
                     box-shadow: none;
                 }
@@ -967,10 +993,10 @@ const HyprCandyDock = GObject.registerClass({
                     min-width: 80px;
                 }
                 .dlg-btn-cancel {
-                    background-color: alpha(@primary, 0.10);
+                    background-color: alpha(@on_secondary, 0.65);
                     color: @primary;
                 }
-                .dlg-btn-cancel:hover { background-color: alpha(@primary, 0.18); }
+                .dlg-btn-cancel:hover { background-color: alpha(@on-secondary, 0.85); }
                 .dlg-btn-confirm {
                     background-color: @error;
                     color: @on_error;
@@ -978,7 +1004,7 @@ const HyprCandyDock = GObject.registerClass({
                 .dlg-btn-confirm:hover { background-color: alpha(@error, 0.80); }
             `, -1);
             dlg.get_style_context().add_provider(
-                dlgCss, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+                dlgCss, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 2);
 
             // Layout
             const root = new Gtk.Box({

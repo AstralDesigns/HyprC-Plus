@@ -53,7 +53,10 @@ PanelWindow {
     property string _dockSpacingVal:    "0"
     property string _dockPaddingVal:    "0"
     property string _dockBorderWVal:    "2"
-    property string _dockBorderRVal:    "20"
+    property string _dockBorderTLVal:   "20"
+    property string _dockBorderTRVal:   "20"
+    property string _dockBorderBLVal:   "20"
+    property string _dockBorderBRVal:   "20"
     property string _dockIconSizeVal:   "24"
     property string _dockStartIconVal:  ""
     property string _dockRectBgStyle:   "glass"
@@ -404,6 +407,10 @@ PanelWindow {
             "grep -oP 'innerPadding:\\s*\\K[0-9]+' \"$f\" | head -1; " +
             "grep -oP 'borderWidth:\\s*\\K[0-9]+' \"$f\" | head -1; " +
             "grep -oP 'borderRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
+            "grep -oP 'borderTopLeftRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
+            "grep -oP 'borderTopRightRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
+            "grep -oP 'borderBottomLeftRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
+            "grep -oP 'borderBottomRightRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
             "grep -oP 'appIconSize:\\s*\\K[0-9]+' \"$f\" | head -1; " +
             "grep -oP \"startIcon:\\s*'\\K[^']+\" \"$f\" | head -1"]
         running: false
@@ -418,9 +425,13 @@ PanelWindow {
             _dockSpacingVal   = (ls[0] !== undefined && ls[0]) ? ls[0] : "0"
             _dockPaddingVal   = (ls[1] !== undefined && ls[1]) ? ls[1] : "0"
             _dockBorderWVal   = (ls[2] !== undefined && ls[2]) ? ls[2] : "2"
-            _dockBorderRVal   = (ls[3] !== undefined && ls[3]) ? ls[3] : "20"
-            _dockIconSizeVal  = (ls[4] !== undefined && ls[4]) ? ls[4] : "24"
-            _dockStartIconVal = (ls[5] !== undefined && ls[5]) ? ls[5] : ""
+            const fallbackR   = (ls[3] !== undefined && ls[3]) ? ls[3] : "20"
+            _dockBorderTLVal  = (ls[4] !== undefined && ls[4]) ? ls[4] : fallbackR
+            _dockBorderTRVal  = (ls[5] !== undefined && ls[5]) ? ls[5] : fallbackR
+            _dockBorderBLVal  = (ls[6] !== undefined && ls[6]) ? ls[6] : fallbackR
+            _dockBorderBRVal  = (ls[7] !== undefined && ls[7]) ? ls[7] : fallbackR
+            _dockIconSizeVal  = (ls[8] !== undefined && ls[8]) ? ls[8] : "24"
+            _dockStartIconVal = (ls[9] !== undefined && ls[9]) ? ls[9] : ""
         }
     }
     // ── Shared conf writer for hyprcandy-bar.conf ────────────────────────────
@@ -1676,12 +1687,26 @@ PanelWindow {
                                             Layout.fillWidth: true
                                         }
 
-                                        CCSection { text: "Shape" }
-                                        CCSlider { label:"Top-Left Radius";     from:0;to:40; value:Config.barTopLeftRadius;     onMoved:function(v){Config.barTopLeftRadius=v} }
-                                        CCSlider { label:"Top-Right Radius";    from:0;to:40; value:Config.barTopRightRadius;    onMoved:function(v){Config.barTopRightRadius=v} }
-                                        CCSlider { label:"Bottom-Left Radius";  from:0;to:40; value:Config.barBottomLeftRadius;  onMoved:function(v){Config.barBottomLeftRadius=v} }
-                                        CCSlider { label:"Bottom-Right Radius"; from:0;to:40; value:Config.barBottomRightRadius; onMoved:function(v){Config.barBottomRightRadius=v} }
-                                        CCSlider { label:"Island Radius";       from:0;to:40; value:Config.islandRadius;         onMoved:function(v){Config.islandRadius=v} }
+                                        CCSection { text: "Corner Radius" }
+                                        // bar / island — single rect corners
+                                        CCSlider { visible: Config.barMode !== "tri"; label:"Top-Left";     from:0;to:40; value:Config.barTopLeftRadius;     onMoved:function(v){Config.barTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri"; label:"Top-Right";    from:0;to:40; value:Config.barTopRightRadius;    onMoved:function(v){Config.barTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri"; label:"Bottom-Left";  from:0;to:40; value:Config.barBottomLeftRadius;  onMoved:function(v){Config.barBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri"; label:"Bottom-Right"; from:0;to:40; value:Config.barBottomRightRadius; onMoved:function(v){Config.barBottomRightRadius=v} }
+                                        // tri — per-segment corners (left uses bar*Radius)
+                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Top-Left";     from:0;to:40; value:Config.barTopLeftRadius;          onMoved:function(v){Config.barTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Top-Right";    from:0;to:40; value:Config.triLeftTopRightRadius;    onMoved:function(v){Config.triLeftTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Bottom-Left";  from:0;to:40; value:Config.barBottomLeftRadius;       onMoved:function(v){Config.barBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Bottom-Right"; from:0;to:40; value:Config.triLeftBottomRightRadius; onMoved:function(v){Config.triLeftBottomRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Top-Left";     from:0;to:40; value:Config.triCenterTopLeftRadius;     onMoved:function(v){Config.triCenterTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Top-Right";    from:0;to:40; value:Config.triCenterTopRightRadius;    onMoved:function(v){Config.triCenterTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Bottom-Left";  from:0;to:40; value:Config.triCenterBottomLeftRadius;  onMoved:function(v){Config.triCenterBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Bottom-Right"; from:0;to:40; value:Config.triCenterBottomRightRadius; onMoved:function(v){Config.triCenterBottomRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Top-Left";     from:0;to:40; value:Config.triRightTopLeftRadius;     onMoved:function(v){Config.triRightTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Top-Right";    from:0;to:40; value:Config.barTopRightRadius;       onMoved:function(v){Config.barTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Left";  from:0;to:40; value:Config.triRightBottomLeftRadius;  onMoved:function(v){Config.triRightBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Right"; from:0;to:40; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
+                                        CCSlider { label:"Island"; from:0;to:40; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
 
                                         CCSection { text: "Mode & Position" }
                                         CCSegmented {
@@ -3507,13 +3532,45 @@ PanelWindow {
                                 }
                             }
                             Process { id: _dockBorderWStateWrite; running: false; onExited: running = false }
+
+                            CCSection { text: "Corner Radius" }
                             CCSlider {
-                                label: "Border R"
-                                from: 0; to: 100; stepSize: 1
-                                value: parseInt(_dockBorderRVal) || 0
+                                label: "Top-Left"
+                                from: 0; to: 40; stepSize: 1
+                                value: parseInt(_dockBorderTLVal) || 0
                                 onMoved: function(v) {
-                                    _dockBorderRVal = v.toString()
-                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderRadius", v.toString()]
+                                    _dockBorderTLVal = v.toString()
+                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderTopLeftRadius", v.toString()]
+                                    _dockWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Top-Right"
+                                from: 0; to: 40; stepSize: 1
+                                value: parseInt(_dockBorderTRVal) || 0
+                                onMoved: function(v) {
+                                    _dockBorderTRVal = v.toString()
+                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderTopRightRadius", v.toString()]
+                                    _dockWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Bottom-Left"
+                                from: 0; to: 40; stepSize: 1
+                                value: parseInt(_dockBorderBLVal) || 0
+                                onMoved: function(v) {
+                                    _dockBorderBLVal = v.toString()
+                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderBottomLeftRadius", v.toString()]
+                                    _dockWrite.running = true
+                                }
+                            }
+                            CCSlider {
+                                label: "Bottom-Right"
+                                from: 0; to: 40; stepSize: 1
+                                value: parseInt(_dockBorderBRVal) || 0
+                                onMoved: function(v) {
+                                    _dockBorderBRVal = v.toString()
+                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderBottomRightRadius", v.toString()]
                                     _dockWrite.running = true
                                 }
                             }
@@ -3547,12 +3604,39 @@ PanelWindow {
                                     }
                                 }
                             }
-                            Process { id: _dockReadBorderR; command: [scriptDir+"/dock-get.sh", "borderRadius"]; running: false
+                            Process { id: _dockReadBorderTL; command: [scriptDir+"/dock-get.sh", "borderTopLeftRadius"]; running: false
                                 stdout: SplitParser {
                                     splitMarker: "\n"
                                     onRead: function(l) {
                                         const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockBorderRVal = v
+                                        if (v && !isNaN(parseInt(v))) _dockBorderTLVal = v
+                                    }
+                                }
+                            }
+                            Process { id: _dockReadBorderTR; command: [scriptDir+"/dock-get.sh", "borderTopRightRadius"]; running: false
+                                stdout: SplitParser {
+                                    splitMarker: "\n"
+                                    onRead: function(l) {
+                                        const v = l.trim()
+                                        if (v && !isNaN(parseInt(v))) _dockBorderTRVal = v
+                                    }
+                                }
+                            }
+                            Process { id: _dockReadBorderBL; command: [scriptDir+"/dock-get.sh", "borderBottomLeftRadius"]; running: false
+                                stdout: SplitParser {
+                                    splitMarker: "\n"
+                                    onRead: function(l) {
+                                        const v = l.trim()
+                                        if (v && !isNaN(parseInt(v))) _dockBorderBLVal = v
+                                    }
+                                }
+                            }
+                            Process { id: _dockReadBorderBR; command: [scriptDir+"/dock-get.sh", "borderBottomRightRadius"]; running: false
+                                stdout: SplitParser {
+                                    splitMarker: "\n"
+                                    onRead: function(l) {
+                                        const v = l.trim()
+                                        if (v && !isNaN(parseInt(v))) _dockBorderBRVal = v
                                     }
                                 }
                             }
@@ -3591,7 +3675,10 @@ PanelWindow {
                                     _dockReadSpacing.running  = true
                                     _dockReadPadding.running  = true
                                     _dockReadBorderW.running  = true
-                                    _dockReadBorderR.running  = true
+                                    _dockReadBorderTL.running = true
+                                    _dockReadBorderTR.running = true
+                                    _dockReadBorderBL.running = true
+                                    _dockReadBorderBR.running = true
                                     _dockReadIconSize.running = true
                                     _dockReadStartIcon.running = true
                                     _dockReadRectBg.running   = true
@@ -4199,6 +4286,46 @@ PanelWindow {
                             Process {
                                 id: _openGumroad
                                 command: ["xdg-open", "https://mirukai.gumroad.com/l/cxsyj"]
+                                running: false
+                                onExited: running = false
+                            }
+
+                            CCSection { text: "Support hyprcandy" }
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Enjoying hyprcandy? A Ko-fi tip helps keep development going — thank you!"
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                               Theme.cPrimary.b, 0.55)
+                                font.family: Config.labelFont; font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+
+                            Item {
+                                Layout.fillWidth: true
+                                height: 52
+                                Image {
+                                    id: _kofiBtnImg
+                                    anchors.left: parent.left
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    height: 44
+                                    width: height * (sourceSize.width > 0 && sourceSize.height > 0
+                                        ? sourceSize.width / sourceSize.height : 2.6)
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                    source: "file://" + scriptDir + "/../assets/kofi-support.png"
+                                }
+                                MouseArea {
+                                    anchors.fill: _kofiBtnImg
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: _openKofi.running = true
+                                }
+                            }
+
+                            Process {
+                                id: _openKofi
+                                command: ["xdg-open", "https://ko-fi.com/ianmking"]
                                 running: false
                                 onExited: running = false
                             }

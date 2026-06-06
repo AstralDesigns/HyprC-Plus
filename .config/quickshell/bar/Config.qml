@@ -22,6 +22,8 @@ QtObject {
         Qt.application.organizationDomain = "hyprcandy.local"
         // Load persisted values after properties are initialized
         _loadSettings()
+        _lastBarPosition = barPosition
+        _cornerSwapReady = true
     }
 
     // ── Settings persistence helper ────────────────────────────────────────
@@ -65,6 +67,19 @@ QtObject {
         v = _settings.value("barTopRightRadius");   barTopRightRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
         v = _settings.value("barBottomLeftRadius"); barBottomLeftRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
         v = _settings.value("barBottomRightRadius");barBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
+        v = _settings.value("triLeftTopRightRadius");    triLeftTopRightRadius    = (v !== undefined && v !== null) ? parseInt(v) : barTopRightRadius
+        v = _settings.value("triLeftBottomRightRadius"); triLeftBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : barBottomRightRadius
+        v = _settings.value("triCenterTopLeftRadius");     triCenterTopLeftRadius     = (v !== undefined && v !== null) ? parseInt(v) : barTopLeftRadius
+        v = _settings.value("triCenterTopRightRadius");    triCenterTopRightRadius    = (v !== undefined && v !== null) ? parseInt(v) : barTopRightRadius
+        v = _settings.value("triCenterBottomLeftRadius");   triCenterBottomLeftRadius  = (v !== undefined && v !== null) ? parseInt(v) : barBottomLeftRadius
+        v = _settings.value("triCenterBottomRightRadius");  triCenterBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : barBottomRightRadius
+        v = _settings.value("triRightTopLeftRadius");     triRightTopLeftRadius     = (v !== undefined && v !== null) ? parseInt(v) : 20
+        v = _settings.value("triRightBottomLeftRadius"); triRightBottomLeftRadius = (v !== undefined && v !== null) ? parseInt(v) : 20
+        // Legacy: outer right tri corners now share barTopRight / barBottomRight
+        v = _settings.value("triRightTopRightRadius")
+        if (v !== undefined && v !== null) barTopRightRadius = parseInt(v)
+        v = _settings.value("triRightBottomRightRadius")
+        if (v !== undefined && v !== null) barBottomRightRadius = parseInt(v)
         v = _settings.value("islandRadius"); if (v !== undefined && v !== null) islandRadius = v
         v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
         v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
@@ -221,6 +236,14 @@ QtObject {
         _settings.setValue("barTopRightRadius",    barTopRightRadius)
         _settings.setValue("barBottomLeftRadius",  barBottomLeftRadius)
         _settings.setValue("barBottomRightRadius", barBottomRightRadius)
+        _settings.setValue("triLeftTopRightRadius",    triLeftTopRightRadius)
+        _settings.setValue("triLeftBottomRightRadius", triLeftBottomRightRadius)
+        _settings.setValue("triCenterTopLeftRadius",     triCenterTopLeftRadius)
+        _settings.setValue("triCenterTopRightRadius",    triCenterTopRightRadius)
+        _settings.setValue("triCenterBottomLeftRadius",  triCenterBottomLeftRadius)
+        _settings.setValue("triCenterBottomRightRadius", triCenterBottomRightRadius)
+        _settings.setValue("triRightTopLeftRadius",     triRightTopLeftRadius)
+        _settings.setValue("triRightBottomLeftRadius",  triRightBottomLeftRadius)
         _settings.setValue("islandRadius", islandRadius)
         _settings.setValue("islandBorder", islandBorder)
         _settings.setValue("islandBorderAlpha", islandBorderAlpha)
@@ -386,8 +409,9 @@ QtObject {
     property int moduleHeight: 20   // px — visual island/pill height
 
     //  Outer margins from screen edges:
-    property int outerMarginTop:    2   // px — gap from screen top
-    property int outerMarginBottom: 0   // px — gap from screen bottom
+    // Widget-local — Top/Bottom sliders always match visual edge; values swap on top↔bottom flip.
+    property int outerMarginTop:    2   // px — gap from screen top (when bar at top)
+    property int outerMarginBottom: 0   // px — gap from screen bottom (when bar at bottom)
     property int outerMarginSide:   6   // px — gap from left & right screen edges
 
     //  Far-edge padding: extra inset from the barBg L/R edges to the first/last
@@ -396,11 +420,57 @@ QtObject {
     property int barEdgePaddingRight: 2   // px
 
     // ── Radii ────────────────────────────────────────────────────────────
+    // Widget-local corners — sliders always match visual TL/TR/BL/BR.
+    // On top↔bottom flip, values swap vertically so screen-edge rounding carries over.
     property int barTopLeftRadius:     20
     property int barTopRightRadius:    20
     property int barBottomLeftRadius:  20
     property int barBottomRightRadius: 20
     readonly property int barRadius: barTopLeftRadius
+    // tri mode — outer corners share bar TL/BL (left) and TR/BR (right); inner corners independent
+    property int triLeftTopRightRadius:    20
+    property int triLeftBottomRightRadius: 20
+    property int triCenterTopLeftRadius:     20
+    property int triCenterTopRightRadius:    20
+    property int triCenterBottomLeftRadius:  20
+    property int triCenterBottomRightRadius: 20
+    property int triRightTopLeftRadius:     20
+    property int triRightBottomLeftRadius:  20
+
+    property string _lastBarPosition: ""
+    property bool   _cornerSwapReady: false
+
+    function _swapBarCornersVertical() {
+        const tl = barTopLeftRadius,     tr = barTopRightRadius
+        const bl = barBottomLeftRadius,  br = barBottomRightRadius
+        barTopLeftRadius = bl;     barTopRightRadius = br
+        barBottomLeftRadius = tl;  barBottomRightRadius = tr
+
+        const ctl = triCenterTopLeftRadius,     ctr = triCenterTopRightRadius
+        const cbl = triCenterBottomLeftRadius,  cbr = triCenterBottomRightRadius
+        triCenterTopLeftRadius = cbl;     triCenterTopRightRadius = cbr
+        triCenterBottomLeftRadius = ctl;  triCenterBottomRightRadius = ctr
+
+        const ltr = triLeftTopRightRadius,    lbr = triLeftBottomRightRadius
+        triLeftTopRightRadius = lbr;    triLeftBottomRightRadius = ltr
+
+        const rtl = triRightTopLeftRadius,    rbl = triRightBottomLeftRadius
+        triRightTopLeftRadius = rbl;    triRightBottomLeftRadius = rtl
+    }
+
+    onBarPositionChanged: {
+        if (!_cornerSwapReady) return
+        const prev = _lastBarPosition
+        if ((prev === "top" && barPosition === "bottom")
+                || (prev === "bottom" && barPosition === "top")) {
+            _swapBarCornersVertical()
+            const mt = outerMarginTop, mb = outerMarginBottom
+            outerMarginTop = mb
+            outerMarginBottom = mt
+        }
+        _lastBarPosition = barPosition
+    }
+
     property int islandRadius: 20   // px — island pill corner radius
 
     // ── Island border ────────────────────────────────────────────────────
