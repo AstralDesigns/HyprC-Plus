@@ -686,9 +686,9 @@ QtObject {
     // ═══════════════════════════════════════════════════════════════════════
 
     property int trayIconSz:     24   // px — icon image size
-    property int trayItemPadH:    1   // px — horizontal padding inside each tray slot
+    property int trayItemPadH:    3   // px — horizontal padding inside each tray slot
     property int trayItemPadV:    2   // px — vertical padding inside each tray slot
-    property int trayItemSpacing: 0   // px — gap between tray icons
+    property int trayItemSpacing: 2   // px — gap between tray icons
 
     // ═══════════════════════════════════════════════════════════════════════
     //  TAB 5 · Cava
