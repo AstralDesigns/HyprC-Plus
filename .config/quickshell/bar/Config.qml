@@ -69,6 +69,11 @@ QtObject {
         v = _settings.value("barBottomRightRadius");barBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
         v = _settings.value("triLeftTopRightRadius");    triLeftTopRightRadius    = (v !== undefined && v !== null) ? parseInt(v) : barTopRightRadius
         v = _settings.value("triLeftBottomRightRadius"); triLeftBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : barBottomRightRadius
+        // Legacy: outer left tri corners now share barTopLeft / barBottomLeft
+        v = _settings.value("triLeftTopLeftRadius")
+        if (v !== undefined && v !== null) barTopLeftRadius = parseInt(v)
+        v = _settings.value("triLeftBottomLeftRadius")
+        if (v !== undefined && v !== null) barBottomLeftRadius = parseInt(v)
         v = _settings.value("triCenterTopLeftRadius");     triCenterTopLeftRadius     = (v !== undefined && v !== null) ? parseInt(v) : barTopLeftRadius
         v = _settings.value("triCenterTopRightRadius");    triCenterTopRightRadius    = (v !== undefined && v !== null) ? parseInt(v) : barTopRightRadius
         v = _settings.value("triCenterBottomLeftRadius");   triCenterBottomLeftRadius  = (v !== undefined && v !== null) ? parseInt(v) : barBottomLeftRadius
@@ -240,12 +245,16 @@ QtObject {
         _settings.setValue("barBottomRightRadius", barBottomRightRadius)
         _settings.setValue("triLeftTopRightRadius",    triLeftTopRightRadius)
         _settings.setValue("triLeftBottomRightRadius", triLeftBottomRightRadius)
+        _settings.setValue("triLeftTopLeftRadius",    barTopLeftRadius)
+        _settings.setValue("triLeftBottomLeftRadius", barBottomLeftRadius)
         _settings.setValue("triCenterTopLeftRadius",     triCenterTopLeftRadius)
         _settings.setValue("triCenterTopRightRadius",    triCenterTopRightRadius)
         _settings.setValue("triCenterBottomLeftRadius",  triCenterBottomLeftRadius)
         _settings.setValue("triCenterBottomRightRadius", triCenterBottomRightRadius)
         _settings.setValue("triRightTopLeftRadius",     triRightTopLeftRadius)
         _settings.setValue("triRightBottomLeftRadius",  triRightBottomLeftRadius)
+        _settings.setValue("triRightTopRightRadius",    barTopRightRadius)
+        _settings.setValue("triRightBottomRightRadius", barBottomRightRadius)
         _settings.setValue("islandRadius", islandRadius)
         _settings.setValue("islandBorder", islandBorder)
         _settings.setValue("islandBorderAlpha", islandBorderAlpha)

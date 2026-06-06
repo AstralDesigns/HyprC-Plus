@@ -189,6 +189,14 @@ PanelWindow {
                 width: 110; height: 110
                 Layout.alignment: Qt.AlignVCenter
 
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 999
+                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28)
+                }
+
                 Canvas {
                     id: analogCanvas
                     anchors.fill: parent
@@ -209,7 +217,7 @@ PanelWindow {
 
                         // 1. Draw outer circle
                         ctx.lineWidth = 1.5
-                        ctx.strokeStyle = Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35).toString()
+                        ctx.strokeStyle = Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35).toString()
                         ctx.beginPath()
                         ctx.arc(cx, cy, r, 0, 2 * Math.PI)
                         ctx.stroke()
