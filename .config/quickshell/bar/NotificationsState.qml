@@ -403,6 +403,24 @@ Item {
     }
 
     // ── Daemon startup ──────────────────────────────────────────────────────
+    // While candylock holds /tmp/candylock-notif.lock the bar must not reclaim DBus.
+    property bool _candylockNotifLock: false
+
+    function _mayRunNotifDaemon() { return !ns._candylockNotifLock }
+
+    Process {
+        id: candylockLockProbe
+        command: ["bash", "-c", "[ -f /tmp/candylock-notif.lock ] && echo 1 || echo 0"]
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { ns._candylockNotifLock = l.trim() === "1" }
+        }
+    }
+    Timer {
+        interval: 1200; repeat: true; running: true; triggeredOnStart: true
+        onTriggered: { if (!candylockLockProbe.running) candylockLockProbe.running = true }
+    }
+
     Process { id: notifDaemonProc
         command: ["python3", "-u",
             Quickshell.env("HOME") +
@@ -411,11 +429,22 @@ Item {
             if (!l.trim()) return
             try { ns._handleNotifEvent(JSON.parse(l)) } catch(e) {}
         }}
-        Component.onCompleted: running = true
-        onRunningChanged: if (!running) notifDaemonRestartTimer.restart()
+        Component.onCompleted: { if (ns._mayRunNotifDaemon()) running = true }
+        onRunningChanged: {
+            if (!running && ns._mayRunNotifDaemon()) notifDaemonRestartTimer.restart()
+        }
     }
     Timer { id: notifDaemonRestartTimer; interval: 3000; repeat: false
-        onTriggered: { if (!notifDaemonProc.running) notifDaemonProc.running = true }
+        onTriggered: {
+            if (!notifDaemonProc.running && ns._mayRunNotifDaemon())
+                notifDaemonProc.running = true
+        }
+    }
+    on_CandylockNotifLockChanged: {
+        if (ns._candylockNotifLock && notifDaemonProc.running)
+            notifDaemonProc.running = false
+        else if (!ns._candylockNotifLock && !notifDaemonProc.running)
+            notifDaemonRestartTimer.restart()
     }
 
     // ── Volume/Backlight listeners ──────────────────────────────────────────

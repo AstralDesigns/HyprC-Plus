@@ -52,11 +52,14 @@ Item {
             Repeater {
                 model: NotificationsState.notifications
                 delegate: Item {
+                    id: toastDelegate
                     required property var modelData
                     required property int index
                     readonly property var notif: modelData
+                    readonly property real progressTimestamp: modelData.timestamp
                     property bool _hov: toastMA.containsMouse
                     property real _radius: 14
+                    onModelDataChanged: progTrackItem._age = 0
                     property real _p: 0
                     property real _swipeX: 0
                     property bool _dismissing: false
@@ -128,22 +131,41 @@ Item {
                             : notif.category==="media.playing"?Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b,1)
                             : Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b,1) }
 
-                    // Progress bar — smooth continuous drain
+                    // Progress bar — smooth continuous drain (matches lockscreen toasts)
                     Item {
                         id: progTrackItem
-                        visible: !notif.isPrompt && notif.urgency<2
-                        anchors { bottom:parent.bottom; left:parent.left; right:parent.right }
-                        height: 3; clip: true
+                        visible: !notif.isPrompt && notif.urgency < 2
+                        anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
+                        height: 3
+                        z: 10
+                        clip: true
                         property real _age: 0
-                        // Poll at 250 ms; the wide Behavior window fills the gap smoothly
-                        Timer { interval:250; repeat:true; running:progTrackItem.visible
-                            onTriggered: progTrackItem._age = Math.min(1,(Date.now()-notif.timestamp)/5000) }
+                        onVisibleChanged: if (visible) _age = 0
+                        Connections {
+                            target: toastDelegate
+                            function onProgressTimestampChanged() { progTrackItem._age = 0 }
+                        }
+                        Timer {
+                            interval: 250
+                            repeat: true
+                            running: progTrackItem.visible
+                            onTriggered: progTrackItem._age = Math.min(1, (Date.now() - toastDelegate.progressTimestamp) / 5000)
+                        }
                         Rectangle {
-                            anchors.fill:parent; radius:parent.parent._radius
-                            color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.22)
-                            Rectangle { anchors{left:parent.left;top:parent.top;bottom:parent.bottom}
-                                width:parent.width*Math.max(0,1-progTrackItem._age); color:Theme.cPrimary; radius:parent.radius
-                                Behavior on width { NumberAnimation { duration:260; easing.type:Easing.Linear } } }
+                            anchors.fill: parent
+                            radius: toastDelegate._radius
+                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                            Rectangle {
+                                anchors.left: parent.left
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                width: parent.width * Math.max(0, 1 - progTrackItem._age)
+                                color: Theme.cPrimary
+                                radius: parent.radius
+                                Behavior on width {
+                                    NumberAnimation { duration: 260; easing.type: Easing.Linear }
+                                }
+                            }
                         }
                     }
 

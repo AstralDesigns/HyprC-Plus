@@ -57,6 +57,7 @@ PanelWindow {
     property string _dockBorderTRVal:   "20"
     property string _dockBorderBLVal:   "20"
     property string _dockBorderBRVal:   "20"
+    property string _dockBorderColorVar: "on_secondary"
     property string _dockIconSizeVal:   "24"
     property string _dockStartIconVal:  ""
     property string _dockRectBgStyle:   "glass"
@@ -157,7 +158,9 @@ PanelWindow {
         {label: "$background", var: "$background"},
         {label: "$surface", var: "$surface"},
         {label: "$surface_container", var: "$surface_container"},
-        {label: "$outline", var: "$outline"}
+        {label: "$outline", var: "$outline"},
+        {label: "$outline_variant", var: "$outline_variant"},
+        {label: "$on_secondary", var: "$on_secondary"}
     ]
 
     // Available pywal border variables (color0–color15 + foreground/background)
@@ -1738,6 +1741,68 @@ PanelWindow {
                                         CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
                                         CCSlider { label:"Island Border";     from:0;to:8; value:Config.islandBorder;      onMoved:function(v){Config.islandBorder=v} }
                                         CCSlider { label:"Island Border α";   from:0;to:1;stepSize:0.05;decimals:2; value:Config.islandBorderAlpha;  onMoved:function(v){Config.islandBorderAlpha=v} }
+
+                                        CCSection { text: "Bar Border Color" }
+                                        Flow {
+                                            Layout.fillWidth: true; spacing: 5
+                                            Repeater {
+                                                model: ccWin._matugenBorderVars
+                                                delegate: Item {
+                                                    required property var modelData
+                                                    width: 28; height: 28
+                                                    Rectangle {
+                                                        anchors.fill: parent; radius: 6
+                                                        color: ccWin._cavaThemeColorLocal(modelData.var)
+                                                        border.width: Config.barBorderVar === modelData.var ? 2 : 1
+                                                        border.color: Config.barBorderVar === modelData.var
+                                                            ? Theme.cPrimary
+                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                        ToolTip.visible: _barBordHov.containsMouse
+                                                        ToolTip.text: modelData.var
+                                                        ToolTip.delay: 400
+                                                        MouseArea {
+                                                            id: _barBordHov
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: { Config.barBorderVar = modelData.var }
+                                                        }
+                                                        Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        CCSection { text: "Island Border Color" }
+                                        Flow {
+                                            Layout.fillWidth: true; spacing: 5
+                                            Repeater {
+                                                model: ccWin._matugenBorderVars
+                                                delegate: Item {
+                                                    required property var modelData
+                                                    width: 28; height: 28
+                                                    Rectangle {
+                                                        anchors.fill: parent; radius: 6
+                                                        color: ccWin._cavaThemeColorLocal(modelData.var)
+                                                        border.width: Config.islandBorderVar === modelData.var ? 2 : 1
+                                                        border.color: Config.islandBorderVar === modelData.var
+                                                            ? Theme.cPrimary
+                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                        ToolTip.visible: _islBordHov.containsMouse
+                                                        ToolTip.text: modelData.var
+                                                        ToolTip.delay: 400
+                                                        MouseArea {
+                                                            id: _islBordHov
+                                                            anchors.fill: parent
+                                                            hoverEnabled: true
+                                                            cursorShape: Qt.PointingHandCursor
+                                                            onClicked: { Config.islandBorderVar = modelData.var }
+                                                        }
+                                                        Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                    }
+                                                }
+                                            }
+                                        }
 
                                         CCSection { text: "Spacing & Padding" }
                                         CCSlider { label:"Island Spacing";  from:0;to:24; value:Config.islandSpacing;  onMoved:function(v){Config.islandSpacing=v} }
@@ -3533,6 +3598,50 @@ PanelWindow {
                             }
                             Process { id: _dockBorderWStateWrite; running: false; onExited: running = false }
 
+                            CCSection { text: "Border Color" }
+                            Flow {
+                                Layout.fillWidth: true; spacing: 5
+                                Repeater {
+                                    model: ccWin._matugenBorderVars
+                                    delegate: Item {
+                                        required property var modelData
+                                        // GTK4 matugen names — no $ prefix (bar uses $ from colors.conf)
+                                        readonly property string gtkName: modelData.var.replace(/^\$/, "")
+                                        width: 28; height: 28
+
+                                        Rectangle {
+                                            anchors.fill: parent; radius: 6
+                                            color: ccWin._cavaThemeColorLocal(modelData.var)
+                                            border.width: _dockBorderColorVar === parent.gtkName ? 2 : 1
+                                            border.color: _dockBorderColorVar === parent.gtkName
+                                                ? Theme.cPrimary
+                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                            Behavior on border.width { NumberAnimation { duration: 100 } }
+                                        }
+
+                                        MouseArea {
+                                            id: _dockBordHov
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            ToolTip.visible: containsMouse
+                                            ToolTip.text: "@" + parent.gtkName
+                                            ToolTip.delay: 400
+                                            onClicked: {
+                                                _dockBorderColorVar = parent.gtkName
+                                                const args = [scriptDir + "/dock-border.sh", parent.gtkName]
+                                                if (_dockBorderColorWrite.running) {
+                                                    _dockBorderColorWrite._pending = args
+                                                } else {
+                                                    _dockBorderColorWrite.command = args
+                                                    _dockBorderColorWrite.running = true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             CCSection { text: "Corner Radius" }
                             CCSlider {
                                 label: "Top-Left"
@@ -3574,7 +3683,34 @@ PanelWindow {
                                     _dockWrite.running = true
                                 }
                             }
-                            Process { id: _dockWrite; running: false; onExited: running = false }
+                            Process {
+                                id: _dockWrite
+                                property var _pending: null
+                                running: false
+                                onExited: {
+                                    running = false
+                                    if (_pending !== null) {
+                                        command = _pending
+                                        _pending = null
+                                        running = true
+                                    }
+                                }
+                            }
+                            Process {
+                                id: _dockBorderColorWrite
+                                property var _pending: null
+                                running: false
+                                onExited: {
+                                    running = false
+                                    if (_pending !== null) {
+                                        command = _pending
+                                        _pending = null
+                                        running = true
+                                    } else {
+                                        _dockReadBorderColor.running = true
+                                    }
+                                }
+                            }
 
                             // Read dock config values on load
                             Process { id: _dockReadSpacing; command: [scriptDir+"/dock-get.sh", "buttonSpacing"]; running: false
@@ -3658,6 +3794,15 @@ PanelWindow {
                                     }
                                 }
                             }
+                            Process { id: _dockReadBorderColor; command: [scriptDir+"/dock-border-get.sh"]; running: false
+                                stdout: SplitParser {
+                                    splitMarker: "\n"
+                                    onRead: function(l) {
+                                        const v = l.trim()
+                                        if (v) _dockBorderColorVar = v
+                                    }
+                                }
+                            }
                             Process { id: _dockReadRectBg; command: [scriptDir+"/dock-get.sh", "rectBgStyle"]; running: false
                                 stdout: SplitParser {
                                     splitMarker: "\n"
@@ -3679,6 +3824,7 @@ PanelWindow {
                                     _dockReadBorderTR.running = true
                                     _dockReadBorderBL.running = true
                                     _dockReadBorderBR.running = true
+                                    _dockReadBorderColor.running = true
                                     _dockReadIconSize.running = true
                                     _dockReadStartIcon.running = true
                                     _dockReadRectBg.running   = true

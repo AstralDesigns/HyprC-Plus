@@ -108,10 +108,26 @@ ShellRoot {
     }
     Timer { id:failTimer; interval:2500; onTriggered:{ root.authFailed=false; root.focusPinRequest=!root.focusPinRequest } }
     Process {
+        id: notifReleaseProc
+        command: ["rm", "-f", "/tmp/candylock-notif.lock"]
+        running: false
+    }
+
+    Process {
         id:authProc; stdinEnabled:true
         command:[Quickshell.env("HOME")+"/.config/quickshell/candylock/pam_auth"]
         onRunningChanged: if(running){ write(root._pendingPin+"\n"); root._pendingPin="" }
-        onExited: function(code){ root.authChecking=false; if(code===0){ sessionLock.locked=false; Qt.quit() } else{ root.authFailed=true; failTimer.restart() } }
+        onExited: function(code){
+            root.authChecking=false
+            if(code===0){
+                notifReleaseProc.running=true
+                sessionLock.locked=false
+                Qt.quit()
+            } else {
+                root.authFailed=true
+                failTimer.restart()
+            }
+        }
     }
 
     // ── Clock ────────────────────────────────────────────────────────────────
@@ -365,6 +381,79 @@ ShellRoot {
         Component.onCompleted: sysProc.running=true
     }
 
+    // ── Output volume (lockscreen mini slider) ───────────────────────────────
+    property int  _volumePct: 50
+    property bool _volumeMuted: false
+
+    Process {
+        id: volReadProc
+        command: ["bash", "-c",
+            "VOL=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -Po '\\d+(?=%)' | head -1); " +
+            "MUTE=$(pactl get-sink-mute @DEFAULT_SINK@ | grep -q yes && echo 1 || echo 0); " +
+            "echo \"${VOL:-50} ${MUTE}\""]
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) {
+                const p = l.trim().split(/\s+/)
+                if (p.length >= 1 && !isNaN(parseInt(p[0]))) root._volumePct = parseInt(p[0])
+                if (p.length >= 2) root._volumeMuted = p[1] === "1"
+            }
+        }
+    }
+    Timer {
+        interval: 2000; repeat: true; running: true; triggeredOnStart: true
+        onTriggered: { if (!volReadProc.running) volReadProc.running = true }
+    }
+
+    Process {
+        id: volSetProc
+        property string _cmd: "true"
+        command: ["bash", "-c", volSetProc._cmd]
+        running: false
+        onExited: running = false
+    }
+
+    function setLockVolume(pct) {
+        const v = Math.max(0, Math.min(100, Math.round(pct)))
+        root._volumePct = v
+        root._volumeMuted = false
+        volSetProc._cmd = "pactl set-sink-volume @DEFAULT_SINK@ " + v + "% && pactl set-sink-mute @DEFAULT_SINK@ 0"
+        if (!volSetProc.running) volSetProc.running = true
+    }
+
+    function toggleLockMute() {
+        root._volumeMuted = !root._volumeMuted
+        volSetProc._cmd = "pactl set-sink-mute @DEFAULT_SINK@ " + (root._volumeMuted ? "1" : "0")
+        if (!volSetProc.running) volSetProc.running = true
+    }
+
+    // ── Battery (laptop only) ────────────────────────────────────────────────
+    property bool _hasBattery: false
+    property int  _batCapacity: 100
+    property bool _batCharging: false
+
+    Process {
+        id: batProc
+        command: ["bash", "-c",
+            "if ! ls /sys/class/power_supply/BAT* >/dev/null 2>&1; then echo '0'; exit 0; fi; " +
+            "CAP=$(cat /sys/class/power_supply/BAT*/capacity 2>/dev/null | head -1); " +
+            "STA=$(cat /sys/class/power_supply/BAT*/status 2>/dev/null | head -1); " +
+            "echo \"1 ${CAP:-100} ${STA:-Unknown}\""]
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) {
+                const p = l.trim().split(/\s+/)
+                root._hasBattery = p.length >= 1 && p[0] === "1"
+                if (p.length >= 2) root._batCapacity = parseInt(p[1]) || 100
+                if (p.length >= 3) root._batCharging = p[2] === "Charging" || p[2] === "Full"
+            }
+        }
+    }
+    Timer {
+        interval: 2000; repeat: true; running: true; triggeredOnStart: true
+        onTriggered: { if (!batProc.running) batProc.running = true }
+    }
+
     // ── Media ─────────────────────────────────────────────────────────────────
     property string mediaStatus:"Stopped"; property string mediaTitle:"No media"
     property string mediaArtist:""; property string mediaArtUrl:""
@@ -602,6 +691,19 @@ ShellRoot {
                     source: root.wallpaperPath?"file://"+root.wallpaperPath:""
                     fillMode:Image.PreserveAspectCrop; smooth:true; cache:true; playing:true; asynchronous:true
                     visible: root.wallpaperPath!==""
+                }
+
+                LockNotificationsOverlay {
+                    id: lockNotif
+                    anchors.fill: parent
+                    wallpaperPath: root.wallpaperPath
+                    cOnSecondary: root.cOnSecondary
+                    cInvPrimary:  root.cInvPrimary
+                    cPrimary:     root.cPrimary
+                    cOnSurf:      root.cOnSurf
+                    cOnSurfVar:   root.cOnSurfVar
+                    cOutVar:      root.cOutVar
+                    cErr:         root.cErr
                 }
 
                 Item {
@@ -927,6 +1029,85 @@ ShellRoot {
                                             }
                                         }
 
+                                        // ── Volume ────────────────────────────────────
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+                                            Text {
+                                                text: root._volumeMuted ? "󰝟" : "󰕾"
+                                                font.family: "Symbols Nerd Font Mono"
+                                                font.pixelSize: 14
+                                                color: root.cPrimary
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: root.toggleLockMute()
+                                                }
+                                            }
+                                            Item {
+                                                id: volBarItem
+                                                Layout.fillWidth: true
+                                                height: 14
+                                                readonly property real _norm: root._volumePct / 100.0
+
+                                                Rectangle {
+                                                    anchors.fill: parent; radius: 7
+                                                    color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.28)
+                                                    border.width: 1
+                                                    border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45)
+                                                }
+
+                                                Item {
+                                                    x: 3; y: 3
+                                                    width: Math.max(0, (volBarItem.width - 6) * volBarItem._norm)
+                                                    height: 8
+                                                    clip: true
+                                                    Rectangle {
+                                                        width: volBarItem.width - 6
+                                                        height: 8; radius: 4
+                                                        gradient: Gradient {
+                                                            orientation: Gradient.Horizontal
+                                                            GradientStop { position: 0.0; color: root.cInvPrimary }
+                                                            GradientStop { position: 1.0; color: root.cOnSecondary }
+                                                        }
+                                                    }
+                                                }
+
+                                                Text {
+                                                    text: "󰟃"
+                                                    font.family: "Symbols Nerd Font Mono"
+                                                    font.pixelSize: 10
+                                                    color: root.cPrimary
+                                                    style: Text.Outline
+                                                    styleColor: Qt.rgba(0, 0, 0, 0.25)
+                                                    x: {
+                                                        const tw = volBarItem.width - 6
+                                                        const cx = 3 + tw * volBarItem._norm - implicitWidth / 2
+                                                        return Math.max(1, Math.min(volBarItem.width - implicitWidth - 1, cx))
+                                                    }
+                                                    y: (volBarItem.height - implicitHeight) / 2
+                                                }
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    preventStealing: true
+                                                    function _n(mx) {
+                                                        return Math.max(0, Math.min(100, (mx / volBarItem.width) * 100))
+                                                    }
+                                                    onClicked: function(m) { root.setLockVolume(_n(m.x)) }
+                                                    onPositionChanged: function(m) {
+                                                        if (pressed) root.setLockVolume(_n(m.x))
+                                                    }
+                                                    onWheel: function(e) {
+                                                        const step = e.angleDelta.y > 0 ? 5 : -5
+                                                        root.setLockVolume(root._volumePct + step)
+                                                        e.accepted = true
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         // ── Controls ──────────────────────────────────
                                         RowLayout {
                                             spacing: 6
@@ -1141,6 +1322,177 @@ ShellRoot {
                                 }
                             }
                         }
+                    }
+                }
+
+                // ── Top-left: notifications toggle (blur circle) ─────────────────
+                Item {
+                    id: notifToggle
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.margins: 24
+                    width: 48; height: 48
+                    z: 20
+
+                    Rectangle {
+                        id: notifMask
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: "white"
+                        visible: false
+                        layer.enabled: true
+                    }
+
+                    Item {
+                        anchors.fill: parent
+                        layer.enabled: wallImg.visible
+                        layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
+                        AnimatedImage {
+                            x: -notifToggle.x; y: -notifToggle.y
+                            width: mainRect.width; height: mainRect.height
+                            source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
+                            fillMode: Image.PreserveAspectCrop
+                            smooth: true; playing: true; cache: true
+                            visible: root.wallpaperPath !== ""
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
+                        border.width: lockNotif.dndEnabled ? 2 : 1
+                        border.color: lockNotif.dndEnabled
+                            ? Qt.rgba(root.cSecondry.r, root.cSecondry.g, root.cSecondry.b, 0.65)
+                            : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.22)
+                    }
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled: true
+                        maskSource: notifMask
+                        maskThresholdMin: 0.5
+                        maskSpreadAtMin: 1.0
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        // nf-md-notifications / nf-md-notifications_off
+                        text: lockNotif.dndEnabled ? "󰂠" : "󰂚"
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 20
+                        color: lockNotif.dndEnabled ? root.cSecondary : root.cPrimary
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                        onClicked: function(e) {
+                            if (e.button === Qt.RightButton) lockNotif.toggleDnd()
+                            else lockNotif.toggleHistory()
+                        }
+                    }
+                }
+
+                // ── Top-right: battery radial (laptop only) ─────────────────────
+                Item {
+                    id: batToggle
+                    visible: root._hasBattery
+                    anchors.top: parent.top
+                    anchors.right: parent.right
+                    anchors.margins: 24
+                    width: 48; height: 48
+                    z: 20
+
+                    Rectangle {
+                        id: batMask
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: "white"
+                        visible: false
+                        layer.enabled: true
+                    }
+
+                    Item {
+                        anchors.fill: parent
+                        layer.enabled: wallImg.visible
+                        layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
+                        AnimatedImage {
+                            x: -batToggle.x; y: -batToggle.y
+                            width: mainRect.width; height: mainRect.height
+                            source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
+                            fillMode: Image.PreserveAspectCrop
+                            smooth: true; playing: true; cache: true
+                            visible: root.wallpaperPath !== ""
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
+                        border.width: 1
+                        border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.22)
+                    }
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled: true
+                        maskSource: batMask
+                        maskThresholdMin: 0.5
+                        maskSpreadAtMin: 1.0
+                    }
+
+                    Canvas {
+                        id: batTrack
+                        anchors.fill: parent
+                        onPaint: {
+                            const ctx = getContext("2d")
+                            ctx.reset()
+                            const cx = width / 2, cy = height / 2, r = 18, lw = 4
+                            ctx.beginPath()
+                            ctx.arc(cx, cy, r, -Math.PI / 2, Math.PI * 1.5)
+                            ctx.strokeStyle = Qt.rgba(root.cOnSurf.r, root.cOnSurf.g, root.cOnSurf.b, 0.15).toString()
+                            ctx.lineWidth = lw
+                            ctx.stroke()
+                        }
+                    }
+
+                    Canvas {
+                        id: batFill
+                        anchors.fill: parent
+                        property color arcCol: root._batCapacity <= 10 ? root.cErr
+                            : (root._batCharging ? root.cPrimary : root.cOnSurf)
+                        onArcColChanged: requestPaint()
+                        Connections {
+                            target: root
+                            function on_BatCapacityChanged() { batFill.requestPaint() }
+                            function on_BatChargingChanged() { batFill.requestPaint() }
+                        }
+                        onPaint: {
+                            const ctx = getContext("2d")
+                            ctx.reset()
+                            const cx = width / 2, cy = height / 2, r = 18, lw = 4
+                            const pct = Math.max(0, Math.min(100, root._batCapacity)) / 100
+                            const end = -Math.PI / 2 + pct * Math.PI * 2
+                            ctx.beginPath()
+                            ctx.arc(cx, cy, r, -Math.PI / 2, end)
+                            ctx.strokeStyle = arcCol.toString()
+                            ctx.lineWidth = lw
+                            ctx.lineCap = "round"
+                            ctx.stroke()
+                        }
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: root._batCharging
+                        text: "󱐋"
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 14
+                        color: root.cPrimary
                     }
                 }
 

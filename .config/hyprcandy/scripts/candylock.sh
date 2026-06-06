@@ -18,5 +18,11 @@ fi
 pkill -f "qs -c candylock$" 2>/dev/null || true
 sleep 0.15
 
+# Hand notification DBus to candylock (bar must not reclaim while locked)
+# shell:bar/NotificationsState.qml
+source "$HOME/.config/hyprcandy/scripts/candylock-notif-handoff.sh"
+candylock_notif_acquire
+trap candylock_notif_release EXIT INT TERM
+
 # Start (blocks until unlocked)
 qs -c candylock

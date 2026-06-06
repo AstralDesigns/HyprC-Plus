@@ -83,8 +83,10 @@ QtObject {
         v = _settings.value("islandRadius"); if (v !== undefined && v !== null) islandRadius = v
         v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
         v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
+        v = _settings.value("islandBorderVar"); if (v !== undefined && v !== null) islandBorderVar = v
         v = _settings.value("barBorderWidth"); if (v !== undefined && v !== null) barBorderWidth = v
         v = _settings.value("barBorderAlpha"); if (v !== undefined && v !== null) barBorderAlpha = v
+        v = _settings.value("barBorderVar"); if (v !== undefined && v !== null) barBorderVar = v
         v = _settings.value("islandBgStyle");  if (v !== undefined && v !== null) islandBgStyle  = v
         v = _settings.value("barRectBgStyle"); if (v !== undefined && v !== null) barRectBgStyle = v
         v = _settings.value("moduleBgOpacity"); if (v !== undefined && v !== null) moduleBgOpacity = v
@@ -247,8 +249,10 @@ QtObject {
         _settings.setValue("islandRadius", islandRadius)
         _settings.setValue("islandBorder", islandBorder)
         _settings.setValue("islandBorderAlpha", islandBorderAlpha)
+        _settings.setValue("islandBorderVar", islandBorderVar)
         _settings.setValue("barBorderWidth", barBorderWidth)
         _settings.setValue("barBorderAlpha", barBorderAlpha)
+        _settings.setValue("barBorderVar", barBorderVar)
         _settings.setValue("islandBgStyle",  islandBgStyle)
         _settings.setValue("barRectBgStyle", barRectBgStyle)
         _settings.setValue("moduleBgOpacity", moduleBgOpacity)
@@ -476,10 +480,14 @@ QtObject {
     // ── Island border ────────────────────────────────────────────────────
     property int  islandBorder:      0     // px — 0 to remove
     property real islandBorderAlpha: 0.22  // 0–1
+    property string islandBorderVar: "$outline_variant"
+    readonly property color islandBorderColor: _cavaThemeColor(islandBorderVar)
 
     // ── Main bar border (bar mode only) ──────────────────────────────────
     property int  barBorderWidth: 2    // px — 0 to hide
     property real barBorderAlpha: 1.0  // opacity
+    property string barBorderVar: "$on_secondary"
+    readonly property color barBorderColor: _cavaThemeColor(barBorderVar)
 
     // ── Island background opacity ─────────────────────────────────────────
     //  moduleBgOpacity  — flat tint alpha in bar mode (also used by islandBgOpacityBar)

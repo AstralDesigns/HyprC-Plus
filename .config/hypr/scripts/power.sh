@@ -14,7 +14,7 @@ fi
 
 if [[ "$1" == "lock" ]]; then
   echo ":: Lock"
-  qs -c candylock
+  "$HOME/.config/hyprcandy/scripts/candylock.sh"
 fi
 
 if [[ "$1" == "reboot" ]]; then
@@ -30,7 +30,7 @@ fi
 if [[ "$1" == "suspend" ]]; then
   echo ":: Suspend"
   touch /tmp/.qs-candylock-sleep
-  qs -c candylock
+  "$HOME/.config/hyprcandy/scripts/candylock.sh"
   rm -f /tmp/.qs-candylock-sleep
 fi
 

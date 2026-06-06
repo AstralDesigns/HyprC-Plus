@@ -398,8 +398,8 @@ PanelWindow {
         }
         color:        Config.barMode === "bar" ? Theme.blurBackground : "transparent"
         border.color: Config.barMode === "bar"
-            ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                      Theme.cOnSecondary.b, Config.barBorderAlpha)
+            ? Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                      Config.barBorderColor.b, Config.barBorderAlpha)
             : "transparent"
         border.width: Config.barMode === "bar" ? Config.barBorderWidth : 0
         // tri mode uses its own three sub-bar rectangles; barBg is invisible
@@ -485,12 +485,10 @@ PanelWindow {
         readonly property real _bgOpacity: _effectiveBgOpacity
 
         Rectangle {
+            id: islFill
             anchors.fill: parent
             radius: Config.islandRadius
             color: "transparent"
-            border.width: Config.islandBorder
-            border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b,
-                                  Config.islandBorderAlpha)
             clip: true
 
             Rectangle {
@@ -513,10 +511,21 @@ PanelWindow {
             }
         }
 
+        Rectangle {
+            anchors.fill: parent
+            radius: Config.islandRadius
+            color: "transparent"
+            border.width: Config.islandBorder
+            border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
+                                  Config.islandBorderColor.b, Config.islandBorderAlpha)
+            z: 1
+        }
+
         Row {
             id: innerRow
             anchors.centerIn: parent
             spacing: Config.groupedSpacing
+            z: 2
         }
     }
 
@@ -648,9 +657,9 @@ PanelWindow {
             bottomRightRadius: Config.triLeftBottomRightRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
-            border.color:  Qt.rgba(Theme.cOnSecondary.r,
-                                   Theme.cOnSecondary.g,
-                                   Theme.cOnSecondary.b,
+            border.color:  Qt.rgba(Config.barBorderColor.r,
+                                   Config.barBorderColor.g,
+                                   Config.barBorderColor.b,
                                    Config.barBorderAlpha)
             clip: false
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
@@ -740,9 +749,9 @@ PanelWindow {
             bottomRightRadius: Config.triCenterBottomRightRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
-            border.color:  Qt.rgba(Theme.cOnSecondary.r,
-                                   Theme.cOnSecondary.g,
-                                   Theme.cOnSecondary.b,
+            border.color:  Qt.rgba(Config.barBorderColor.r,
+                                   Config.barBorderColor.g,
+                                   Config.barBorderColor.b,
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
@@ -819,9 +828,9 @@ PanelWindow {
             bottomRightRadius: Config.barBottomRightRadius
             color:         Theme.blurBackground
             border.width:  Config.barBorderWidth
-            border.color:  Qt.rgba(Theme.cOnSecondary.r,
-                                   Theme.cOnSecondary.g,
-                                   Theme.cOnSecondary.b,
+            border.color:  Qt.rgba(Config.barBorderColor.r,
+                                   Config.barBorderColor.g,
+                                   Config.barBorderColor.b,
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 

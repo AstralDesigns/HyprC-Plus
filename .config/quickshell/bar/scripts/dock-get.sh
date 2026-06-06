@@ -1,6 +1,7 @@
 #!/bin/bash
 # Get dock config value
 CONFIG="$HOME/.hyprcandy/GJS/hyprcandydock/config.js"
+STYLE="$HOME/.hyprcandy/GJS/hyprcandydock/style.css"
 key="$1"
 
 if [ -f "$CONFIG" ]; then
@@ -16,6 +17,11 @@ if [ -f "$CONFIG" ]; then
             ;;
         appIconSize|buttonSpacing|innerPadding|borderWidth|borderRadius)
             grep -oP "${key}:\s*\K[0-9]+" "$CONFIG" | head -1
+            ;;
+        borderColorVar)
+            # Deprecated — use dock-border-get.sh; kept for compatibility
+            SCRIPT_DIR="$(dirname "$0")"
+            "$SCRIPT_DIR/dock-border-get.sh"
             ;;
         rectBgStyle)
             grep -oP "${key}:\s*'\K[^']+" "$CONFIG" | head -1
