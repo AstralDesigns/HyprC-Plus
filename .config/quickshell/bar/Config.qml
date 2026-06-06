@@ -556,19 +556,19 @@ QtObject {
     //  textColor   → info text (time, date, weather value, battery %)
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
-    readonly property color glyphColor:  Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    readonly property color glyphColor:  Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35)
     readonly property color textColor:   Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.9)
-    readonly property color activeColor: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    readonly property color activeColor: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35)
     readonly property color dimColor:    Theme.cOnSurfVar
 
     // ── Per-module color overrides ───────────────────────────────────────
-    property color batteryIconColor:     Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color batteryIconColor:     Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35)
     property color batteryTextColor:     Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.9)
-    property color batteryChargingColor: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color batteryChargingColor: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35)
     property color batteryLowColor:      Theme.cErr
-    property color clockIconColor:       Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color clockIconColor:       Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35)
     property color clockTextColor:       Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.9)
-    property color rightGroupColor:      Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color rightGroupColor:      Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35)
 
     // ── Clock popup sizing ────────────────────────────────────────────────
     property int clockTextSize: 38   // C059 Bold Italic time font size in ClockPopup
@@ -584,9 +584,9 @@ QtObject {
         { "city": "Dubai",     "timezone": "Asia/Dubai"       }
     ]
 
-    property color dateIconColor:        Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color dateIconColor:        Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35)
     property color dateTextColor:        Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.9)
-    property color mediaGlyphColor:      Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+    property color mediaGlyphColor:      Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.35)
     property color discGlyphColor:       Theme.cPrimary
     property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.80)
     property color powerGlyphColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
