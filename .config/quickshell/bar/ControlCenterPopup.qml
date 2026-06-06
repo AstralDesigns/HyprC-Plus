@@ -1739,8 +1739,8 @@ PanelWindow {
                                         CCSection { text: "Border" }
                                         CCSlider { label:"Border W";        from:0;to:8; value:Config.barBorderWidth;    onMoved:function(v){Config.barBorderWidth=v} }
                                         CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
-                                        CCSlider { label:"Island Border";     from:0;to:8; value:Config.islandBorder;      onMoved:function(v){Config.islandBorder=v} }
-                                        CCSlider { label:"Island Border α";   from:0;to:1;stepSize:0.05;decimals:2; value:Config.islandBorderAlpha;  onMoved:function(v){Config.islandBorderAlpha=v} }
+                                        CCSlider { label:"Island B-W";     from:0;to:8; value:Config.islandBorder;      onMoved:function(v){Config.islandBorder=v} }
+                                        CCSlider { label:"Island B-α";   from:0;to:1;stepSize:0.05;decimals:2; value:Config.islandBorderAlpha;  onMoved:function(v){Config.islandBorderAlpha=v} }
 
                                         CCSection { text: "Bar Border Color" }
                                         Flow {

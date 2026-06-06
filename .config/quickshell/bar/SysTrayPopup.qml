@@ -24,7 +24,7 @@ PanelWindow {
     // _pad drives symmetric padding on all sides, sourced from bar's outerMarginTop
     readonly property real _pad: Config.outerMarginTop
     // Minimum slot = 24px icon + pad on both sides so pill never collapses when empty
-    readonly property real _minSlot: 26 + _pad * 2
+    readonly property real _minSlot: 34 + _pad * 2
 
     implicitHeight: _minSlot
     implicitWidth:  popupRect.implicitWidth

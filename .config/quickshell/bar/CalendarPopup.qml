@@ -269,128 +269,146 @@ PanelWindow {
             }
 
             // ── Day-of-week headers ───────────────────────────────────────
-            Row {
+            Rectangle {
                 Layout.fillWidth: true
-                Layout.bottomMargin: 4
-                // Week-number gutter label
-                Item { width: 26; height: 20
-                    Text { anchors.centerIn: parent; text: "Wk"
-                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.50)
-                        font.family: Config.labelFont; font.pixelSize: 9 }
-                }
-                Repeater {
-                    model: calWin._dayLabels
-                    delegate: Item {
-                        // BUG FIX: with pragma ComponentBehavior: Bound,
-                        // `index` is not implicitly in scope — it must be
-                        // declared as a required property to be accessible.
-                        required property string modelData
-                        required property int    index
-                        width: (320 - 28 - 28) / 7
-                        height: 20
-                        Text {
-                            anchors.centerIn: parent
-                            text: modelData
-                            color: (index === 5 || index === 6)
-                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.70)
-                                : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.70)
-                            font.family: Config.labelFont
-                            font.pixelSize: 10
-                            font.weight: Font.Medium
+                Layout.bottomMargin: 8
+                implicitHeight: headersRow.implicitHeight + 12
+                radius: 20
+                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                border.width: 1
+                border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.22)
+
+                Row {
+                    id: headersRow
+                    anchors.centerIn: parent
+                    width: 290
+                    height: 20
+
+                    // Week-number gutter label
+                    Item { width: 26; height: 20
+                        Text { anchors.centerIn: parent; text: "Wk"
+                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.50)
+                            font.family: Config.labelFont; font.pixelSize: 9 }
+                    }
+                    Repeater {
+                        model: calWin._dayLabels
+                        delegate: Item {
+                            // BUG FIX: with pragma ComponentBehavior: Bound,
+                            // `index` is not implicitly in scope — it must be
+                            // declared as a required property to be accessible.
+                            required property string modelData
+                            required property int    index
+                            width: (320 - 28 - 28) / 7
+                            height: 20
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData
+                                color: (index === 5 || index === 6)
+                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.70)
+                                    : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.70)
+                                font.family: Config.labelFont
+                                font.pixelSize: 10
+                                font.weight: Font.Medium
+                            }
                         }
                     }
                 }
             }
 
-            // Divider
-            Rectangle {
-                Layout.fillWidth: true; height: 1; Layout.bottomMargin: 6
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28)
-            }
-
             // ── Calendar grid ─────────────────────────────────────────────
-            Column {
+            Rectangle {
                 Layout.fillWidth: true
                 Layout.bottomMargin: 10
-                spacing: 2
+                implicitHeight: gridCol.implicitHeight + 16
+                radius: 20
+                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                border.width: 1
+                border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.22)
 
-                Repeater {
-                    model: calWin._cells.length / 7
-                    delegate: Row {
-                        required property int index
-                        property int _row: index
-                        width: parent.width
-                        spacing: 0
+                Column {
+                    id: gridCol
+                    anchors.centerIn: parent
+                    width: 290
+                    spacing: 2
 
-                        // Week-number gutter
-                        Item {
-                            width: 26; height: 30
-                            Text {
-                                anchors.centerIn: parent
-                                property int _fd: {
-                                    for (let i = 0; i < 7; i++) {
-                                        const c = calWin._cells[_row * 7 + i]
-                                        if (c > 0) return c
-                                    }
-                                    return 1
-                                }
-                                text: calWin._isoWeek(calWin._viewYear, calWin._viewMonth, _fd)
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
-                                font.family: Config.labelFont; font.pixelSize: 9
-                            }
-                        }
+                    Repeater {
+                        model: calWin._cells.length / 7
+                        delegate: Row {
+                            required property int index
+                            property int _row: index
+                            width: parent.width
+                            spacing: 0
 
-                        // 7 day cells
-                        Repeater {
-                            model: 7
-                            delegate: Item {
-                                required property int index
-                                property int _col:  index
-                                property int _day:  calWin._cells[_row * 7 + _col]
-                                property bool _isToday: _day > 0
-                                    && calWin._viewYear  === calWin._todayYear
-                                    && calWin._viewMonth === calWin._todayMonth
-                                    && _day === calWin._todayDay
-                                property bool _isWeekend: _col >= 5
-
-                                width: (320 - 28 - 28) / 7; height: 30
-
-                                // Hover highlight (non-today cells only)
-                                Rectangle {
-                                    anchors.centerIn: parent
-                                    width: 28; height: 26; radius: 8
-                                    visible: !_isToday && _day > 0 && dayHover.containsMouse
-                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
-                                }
-
-                                // Today pill
-                                Rectangle {
-                                    anchors.centerIn: parent
-                                    width: 28; height: 26; radius: 8
-                                    visible: _isToday
-                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
-                                }
-
+                            // Week-number gutter
+                            Item {
+                                width: 26; height: 30
                                 Text {
                                     anchors.centerIn: parent
-                                    text: _day > 0 ? _day : ""
-                                    color: _isToday
-                                        ? Theme.cPrimary
-                                        : _isWeekend
-                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
-                                            : Theme.cOnSurf
-                                    font.family: Config.labelFont
-                                    font.pixelSize: 12
-                                    font.weight: _isToday ? Font.Bold : Font.Normal
+                                    property int _fd: {
+                                        for (let i = 0; i < 7; i++) {
+                                            const c = calWin._cells[_row * 7 + i]
+                                            if (c > 0) return c
+                                        }
+                                        return 1
+                                    }
+                                    text: calWin._isoWeek(calWin._viewYear, calWin._viewMonth, _fd)
+                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
+                                    font.family: Config.labelFont; font.pixelSize: 9
                                 }
+                            }
 
-                                MouseArea {
-                                    id: dayHover
-                                    anchors.fill: parent
-                                    hoverEnabled: _day > 0
-                                    cursorShape: _day > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            // 7 day cells
+                            Repeater {
+                                model: 7
+                                delegate: Item {
+                                    required property int index
+                                    property int _col:  index
+                                    property int _day:  calWin._cells[_row * 7 + _col]
+                                    property bool _isToday: _day > 0
+                                        && calWin._viewYear  === calWin._todayYear
+                                        && calWin._viewMonth === calWin._todayMonth
+                                        && _day === calWin._todayDay
+                                    property bool _isWeekend: _col >= 5
+
+                                    width: (320 - 28 - 28) / 7; height: 30
+
+                                    // Hover highlight (non-today cells only)
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 28; height: 26; radius: 8
+                                        visible: !_isToday && _day > 0 && dayHover.containsMouse
+                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                    }
+
+                                    // Today pill
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 28; height: 26; radius: 8
+                                        visible: _isToday
+                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                                        border.width: 1
+                                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: _day > 0 ? _day : ""
+                                        color: _isToday
+                                            ? Theme.cPrimary
+                                            : _isWeekend
+                                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
+                                                : Theme.cOnSurf
+                                        font.family: Config.labelFont
+                                        font.pixelSize: 12
+                                        font.weight: _isToday ? Font.Bold : Font.Normal
+                                    }
+
+                                    MouseArea {
+                                        id: dayHover
+                                        anchors.fill: parent
+                                        hoverEnabled: _day > 0
+                                        cursorShape: _day > 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    }
                                 }
                             }
                         }

@@ -29,8 +29,31 @@ A window designed to be attached to one or more screen edges, commonly used to b
 Allows launching and interacting with external CLI processes.
 - **`command`**: A list of strings representing the executable and arguments.
 - **`running`**: A boolean value to start/stop the process or check if it's currently active.
+- **`stdout`**: Assign a data parser (e.g., `SplitParser` or `StdioCollector`) to handle stdout stream.
+- **`stderr`**: Assign a data parser to handle stderr stream.
 - **`readOut()`**: Read standard output.
 - **`readErr()`**: Read standard error.
+- **`onRunningChanged`**: Signal triggered when the execution state changes.
+- **`onExited`**: Signal triggered when the process exits.
+
+### `FileView`
+A utility type to read and watch files on the local filesystem.
+- **`path`**: Absolute path to the file.
+- **`watchChanges`**: Set to `true` to watch the file for changes on disk.
+- **`onFileChanged`**: Signal handler invoked when the file changes.
+- **`onLoaded`**: Signal handler invoked when the file has been initially loaded.
+- **`text()`**: Returns the file content as a string.
+- **`reload()`**: Reloads the file content.
+
+### `SplitParser`
+Parses a data stream by splitting it on a marker.
+- **`splitMarker`**: The string delimiter (typically `"\n"`).
+- **`onRead(line)`**: Signal triggered when a complete chunk is read.
+
+### `StdioCollector`
+Collects the entire data stream until execution finishes.
+- **`text`**: The accumulated string from the stream.
+- **`onStreamFinished`**: Signal handler invoked when the stream has closed.
 
 ### `Scope`
 A utility type to hold custom properties or create isolated scopes.
@@ -45,7 +68,7 @@ A standard visual rectangle element.
 - **`border.color`**: Color of the border.
 - **`border.width`**: Width of the border.
 - **`radius`**: Corner radius. Set to half of the height/width for circular pills.
-- **`topLeftRadius`, `topRightRadius`, `bottomLeftRadius`, `bottomRightRadius`**: Properties to control individual corner radii (available in newer Qt versions).
+- **`topLeftRadius`, `topRightRadius`, `bottomLeftRadius`, `bottomRightRadius`**: Properties to control individual corner radii.
 
 ### `HoverHandler`
 A handler that detects pointer (mouse) hover events.
@@ -59,10 +82,16 @@ A component to trigger actions after a delay.
 - **`repeat`**: If `true`, fires repeatedly; if `false`, fires once.
 - **`onTriggered`**: Signal handler invoked when the timer fires.
 
+### `Canvas`
+Allows dynamic drawing using a 2D context similar to HTML5 Canvas.
+- **`paint`**: Signal emitted when drawing needs to happen.
+- **`requestPaint()`**: Method to request redraw.
+- **`getContext("2d")`**: Returns the drawing context.
+
 ### `Connections`
 Declares connections to signals of objects defined outside the local scope.
 - **`target`**: The source object.
-- **`function on<SignalName>Name(...)`**: Handler syntax.
+- **`function on<SignalName>(...)`**: Handler syntax.
 
 ---
 

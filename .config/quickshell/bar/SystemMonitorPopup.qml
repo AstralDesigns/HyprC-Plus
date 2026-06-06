@@ -401,10 +401,10 @@ PanelWindow {
     // ── Panel ─────────────────────────────────────────────────────────────
     Rectangle {
         id: smPanel
-        // 5 × 88 + 4 × 8 + 2 × 16 = 504 px
+        readonly property int _gaugeCount: 3 + (smWin._swapOk ? 1 : 0) + smWin._gpus.length + (smWin._hasBat ? 1 : 0)
         anchors { right: parent.right; rightMargin: smWin._panelMargin
                   top: parent.top; bottom: parent.bottom }
-        width: 504
+        width: _gaugeCount * 88 + (_gaugeCount - 1) * 8 + 24 + 32
 
         //radius: startMenuPanel._panelRadius
         topLeftRadius: 20
@@ -451,62 +451,74 @@ PanelWindow {
 
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28) }
 
-            // Gauge grid — Flow wraps at 5 per row (504 px panel, 88 px gauges, 8 px gaps)
-            Flow {
-                Layout.fillWidth: true; spacing: 8
+            // Unified card background for gauges in a single horizontal line
+            Rectangle {
+                id: gaugesCard
+                Layout.fillWidth: true
+                implicitHeight: 112 + 16
+                radius: 20
+                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                border.width: 1
+                border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
 
-                ArcGauge {
-                    value:    smWin._cpu;  glyph: "󰻠"; label: "CPU"
-                    valStr:   Math.round(smWin._cpu * 100) + "%"
-                    arcColor: Theme.cPrimary
-                }
-                ArcGauge {
-                    value:    smWin._ram;  glyph: "󰍛"; label: "RAM"
-                    valStr:   Math.round(smWin._ram * 100) + "%"
-                    sub:      smWin._fmtBytes(smWin._ramUsed)
-                    arcColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
-                }
-                ArcGauge {
-                    value:    smWin._tempOk ? Math.min(smWin._temp / 100, 1) : 0
-                    glyph:    "󰔏"; label: "Temp"
-                    valStr:   smWin._tempOk ? Math.round(smWin._temp) + "°" : "N/A"
-                    arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
-                }
-                ArcGauge {
-                    visible:  smWin._swapOk
-                    value:    smWin._swap; glyph: "󰾴"; label: "Swap"
-                    valStr:   Math.round(smWin._swap * 100) + "%"
-                    sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
-                    arcColor: Theme.cPrimaryFixedDim; opacity: 0.8
-                }
+                Row {
+                    id: gaugesRow
+                    anchors.centerIn: parent
+                    spacing: 8
 
-                // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
-                Repeater {
-                    model: smWin._gpus
-                    delegate: ArcGauge {
-                        required property var modelData
-                        value:    modelData.pct / 100
-                        glyph:    modelData.isIgpu ? "󱤓" : "󰢮"
-                        label:    (modelData.isIgpu ? "iGPU" : "dGPU") + (smWin._gpus.length > 1 ? "" : "")
-                        valStr:   modelData.pct + "%"
-                        sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
-                        arcColor: modelData.isIgpu ? Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                    ArcGauge {
+                        value:    smWin._cpu;  glyph: "󰻠"; label: "CPU"
+                        valStr:   Math.round(smWin._cpu * 100) + "%"
+                        arcColor: Theme.cPrimary
                     }
-                }
+                    ArcGauge {
+                        value:    smWin._ram;  glyph: "󰍛"; label: "RAM"
+                        valStr:   Math.round(smWin._ram * 100) + "%"
+                        sub:      smWin._fmtBytes(smWin._ramUsed)
+                        arcColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                    }
+                    ArcGauge {
+                        value:    smWin._tempOk ? Math.min(smWin._temp / 100, 1) : 0
+                        glyph:    "󰔏"; label: "Temp"
+                        valStr:   smWin._tempOk ? Math.round(smWin._temp) + "°" : "N/A"
+                        arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                    }
+                    ArcGauge {
+                        visible:  smWin._swapOk
+                        value:    smWin._swap; glyph: "󰾴"; label: "Swap"
+                        valStr:   Math.round(smWin._swap * 100) + "%"
+                        sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
+                        arcColor: Theme.cPrimaryFixedDim; opacity: 0.8
+                    }
 
-                // Battery — laptops only; hidden on desktops
-                ArcGauge {
-                    visible:  smWin._hasBat
-                    value:    smWin._batPct / 100
-                    glyph:    smWin._batPct > 80 ? "󰁹" : smWin._batPct > 60 ? "󰂀"
-                              : smWin._batPct > 40 ? "󰁾" : smWin._batPct > 20 ? "󰁼" : "󰁺"
-                    label:    smWin._batStatus === "Full"      ? "Battery "
-                              : smWin._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
-                    valStr:   smWin._batPct + "%"
-                    sub:      smWin._batStatus
-                    arcColor: smWin._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
-                              : smWin._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
-                              : Config.powerGlyphColor
+                    // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
+                    Repeater {
+                        model: smWin._gpus
+                        delegate: ArcGauge {
+                            required property var modelData
+                            value:    modelData.pct / 100
+                            glyph:    modelData.isIgpu ? "󱤓" : "󰢮"
+                            label:    modelData.isIgpu ? "iGPU" : "dGPU"
+                            valStr:   modelData.pct + "%"
+                            sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
+                            arcColor: modelData.isIgpu ? Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        }
+                    }
+
+                    // Battery — laptops only; hidden on desktops
+                    ArcGauge {
+                        visible:  smWin._hasBat
+                        value:    smWin._batPct / 100
+                        glyph:    smWin._batPct > 80 ? "󰁹" : smWin._batPct > 60 ? "󰂀"
+                                  : smWin._batPct > 40 ? "󰁾" : smWin._batPct > 20 ? "󰁼" : "󰁺"
+                        label:    smWin._batStatus === "Full"      ? "Battery "
+                                  : smWin._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
+                        valStr:   smWin._batPct + "%"
+                        sub:      smWin._batStatus
+                        arcColor: smWin._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
+                                  : smWin._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
+                                  : Config.powerGlyphColor
+                    }
                 }
             }
 

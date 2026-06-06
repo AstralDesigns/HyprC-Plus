@@ -90,8 +90,10 @@ let cssProviders = [];          // Static providers cleared/re-added on theme ch
 let dynamicConfigProvider = null; // Persistent provider for config-driven values — never cleared
 let dockWindow = null;
 
-let _colorMonitor    = null;  // Gio.FileMonitor for gtk-4.0/colors.css
-let _colorReloadTimer = 0;    // GLib timeout source ID (debounce)
+let _colorMonitor     = null;  // Gio.FileMonitor for gtk-4.0/colors.css
+let _styleMonitor     = null;  // Gio.FileMonitor for hyprcandydock/style.css
+let _colorReloadTimer = 0;     // GLib timeout source ID (debounce)
+let _styleReloadTimer = 0;
 let _launcherMonitor  = null; // Gio.FileMonitor for launcher.state
 let _launcherOpen     = false; // true while launcher window is visible
 
@@ -149,6 +151,33 @@ function loadCSS() {
 
 // Remap canonical (bottom-dock) corner radii → widget-local CSS corners.
 //   top*    = desktop-facing edge  |  bottom* = screen-attached edge
+// Read a string @HCD value directly from config.js on disk (source of truth on hot-reload).
+function _readHcdString(key) {
+    try {
+        const [ok, contents] = GLib.file_get_contents(DOCK_CONFIG_PATH);
+        if (!ok) return null;
+        const text = new TextDecoder().decode(contents);
+        const re = new RegExp('\\b' + key + ":\\s*'([^']*)'");
+        const m = text.match(re);
+        return m ? m[1] : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Border colour lives in style.css (GTK @name) — not in the dynamic injector.
+function _readBorderColorFromStyle() {
+    try {
+        const [ok, contents] = GLib.file_get_contents(DOCK_STYLE_PATH);
+        if (!ok) return null;
+        const text = new TextDecoder().decode(contents);
+        const m = text.match(/border-color:\s*@([a-zA-Z0-9_]+)/);
+        return m ? m[1] : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 function _mapCornersForPosition(edge, storedTL, storedTR, storedBL, storedBR) {
     switch (edge) {
     case 'top':
@@ -224,6 +253,7 @@ function _injectGlyphSizeCSS(display) {
         /* Config-driven values — updated in-place on SIGUSR2 hot-reload */
         window.background {
             border-width: ${borderW}px;
+            border-style: solid;
             border-radius: ${borderTL}px ${borderTR}px ${borderBR}px ${borderBL}px;
             ${bgStyle}
         }
@@ -303,7 +333,7 @@ function reloadConfigFromFile() {
             }
         }
         // String @HCD values  (e.g.  startIcon: '',   // @HCD:startIcon)
-        const strRe = /\b(\w+):[ \t]*'([^']*)',[ \t]*\/\/ @HCD:\1\b/g;
+        const strRe = /\b(\w+):[ \t]*'([^']*)',[ \t]*\/\/ @HCD:\1/g;
         while ((match = strRe.exec(text)) !== null) {
             const key = match[1];
             DockConfig[key] = match[2];
@@ -391,14 +421,21 @@ function readHyprCandyConf() {
 //   appIconSize   → button min/max size + image pixel_size CSS (CSS side; button
 //                   widget size_request needs a dock restart for structural rebuild)
 //   innerPadding  → #box { padding }          (CSS re-inject)
-//   borderWidth   → window.background border  (CSS re-inject)
+//   borderWidth   → window.background border-width  (CSS re-inject)
+//   borderColorVar → style.css border-color: @<gtk_name> (loadCSS reload)
 //   borderRadius / border*Radius → window.background radius  (CSS re-inject)
+//   rectBgStyle   → window.background fill (glass vs gradient)
 //   marginBottom/Top/Left/Right → Gtk4LayerShell.set_margin (live)
 function hotReload() {
     log('[dock] SIGUSR2 received — hot-reloading config');
     if (!reloadConfigFromFile()) return;
     const display = Gdk.Display.get_default();
-    if (display) _injectGlyphSizeCSS(display);
+    if (display) {
+        loadCSS();
+        const borderGtk = _readBorderColorFromStyle();
+        log('[dock] hot-reload: border-color = @' + (borderGtk || 'on_secondary'));
+        if (dockWindow) dockWindow.queue_draw();
+    }
 
     // Apply layer (top/overlay) and margin_from_edge from hyprcandy-bar.conf
     {
@@ -492,6 +529,32 @@ function hotReload() {
 //   • teardownColorMonitor() cancels both the monitor and any pending timer;
 //     it is called from vfunc_close_request so nothing outlives the process.
 
+function _scheduleCssReload(timerRef) {
+    if (timerRef === 'style') {
+        if (_styleReloadTimer) {
+            GLib.source_remove(_styleReloadTimer);
+            _styleReloadTimer = 0;
+        }
+        _styleReloadTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 300, () => {
+            _styleReloadTimer = 0;
+            loadCSS();
+            if (dockWindow) dockWindow.queue_draw();
+            return GLib.SOURCE_REMOVE;
+        });
+        return;
+    }
+    if (_colorReloadTimer) {
+        GLib.source_remove(_colorReloadTimer);
+        _colorReloadTimer = 0;
+    }
+    _colorReloadTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 300, () => {
+        _colorReloadTimer = 0;
+        loadCSS();
+        if (dockWindow) dockWindow.queue_draw();
+        return GLib.SOURCE_REMOVE;
+    });
+}
+
 function setupColorMonitor() {
     const file = Gio.File.new_for_path(GTK4_COLORS_PATH);
     try {
@@ -499,19 +562,25 @@ function setupColorMonitor() {
         _colorMonitor.connect('changed', (_mon, _f, _other, eventType) => {
             if (eventType !== Gio.FileMonitorEvent.CHANGES_DONE_HINT &&
                 eventType !== Gio.FileMonitorEvent.CREATED) return;
-            if (_colorReloadTimer) {
-                GLib.source_remove(_colorReloadTimer);
-                _colorReloadTimer = 0;
-            }
-            _colorReloadTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT_IDLE, 300, () => {
-                _colorReloadTimer = 0;
-                loadCSS();
-                if (dockWindow) dockWindow.queue_draw();
-                return GLib.SOURCE_REMOVE;
-            });
+            _scheduleCssReload('color');
         });
     } catch (e) {
         log('[dock] Color monitor setup failed: ' + e.message);
+    }
+}
+
+function setupStyleMonitor() {
+    const file = Gio.File.new_for_path(DOCK_STYLE_PATH);
+    try {
+        _styleMonitor = file.monitor_file(Gio.FileMonitorFlags.NONE, null);
+        _styleMonitor.connect('changed', (_mon, _f, _other, eventType) => {
+            if (eventType !== Gio.FileMonitorEvent.CHANGES_DONE_HINT &&
+                eventType !== Gio.FileMonitorEvent.CREATED) return;
+            _scheduleCssReload('style');
+        });
+        log('[dock] style.css monitor active: ' + DOCK_STYLE_PATH);
+    } catch (e) {
+        log('[dock] Style monitor setup failed: ' + e.message);
     }
 }
 
@@ -520,9 +589,17 @@ function teardownColorMonitor() {
         GLib.source_remove(_colorReloadTimer);
         _colorReloadTimer = 0;
     }
+    if (_styleReloadTimer) {
+        GLib.source_remove(_styleReloadTimer);
+        _styleReloadTimer = 0;
+    }
     if (_colorMonitor) {
         _colorMonitor.cancel();
         _colorMonitor = null;
+    }
+    if (_styleMonitor) {
+        _styleMonitor.cancel();
+        _styleMonitor = null;
     }
     teardownLauncherMonitor();
 }
@@ -2292,8 +2369,9 @@ const DockApplication = GObject.registerClass({
         // Load CSS (static providers: GTK3/4 colours + style.css)
         loadCSS();
 
-        // Watch gtk-4.0/colors.css so matugen theme changes hot-reload colours
+        // Watch gtk-4.0/colors.css + style.css for matugen / CC hot-reload
         setupColorMonitor();
+        setupStyleMonitor();
 
         // Create dock
         dockWindow = new HyprCandyDock(this);

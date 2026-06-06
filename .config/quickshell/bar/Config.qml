@@ -685,7 +685,7 @@ QtObject {
     //  System Tray
     // ═══════════════════════════════════════════════════════════════════════
 
-    property int trayIconSz:     18   // px — icon image size
+    property int trayIconSz:     24   // px — icon image size
     property int trayItemPadH:    1   // px — horizontal padding inside each tray slot
     property int trayItemPadV:    2   // px — vertical padding inside each tray slot
     property int trayItemSpacing: 0   // px — gap between tray icons
@@ -703,7 +703,7 @@ QtObject {
     property string cavaStyle: "dots"
 
     readonly property var cavaStyleMap: ({
-        "dots":           "⣀⣄⣤⣦⣶⣷⣿",
+        "dots":           "⣀⣄⣤⣦⣶⣷⣿⣿",
         "bars":           "▁▂▃▄▅▆▇█",
         "braille_fill":   "⠂⠃⠇⡇⣇⣧⣷⣿",
         "braille_hollow": "⠂⠂⠃⠃⡃⡇⡇⣇",

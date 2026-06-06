@@ -7,11 +7,11 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  ClockPopup.qml — minimal clock popup, hyprcandy quickshell edition
+//  ClockPopup.qml — advanced clock dashboard, hyprcandy quickshell edition
 //
 //  Left-click on the Clock bar module → toggle this popup.
-//  Shows only the current time in C059 Bold Italic with the
-//  hour-matched nerd-font icon. Dismisses on focus change.
+//  Displays a dashboard with a ticking greeting, digital clock, seconds capsule,
+//  and a beautiful high-frequency sweeping analog clock. Dismisses on focus.
 // ═══════════════════════════════════════════════════════════════════════════
 PanelWindow {
     id: clkWin
@@ -19,6 +19,7 @@ PanelWindow {
     readonly property bool _barAtBottom: Config.barPosition === "bottom"
     readonly property real _barGap:    Config.outerMarginTop    + Config.barHeight + 6
     readonly property real _barGapBot: Config.outerMarginBottom + Config.barHeight + 6
+    readonly property real _panelMargin: Config.outerMarginSide * 2
 
     anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
     margins {
@@ -37,9 +38,6 @@ PanelWindow {
     visible: ClockPopupState.visible
 
     // ── Dismiss on focus change ───────────────────────────────────────────
-    // BUG FIX: guard with typeof check (same pattern as ControlCenterPopup,
-    // NotificationsPopup, SystemMonitorPopup) to avoid the
-    // "HyprlandFocusedClient is not defined" ReferenceError.
     Connections {
         target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
         ignoreUnknownSignals: true
@@ -51,25 +49,28 @@ PanelWindow {
 
     MouseArea { anchors.fill: parent; z: -1; onClicked: ClockPopupState.close() }
 
-    // ── Clock icon logic (mirrors Clock.qml) ─────────────────────────────
-    function _clockIcon() {
-        const h12     = new Date().getHours() % 12 || 12
-        const filled  = ["󱑋","󱑌","󱑍","󱑎","󱑏","󱑐","󱑑","󱑒","󱑓","󱑔","󱑕","󱑖"]
-        const outline = ["󱑋","󱑌","󱑍","󱑎","󱑏","󱑐","󱑑","󱑒","󱑓","󱑔","󱑕","󱑖"]
-        // Simple day/night: day 06:00–18:59
-        const h = new Date().getHours()
-        return (h >= 6 && h < 19) ? filled[h12 - 1] : outline[h12 - 1]
+    // ── Time & Greeting Logic ─────────────────────────────────────────────
+    property var _now: new Date()
+    property string _secStr: Qt.formatDateTime(_now, "ss")
+    property string _dateStr: Qt.formatDateTime(_now, "dddd, MMMM d")
+    property bool _colonVisible: _now.getMilliseconds() < 500
+
+    property string _greeting: {
+        const h = _now.getHours()
+        if (h >= 5 && h < 12) return "Good Morning!"
+        if (h >= 12 && h < 17) return "Good Afternoon!"
+        if (h >= 17 && h < 22) return "Good Evening!"
+        return "Good Night!"
     }
 
-    property string _time: Qt.formatDateTime(new Date(), "HH:mm:ss")
-    property string _icon: _clockIcon()
-
-    // Tick every second
+    // High frequency timer for smooth sweep and accurate digital update
     Timer {
-        interval: 1000; running: ClockPopupState.visible; repeat: true
+        id: smoothTimer
+        interval: 50
+        running: clkWin.visible
+        repeat: true
         onTriggered: {
-            clkWin._time = Qt.formatDateTime(new Date(), "HH:mm:ss")
-            clkWin._icon = clkWin._clockIcon()
+            clkWin._now = new Date()
         }
     }
 
@@ -78,8 +79,8 @@ PanelWindow {
         id: clkPanel
         anchors.horizontalCenter: parent.horizontalCenter
 
-        implicitWidth:  clkRow.implicitWidth  + 32
-        implicitHeight: clkRow.implicitHeight + 20
+        implicitWidth:  380
+        implicitHeight: 150
 
         radius: 20
         clip: true
@@ -99,27 +100,200 @@ PanelWindow {
             }
         }
 
-        Row {
-            id: clkRow
-            anchors.centerIn: parent
-            spacing: 12
+        RowLayout {
+            id: clkLayout
+            anchors.fill: parent
+            anchors.margins: 18
+            spacing: 20
 
-            Text {
-                text: clkWin._icon
-                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.80)
-                font.family: Config.fontFamily
-                font.pixelSize: Config.clockIconSize !== undefined ? Config.clockIconSize : 32
-                anchors.verticalCenter: parent.verticalCenter
+            // Left Side: Digital display & info
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignVCenter
+                spacing: 6
+
+                // Greeting text
+                Text {
+                    text: clkWin._greeting
+                    color: Theme.cPrimary
+                    font.family: Config.labelFont
+                    font.pixelSize: 13
+                    font.weight: Font.Medium
+                }
+
+                // Digital Time Row
+                Row {
+                    spacing: 2
+
+                    Text {
+                        text: Qt.formatDateTime(clkWin._now, "HH")
+                        color: Theme.cOnSurf
+                        font.family: "C059"
+                        font.italic: true
+                        font.weight: Font.Bold
+                        font.pixelSize: 38
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: ":"
+                        color: Theme.cPrimary
+                        font.family: "C059"
+                        font.italic: true
+                        font.weight: Font.Bold
+                        font.pixelSize: 38
+                        opacity: clkWin._colonVisible ? 1.0 : 0.2
+                        anchors.verticalCenter: parent.verticalCenter
+                        Behavior on opacity { NumberAnimation { duration: 150 } }
+                    }
+                    Text {
+                        text: Qt.formatDateTime(clkWin._now, "mm")
+                        color: Theme.cOnSurf
+                        font.family: "C059"
+                        font.italic: true
+                        font.weight: Font.Bold
+                        font.pixelSize: 38
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Item { width: 8; height: 1 } // spacer
+                    // Seconds capsule
+                    Rectangle {
+                        width: 32
+                        height: 22
+                        radius: 6
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                        border.width: 1
+                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
+                        anchors.verticalCenter: parent.verticalCenter
+                        Text {
+                            anchors.centerIn: parent
+                            text: clkWin._secStr
+                            color: Theme.cPrimary
+                            font.family: Config.labelFont
+                            font.pixelSize: 11
+                            font.weight: Font.Bold
+                        }
+                    }
+                }
+
+                // Localized date
+                Text {
+                    text: clkWin._dateStr
+                    color: Theme.cOnSurfVar
+                    font.family: Config.labelFont
+                    font.pixelSize: 12
+                }
             }
 
-            Text {
-                text: clkWin._time
-                color: Theme.cOnSurf
-                font.family: "C059"
-                font.italic: true
-                font.weight: Font.Bold
-                font.pixelSize: Config.clockTextSize !== undefined ? Config.clockTextSize : 38
-                anchors.verticalCenter: parent.verticalCenter
+            // Right Side: Sweeping Analog Clock
+            Item {
+                width: 110; height: 110
+                Layout.alignment: Qt.AlignVCenter
+
+                Canvas {
+                    id: analogCanvas
+                    anchors.fill: parent
+                    antialiasing: true
+
+                    // Trigger repaint whenever time changes
+                    property var time: clkWin._now
+                    onTimeChanged: requestPaint()
+
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.reset()
+                        ctx.clearRect(0, 0, width, height)
+
+                        const cx = width / 2
+                        const cy = height / 2
+                        const r = width / 2 - 4
+
+                        // 1. Draw outer circle
+                        ctx.lineWidth = 1.5
+                        ctx.strokeStyle = Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35).toString()
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                        ctx.stroke()
+
+                        // 2. Draw dial markings (12 dots)
+                        ctx.fillStyle = Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.40).toString()
+                        for (let i = 0; i < 12; i++) {
+                            const angle = (i * 30) * Math.PI / 180
+                            const mx = cx + (r - 6) * Math.sin(angle)
+                            const my = cy - (r - 6) * Math.cos(angle)
+                            ctx.beginPath()
+                            // Make 12, 3, 6, 9 markers slightly larger
+                            const mRadius = (i % 3 === 0) ? 2.5 : 1.2
+                            ctx.arc(mx, my, mRadius, 0, 2 * Math.PI)
+                            ctx.fill()
+                        }
+
+                        // Compute smooth hand angles
+                        const ms = time.getMilliseconds()
+                        const sec = time.getSeconds() + ms / 1000.0
+                        const min = time.getMinutes() + sec / 60.0
+                        const hr = (time.getHours() % 12) + min / 60.0
+
+                        const secAngle = (sec * 6) * Math.PI / 180
+                        const minAngle = (min * 6) * Math.PI / 180
+                        const hrAngle = (hr * 30) * Math.PI / 180
+
+                        // 3. Draw Hour Hand
+                        ctx.save()
+                        ctx.translate(cx, cy)
+                        ctx.rotate(hrAngle)
+                        ctx.lineWidth = 4.0
+                        ctx.lineCap = "round"
+                        ctx.strokeStyle = Theme.cPrimary.toString()
+                        ctx.beginPath()
+                        ctx.moveTo(0, 8)
+                        ctx.lineTo(0, -(r - 18))
+                        ctx.stroke()
+                        ctx.restore()
+
+                        // 4. Draw Minute Hand
+                        ctx.save()
+                        ctx.translate(cx, cy)
+                        ctx.rotate(minAngle)
+                        ctx.lineWidth = 2.5
+                        ctx.lineCap = "round"
+                        ctx.strokeStyle = Theme.cOnSurf.toString()
+                        ctx.beginPath()
+                        ctx.moveTo(0, 10)
+                        ctx.lineTo(0, -(r - 10))
+                        ctx.stroke()
+                        ctx.restore()
+
+                        // 5. Draw Second Hand (Smooth Sweeping)
+                        ctx.save()
+                        ctx.translate(cx, cy)
+                        ctx.rotate(secAngle)
+                        ctx.lineWidth = 0.0
+                        ctx.lineCap = "round"
+                        ctx.strokeStyle = Theme.cPrimaryFixedDim.toString()
+                        ctx.beginPath()
+                        ctx.moveTo(0, 12)
+                        ctx.lineTo(0, -(r - 6))
+                        ctx.stroke()
+
+                        // Target circle on second hand
+                        ctx.fillStyle = Theme.cPrimaryFixedDim.toString()
+                        ctx.beginPath()
+                        ctx.arc(0, -(r - 16), 3, 0, 2 * Math.PI)
+                        ctx.fill()
+                        ctx.restore()
+
+                        // 6. Center Pin (Axle)
+                        ctx.fillStyle = Theme.cPrimary.toString()
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, 4, 0, 2 * Math.PI)
+                        ctx.fill()
+
+                        ctx.fillStyle = Theme.cOnSurf.toString()
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI)
+                        ctx.fill()
+                    }
+                }
             }
         }
     }

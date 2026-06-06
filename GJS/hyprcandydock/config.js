@@ -63,6 +63,7 @@ var DockConfig = {
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 2,                // @HCD:borderWidth
+    borderColorVar: 'background', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
     borderTopLeftRadius: 20,       // @HCD:borderTopLeftRadius
     borderTopRightRadius: 20,      // @HCD:borderTopRightRadius
