@@ -292,7 +292,7 @@ function _injectGlyphSizeCSS(display) {
             border-radius: 50%;
             background-image: ${glyphBadgeGradient};
             padding-left: 1px;
-            padding-top: 0.25px;
+            padding-top: 1px;
             padding-bottom: 0.25px;
             padding-right: 0.125px;
         }
