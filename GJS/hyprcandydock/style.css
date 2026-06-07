@@ -30,11 +30,19 @@ window.background {
     margin: 0px;
 }
 
-/* Start and trash icons — font-size matches ICON_SIZE.
-   JS injects an override rule so this stays in sync automatically. */
+/* Start and trash icons — circular gradient badge.
+   font-size, min-width, and min-height are all injected at runtime from
+   glyphPx so the circle stays perfectly round at any icon size.
+   border-radius: 50% on a square widget always produces a true circle.
+   The gradient direction is overridden at runtime to match the dock
+   position so the badge depth-matches the dock fill on all four edges. */
 #start-icon, #trash-icon {
-    color: @primary_container;
-    font-size: 32px;        /* overridden at runtime from ICON_SIZE */
+    color: @primary;
+    font-size: 22px;            /* overridden at runtime — do not rely on this */
+    min-width:  22px;           /* overridden at runtime — keeps circle square  */
+    min-height: 22px;           /* overridden at runtime — keeps circle square  */
+    border-radius: 50%;
+    background-image: linear-gradient(to bottom, @background, @scrim);
     padding: 0px;
     margin: 0px;
 }
@@ -43,7 +51,7 @@ window.background {
    Uses the Hyprland NF glyph (\u{F30F}).
    font-size is overridden at runtime from ICON_SIZE. */
 .fallback-icon {
-    color: @primary_fixed_dim;
+    color: @on_surface;
     font-size: 22px;        /* overridden at runtime from ICON_SIZE */
     padding: 0px;
     margin: 0px;
@@ -57,10 +65,9 @@ button.app-button, button.dock-button {
     background: none;
     background-color: transparent;
     border: none;
-    border-radius: 0;
+    border-radius: 999px;
     box-shadow: none;
     padding: 2px;
-    margin: 0px;
     min-width: 0;
     min-height: 0;
     outline: none;

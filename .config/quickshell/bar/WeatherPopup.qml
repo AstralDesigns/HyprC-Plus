@@ -205,7 +205,7 @@ PanelWindow {
                     implicitHeight: 172
                     radius: 20
                     clip: true
-                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
+                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28)
 
@@ -332,7 +332,7 @@ PanelWindow {
 
                             width: 58
                             height: 78
-                            radius: 12
+                            radius: 99
                             clip: true
 
                             readonly property real cx: orbitContainer.width / 2
@@ -353,7 +353,7 @@ PanelWindow {
 
                             color: isCurrentHour
                                 ? "transparent"
-                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 1.0)
 
                             gradient: isCurrentHour ? hrGradient : null
 
@@ -441,7 +441,7 @@ PanelWindow {
                         // Gradient for current day, Theme.cOnSecondary for others
                         color: index === 0
                             ? "transparent"
-                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.55)
+                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
 
                         gradient: index === 0 ? fcGradient : null
 

@@ -160,14 +160,14 @@ PanelWindow {
                         width: 32
                         height: 22
                         radius: 6
-                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                         border.width: 1
                         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
                         anchors.verticalCenter: parent.verticalCenter
                         Text {
                             anchors.centerIn: parent
                             text: clkWin._secStr
-                            color: Theme.cPrimary
+                            color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.0)
                             font.family: Config.labelFont
                             font.pixelSize: 11
                             font.weight: Font.Bold
@@ -178,7 +178,7 @@ PanelWindow {
                 // Localized date
                 Text {
                     text: clkWin._dateStr
-                    color: Theme.cOnSurfVar
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.0)
                     font.family: Config.labelFont
                     font.pixelSize: 12
                 }
@@ -192,7 +192,7 @@ PanelWindow {
                 Rectangle {
                     anchors.fill: parent
                     radius: 999
-                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
+                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28)
                 }

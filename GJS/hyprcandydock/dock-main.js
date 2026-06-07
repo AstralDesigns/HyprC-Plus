@@ -249,6 +249,26 @@ function _injectGlyphSizeCSS(display) {
         bgStyle = 'background-image: none; background-color: @blur_background;';
     }
 
+    // Circular badge gradient for start / trash icons.
+    // Direction mirrors the dock surface gradient so the badge looks
+    // depth-consistent with the fill regardless of dock position:
+    //   bottom → light from top    → inverse_primary top,  scrim bottom
+    //   top    → light from bottom → inverse_primary bottom, scrim top
+    //   left   → light from left   → inverse_primary left,  scrim right
+    //   right  → light from right  → inverse_primary right, scrim left
+    const _badgePos = DockConfig.position || 'bottom';
+    let glyphBadgeGradient;
+    if (_badgePos === 'top') {
+        glyphBadgeGradient = 'linear-gradient(to top, @background, @on_secondary)';
+    } else if (_badgePos === 'left') {
+        glyphBadgeGradient = 'linear-gradient(to left, @background, @on_secondary)';
+    } else if (_badgePos === 'right') {
+        glyphBadgeGradient = 'linear-gradient(to right, @background, @on_secondary)';
+    } else {
+        // bottom (default)
+        glyphBadgeGradient = 'linear-gradient(to bottom, @background, @on_secondary)';
+    }
+
     const css = `
         /* Config-driven values — updated in-place on SIGUSR2 hot-reload */
         window.background {
@@ -260,8 +280,21 @@ function _injectGlyphSizeCSS(display) {
         #box {
             padding: ${padPx}px;
         }
+        /* ── Circular badge for start / trash glyphs ──────────────────────
+           min-width = min-height = glyphPx ensures the label is always a
+           perfect square before border-radius: 50% rounds it into a circle.
+           The gradient direction is flipped to match the dock edge so the
+           badge depth-illusion is consistent with the dock surface fill. */
         #start-icon, #trash-icon {
             font-size: ${glyphPx}px;
+            min-width:  calc(${glyphPx}px + 4px);
+            min-height: ${padPx}px;
+            border-radius: 50%;
+            background-image: ${glyphBadgeGradient};
+            padding-left: 1px;
+            padding-top: 0.25px;
+            padding-bottom: 0.25px;
+            padding-right: 0.125px;
         }
         .fallback-icon {
             font-size: ${glyphPx}px;

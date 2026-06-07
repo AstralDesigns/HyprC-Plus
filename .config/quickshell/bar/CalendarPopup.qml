@@ -375,15 +375,15 @@ PanelWindow {
                                     // Hover highlight (non-today cells only)
                                     Rectangle {
                                         anchors.centerIn: parent
-                                        width: 28; height: 26; radius: 8
+                                        width: 26; height: 26; radius: 99
                                         visible: !_isToday && _day > 0 && dayHover.containsMouse
-                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
                                     }
 
                                     // Today pill
                                     Rectangle {
                                         anchors.centerIn: parent
-                                        width: 28; height: 26; radius: 8
+                                        width: 26; height: 26; radius: 99
                                         visible: _isToday
                                         color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
                                         border.width: 1
@@ -427,7 +427,7 @@ PanelWindow {
                 Layout.bottomMargin: 6
                 horizontalAlignment: Text.AlignHCenter
                 text: Qt.formatDateTime(new Date(), "dddd, d MMMM yyyy")
-                color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.70)
+                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.0)
                 font.family: Config.labelFont
                 font.pixelSize: 11
             }
@@ -450,7 +450,7 @@ PanelWindow {
                         Layout.fillWidth: true
                         height: upcomingCol.implicitHeight + 10
                         radius: 6
-                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.07)
+                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                         border.width: 1
                         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.18)
 
@@ -462,7 +462,7 @@ PanelWindow {
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: modelData.label
-                                color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.55)
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.0)
                                 font.family: Config.labelFont
                                 font.pixelSize: 9
                                 font.weight: Font.Medium
