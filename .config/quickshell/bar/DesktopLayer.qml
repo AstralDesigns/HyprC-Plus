@@ -124,7 +124,7 @@ Item {
                 // No explicit width — let it grow rightward as columns fill.
                 // TopToBottom flow: items fill column top→bottom, wrap right.
                 flow:    Flow.TopToBottom
-                spacing: 16
+                spacing: 10
 
                 Repeater {
                     id: iconRepeater
