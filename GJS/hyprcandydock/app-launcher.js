@@ -730,7 +730,7 @@ window.hyprcandy-group-dialog {
    pillWrap margin-start: 2px  → 2px from the list-frame left inner edge.
    pillWrap margin-end:   2px  → 2px gap between pill and stack content.  */
 .tab-pill {
-    background-color: alpha(@inverse_primary, 0.35);
+    background-color: alpha(@inverse_primary, 0.65);
     border-radius: 30px;
     border: 1px solid alpha(@scrim, 1.00);
     padding: 1px 0;

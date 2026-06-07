@@ -119,7 +119,7 @@ Item {
                     top:    parent.top
                     left:   parent.left
                     bottom: parent.bottom
-                    margins: 18
+                    margins: 10
                 }
                 // No explicit width — let it grow rightward as columns fill.
                 // TopToBottom flow: items fill column top→bottom, wrap right.
