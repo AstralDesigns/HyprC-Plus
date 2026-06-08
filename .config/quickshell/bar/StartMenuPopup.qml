@@ -80,9 +80,9 @@ PanelWindow {
                         font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                 }
                 ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    Text { text: Quickshell.env("USER"); color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00); font.pixelSize: 13; font.weight: Font.Medium }
+                    Text { text: Quickshell.env("USER"); color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00); font.family: "C059"; font.pixelSize: 20; font.weight: Font.Bold; font.italic: true }
                     Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm")
-                        color: Theme.cOnSurfVar; font.pixelSize: 10 }
+                        color: Theme.cOnSurfVar; font.pixelSize: 13 }
                 }
                 // Recorder
                 Rectangle {
@@ -129,8 +129,12 @@ PanelWindow {
 
             // ── Brightness ────────────────────────────────────────────
             RowLayout { Layout.fillWidth: true; spacing: 10
-                Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cOnSecondary }
-                Text { text: "Brightness"; color: Theme.cOnSurfVar; font.pixelSize: 13; Layout.preferredWidth: 72 }
+                Rectangle {
+                    width: 17; height: 17; radius: 15
+                    color:  Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.65)
+                    Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Config.glyphColor }
+                }
+                Text { text: "Brightness"; color: Theme.cOnSurfVar; font.pixelSize: 10; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
                     value: StartMenuState.backlightValue
@@ -143,12 +147,16 @@ PanelWindow {
 
             // ── Volume ────────────────────────────────────────────────
             RowLayout { Layout.fillWidth: true; spacing: 10
-                Text {
-                    text: StartMenuState.volumeMuted ? "󰖁" : "󰕾"
-                    font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cOnSecondary
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
+                Rectangle {
+                    width: 17; height: 17; radius: 15
+                    color:  Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.65)
+                    Text {
+                        text: StartMenuState.volumeMuted ? "󰖁" : "󰕾"
+                        font.pixelSize: 17; font.family: Config.fontFamily; color: Config.glyphColor
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
+                    }
                 }
-                Text { text: "Volume"; color: Theme.cOnSurfVar; font.pixelSize: 13; Layout.preferredWidth: 72 }
+                Text { text: "Volume"; color: Theme.cOnSurfVar; font.pixelSize: 10; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
                     value: StartMenuState.volumeValue
@@ -755,7 +763,7 @@ PanelWindow {
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
                                 font.pixelSize: 18; font.family: Config.fontFamily
-                                color: ph.containsMouse ? Config.powerGlyphColor : Config.glyphColor
+                                color: ph.containsMouse ? Config.powerGlyphColor : Config.mediabtGlyphColor
                                 Behavior on color { ColorAnimation { duration: 120 } } }
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.l
                                 color: Theme.cOnSurfVar; font.pixelSize: 9 }
@@ -779,7 +787,7 @@ PanelWindow {
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
                     Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"
-                        color: logh.containsMouse ? Config.powerGlyphColor : Config.glyphColor
+                        color: logh.containsMouse ? Config.powerGlyphColor : Config.mediabtGlyphColor
                         Behavior on color { ColorAnimation { duration: 120 } } }
                     Text { text: "Logout"; color: logh.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
                         font.pixelSize: 12; font.weight: Font.Medium
