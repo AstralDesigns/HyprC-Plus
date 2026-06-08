@@ -7,20 +7,9 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  WeatherPopup — pure display layer.
-//
-//  All data lives in WeatherPopupState (singleton). The popup opens with data
-//  already populated because Weather.qml keeps the singleton refreshed on its
-//  poll interval. No fetch is triggered here.
-// ─────────────────────────────────────────────────────────────────────────────
-PanelWindow {
-    id: wxWin
-
-    readonly property bool _barAtBottom:  Config.barPosition === "bottom"
-    readonly property real _barGap:       Config.outerMarginTop    + Config.barHeight + 6
-    readonly property real _barGapBot:    Config.outerMarginBottom + Config.barHeight + 6
-    readonly property real _panelMargin:  Config.outerMarginSide * 2
+// Left-click → top-layer popup. Right-click → bottom-layer draggable widget.
+Item {
+    id: scope
 
     property real orbitOffset: 0
     property int _wheelPending: 0
@@ -34,7 +23,7 @@ PanelWindow {
         id: wheelCoalesce
         interval: 90
         repeat: false
-        onTriggered: wxWin._flushWheelSteps()
+        onTriggered: scope._flushWheelSteps()
     }
 
     function _flushWheelSteps() {
@@ -70,50 +59,20 @@ PanelWindow {
         target: WeatherPopupState
         function onVisibleChanged() {
             if (WeatherPopupState.visible) {
-                wxWin._wheelPending = 0
-                wxWin.orbitOffset = 0
+                scope._wheelPending = 0
+                scope.orbitOffset = 0
             }
         }
     }
 
-    anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
-    margins {
-        top:    _barAtBottom ? 0 : _barGap
-        bottom: _barAtBottom ? _barGapBot : 0
-    }
-
-    implicitHeight: wxPanel.implicitHeight
-
-    exclusionMode:            ExclusionMode.Ignore
-    WlrLayershell.layer:      WlrLayer.Top
-    WlrLayershell.namespace:  "quickshell:weather-popup"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    color:   "transparent"
-    visible: WeatherPopupState.visible
-
-    // ── Dismiss on focus change ───────────────────────────────────────────
-    Connections {
-        target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
-        ignoreUnknownSignals: true
-        function onAddressChanged() {
-            if (HyprlandFocusedClient.address !== "")
-                WeatherPopupState.close()
-        }
-    }
-
-    MouseArea { anchors.fill: parent; z: -1; onClicked: WeatherPopupState.close() }
-
-    // ── Panel ─────────────────────────────────────────────────────────────
-    Rectangle {
+    component WeatherPanel: Rectangle {
         id: wxPanel
-        anchors {
-            right: parent.right; rightMargin: wxWin._panelMargin
-            top: parent.top; bottom: parent.bottom
-        }
+        required property var root
+        property bool showClose: true
+        property bool popupMode: false
+
         width: 560
         implicitHeight: wxCol.implicitHeight + 32
-
-        //radius: startMenuPanel._panelRadius
         topLeftRadius: 20
         topRightRadius: 20
         bottomLeftRadius: 20
@@ -122,11 +81,11 @@ PanelWindow {
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
 
-        scale: WeatherPopupState.visible ? 1.0 : 0.94
-        transformOrigin: wxWin._barAtBottom ? Item.BottomRight : Item.TopRight
-        Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        scale: popupMode && WeatherPopupState.visible ? 1.0 : (popupMode ? 0.94 : 1.0)
+        transformOrigin: popupMode && Config.barPosition === "bottom" ? Item.BottomRight : Item.TopRight
+        Behavior on scale { enabled: popupMode; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
-        MouseArea { anchors.fill: parent }
+        MouseArea { anchors.fill: parent; enabled: popupMode }
 
         ColumnLayout {
             id: wxCol
@@ -170,8 +129,9 @@ PanelWindow {
                     }
                 }
 
-                // Close button
+                // Close button (popup only)
                 Rectangle {
+                    visible: showClose
                     width: 24; height: 24; radius: 99
                     color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.2)
                     MouseArea {
@@ -313,9 +273,9 @@ PanelWindow {
                         acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
                         onWheel: (event) => {
                             if (event.angleDelta.y > 0)
-                                wxWin.stepHour(-1)
+                                root.stepHour(-1)
                             else
-                                wxWin.stepHour(1)
+                                root.stepHour(1)
                         }
                     }
 
@@ -325,7 +285,7 @@ PanelWindow {
                             id: hrCard
                             required property int index
 
-                            readonly property real theta: (2 * Math.PI / wxWin._hourCount) * (index - wxWin.orbitOffset)
+                            readonly property real theta: (2 * Math.PI / root._hourCount) * (index - root.orbitOffset)
                             readonly property real zRatio: Math.cos(theta)
                             readonly property bool isCurrentHour: index === 0
                             readonly property bool isOrbitFront: zRatio > 0.96
@@ -378,7 +338,7 @@ PanelWindow {
                                 anchors.fill: parent
                                 z: 1
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: wxWin.focusHour(index)
+                                onClicked: root.focusHour(index)
                             }
 
                             Column {
@@ -492,6 +452,74 @@ PanelWindow {
             }
 
             Item { height: 4 }
+        }
+    }
+
+    PanelWindow {
+        id: wxPopup
+        readonly property bool _barAtBottom: Config.barPosition === "bottom"
+        readonly property real _barGap: Config.outerMarginTop + Config.barHeight + 6
+        readonly property real _barGapBot: Config.outerMarginBottom + Config.barHeight + 6
+        readonly property real _panelMargin: Config.outerMarginSide * 2
+
+        anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
+        margins {
+            top: _barAtBottom ? 0 : _barGap
+            bottom: _barAtBottom ? _barGapBot : 0
+        }
+
+        implicitHeight: wxPanelPopup.implicitHeight
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.namespace: "quickshell:weather-popup"
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        color: "transparent"
+        visible: WeatherPopupState.visible
+
+        Connections {
+            target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
+            ignoreUnknownSignals: true
+            function onAddressChanged() {
+                if (HyprlandFocusedClient.address !== "")
+                    WeatherPopupState.close()
+            }
+        }
+
+        MouseArea { anchors.fill: parent; z: -1; onClicked: WeatherPopupState.close() }
+
+        WeatherPanel {
+            id: wxPanelPopup
+            root: scope
+            showClose: true
+            popupMode: true
+            anchors {
+                right: parent.right
+                rightMargin: wxPopup._panelMargin
+                top: parent.top
+                bottom: parent.bottom
+            }
+        }
+    }
+
+    PinnedWidgetWindow {
+        id: weatherWidget
+        active: WeatherPopupState.widgetVisible
+        widgetNamespace: "quickshell:weather-widget"
+        onActiveChanged: {
+            if (active) {
+                weatherWidget.posX = WeatherPopupState.widgetX
+                weatherWidget.posY = WeatherPopupState.widgetY
+            }
+        }
+        onPositionCommitted: function(x, y) {
+            WeatherPopupState.widgetX = Math.round(x)
+            WeatherPopupState.widgetY = Math.round(y)
+        }
+
+        WeatherPanel {
+            root: scope
+            showClose: false
+            popupMode: false
         }
     }
 }

@@ -59,7 +59,9 @@ Item {
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         onClicked: function(ev) {
-            if (ev.button !== Qt.RightButton)
+            if (ev.button === Qt.RightButton)
+                WeatherPopupState.toggleWidget()
+            else
                 WeatherPopupState.toggle()
         }
         onWheel: function(ev) {

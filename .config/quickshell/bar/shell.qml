@@ -67,7 +67,7 @@ ShellRoot {
     Loader { active: LicenseState.activated && VolumePopupState.visible;   source: "VolumePopup.qml"   }
     Loader { active: LicenseState.activated && NetworkPopupState.visible;  source: "NetworkPopup.qml"  }
     Loader { active: LicenseState.activated && CalendarPopupState.visible; source: "CalendarPopup.qml" }
-    Loader { active: LicenseState.activated && ClockPopupState.visible;    source: "ClockPopup.qml"    }
+    Loader { active: LicenseState.activated && (ClockPopupState.visible || ClockPopupState.widgetVisible); source: "ClockPopup.qml" }
     Loader { active: LicenseState.activated && TrayMenuState.visible;      source: "TrayMenuPopup.qml" }
     // Wrapped in a Loader so wallpaper changes can fully destroy+recreate
     // it, forcing Qt to re-apply the new QT color palette for native menus.
@@ -146,8 +146,8 @@ ShellRoot {
         source: "DesktopLayer.qml"
     }
     Loader { active: ControlCenterState.visible;  source: "ControlCenterPopup.qml" }
-    Loader { active: LicenseState.activated && WeatherPopupState.visible;        source: "WeatherPopup.qml"        }
-    Loader { active: LicenseState.activated && SystemMonitorPopupState.visible;  source: "SystemMonitorPopup.qml"  }
+    Loader { active: LicenseState.activated && (WeatherPopupState.visible || WeatherPopupState.widgetVisible); source: "WeatherPopup.qml" }
+    Loader { active: LicenseState.activated && (SystemMonitorPopupState.visible || SystemMonitorPopupState.widgetVisible); source: "SystemMonitorPopup.qml" }
     Loader { active: LicenseState.activated && (NotificationsState.historyVisible || NotificationsState.notifications.length > 0); source: "NotificationsPopup.qml" }
     Loader { active: StartMenuState.menuVisible;    source: "StartMenuPopup.qml"    }
     Loader { active: LicenseState.activated && ScreenshotPopupState.visible; source: "ScreenshotPopup.qml" }

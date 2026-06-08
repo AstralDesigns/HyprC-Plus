@@ -95,8 +95,13 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        acceptedButtons: Qt.LeftButton
-        onClicked: ClockPopupState.toggle()
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onClicked: function(ev) {
+            if (ev.button === Qt.RightButton)
+                ClockPopupState.toggleWidget()
+            else
+                ClockPopupState.toggle()
+        }
     }
 
     // Sync to next minute boundary, then tick every 60 s

@@ -43,6 +43,7 @@ singleton ControlCenterState 1.0 ControlCenterState.qml
 singleton LicenseState 1.0 LicenseState.qml
 ControlCenterPopup 1.0 ControlCenterPopup.qml
 WeatherPopup 1.0 WeatherPopup.qml
+PinnedWidgetWindow 1.0 PinnedWidgetWindow.qml
 SystemMonitorPopup 1.0 SystemMonitorPopup.qml
 NotificationsPopup 1.0 NotificationsPopup.qml
 StartMenuPopup 1.0 StartMenuPopup.qml

@@ -21,38 +21,11 @@ import Quickshell.Io
 //            collisions in GPU names from lspci.
 // ─────────────────────────────────────────────────────────────────────────────
 
-PanelWindow {
-    id: smWin
+// Left-click → top-layer popup. Right-click → bottom-layer draggable widget.
+Item {
+    id: scope
 
-    readonly property bool _barAtBottom: Config.barPosition === "bottom"
-    readonly property real _barGap:    Config.outerMarginTop    + Config.barHeight + 6
-    readonly property real _barGapBot: Config.outerMarginBottom + Config.barHeight + 6
-    readonly property real _panelMargin: Config.outerMarginSide * 2
-
-    anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
-    margins {
-        top:    _barAtBottom ? 0 : _barGap
-        bottom: _barAtBottom ? _barGapBot : 0
-    }
-
-    implicitHeight: smCol.implicitHeight + 32
-
-    exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.layer:     WlrLayer.Top
-    WlrLayershell.namespace: "quickshell:sysmon-popup"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    color: "transparent"
-
-    Connections {
-        target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
-        ignoreUnknownSignals: true
-        function onAddressChanged() {
-            if (HyprlandFocusedClient.address !== "")
-                SystemMonitorPopupState.close()
-        }
-    }
-
-    MouseArea { anchors.fill: parent; z: -1; onClicked: SystemMonitorPopupState.close() }
+    readonly property bool _active: SystemMonitorPopupState.visible || SystemMonitorPopupState.widgetVisible
 
     // ── Data ──────────────────────────────────────────────────────────────
     property real   _cpu:       0
@@ -184,7 +157,7 @@ PanelWindow {
         }
         onRunningChanged: if (running) _buf = []
         onExited: function() {
-            smWin._parse(sysProc._buf.slice())
+            scope._parse(sysProc._buf.slice())
             sysProc._buf = []
         }
     }
@@ -322,7 +295,7 @@ PanelWindow {
 
     Timer {
         interval: 2000; repeat: true; triggeredOnStart: true
-        running: true
+        running: scope._active
         onTriggered: if (!sysProc.running) sysProc.running = true
     }
 
@@ -398,15 +371,16 @@ PanelWindow {
         }
     }
 
-    // ── Panel ─────────────────────────────────────────────────────────────
-    Rectangle {
+    component SysMonPanel: Rectangle {
         id: smPanel
-        readonly property int _gaugeCount: 3 + (smWin._swapOk ? 1 : 0) + smWin._gpus.length + (smWin._hasBat ? 1 : 0)
-        anchors { right: parent.right; rightMargin: smWin._panelMargin
-                  top: parent.top; bottom: parent.bottom }
-        width: _gaugeCount * 88 + (_gaugeCount - 1) * 8 + 24 + 32
+        required property var root
+        property bool showClose: true
+        property bool popupMode: false
 
-        //radius: startMenuPanel._panelRadius
+        readonly property int _gaugeCount: 3 + (root._swapOk ? 1 : 0) + root._gpus.length + (root._hasBat ? 1 : 0)
+        width: _gaugeCount * 88 + (_gaugeCount - 1) * 8 + 24 + 32
+        implicitHeight: smCol.implicitHeight + 32
+
         topLeftRadius: 20
         topRightRadius: 20
         bottomLeftRadius: 20
@@ -415,11 +389,11 @@ PanelWindow {
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
 
-        scale: SystemMonitorPopupState.visible ? 1.0 : 0.92
-        transformOrigin: smWin._barAtBottom ? Item.BottomRight : Item.TopRight
-        Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        scale: popupMode && SystemMonitorPopupState.visible ? 1.0 : (popupMode ? 0.92 : 1.0)
+        transformOrigin: popupMode && Config.barPosition === "bottom" ? Item.BottomRight : Item.TopRight
+        Behavior on scale { enabled: popupMode; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
 
-        MouseArea { anchors.fill: parent }
+        MouseArea { anchors.fill: parent; enabled: popupMode }
 
         ColumnLayout {
             id: smCol
@@ -435,6 +409,7 @@ PanelWindow {
                 }
                 Item { Layout.fillWidth: true }
                 Rectangle {
+                    visible: showClose
                     width: 26; height: 26; radius: 99; color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.2)
                     MouseArea {
                         anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
@@ -467,33 +442,33 @@ PanelWindow {
                     spacing: 8
 
                     ArcGauge {
-                        value:    smWin._cpu;  glyph: "󰻠"; label: "CPU"
-                        valStr:   Math.round(smWin._cpu * 100) + "%"
+                        value:    root._cpu;  glyph: "󰻠"; label: "CPU"
+                        valStr:   Math.round(root._cpu * 100) + "%"
                         arcColor: Theme.cPrimary
                     }
                     ArcGauge {
-                        value:    smWin._ram;  glyph: "󰍛"; label: "RAM"
-                        valStr:   Math.round(smWin._ram * 100) + "%"
-                        sub:      smWin._fmtBytes(smWin._ramUsed)
+                        value:    root._ram;  glyph: "󰍛"; label: "RAM"
+                        valStr:   Math.round(root._ram * 100) + "%"
+                        sub:      root._fmtBytes(root._ramUsed)
                         arcColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                     }
                     ArcGauge {
-                        value:    smWin._tempOk ? Math.min(smWin._temp / 100, 1) : 0
+                        value:    root._tempOk ? Math.min(root._temp / 100, 1) : 0
                         glyph:    "󰔏"; label: "Temp"
-                        valStr:   smWin._tempOk ? Math.round(smWin._temp) + "°" : "N/A"
-                        arcColor: smWin._tempOk && smWin._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        valStr:   root._tempOk ? Math.round(root._temp) + "°" : "N/A"
+                        arcColor: root._tempOk && root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                     }
                     ArcGauge {
-                        visible:  smWin._swapOk
-                        value:    smWin._swap; glyph: "󰾴"; label: "Swap"
-                        valStr:   Math.round(smWin._swap * 100) + "%"
-                        sub:      smWin._swapOk ? smWin._fmtBytes(smWin._swapUsed) : ""
+                        visible:  root._swapOk
+                        value:    root._swap; glyph: "󰾴"; label: "Swap"
+                        valStr:   Math.round(root._swap * 100) + "%"
+                        sub:      root._swapOk ? root._fmtBytes(root._swapUsed) : ""
                         arcColor: Theme.cPrimaryFixedDim; opacity: 0.8
                     }
 
                     // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
                     Repeater {
-                        model: smWin._gpus
+                        model: root._gpus
                         delegate: ArcGauge {
                             required property var modelData
                             value:    modelData.pct / 100
@@ -507,16 +482,16 @@ PanelWindow {
 
                     // Battery — laptops only; hidden on desktops
                     ArcGauge {
-                        visible:  smWin._hasBat
-                        value:    smWin._batPct / 100
-                        glyph:    smWin._batPct > 80 ? "󰁹" : smWin._batPct > 60 ? "󰂀"
-                                  : smWin._batPct > 40 ? "󰁾" : smWin._batPct > 20 ? "󰁼" : "󰁺"
-                        label:    smWin._batStatus === "Full"      ? "Battery "
-                                  : smWin._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
-                        valStr:   smWin._batPct + "%"
-                        sub:      smWin._batStatus
-                        arcColor: smWin._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
-                                  : smWin._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
+                        visible:  root._hasBat
+                        value:    root._batPct / 100
+                        glyph:    root._batPct > 80 ? "󰁹" : root._batPct > 60 ? "󰂀"
+                                  : root._batPct > 40 ? "󰁾" : root._batPct > 20 ? "󰁼" : "󰁺"
+                        label:    root._batStatus === "Full"      ? "Battery "
+                                  : root._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
+                        valStr:   root._batPct + "%"
+                        sub:      root._batStatus
+                        arcColor: root._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
+                                  : root._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
                                   : Config.powerGlyphColor
                     }
                 }
@@ -531,11 +506,11 @@ PanelWindow {
                     spacing: 4
                     Row { spacing: 6
                         Text { text: "󰁅"; color: Theme.cPrimary; font.pixelSize: 12; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: smWin._fmtRate(smWin._rxRate); color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
+                        Text { text: root._fmtRate(root._rxRate); color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
                     }
                     Row { spacing: 6
                         Text { text: "󰁝"; color: Theme.cPrimary; font.pixelSize: 12; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: smWin._fmtRate(smWin._txRate); color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
+                        Text { text: root._fmtRate(root._txRate); color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
                     }
                 }
                 Item { Layout.fillWidth: true }
@@ -543,16 +518,84 @@ PanelWindow {
                     spacing: 4
                     Row { spacing: 6; anchors.right: parent.right
                         Text { text: "󰅐"; color: Theme.cPrimary; font.pixelSize: 12; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "Up: " + smWin._uptime; color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
+                        Text { text: "Up: " + root._uptime; color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
                     }
                     Row { spacing: 6; anchors.right: parent.right
                         Text { text: "󰒋"; color: Theme.cPrimary; font.pixelSize: 12; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "Load: " + smWin._load; color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
+                        Text { text: "Load: " + root._load; color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
                     }
                 }
             }
 
             Item { height: 0 }
+        }
+    }
+
+    PanelWindow {
+        id: smPopup
+        readonly property bool _barAtBottom: Config.barPosition === "bottom"
+        readonly property real _barGap: Config.outerMarginTop + Config.barHeight + 6
+        readonly property real _barGapBot: Config.outerMarginBottom + Config.barHeight + 6
+        readonly property real _panelMargin: Config.outerMarginSide * 2
+
+        anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
+        margins {
+            top: _barAtBottom ? 0 : _barGap
+            bottom: _barAtBottom ? _barGapBot : 0
+        }
+
+        implicitHeight: smPanelPopup.implicitHeight
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.layer: WlrLayer.Top
+        WlrLayershell.namespace: "quickshell:sysmon-popup"
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        color: "transparent"
+        visible: SystemMonitorPopupState.visible
+
+        Connections {
+            target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
+            ignoreUnknownSignals: true
+            function onAddressChanged() {
+                if (HyprlandFocusedClient.address !== "")
+                    SystemMonitorPopupState.close()
+            }
+        }
+
+        MouseArea { anchors.fill: parent; z: -1; onClicked: SystemMonitorPopupState.close() }
+
+        SysMonPanel {
+            id: smPanelPopup
+            root: scope
+            showClose: true
+            popupMode: true
+            anchors {
+                right: parent.right
+                rightMargin: smPopup._panelMargin
+                top: parent.top
+                bottom: parent.bottom
+            }
+        }
+    }
+
+    PinnedWidgetWindow {
+        id: sysmonWidget
+        active: SystemMonitorPopupState.widgetVisible
+        widgetNamespace: "quickshell:sysmon-widget"
+        onActiveChanged: {
+            if (active) {
+                sysmonWidget.posX = SystemMonitorPopupState.widgetX
+                sysmonWidget.posY = SystemMonitorPopupState.widgetY
+            }
+        }
+        onPositionCommitted: function(x, y) {
+            SystemMonitorPopupState.widgetX = Math.round(x)
+            SystemMonitorPopupState.widgetY = Math.round(y)
+        }
+
+        SysMonPanel {
+            root: scope
+            showClose: false
+            popupMode: false
         }
     }
 }

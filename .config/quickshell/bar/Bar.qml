@@ -64,13 +64,16 @@ PanelWindow {
     property int  _ahDelaySec: 5
     property bool _ahHidden:   false
 
-    // Guard: bar stays visible while any panel (CC, notifications, start-menu, tray menu) is open.
+    // Guard: bar stays visible while any panel is open.
     readonly property bool anyPanelOpen: ControlCenterState.visible
                                        || NotificationsState.historyVisible
                                        || StartMenuState.menuVisible
                                        || TrayMenuState.visible
                                        || SysTrayPopupState.visible
                                        || UpdatesPopupState.visible
+                                       || ClockPopupState.visible
+                                       || WeatherPopupState.visible
+                                       || SystemMonitorPopupState.visible
 
     // Tri AH: only pin the segment that owns the open popup. CC pins all three.
     readonly property bool _triLeftPinned:  ControlCenterState.visible

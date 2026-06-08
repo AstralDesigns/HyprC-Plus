@@ -19,9 +19,16 @@ QtObject {
 
     // ── Visibility ────────────────────────────────────────────────────────
     property bool visible: false
+    property bool widgetVisible: false
+    property int widgetX: 480
+    property int widgetY: 100
+
     function toggle() { root.visible = !root.visible }
     function open()   { root.visible = true  }
     function close()  { root.visible = false }
+
+    function toggleWidget() { root.widgetVisible = !root.widgetVisible }
+    function closeWidget()  { root.widgetVisible = false }
 
     // ── File paths ────────────────────────────────────────────────────────
     readonly property string _pinnedLocFile: Quickshell.env("HOME") + "/.config/hyprcandy/weather-location.conf"

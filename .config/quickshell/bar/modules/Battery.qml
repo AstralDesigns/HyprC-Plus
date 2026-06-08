@@ -158,8 +158,6 @@ Item {
     opacity: ma.containsMouse ? 0.7 : 1.0
     Behavior on opacity { NumberAnimation { duration: 80 } }
 
-    Process { id: sysAppProc; command: ["gnome-system-monitor"]; running: false }
-
     MouseArea {
         id: ma
         anchors.fill: parent
@@ -167,8 +165,10 @@ Item {
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         onClicked: function(ev) {
-            if (ev.button === Qt.RightButton) { if (!sysAppProc.running) sysAppProc.running = true }
-            else                              { SystemMonitorPopupState.toggle() }
+            if (ev.button === Qt.RightButton)
+                SystemMonitorPopupState.toggleWidget()
+            else
+                SystemMonitorPopupState.toggle()
         }
     }
 }
