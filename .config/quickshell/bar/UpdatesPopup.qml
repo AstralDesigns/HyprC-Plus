@@ -291,7 +291,7 @@ PanelWindow {
             "cd ~/.hyprcandy/candyinstall && " +
             "chmod +x Candy_Update.sh && " +
             "pkexec bash ~/.hyprcandy/candyinstall/Candy_Update.sh > /tmp/candy-update.log 2>&1 && " +
-            "bash ~/.config/hypr/scripts/notify.sh > /dev/null"
+            "sleep 3 && bash ~/.config/hypr/scripts/notify.sh > /dev/null"
         ]
         running: false
         onExited: (code) => {
