@@ -355,7 +355,7 @@ PanelWindow {
         id: _hcStateClearProc
         command: [
             "bash", "-c",
-            "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
+            "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state && " + "bash ~/.config/hypr/scripts/notify.sh"
         ]
         running: false
         onExited: {
