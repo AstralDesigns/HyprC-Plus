@@ -1426,7 +1426,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["General","Icons","Workspaces","Media","Cava","Clock","Background","Visibility"]
+                                    model: ["General","Icons","Workspaces","Media","Cava","Background","Visibility"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -2310,30 +2310,6 @@ PanelWindow {
                                         }
 
                                         Item { height: 10 }
-                                }
-                                
-                                
-                                // ── Clock ───────────────────────────────────
-                                CCScrollPane {
-                                    ColumnLayout {
-                                        width: parent.width; spacing: 5
-
-                                        // ── Popup sizes ──────────────────────────────
-                                        CCSection { text: "Clock Popup Sizes" }
-
-                                        CCSlider {
-                                            label: "Time Font Size"
-                                            from: 16; to: 60; stepSize: 1
-                                            value: Config.clockTextSize
-                                            onMoved: function(v) { Config.clockTextSize = v }
-                                        }
-                                        CCSlider {
-                                            label: "Icon Size"
-                                            from: 10; to: 48; stepSize: 1
-                                            value: Config.clockIconSize
-                                            onMoved: function(v) { Config.clockIconSize = v }
-                                        }
-                                    }
                                 }
 
                                 // ── Background ─────────────────────────────

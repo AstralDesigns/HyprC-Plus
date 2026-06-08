@@ -119,12 +119,12 @@ Item {
                     top:    parent.top
                     left:   parent.left
                     bottom: parent.bottom
-                    margins: 10
+                    margins: 6
                 }
                 // No explicit width — let it grow rightward as columns fill.
                 // TopToBottom flow: items fill column top→bottom, wrap right.
                 flow:    Flow.TopToBottom
-                spacing: 10
+                spacing: 4
 
                 Repeater {
                     id: iconRepeater
@@ -143,8 +143,8 @@ Item {
 
                         // Fixed cell size — both dimensions explicit so Flow
                         // can pack them correctly in TopToBottom mode.
-                        width:  Config.desktopIconSize + 16
-                        height: Config.desktopIconSize + Config.desktopLabelSize + 22
+                        width:  Config.desktopIconSize + 25
+                        height: Config.desktopIconSize + Config.desktopLabelSize + 16
 
                         readonly property string _iconSrc: {
                             if (_icon.startsWith("/"))
