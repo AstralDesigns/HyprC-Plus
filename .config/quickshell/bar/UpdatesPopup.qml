@@ -297,8 +297,11 @@ PanelWindow {
             running = false
             if (code === 0) {
                 // Git clone succeeded and the script has been launched.
-                // Mark it running so the UI shows "Running …" immediately,
-                // then let the poll timer take over tracking.
+                // Write a sentinel file before marking running — this survives
+                // the QS reload that the update itself triggers, so the
+                // post-reload pgrep check can detect a completed update even
+                // though _hcScriptRunning resets to false on every reload.
+                _hcSentinelProc.running = true
                 _hcScriptRunning = true
                 _hcPollTimer.start()
             }
@@ -322,14 +325,11 @@ PanelWindow {
                 _hcScriptRunning = true
             } else {
                 // Script finished (or was never running on this boot).
-                // Only run cleanup when we were previously tracking it so
-                // a cold QS start doesn't spuriously clear the state file.
-                if (_hcScriptRunning) {
-                    _hcScriptRunning = false
-                    _hcStateClearProc.running = true
-                }
-                // If _hcScriptRunning was already false (cold start, no
-                // prior run detected) do nothing — leave state as-is.
+                // Check sentinel file rather than _hcScriptRunning — the flag
+                // resets on every QS reload but the file survives, so this
+                // correctly fires even when the reload happened mid-update.
+                _hcScriptRunning = false
+                _hcStateClearProc.running = true
             }
         }
     }
@@ -351,24 +351,37 @@ PanelWindow {
     // ── HC state file cleanup process (runs after script finishes) ────────────
     // Removes ~/.config/hyprcandy/hc-update-state so the next check
     // evaluates fresh rather than reading the now-stale persisted state.
+    // Gates on the sentinel file so cold QS starts (where no update ran)
+    // don't spuriously fire notify.sh.
     Process {
         id: _hcStateClearProc
         command: [
             "bash", "-c",
-            Quickshell.env("HOME") + "/.config/hypr/scripts/notify.sh > /dev/null && " +
-            "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
+            "s=" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel; " +
+            "[ -f \"$s\" ] || exit 0; " +
+            Quickshell.env("HOME") + "/.config/hypr/scripts/notify.sh > /dev/null; " +
+            "rm -f \"$s\" " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
         ]
         running: false
         onExited: {
             running = false
-            // Rescan — hc-update-check.sh will find no state file and run a
-            // fresh git pull which should report up to date.
             UpdatesPopupState.requestRescan()
-            // Regen matugen + pywal colors from the user's current wallpaper
-            // now that the update script has finished and dotfiles are in place.
             if (!_hcReColorProc.running)
                 _hcReColorProc.running = true
         }
+    }
+
+    // ── Sentinel writer — marks that an HC+ update was launched ──────────────
+    // Written before the QS reload so the post-reload pgrep check knows a
+    // completed update needs cleanup, even though _hcScriptRunning resets.
+    Process {
+        id: _hcSentinelProc
+        command: [
+            "bash", "-c",
+            "touch " + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel"
+        ]
+        running: false
+        onExited: running = false
     }
 
     // ── Post-update color regeneration ───────────────────────────────────────
