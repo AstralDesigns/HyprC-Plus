@@ -290,8 +290,7 @@ PanelWindow {
             "git clone --depth 1 https://github.com/AstralDesigns/candyinstall.git ~/.hyprcandy/candyinstall && " +
             "cd ~/.hyprcandy/candyinstall && " +
             "chmod +x Candy_Update.sh && " +
-            "pkexec bash ~/.hyprcandy/candyinstall/Candy_Update.sh > /tmp/candy-update.log 2>&1 && " +
-            "sleep 3 && bash ~/.config/hypr/scripts/notify.sh > /dev/null"
+            "pkexec bash ~/.hyprcandy/candyinstall/Candy_Update.sh > /tmp/candy-update.log 2>&1"
         ]
         running: false
         onExited: (code) => {
@@ -356,6 +355,7 @@ PanelWindow {
         id: _hcStateClearProc
         command: [
             "bash", "-c",
+            "~/.config/hypr/scripts/notify.sh > /dev/null && " + 
             "rm -f " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
         ]
         running: false
