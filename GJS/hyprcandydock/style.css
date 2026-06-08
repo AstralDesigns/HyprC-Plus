@@ -12,7 +12,7 @@ window.background {
 
 /* Dock box container */
 #box {
-    padding: 4px;           /* config: innerPadding */
+    padding: 0px;           /* config: innerPadding */
     background-color: transparent;
 }
 

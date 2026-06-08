@@ -210,22 +210,22 @@ QtObject {
         v = _settings.value("launcherInnerPadding");   if (v !== undefined && v !== null) launcherInnerPadding   = v
         // Bar autohide + dock runtime state
         v = _settings.value("barAutoHide");      if (v !== undefined && v !== null) barAutoHide      = _toBool(v)
-        v = _settings.value("barAutoHideDelay"); if (v !== undefined && v !== null) barAutoHideDelay = parseInt(v) || 5
+        v = _settings.value("barAutoHideDelay"); if (v !== undefined && v !== null) barAutoHideDelay = parseInt(v)
         v = _settings.value("triLeftAutoHide");       if (v !== undefined && v !== null) triLeftAutoHide       = _toBool(v)
-        v = _settings.value("triLeftAutoHideDelay");  if (v !== undefined && v !== null) triLeftAutoHideDelay  = parseInt(v) || 5
+        v = _settings.value("triLeftAutoHideDelay");  if (v !== undefined && v !== null) triLeftAutoHideDelay  = parseInt(v)
         v = _settings.value("triCenterAutoHide");     if (v !== undefined && v !== null) triCenterAutoHide     = _toBool(v)
-        v = _settings.value("triCenterAutoHideDelay");if (v !== undefined && v !== null) triCenterAutoHideDelay = parseInt(v) || 5
+        v = _settings.value("triCenterAutoHideDelay");if (v !== undefined && v !== null) triCenterAutoHideDelay = parseInt(v)
         v = _settings.value("triRightAutoHide");      if (v !== undefined && v !== null) triRightAutoHide      = _toBool(v)
-        v = _settings.value("triRightAutoHideDelay"); if (v !== undefined && v !== null) triRightAutoHideDelay = parseInt(v) || 5
+        v = _settings.value("triRightAutoHideDelay"); if (v !== undefined && v !== null) triRightAutoHideDelay = parseInt(v)
         v = _settings.value("dockAutoHide");     if (v !== undefined && v !== null) dockAutoHide     = _toBool(v)
-        v = _settings.value("dockAutoHideDelay");if (v !== undefined && v !== null) dockAutoHideDelay= parseInt(v) || 5
-        v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v) || 6
-        v = _settings.value("desktopIconSize");    if (v !== undefined && v !== null) desktopIconSize    = parseInt(v) || 64
-        v = _settings.value("desktopLabelSize");   if (v !== undefined && v !== null) desktopLabelSize   = parseInt(v) || 11
-        v = _settings.value("desktopLabelRadius"); if (v !== undefined && v !== null) desktopLabelRadius = parseInt(v) || 20
+        v = _settings.value("dockAutoHideDelay");if (v !== undefined && v !== null) dockAutoHideDelay= parseInt(v)
+        v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v)
+        v = _settings.value("desktopIconSize");    if (v !== undefined && v !== null) desktopIconSize    = parseInt(v)
+        v = _settings.value("desktopLabelSize");   if (v !== undefined && v !== null) desktopLabelSize   = parseInt(v)
+        v = _settings.value("desktopLabelRadius"); if (v !== undefined && v !== null) desktopLabelRadius = parseInt(v)
         v = _settings.value("desktopVisible");     if (v !== undefined && v !== null) desktopVisible     = _toBool(v)
-        v = _settings.value("clockTextSize");      if (v !== undefined && v !== null) clockTextSize      = parseInt(v) || 38
-        v = _settings.value("clockIconSize");      if (v !== undefined && v !== null) clockIconSize      = parseInt(v) || 32
+        v = _settings.value("clockTextSize");      if (v !== undefined && v !== null) clockTextSize      = parseInt(v)
+        v = _settings.value("clockIconSize");      if (v !== undefined && v !== null) clockIconSize      = parseInt(v)
         v = _settings.value("clockWorldCities");   if (v !== undefined && v !== null) { try { clockWorldCities = JSON.parse(v) } catch(e) {} }
     }
 
@@ -588,7 +588,7 @@ QtObject {
     property color dateTextColor:        Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.0)
     property color mediaGlyphColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
     property color discGlyphColor:       Theme.cPrimary
-    property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.80)
+    property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80)
     property color powerGlyphColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
@@ -647,8 +647,8 @@ QtObject {
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
     readonly property color wsActiveColor:     Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, wsActiveOpacity)
-    readonly property color wsPersistentColor: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, wsPersistentOpacity)
-    readonly property color wsEmptyColor:      Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, wsEmptyOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsPersistentOpacity)
+    readonly property color wsEmptyColor:      Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
     //  wsGlyphSize controls the font size of workspace button icons.
@@ -1084,8 +1084,8 @@ QtObject {
     readonly property int modulePadV:       modPadV * 2
     readonly property int islandMarginH:    0
     readonly property int islandMarginV:    0
-    readonly property int trayIconSize:     15
-    readonly property int traySpacing:      4
+    readonly property int trayIconSize:     24
+    readonly property int traySpacing:      2
     readonly property int mediaThumbSz:     mediaThumbSize
     readonly property int wsGlyphSz:        wsGlyphSize
 }

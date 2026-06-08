@@ -19,12 +19,12 @@ PanelWindow {
     margins {
         top:    _barAtBottom ? 0 : _barGap
         bottom: _barAtBottom ? _barGapBot : 0
-        right:  _panelMargin + 135
+        right:  _panelMargin + 142
     }
     // _pad drives symmetric padding on all sides, sourced from bar's outerMarginTop
     readonly property real _pad: Config.outerMarginTop
     // Minimum slot = 24px icon + pad on both sides so pill never collapses when empty
-    readonly property real _minSlot: 34 + _pad * 2
+    readonly property real _minSlot: 28 + _pad * 2
 
     implicitHeight: _minSlot
     implicitWidth:  popupRect.implicitWidth
@@ -80,8 +80,8 @@ PanelWindow {
                     Image {
                         anchors.centerIn: parent
                         source:   slot._src
-                        width:    Config.trayIconSz
-                        height:   Config.trayIconSz
+                        width:    24
+                        height:   24
                         smooth:   true
                         mipmap:   true
                         fillMode: Image.PreserveAspectFit

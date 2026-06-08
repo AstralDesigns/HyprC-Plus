@@ -2387,22 +2387,22 @@ PanelWindow {
                                         CCSection { text: "Per-Group Background Opacity" }
                                         Text {
                                             Layout.fillWidth: true
-                                            text: "0 = fully transparent  •  1 = fully opaque"
+                                            text: "0.05 = lowest transparency maintaining blur  •  1 = fully opaque"
                                             color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                            Theme.cPrimary.b, 0.48)
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             wrapMode: Text.Wrap
                                         }
 
-                                        CCSlider { label:"Workspaces";    from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsBgOpacity;          onMoved:function(v){Config.wsBgOpacity=v} }
-                                        CCSlider { label:"Clock & Date";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.clockDateBgOpacity;   onMoved:function(v){Config.clockDateBgOpacity=v} }
-                                        CCSlider { label:"Weather & Bat"; from:0;to:1;stepSize:0.05;decimals:2; value:Config.weatherBatBgOpacity; onMoved:function(v){Config.weatherBatBgOpacity=v} }
-                                        CCSlider { label:"Left Group";    from:0;to:1;stepSize:0.05;decimals:2; value:Config.leftGroupBgOpacity;  onMoved:function(v){Config.leftGroupBgOpacity=v} }
-                                        CCSlider { label:"Right Group";   from:0;to:1;stepSize:0.05;decimals:2; value:Config.rightGroupBgOpacity; onMoved:function(v){Config.rightGroupBgOpacity=v} }
-                                        CCSlider { label:"Start Menu";    from:0;to:1;stepSize:0.05;decimals:2; value:Config.startMenuBgOpacity;    onMoved:function(v){Config.startMenuBgOpacity=v} }
-                                        CCSlider { label:"Media";         from:0;to:1;stepSize:0.05;decimals:2; value:Config.mediaBgOpacity;        onMoved:function(v){Config.mediaBgOpacity=v} }
-                                        CCSlider { label:"Cava";          from:0;to:1;stepSize:0.05;decimals:2; value:Config.cavaBgOpacity;         onMoved:function(v){Config.cavaBgOpacity=v} }
-                                        CCSlider { label:"Distro";        from:0;to:1;stepSize:0.05;decimals:2; value:Config.distroBgOpacity;       onMoved:function(v){Config.distroBgOpacity=v} }
+                                        CCSlider { label:"Workspaces";    from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.wsBgOpacity;          onMoved:function(v){Config.wsBgOpacity=v} }
+                                        CCSlider { label:"Clock & Date";  from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.clockDateBgOpacity;   onMoved:function(v){Config.clockDateBgOpacity=v} }
+                                        CCSlider { label:"Weather & Bat"; from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.weatherBatBgOpacity; onMoved:function(v){Config.weatherBatBgOpacity=v} }
+                                        CCSlider { label:"Left Group";    from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.leftGroupBgOpacity;  onMoved:function(v){Config.leftGroupBgOpacity=v} }
+                                        CCSlider { label:"Right Group";   from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.rightGroupBgOpacity; onMoved:function(v){Config.rightGroupBgOpacity=v} }
+                                        CCSlider { label:"Start Menu";    from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.startMenuBgOpacity;    onMoved:function(v){Config.startMenuBgOpacity=v} }
+                                        CCSlider { label:"Media";         from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.mediaBgOpacity;        onMoved:function(v){Config.mediaBgOpacity=v} }
+                                        CCSlider { label:"Cava";          from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.cavaBgOpacity;         onMoved:function(v){Config.cavaBgOpacity=v} }
+                                        CCSlider { label:"Distro";        from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.distroBgOpacity;       onMoved:function(v){Config.distroBgOpacity=v} }
 
                                         Item { height: 10 }
                                 }
