@@ -530,7 +530,7 @@ Item {
                             radius:12; Layout.fillWidth:true
                             height:hcBody.implicitHeight+16
                             Layout.preferredHeight:height
-                            color:hcMA.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
+                            color:hcMA.containsMouse ? Qt.rgba(Theme.cSurfMid.r,Theme.cSurfMid.g,Theme.cSurfMid.b,0.8)
                                 : Qt.rgba(Theme.cSurfMid.r,Theme.cSurfMid.g,Theme.cSurfMid.b,0.5)
                             border.width:1
                             border.color:notif.urgency>=2 ? Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.35)
