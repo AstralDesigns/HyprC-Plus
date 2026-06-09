@@ -1690,6 +1690,20 @@ PanelWindow {
                                             Layout.fillWidth: true
                                         }
 
+                                        CCSection { text: "Mode & Position" }
+                                        CCSegmented {
+                                            label: "Bar Mode"
+                                            options: ["bar", "island", "tri"]
+                                            current: Config.barMode
+                                            onPicked: function(v) { Config.barMode = v }
+                                        }
+                                        CCSegmented {
+                                            label: "Position"
+                                            options: ["top","bottom"] //,"left","right" (commented currently broken left&right position)
+                                            current: Config.barPosition
+                                            onPicked: function(v) { Config.barPosition = v }
+                                        }
+
                                         CCSection { text: "Corner Radius" }
                                         // bar / island — single rect corners
                                         CCSlider { visible: Config.barMode !== "tri"; label:"Top-Left";     from:0;to:40; value:Config.barTopLeftRadius;     onMoved:function(v){Config.barTopLeftRadius=v} }
@@ -1710,20 +1724,6 @@ PanelWindow {
                                         CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Left";  from:0;to:40; value:Config.triRightBottomLeftRadius;  onMoved:function(v){Config.triRightBottomLeftRadius=v} }
                                         CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Right"; from:0;to:40; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
                                         CCSlider { label:"Island"; from:0;to:40; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
-
-                                        CCSection { text: "Mode & Position" }
-                                        CCSegmented {
-                                            label: "Bar Mode"
-                                            options: ["bar", "island", "tri"]
-                                            current: Config.barMode
-                                            onPicked: function(v) { Config.barMode = v }
-                                        }
-                                        CCSegmented {
-                                            label: "Position"
-                                            options: ["top","bottom"] //,"left","right" (commented currently broken left&right position)
-                                            current: Config.barPosition
-                                            onPicked: function(v) { Config.barPosition = v }
-                                        }
 
                                         CCSection { text: "Dimensions" }
                                         CCSlider { label:"Bar Height";    from:20;to:80;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
