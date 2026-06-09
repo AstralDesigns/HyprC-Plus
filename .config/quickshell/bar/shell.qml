@@ -30,22 +30,33 @@ ShellRoot {
     //  The  n === Config.cavaWidth  guard prevents an infinite reload loop
     //  (after reload the file still holds the same value but Config is already
     //  initialised from the persisted setting, so the guard exits early).
-    FileView {
+    Process {
         id: cavaSizeWatch
-        path: "/tmp/qs-cava-size"
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            const raw = text().trim()
-            if (!raw) return
-            const n = parseInt(raw, 10)
-            if (isNaN(n) || n < 1 || n > 300) return
-            if (n === Config.cavaWidth) return   // already at this width — skip
-            Config.cavaWidth = n
-            Config._settings.setValue("cavaWidth", n)
-            Config._settings.sync()
-            Quickshell.reload(false)
+        command: ["bash", "-c",
+            "F=/tmp/qs-cava-size; " +
+            "while true; do " +
+            "  if [ -f \"$F\" ]; then " +
+            "    inotifywait -q -e modify,close_write \"$F\" 2>/dev/null || sleep 1; " +
+            "    [ -f \"$F\" ] && cat \"$F\"; " +
+            "  else " +
+            "    inotifywait -q -e create -m /tmp --include 'qs-cava-size' 2>/dev/null || sleep 2; " +
+            "  fi; " +
+            "done"]
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) {
+                const raw = line.trim()
+                if (!raw) return
+                const n = parseInt(raw, 10)
+                if (isNaN(n) || n < 1 || n > 300) return
+                if (n === Config.cavaWidth) return
+                Config.cavaWidth = n
+                Config._settings.setValue("cavaWidth", n)
+                Config._settings.sync()
+                Quickshell.reload(false)
+            }
         }
+        Component.onCompleted: running = true
     }
 
     // ── License gate: auto-open CC on activation tab when not activated ──────

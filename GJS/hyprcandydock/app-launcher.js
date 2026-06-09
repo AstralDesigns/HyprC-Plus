@@ -183,11 +183,19 @@ function focusWindow(address) {
     } catch (_) {}
 }
 
+/** Short-lived cache — launcher show + refresh can call this back-to-back. */
+let _runningAppsCache = null;
+let _runningAppsCacheUs = 0;
+const RUNNING_APPS_TTL_US = 800 * 1000;
+
 /**
  * Query running apps via hyprctl clients -j.
  * Returns Map<lowerCaseClass, [{title, address}]>
  */
 function getRunningApps() {
+    const now = GLib.get_monotonic_time();
+    if (_runningAppsCache && (now - _runningAppsCacheUs) < RUNNING_APPS_TTL_US)
+        return _runningAppsCache;
     const running = new Map();
     try {
         const [ok, out] = GLib.spawn_command_line_sync('hyprctl clients -j');
@@ -200,6 +208,8 @@ function getRunningApps() {
             }
         }
     } catch (_) {}
+    _runningAppsCache = running;
+    _runningAppsCacheUs = now;
     return running;
 }
 

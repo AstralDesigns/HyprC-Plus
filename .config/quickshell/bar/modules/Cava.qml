@@ -4,32 +4,26 @@ import Quickshell
 import Quickshell.Io
 import ".."
 
-// Cava visualizer — runs cava directly with a generated per-side config.
-// Bypasses the socket manager for reliability.
-// Non-collapse: uses a hidden sizer Text so width is always reserved.
-// Auto-hide: when Config.cavaAutoHide is true AND Config.showMediaPlayer is false,
-//            the module hides itself when no media is detected and shows again
-//            when media plays. If the media player module is visible, cava always
-//            stays shown (media info is already providing context).
+// Cava visualizer — one cava child per side.
+// Keeps a light cava proc alive whenever the module is visible so level-0 ASCII
+// and the Transparent Inactive toggle stay cava-driven (not QS-drawn).
+// Framerate drops when audio is idle to limit CPU.
 Item {
     id: root
     property string side: "left"   // "left" or "right"
 
     Layout.alignment: Qt.AlignVCenter
 
-    //  Auto-hide only applies when the toggle is on AND media module is hidden.
     readonly property bool _autoHideActive: Config.cavaAutoHide && !Config.showMediaPlayer
+    readonly property bool _mediaActive: MediaPlayerState.active
 
-    //  FIX: Transparent Inactive controls whether cava shows at level 0 or hides
-    //       Auto-hide is controlled separately by cavaAutoHide + media visibility
-    //  Non-collapse: always reserve full width when transparent-when-inactive.
-    //  _sizer uses a placeholder string of cavaWidth first-bar chars so the
-    //  island pre-allocates the correct width before cava outputs anything.
+    // Run whenever the island is shown — not only while Playing.
+    readonly property bool _procShouldRun: Config.showCava && (!root._autoHideActive || root._mediaActive)
+    readonly property int  _cavaFramerate: MediaPlayerState.playing ? 30 : 2
+
     implicitWidth: {
-        // Auto-hide: collapse when no media AND auto-hide is active
         if (_autoHideActive && !_mediaActive) return 0
-        const w = _sizer.advanceWidth + Config.modPadH * 2
-        return w
+        return _sizer.advanceWidth + Config.modPadH * 2
     }
     implicitHeight: Config.moduleHeight
 
@@ -38,44 +32,50 @@ Item {
     property string _text:   ""
     property bool   _active: false
 
-    // ── Media detection for auto-hide ─────────────────────────────────────────
-    //  Watches playerctl status; _mediaActive = true when Playing or Paused.
-    //  Only runs when auto-hide is actually in effect.
-    property bool _mediaActive: false
-
-    Process {
-        id: mediaWatchProc
-        command: ["playerctl", "-F", "status"]
-        running: root._autoHideActive
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: function(line) {
-                const s = line.trim()
-                root._mediaActive = (s === "Playing" || s === "Paused")
-            }
+    function _syncCavaProc() {
+        if (root._procShouldRun) {
+            if (!cavaProc.running) cavaProc.running = true
+        } else if (cavaProc.running) {
+            cavaProc.running = false
+            root._text = ""
+            root._active = false
         }
-        onExited: mediaWatchRestart.restart()
     }
-    Timer { id: mediaWatchRestart; interval: 3000; repeat: false
-        onTriggered: if (root._autoHideActive && !mediaWatchProc.running) mediaWatchProc.running = true }
 
-    // ── Direct cava invocation ────────────────────────────────────────────────
-    //  Writes a temp config file then runs cava with ascii output.
-    //  Each output line: semicolon-separated integers 0..N-1 where N = len(bars).
+    function _restartCavaForFramerate() {
+        if (!cavaProc.running || !root._procShouldRun) return
+        root._intentionalRestart = true
+        cavaProc.running = false
+    }
+
+    Connections {
+        target: MediaPlayerState
+        function onPlayingChanged() {
+            const wasRunning = cavaProc.running
+            root._syncCavaProc()
+            if (wasRunning && root._procShouldRun)
+                root._restartCavaForFramerate()
+        }
+        function onStatusChanged() { root._syncCavaProc() }
+    }
+    Connections {
+        target: Config
+        function onShowCavaChanged() { root._syncCavaProc() }
+    }
+    Component.onCompleted: root._syncCavaProc()
+
     Process {
         id: cavaProc
-        // Build command at binding time so it reacts to Config changes on restart.
         command: {
             const bars    = Config.cavaEffectiveBars
-            const maxR    = Math.max(0, Math.floor((bars.length - 1) * 1.5))  // 50% more height levels
+            const maxR    = Math.max(0, Math.floor((bars.length - 1) * 1.5))
             const rev     = root.side === "right" ? 1 : 0
             const cfgPath = "/tmp/qs-cava-" + root.side + ".ini"
-            // Pass each line as a separate printf arg so actual newlines are
-            // written — JSON.stringify would escape \n in a joined string.
             const lines = [
                 "[general]",
                 "bars = "             + Config.cavaWidth,
-                "framerate = 60",
+                "framerate = "        + root._cavaFramerate,
+                "sleep_timer = 1",
                 "",
                 "[output]",
                 "method = raw",
@@ -89,12 +89,11 @@ Item {
             const writeCmd = "printf '%s\\n' " + quoted + " > " + cfgPath
             return ["bash", "-c", writeCmd + " && cava -p " + cfgPath]
         }
-        Component.onCompleted: running = true
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(line) {
                 const t = line.trim()
-                if (!t || t.startsWith("[")) return   // skip cava header lines
+                if (!t || t.startsWith("[")) return
                 const vals    = t.split(";")
                 const barsStr = Config.cavaEffectiveBars
                 const maxR    = Math.max(0, Math.floor((barsStr.length - 1) * 1.5))
@@ -104,7 +103,6 @@ Item {
                     const v = parseInt(vals[i])
                     if (!isNaN(v)) {
                         if (v > 0) allZero = false
-                        // Scale cava output (0-maxR) to barsStr index (0-barsStr.length-1)
                         const scaledV = Math.floor(v * (barsStr.length - 1) / maxR)
                         result += barsStr[Math.min(scaledV, barsStr.length - 1)]
                     }
@@ -114,6 +112,7 @@ Item {
             }
         }
         onExited: {
+            if (!root._procShouldRun) return
             if (root._intentionalRestart) {
                 root._intentionalRestart = false
                 quickRestartTimer.restart()
@@ -123,41 +122,28 @@ Item {
         }
     }
 
-    // Set to true before intentionally killing cavaProc so onExited routes
-    // to the fast timer instead of the crash-recovery back-off.
     property bool _intentionalRestart: false
 
-    // Fast restart — intentional config changes (width / style tweak).
-    // Tune this; 50 ms is enough for cava to fully exit on a clean SIGTERM.
     Timer { id: quickRestartTimer; interval: 50; repeat: false
-        onTriggered: if (!cavaProc.running) cavaProc.running = true }
+        onTriggered: if (root._procShouldRun && !cavaProc.running) cavaProc.running = true }
 
-    // Slow restart — unexpected exit / crash recovery back-off.
     Timer { id: crashRestartTimer; interval: 2000; repeat: false
-        onTriggered: if (!cavaProc.running) cavaProc.running = true }
+        onTriggered: if (root._procShouldRun && !cavaProc.running) cavaProc.running = true }
 
-    // ── Restart cava when bar count or style changes ──────────────────────
-    //  Handles ControlCenter slider adjustments and any direct Config.cavaWidth
-    //  writes (including those from the FileView hot-reload path in shell.qml).
-    //  Sets _intentionalRestart so onExited uses the fast path.
     Connections {
         target: Config
         function onCavaWidthChanged() {
-            if (cavaProc.running) {
-                root._intentionalRestart = true
-                cavaProc.running = false
-            }
+            if (!cavaProc.running) return
+            root._intentionalRestart = true
+            cavaProc.running = false
         }
         function onCavaStyleChanged() {
-            if (cavaProc.running) {
-                root._intentionalRestart = true
-                cavaProc.running = false
-            }
+            if (!cavaProc.running) return
+            root._intentionalRestart = true
+            cavaProc.running = false
         }
     }
 
-    // ── Hidden sizer: reserves correct width before first output ─────────────
-    // Uses TextMetrics so the island bg always matches what cavaLabel will render.
     TextMetrics {
         id: _sizer
         font.family:    Config.fontFamily
@@ -170,11 +156,6 @@ Item {
         }
     }
 
-    // ── Visible label — two halves stacked for vertical gradient ─────────
-    // Top 50% → cavaGradientStartColor, bottom 50% → cavaGradientEndColor
-    // When gradient is disabled, only the top item is used (full height, solid color).
-
-    // Resolved colors factored out for both active/inactive states
     readonly property color _colorTop: {
         if (root._active) {
             return Config.cavaGradientEnabled
@@ -212,7 +193,6 @@ Item {
         width:  _sizer.advanceWidth
         height: Config.glyphSize
 
-        // TOP half — start color, clips to upper split%
         Text {
             id: cavaTop
             anchors.top: parent.top
@@ -220,7 +200,6 @@ Item {
             height: parent.height * Config.cavaGradientSplit
             clip: true
             text: root._text
-            // Bars style sits lower - shift up slightly
             topPadding: Config.cavaStyle === "bars" ? -2 : 0
             color: root._colorTop
             font.family:      Config.fontFamily
@@ -229,7 +208,6 @@ Item {
             Behavior on color { ColorAnimation { duration: 300 } }
         }
 
-        // BOTTOM half — end color (same as top when gradient disabled), clips to lower split%
         Text {
             id: cavaBot
             anchors.bottom: parent.bottom
@@ -237,8 +215,6 @@ Item {
             height: parent.height * (1.0 - Config.cavaGradientSplit)
             clip:   true
             text:   root._text
-            // Shift the text upward so the bottom portion of the glyph aligns correctly.
-            // Bars style needs additional upward shift
             topPadding: -(parent.height * Config.cavaGradientSplit) + (Config.cavaStyle === "bars" ? -2 : 0)
             color: Config.cavaGradientEnabled ? root._colorBot : root._colorTop
             font.family:      Config.fontFamily

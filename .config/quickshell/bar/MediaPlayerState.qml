@@ -23,6 +23,9 @@ Item {
     readonly property bool playing: status === "Playing"
     readonly property int  thumbSize: Config.mediaThumbSize
 
+    // Run playerctl only when a bar module actually needs MPRIS state.
+    readonly property bool _watchMedia: Config.showMediaPlayer || Config.showCava
+
     readonly property string label: {
         const full = artist ? (title + " \u2013 " + artist) : title
         return full.length > 20 ? full.substring(0, 19) + "\u2026" : full
@@ -33,7 +36,7 @@ Item {
         id: playerctlProc
         command: ["playerctl", "-F", "metadata",
             "--format", "{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}"]
-        running: true
+        running: root._watchMedia
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(l) {
@@ -55,7 +58,25 @@ Item {
         onExited: pctlRestart.restart()
     }
     Timer { id: pctlRestart; interval: 3000; repeat: false
-        onTriggered: if (!playerctlProc.running) playerctlProc.running = true }
+        onTriggered: if (root._watchMedia && !playerctlProc.running) playerctlProc.running = true }
+
+    Connections {
+        target: Config
+        function onShowMediaPlayerChanged() { root._syncPlayerctl() }
+        function onShowCavaChanged() { root._syncPlayerctl() }
+    }
+    function _syncPlayerctl() {
+        if (root._watchMedia) {
+            if (!playerctlProc.running) playerctlProc.running = true
+        } else if (playerctlProc.running) {
+            playerctlProc.running = false
+            root.status = "Stopped"
+            root.title = ""
+            root.artist = ""
+            root.artUrl = ""
+            root.artPath = ""
+        }
+    }
 
     // ── Art URL → circle PNG (ImageMagick) ───────────────────────────────
     Process {

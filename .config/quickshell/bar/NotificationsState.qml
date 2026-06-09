@@ -91,6 +91,9 @@ Item {
     }
 
     function groupKey(n) {
+        const cat = n.category || ""
+        if (cat === "system.volume") return "system.volume"
+        if (cat === "media.playing") return "media.playing"
         return (n.appName || "") + "|" + (n.summary || "")
     }
 
@@ -116,8 +119,8 @@ Item {
             ns.notifications = q
         }
 
-        // History — group + bump. All non-prompt notifications go here.
-        if (!n.isPrompt) {
+        // NotificationsState.qml — the "History — group + bump" block. All non-prompt notifications go here.
+        if (!n.isPrompt && n.category !== "system.volume") {
             const h = ns.history.slice()
             const isMedia = n.category === "media.playing"
             const hi = isMedia
@@ -365,8 +368,21 @@ Item {
         _notifWriteProc.running = true
     }
 
+    function _isExternalVolumeNotif(ev) {
+        const app  = (ev.app_name || "").toLowerCase()
+        const sum  = (ev.summary || "").toLowerCase()
+        const cat  = (ev.category || "").toLowerCase()
+        const icon = (ev.icon || "").toLowerCase()
+        if (cat === "system.volume") return true
+        if (app === "volume" || sum === "volume" || sum === "muted") return true
+        if (sum.startsWith("volume:")) return true
+        if (icon.includes("audio-volume")) return true
+        return false
+    }
+
     function _handleNotifEvent(ev) {
         if (ev.type !== "notify") return
+        if (ns._isExternalVolumeNotif(ev)) return
         const urgMap = { "low": 0, "normal": 1, "critical": 2 }
         const appName      = ev.app_name      || ""
         const body         = ev.body          || ""
@@ -417,7 +433,7 @@ Item {
         }
     }
     Timer {
-        interval: 1200; repeat: true; running: true; triggeredOnStart: true
+        interval: 5000; repeat: true; running: true; triggeredOnStart: true
         onTriggered: { if (!candylockLockProbe.running) candylockLockProbe.running = true }
     }
 
@@ -431,7 +447,9 @@ Item {
         }}
         Component.onCompleted: { if (ns._mayRunNotifDaemon()) running = true }
         onRunningChanged: {
-            if (!running && ns._mayRunNotifDaemon()) notifDaemonRestartTimer.restart()
+            if (running) return
+            if (!ns._mayRunNotifDaemon()) return
+            notifDaemonRestartTimer.restart()
         }
     }
     Timer { id: notifDaemonRestartTimer; interval: 3000; repeat: false
@@ -447,42 +465,105 @@ Item {
             notifDaemonRestartTimer.restart()
     }
 
-    // ── Volume/Backlight listeners ──────────────────────────────────────────
-    // Listens to pactl/brightnessctl events via a bash script that outputs JSON
-    Process { id: sysEventProc
+    // Volume OSD — pactl subscribe; grouped toast + history badge like notify-send.
+    readonly property bool _sysEventsNeeded: LicenseState.activated
+    property int  _lastVolPct:  -1
+    property bool _lastVolMuted: false
+    property bool _suppressVolumeNotif: false
+
+    function _armVolumeSuppress(ms) {
+        ns._suppressVolumeNotif = true
+        volSuppressTimer.interval = ms > 0 ? ms : 2500
+        volSuppressTimer.restart()
+    }
+
+    function _emitVolumeNotif(pct, mute) {
+        if (ns._suppressVolumeNotif) return
+        if (pct === ns._lastVolPct && mute === ns._lastVolMuted) return
+        ns._lastVolPct = pct
+        ns._lastVolMuted = mute
+        ns.addNotification({
+            appName: "",
+            summary: mute ? "Muted" : "Volume",
+            body: mute ? "" : (pct + "%"),
+            icon: mute ? "audio-volume-muted" : "audio-volume-high",
+            urgency: 0, category: "system.volume"
+        })
+    }
+
+    // Seed last-known volume without showing a toast on startup.
+    Process {
+        id: volInitProc
+        running: ns._sysEventsNeeded
         command: ["bash", "-c",
-            "sleep 1.5; " +
+            "VOL=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -Po '\\d+(?=%)' | head -1); " +
+            "MUTE=$(pactl get-sink-mute @DEFAULT_SINK@ | grep -q 'yes' && echo 'true' || echo 'false'); " +
+            "echo \"{\\\"type\\\":\\\"volume_init\\\",\\\"value\\\":$VOL,\\\"mute\\\":$MUTE}\""]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
+            if (!l.trim()) return
+            try {
+                const ev = JSON.parse(l)
+                if (ev.type !== "volume_init") return
+                const pct = parseInt(ev.value, 10)
+                if (!isNaN(pct)) ns._lastVolPct = pct
+                ns._lastVolMuted = ev.mute === true || ev.mute === "true"
+            } catch(e) {}
+        }}
+    }
+    
+    Timer {
+        id: startupVolSuppressTimer
+        interval: 4000   // covers Hyprland's late-init sink event
+        repeat: false
+        running: ns._sysEventsNeeded
+        onTriggered: {}   // volSuppressTimer handles reset
+        Component.onCompleted: ns._armVolumeSuppress(4000)
+    }
+
+    // Sink 'change' fires on media start even when level is unchanged — suppress briefly.
+    Connections {
+        target: MediaPlayerState
+        function onStatusChanged() { ns._armVolumeSuppress(2500) }
+    }
+    Timer { id: volSuppressTimer; interval: 2500; repeat: false
+        onTriggered: ns._suppressVolumeNotif = false }
+
+    Process { id: sysEventProc
+        running: ns._sysEventsNeeded
+        command: ["bash", "-c",
+            "LAST_VOL=''; LAST_MUTE=''; " +
             "pactl subscribe | while read -r line; do " +
             "  if echo \"$line\" | grep -q \"'change' on sink\"; then " +
             "    VOL=$(pactl get-sink-volume @DEFAULT_SINK@ | grep -Po '\\d+(?=%)' | head -1); " +
             "    MUTE=$(pactl get-sink-mute @DEFAULT_SINK@ | grep -q 'yes' && echo 'true' || echo 'false'); " +
-            "    echo \"{\\\"type\\\":\\\"volume\\\",\\\"value\\\":$VOL,\\\"mute\\\":$MUTE}\"; " +
+            "    if [ \"$VOL\" != \"$LAST_VOL\" ] || [ \"$MUTE\" != \"$LAST_MUTE\" ]; then " +
+            "      LAST_VOL=\"$VOL\"; LAST_MUTE=\"$MUTE\"; " +
+            "      echo \"{\\\"type\\\":\\\"volume\\\",\\\"value\\\":$VOL,\\\"mute\\\":$MUTE}\"; " +
+            "    fi; " +
             "  fi; " +
-            "done " +
-            "brightnessctl s -m | while read -r line; do " +
-            "  CUR=$(echo \"$line\" | cut -d, -f4 | tr -d '%'); " +
-            "  echo \"{\\\"type\\\":\\\"brightness\\\",\\\"value\\\":$CUR}\"; " +
             "done"]
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
             if (!l.trim()) return
             try {
                 const ev = JSON.parse(l)
                 if (ev.type === "volume") {
-                    ns.addNotification({
-                        summary: ev.mute ? "Muted" : "Volume: " + ev.value + "%",
-                        body: "", icon: ev.mute ? "audio-volume-muted" : "audio-volume-high",
-                        urgency: 0, category: "system.volume"
-                    })
-                } else if (ev.type === "brightness") {
-                    ns.addNotification({
-                        summary: "Brightness: " + ev.value + "%",
-                        body: "", icon: "display-brightness",
-                        urgency: 0, category: "system.brightness"
-                    })
+                    const pct  = parseInt(ev.value, 10)
+                    const mute = ev.mute === true || ev.mute === "true"
+                    if (isNaN(pct)) return
+                    ns._emitVolumeNotif(pct, mute)
                 }
             } catch(e) {}
         }}
-        Component.onCompleted: running = true
+        onExited: if (ns._sysEventsNeeded) sysEventRestartTimer.restart()
+    }
+    Timer { id: sysEventRestartTimer; interval: 3000; repeat: false
+        onTriggered: if (ns._sysEventsNeeded && !sysEventProc.running) sysEventProc.running = true }
+    on_SysEventsNeededChanged: {
+        if (ns._sysEventsNeeded) {
+            if (!sysEventProc.running) sysEventRestartTimer.restart()
+        } else if (sysEventProc.running) {
+            sysEventProc.running = false
+        }
     }
 
     // ── BT agent startup ────────────────────────────────────────────────────
@@ -510,11 +591,10 @@ Item {
         }}
         Component.onCompleted: running = true
         onRunningChanged: {
-            if (!running) {
-                ns.btAgentReady = false
-                console.warn("bt-agent exited code=" + exitCode)
-                btAgentRestartTimer.restart()
-            }
+            if (running) return
+            ns.btAgentReady = false
+            console.warn("bt-agent exited code=" + exitCode)
+            btAgentRestartTimer.restart()
         }
     }
     Timer { id: btAgentRestartTimer; interval: 3000; repeat: false
@@ -629,12 +709,12 @@ Item {
     }
 
     // ── Auto-dismiss ───────────────────────────────────────────────────────
-    Timer { id: autoDismissTimer; interval: 200; repeat: true; running: true
+    Timer { id: autoDismissTimer; interval: 1000; repeat: true; running: true
         onTriggered: {
+            if (ns.notifications.length === 0) return
             const now = Date.now()
             const rem = ns.notifications.filter(function(n) {
                 if (n.isPrompt || n.urgency >= 2) return true
-                if (n.category === "media.playing") return (now - n.timestamp) < 5000
                 return (now - n.timestamp) < 5000
             })
             if (rem.length !== ns.notifications.length) ns.notifications = rem
@@ -642,14 +722,9 @@ Item {
     }
 
     // ═════════════════════════════════════════════════════════════════════
-    //  WAYBAR STATE
+    //  NOTIFICATION ICON STATE (inhibitor via quickshell InhibitorState)
     // ═════════════════════════════════════════════════════════════════════
-    property bool inhibitorActive: false
-    FileView {
-        path: Quickshell.env("HOME") + "/.cache/waybar-idle-inhibitor.state"
-        watchChanges: true; onFileChanged: reload()
-        onLoaded: ns.inhibitorActive = text().trim() === "active"
-    }
+    readonly property bool inhibitorActive: InhibitorState.active
 
     function _waybarIconKey() {
         const has  = ns.history.length > 0
@@ -674,14 +749,20 @@ Item {
         return map[key] || "󰂜"
     }
     function _emitWaybarState() {
-        const key    = ns._waybarIconKey()
-        const icon   = ns._waybarIconGlyph(key)
-        const count  = ns.history.length
-        const tip    = ns.dndEnabled ? "Do Not Disturb ON" : "Notifications"
-        const cls    = ns.dndEnabled ? "dnd" : (count > 0 ? "unread" : "")
-        const json   = JSON.stringify({ text: icon, tooltip: tip, class: cls, alt: key, count: count })
-        waybarStateProc._json = json
-        if (!waybarStateProc.running) waybarStateProc.running = true
+        waybarStateDebounce.restart()
+    }
+    Timer { id: waybarStateDebounce; interval: 400; repeat: false
+        onTriggered: {
+            const key    = ns._waybarIconKey()
+            const icon   = ns._waybarIconGlyph(key)
+            const count  = ns.history.length
+            const tip    = ns.dndEnabled ? "Do Not Disturb ON" : "Notifications"
+            const cls    = ns.dndEnabled ? "dnd" : (count > 0 ? "unread" : "")
+            const json   = JSON.stringify({ text: icon, tooltip: tip, class: cls, alt: key, count: count })
+            if (json === waybarStateProc._json) return
+            waybarStateProc._json = json
+            if (!waybarStateProc.running) waybarStateProc.running = true
+        }
     }
     Process { id: waybarStateProc; property string _json: "{}"
         command: ["bash", "-c",

@@ -54,7 +54,7 @@ QtObject {
 
     readonly property var _pollTimer: Timer {
         interval: 900000 // 15 minutes
-        running: true
+        running: Config.showWeather || WeatherPopupState.visible
         repeat: true
         triggeredOnStart: true
         onTriggered: root._fetchProc.running = true

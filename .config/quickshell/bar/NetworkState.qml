@@ -72,7 +72,7 @@ QtObject {
 
     readonly property var _pollTimer: Timer {
         interval: 10000
-        running: true
+        running: NetworkPopupState.visible
         repeat: true
         triggeredOnStart: true
         onTriggered: root._netProc.running = true

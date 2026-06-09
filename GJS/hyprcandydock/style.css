@@ -76,7 +76,8 @@ button.app-button, button.dock-button {
 button.app-button:hover, button.dock-button:hover {
     background: none;
     background-color: transparent;
-    opacity: 0.45;
+    /* Opacity on hover is driven by EventControllerMotion in dock-main.js
+       so right-click popovers cannot leave icons stuck at low opacity. */
 }
 
 button.app-button:focus, button.dock-button:focus {

@@ -961,6 +961,7 @@ const HyprCandyDock = GObject.registerClass({
         label.set_valign(Gtk.Align.CENTER);
         btn.set_child(label);
         btn.set_tooltip_text('Applications');
+        this._installDockButtonHover(btn);
 
         // Left click — toggle the HyprCandy App Launcher (HyprCandy+ only)
         // Reads licenseStatus from [cc-license-v1] in hyprcandy-bar.conf each
@@ -1001,6 +1002,7 @@ const HyprCandyDock = GObject.registerClass({
         label.set_valign(Gtk.Align.CENTER);
         btn.set_child(label);
         btn.set_tooltip_text('Trash (empty)');
+        this._installDockButtonHover(btn);
 
         // ── Part 2: count-aware monitoring via trash:/// ──────────────────────
         // Query trash::item-count on trash:/// exactly as Nautilus does — this
@@ -1206,6 +1208,17 @@ const HyprCandyDock = GObject.registerClass({
         // Don't touch widget order while a drag is in flight
         if (this.dragDropManager && this.dragDropManager.isDragging) return;
 
+        const orderKey = clientData.map(d => d.className).join('\0');
+        const stateKey = clientData.map(d =>
+            d.className + '\x01' + (d.instances ? d.instances.length : 0) +
+            '\x01' + (d.active ? 1 : 0)
+        ).join('\0');
+        const fullKey = orderKey + '\x02' + stateKey;
+        if (fullKey === this._lastDaemonKey) return;
+        const prevOrderKey = this._lastOrderKey || '';
+        this._lastDaemonKey = fullKey;
+        this._lastOrderKey = orderKey;
+
         const currentClasses = new Set(this.clientWidgets.keys());
         const newClasses = new Set(clientData.map(d => d.className));
         let added = 0, removed = 0;
@@ -1240,21 +1253,20 @@ const HyprCandyDock = GObject.registerClass({
         // which iterates the Map in *insertion* order (diverges from clientData
         // order whenever a new app is added mid-sequence, causing apps to appear
         // after the trash icon).
-        let prev = this._startSeparator || null;
         let structuralChange = added > 0 || removed > 0;
-        for (const data of clientData) {
-            const w = this.clientWidgets.get(data.className);
-            if (w) { this.mainBox.reorder_child_after(w, prev); prev = w; }
+        if (orderKey !== prevOrderKey || structuralChange) {
+            let prev = this._startSeparator || null;
+            for (const data of clientData) {
+                const w = this.clientWidgets.get(data.className);
+                if (w) { this.mainBox.reorder_child_after(w, prev); prev = w; }
+            }
+            if (this._endSeparator)
+                this.mainBox.reorder_child_after(this._endSeparator, prev);
+            if (this._trashButton)
+                this.mainBox.reorder_child_after(
+                    this._trashButton, this._endSeparator || prev);
+            this._scheduleExclusiveZoneUpdate();
         }
-
-        // sep-end and trash always last — anchored off `prev` (last app in clientData order)
-        if (this._endSeparator)
-            this.mainBox.reorder_child_after(this._endSeparator, prev);
-        if (this._trashButton)
-            this.mainBox.reorder_child_after(
-                this._trashButton, this._endSeparator || prev);
-
-        if (structuralChange) this._scheduleExclusiveZoneUpdate();
     }
 
     _getLastAppWidget() {
@@ -1263,6 +1275,30 @@ const HyprCandyDock = GObject.registerClass({
             last = widget;
         }
         return last;
+    }
+
+    // CSS :hover opacity can stick after a right-click popover closes because
+    // GTK's grab sequence skips the normal leave event. Manage opacity in JS.
+    _installDockButtonHover(btn) {
+        if (btn._dockHoverInstalled) return;
+        btn._dockHoverInstalled = true;
+        btn._suppressDockHover = false;
+        const motion = new Gtk.EventControllerMotion();
+        motion.connect('enter', () => {
+            if (!btn._suppressDockHover)
+                btn.set_opacity(0.45);
+        });
+        motion.connect('leave', () => {
+            btn._suppressDockHover = false;
+            btn.set_opacity(1.0);
+        });
+        btn.add_controller(motion);
+    }
+
+    _resetDockButtonHover(btn) {
+        if (!btn) return;
+        btn._suppressDockHover = true;
+        btn.set_opacity(1.0);
     }
 
     _addClientButton(data) {
@@ -1316,6 +1352,7 @@ const HyprCandyDock = GObject.registerClass({
             iconWidget.set_valign(Gtk.Align.CENTER);
         }
         btn.set_child(iconWidget);
+        this._installDockButtonHover(btn);
 
         const tooltipText = data.instances.length > 1
             ? (data.displayName || data.className) + ' (' + data.instances.length + ')'
@@ -1488,6 +1525,7 @@ const HyprCandyDock = GObject.registerClass({
         picker.set_offset(offX, offY);
         picker.connect('closed', () => {
             _ahPopoverClosed();
+            this._resetDockButtonHover(parentButton);
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
                 try { picker.unparent(); } catch (_) {}
                 return GLib.SOURCE_REMOVE;
@@ -1600,6 +1638,7 @@ const HyprCandyDock = GObject.registerClass({
         // ever showed a popover.  idle_add lets GTK finish cleanup first.
         mainPopover.connect('closed', () => {
             _ahPopoverClosed();
+            this._resetDockButtonHover(parentButton);
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
                 try { mainPopover.unparent(); } catch(_) {}
                 return GLib.SOURCE_REMOVE;
@@ -2039,6 +2078,7 @@ wsBtn.connect('clicked', () => {
         popover.set_offset(mainOffX, mainOffY);
         popover.connect('closed', () => {
             _ahPopoverClosed();
+            this._resetDockButtonHover(parentButton);
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
                 try { popover.unparent(); } catch(_) {}
                 return GLib.SOURCE_REMOVE;

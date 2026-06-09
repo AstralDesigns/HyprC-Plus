@@ -78,10 +78,6 @@ PanelWindow {
         body.y = Math.max(8, Math.min(body.y, sh - h - 8))
     }
 
-    // Sync body position when posX/Y are set externally (widget open / state restore).
-    onPosXChanged: if (!_dragging) body.x = posX
-    onPosYChanged: if (!_dragging) body.y = posY
-
     onActiveChanged: if (active) Qt.callLater(_clampPos)
 
     component WidgetDrag: DragHandler {

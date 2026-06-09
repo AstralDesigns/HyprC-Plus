@@ -93,7 +93,7 @@ var DockConfig = {
     position: 'bottom',
 
     // ── Debounce ──────────────────────────────────────────────────────────
-    refreshDebounceMs: 80,
+    refreshDebounceMs: 120,
 
     // ── Position-specific overrides ───────────────────────────────────────
     // Override any base config values for specific dock positions.

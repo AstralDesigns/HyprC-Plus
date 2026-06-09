@@ -58,7 +58,7 @@ QtObject {
 
     readonly property var _subscribeProc: Process {
         command: ["pactl", "subscribe"]
-        running: true
+        running: VolumePopupState.visible
         stdout: SplitParser {
             onRead: data => {
                 if (data.includes("sink") && data.includes("'change'"))
@@ -67,12 +67,13 @@ QtObject {
         }
     }
 
-    // Initial fetch + fallback poll (in case pactl subscribe dies)
+    // Poll + subscribe only while volume popup is open.
     readonly property var _pollTimer: Timer {
         interval: 60000
-        running: true
+        running: VolumePopupState.visible
         repeat: true
         triggeredOnStart: true
         onTriggered: root._volumeProc.running = true
+        onRunningChanged: if (running) root._volumeProc.running = true
     }
 }

@@ -28,13 +28,33 @@ A window designed to be attached to one or more screen edges, commonly used to b
 ### `Process`
 Allows launching and interacting with external CLI processes.
 - **`command`**: A list of strings representing the executable and arguments.
-- **`running`**: A boolean value to start/stop the process or check if it's currently active.
-- **`stdout`**: Assign a data parser (e.g., `SplitParser` or `StdioCollector`) to handle stdout stream.
-- **`stderr`**: Assign a data parser to handle stderr stream.
-- **`readOut()`**: Read standard output.
-- **`readErr()`**: Read standard error.
-- **`onRunningChanged`**: Signal triggered when the execution state changes.
-- **`onExited`**: Signal triggered when the process exits.
+- **`running`**: Start/stop. `false` sends SIGTERM. Use `signal(SIGKILL)` for immediate kill.
+- **`stdout` / `stderr`**: Assign `SplitParser` (streaming) or `StdioCollector` (one-shot).
+- **`stdinEnabled`**: Enable `write()` for stdin.
+- **`clearEnvironment`**: Strip env before applying `environment` object.
+- **`environment`**: JS object `({ KEY: "val", REMOVED: null })` — wrap in `()`.
+- **`workingDirectory`**: CWD for next start.
+- **`processId`**: PID while running, else null.
+- **`exec(context)`**: Launch with optional command/env/cwd override.
+- **`startDetached()`**: Untracked child — survives Quickshell reload/kill.
+- **`onExited(exitCode, exitStatus)`**, **`onStarted()`**, **`onRunningChanged`**.
+- **Lifecycle**: Gate `running` on actual need; stop long-lived daemons when idle.
+- **Restart loop**: `onExited: restartTimer.restart()` with backoff — not `onRunningChanged: running=true`.
+- **No shell**: Use `["sh", "-c", "..."]` for shell scripts; not `["script.sh"]` without shebang.
+
+### `LazyLoader`
+Async component load between frames; unload via `active: false` to free memory.
+- **`loading`**: Set true to async load; reading `item` while loading blocks.
+- **`loaded`**: True when complete; `active: false` destroys component.
+- WARNING: Must have at least one non-lazy window or nothing loads.
+- Use for popups/panels (Loader for Item children, LazyLoader otherwise).
+
+### Optimization patterns (v0.3 FAQ)
+- One process per widget → bad; single Process + SplitParser for IPC streams.
+- Loaders/LazyLoaders for off-screen UI — destroy when hidden.
+- `Item.visible = false` does NOT stop child Processes — gate `running` explicitly.
+- Opaque window `color` reduces GPU work; transparency needs `QWindow.surfaceFormat` opaque=false.
+- Jemalloc in Quickshell build masks QML heap fragmentation (perceived leaks).
 
 ### `FileView`
 A utility type to read and watch files on the local filesystem.

@@ -721,10 +721,10 @@ function createMediaBox() {
             const _bg = _bgColors ? _bgColors.bg : { r: 1, g: 1, b: 1 };
             const _pri = _bgColors ? _bgColors.pri : { r: 1, g: 1, b: 1 };
             cr.arc(cx, cy, 5, 0, 2 * Math.PI);
-            cr.setSourceRGBA(_bg.r, _bg.g, _bg.b, 0.85);
+            cr.setSourceRGBA(_bg.r, _bg.g, _bg.b, 0);
             cr.fill();
             cr.arc(cx, cy, 2.5, 0, 2 * Math.PI);
-            cr.setSourceRGBA(_pri.r, _pri.g, _pri.b, 0.85);
+            cr.setSourceRGBA(_pri.r, _pri.g, _pri.b, 0);
             cr.fill();
             cr.restore();
         }

@@ -29,11 +29,17 @@ QtObject {
         Component.onCompleted: reload()
     }
 
-    // Re-resolve whenever DesktopEntries finishes (re-)loading
-    property var _entriesReady: Connections {
-        target: DesktopEntries.applications
-        function onCountChanged() {
-            if (DesktopEntries.applications.count > 0 && root._classList.length > 0)
+    // Re-resolve once desktop entries become available after startup.
+    property var _entriesPoller: Timer {
+        interval: 250
+        repeat: true
+        running: root._classList.length > 0 && DesktopEntries.applications.count === 0
+        property int _attempts: 0
+        onTriggered: {
+            _attempts++
+            if (DesktopEntries.applications.count > 0 || _attempts >= 40)
+                stop()
+            if (DesktopEntries.applications.count > 0)
                 root._resolveApps()
         }
     }

@@ -22,6 +22,16 @@ Item {
     }
     function close()  { sm.menuVisible = false }
 
+    readonly property bool _pollActive: menuVisible
+
+    onMenuVisibleChanged: {
+        if (!menuVisible) return
+        if (!volReadProc.running) volReadProc.running = true
+        if (!blReadProc.running) blReadProc.running = true
+        if (!netStatusProc.running) netStatusProc.running = true
+        if (!btStatusProc.running) btStatusProc.running = true
+    }
+
     // ── Network scan state ──────────────────────────────────────────────
     property bool netScanProcRunning: false
     property bool netSavedProcRunning: false
@@ -54,7 +64,6 @@ Item {
                     sm.backlightValue=parseFloat(p[3].replace("%",""))/100
             }
         }}
-        Component.onCompleted: running=true
     }
     Process { id: blSetProc; property string _val:""; property string _queued:""
         command:["brightnessctl","s",blSetProc._val]
@@ -66,9 +75,8 @@ Item {
         const n=String(Math.round(v*sm.backlightMax))
         if(blSetProc.running){ blSetProc._queued=n } else { blSetProc._val=n; blSetProc.running=true }
     }
-    // Initial poll + fast polling to match volume slider responsiveness
-    Timer { interval:250; running:true; repeat:false; onTriggered: if(!blReadProc.running) blReadProc.running=true }
-    Timer { interval:200; repeat:true; running:true
+    // Fast poll only while start menu is open (slider responsiveness).
+    Timer { interval:200; repeat:true; running: sm._pollActive
         onTriggered: { if(!blReadProc.running) blReadProc.running=true } }
 
     // ── Volume ────────────────────────────────────────────────────────────────
@@ -82,17 +90,16 @@ Item {
         command:["bash","-c",volSetProc._cmd]
         onExited: { if(_queued!==""){ _cmd=_queued; _queued=""; running=true } else muteRefreshTimer.restart() }
     }
-    function setVolume(v){ const c="pactl set-sink-volume @DEFAULT_SINK@ "+Math.round(v*100)+"%"; if(volSetProc.running){ volSetProc._queued=c } else { volSetProc._cmd=c; volSetProc.running=true } }
+    function setVolume(v){ const c="pactl set-sink-volume @DEFAULT_SINK@ "+Math.round(v*100)+"%"; NotificationsState._armVolumeSuppress(3000); if(volSetProc.running){ volSetProc._queued=c } else { volSetProc._cmd=c; volSetProc.running=true } }
     function toggleMute(){ const c="pactl set-sink-mute @DEFAULT_SINK@ toggle"; if(volSetProc.running){ volSetProc._queued=c } else { volSetProc._cmd=c; volSetProc.running=true; muteRefreshTimer.restart() } }
     Timer { id:muteRefreshTimer; interval:350; repeat:false; onTriggered: if(!volReadProc.running) volReadProc.running=true }
-    Timer { interval:250; running:true; repeat:false; onTriggered: if(!volReadProc.running) volReadProc.running=true }
-    // Poll volume every 200ms so slider reflects external keybind changes
-    Timer { interval:200; repeat:true; running:true
+    Timer { interval:200; repeat:true; running: sm._pollActive
         onTriggered: { if(!volReadProc.running) volReadProc.running=true } }
 
     // ── Clock tick ────────────────────────────────────────────────────────
     property date _now: new Date()
-    Timer { interval:10000; repeat:true; running:true; onTriggered: sm._now = new Date() }
+    Timer { interval:10000; repeat:true; running: sm._pollActive
+        onTriggered: sm._now = new Date() }
 
     // ── Network ────────────────────────────────────────────────────────────────
     property bool networkExpanded: false
@@ -149,7 +156,8 @@ Item {
         }
         Component.onCompleted: running=true
     }
-    Timer { interval:8000; repeat:true; running:true; onTriggered: if(!netStatusProc.running) netStatusProc.running=true }
+    Timer { interval:8000; repeat:true; running: sm._pollActive
+        onTriggered: if(!netStatusProc.running) netStatusProc.running=true }
 
     // Auto-scan gate — allows at most one background nmcli wifi list call per
     // 30 seconds.  Resets whenever the network panel is first expanded or when
@@ -499,7 +507,7 @@ Item {
         }
         if (!btTrustSetProc.running) btTrustSetProc.running = true
     }
-    Timer { interval: 8000; repeat: true; running: true;
+    Timer { interval: 8000; repeat: true; running: sm._pollActive
         onTriggered: if (!btStatusProc.running) btStatusProc.running = true }
 
     // ── Power toggle ─────────────────────────────────────────────────────────
@@ -710,9 +718,8 @@ Item {
     Process { id: recCheckProc
         command:["bash","-c","pgrep -x wf-recorder > /dev/null && echo 1 || echo 0"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){ sm.isRecording=l.trim()==="1" } }
-        Component.onCompleted: running=true
     }
-    Timer { interval:3000; repeat:true; running:true
+    Timer { interval:3000; repeat:true; running: sm._pollActive || sm.isRecording
         onTriggered: if(!recCheckProc.running) recCheckProc.running=true }
 
     Process { id: recProc; property string _cmd:""; command:["bash","-c",recProc._cmd]
@@ -802,13 +809,22 @@ Item {
             if(code===0) sm._userIconPath = smIconProc._dst+"?"+Date.now()
         }
     }
+    
+    Timer {
+        id: smIconPreloadTimer
+    	interval: 1500   // after bar settles; avoids competing with heavier startup work
+    	repeat: false
+    	running: true
+    	onTriggered: {
+            if (sm._userIconPath === "" && !smIconProc.running)
+                smIconProc.running = true
+    	}
+    }
 
     Timer {
         id: smIconWatchTimer
-        interval: 1000; running: true; repeat: true
-        onTriggered: {
-            _smIconCheck.running = true
-        }
+        interval: 2000; running: sm._pollActive; repeat: true
+        onTriggered: { if (!_smIconCheck.running) _smIconCheck.running = true }
     }
 
     Process { id: _smIconCheck

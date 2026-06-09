@@ -15,7 +15,7 @@ Item {
     property var _now: new Date()
     property string _secStr: Qt.formatDateTime(_now, "ss")
     property string _dateStr: Qt.formatDateTime(_now, "dddd, MMMM d")
-    property bool _colonVisible: _now.getMilliseconds() < 500
+    property bool _colonVisible: _now.getMilliseconds() < 250
 
     property string _greeting: {
         const h = _now.getHours()
@@ -25,8 +25,9 @@ Item {
         return "Good Night!"
     }
 
+    // 1 Hz tick — enough for digital + analog; avoids 20 FPS canvas repaints.
     Timer {
-        interval: 50
+        interval: 100
         running: scope._active
         repeat: true
         onTriggered: { scope._now = new Date() }
@@ -91,7 +92,6 @@ Item {
                         font.pixelSize: 38
                         opacity: root._colonVisible ? 1.0 : 0.2
                         anchors.verticalCenter: parent.verticalCenter
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
                     }
                     Text {
                         text: Qt.formatDateTime(root._now, "mm")

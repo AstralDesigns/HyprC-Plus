@@ -2650,7 +2650,7 @@ PanelWindow {
                                         }
                                         Connections {
                                             target: ccWin
-                                            function on_kbLayoutChanged() {
+                                            function on_KbLayoutChanged() {
                                                 if (!_kbLayoutTI.activeFocus) _kbLayoutTI.text = ccWin._kbLayout
                                             }
                                         }

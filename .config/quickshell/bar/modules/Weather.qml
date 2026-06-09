@@ -20,7 +20,7 @@ Item {
     // ── Drive the shared fetch pipeline on the bar's configured interval ──
     Timer {
         interval: Config.weatherInterval * 1000
-        running: true; repeat: true; triggeredOnStart: true
+        running: Config.showWeather; repeat: true; triggeredOnStart: true
         onTriggered: WeatherPopupState.refresh()
     }
 

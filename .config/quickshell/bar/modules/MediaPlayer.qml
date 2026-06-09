@@ -116,9 +116,7 @@ Item {
                         Repeater {
                             model: [
                                 { glyph: "󰒮", cmd: "previous"   },
-                                { glyph: ""   },
                                 { glyphplay: MediaPlayerState.playing ? "󰏤" : "󰐊", cmd: "play-pause" },
-                                { glyph: ""   },
                                 { glyph: "󰒭", cmd: "next"       }
                             ]
                             delegate: Item {
@@ -130,19 +128,13 @@ Item {
                                 Text {
                                     id: ctlGlyph
                                     anchors.centerIn: parent
-                                    text:  modelData.glyph
-                                    color: ctlMa.containsMouse ? Config.powerGlyphColor : Config.mediabtGlyphColor; opacity: 0.8
-                                    font.family:    Config.fontFamily
-                                    font.pixelSize: Config.mediaCtlSize
-                                    font.weight:    Config.fontWeight
-                                    Behavior on color { ColorAnimation { duration: 80 } }
-                                }
-                                
-                                Text {
-                                    id: ctlglyph
-                                    anchors.centerIn: parent
-                                    text:  modelData.glyphplay
-                                    color: ctlMa.containsMouse ? Config.powerGlyphColor : Theme.cPrimaryFixedDim; opacity: 0.8
+                                    text: modelData.glyphplay !== undefined
+                                        ? modelData.glyphplay
+                                        : (modelData.glyph || "")
+                                    color: modelData.glyphplay !== undefined
+                                        ? (ctlMa.containsMouse ? Config.powerGlyphColor : Theme.cPrimaryFixedDim)
+                                        : (ctlMa.containsMouse ? Config.powerGlyphColor : Config.mediabtGlyphColor)
+                                    opacity: 0.8
                                     font.family:    Config.fontFamily
                                     font.pixelSize: Config.mediaCtlSize
                                     font.weight:    Config.fontWeight

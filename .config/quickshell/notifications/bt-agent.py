@@ -438,47 +438,47 @@ def send_file_dbus(session_bus, mac, file_path):
         emit({"type": "file_send_error", "mac": mac, "filename": filename, "msg": str(e)})
 
 
+def _handle_bt_cmd(line, loop, bt_agent, obex_agent, session_bus):
+    line = line.strip()
+    if not line:
+        return
+    parts = line.split()
+    cmd = parts[0] if parts else ""
+    try:
+        if cmd == "accept_pair" and len(parts) >= 2:
+            bt_agent.respond(parts[1], True)
+        elif cmd == "reject_pair" and len(parts) >= 2:
+            bt_agent.respond(parts[1], False)
+        elif cmd == "pin_pair" and len(parts) >= 3:
+            bt_agent.respond(parts[1], True, pin=parts[2])
+        elif cmd == "accept_file" and len(parts) >= 2:
+            obex_agent.respond_transfer(parts[1], True)
+        elif cmd == "reject_file" and len(parts) >= 2:
+            obex_agent.respond_transfer(parts[1], False)
+        elif cmd == "set_auto_accept" and len(parts) >= 2:
+            obex_agent.auto_accept = (parts[1] == "1")
+            emit({"type": "auto_accept", "enabled": obex_agent.auto_accept})
+        elif cmd == "send_file" and len(parts) >= 3:
+            mac = parts[1]
+            file_path = " ".join(parts[2:])
+            t = threading.Thread(target=send_file_dbus, args=(session_bus, mac, file_path), daemon=True)
+            t.start()
+        elif cmd == "quit":
+            loop.quit()
+    except Exception as ex:
+        emit({"type": "error", "msg": str(ex)})
+
+
 def stdin_reader(loop, bt_agent, obex_agent, session_bus):
+    """Blocking read on the command FIFO — one open, no reopen loop."""
     FIFO = "/tmp/qs_bt_cmd"
-    import fcntl as _fcntl
-    while True:
-        try:
-            fd = os.open(FIFO, os.O_RDONLY | os.O_NONBLOCK)
-            flags = _fcntl.fcntl(fd, _fcntl.F_GETFL)
-            _fcntl.fcntl(fd, _fcntl.F_SETFL, flags & ~os.O_NONBLOCK)
-            with os.fdopen(fd, "r") as fh:
-                for raw in fh:
-                    line = raw.strip()
-                    if not line: continue
-                    parts = line.split()
-                    cmd = parts[0] if parts else ""
-                    try:
-                        if cmd == "accept_pair" and len(parts) >= 2:
-                            bt_agent.respond(parts[1], True)
-                        elif cmd == "reject_pair" and len(parts) >= 2:
-                            bt_agent.respond(parts[1], False)
-                        elif cmd == "pin_pair" and len(parts) >= 3:
-                            bt_agent.respond(parts[1], True, pin=parts[2])
-                        elif cmd == "accept_file" and len(parts) >= 2:
-                            obex_agent.respond_transfer(parts[1], True)
-                        elif cmd == "reject_file" and len(parts) >= 2:
-                            obex_agent.respond_transfer(parts[1], False)
-                        elif cmd == "set_auto_accept" and len(parts) >= 2:
-                            obex_agent.auto_accept = (parts[1] == "1")
-                            emit({"type": "auto_accept", "enabled": obex_agent.auto_accept})
-                        elif cmd == "send_file" and len(parts) >= 3:
-                            mac = parts[1]
-                            file_path = " ".join(parts[2:])
-                            t = threading.Thread(target=send_file_dbus, args=(session_bus, mac, file_path), daemon=True)
-                            t.start()
-                        elif cmd == "quit":
-                            loop.quit()
-                            return
-                    except Exception as ex:
-                        emit({"type": "error", "msg": str(ex)})
-            time.sleep(0.25)
-        except Exception:
-            time.sleep(1)
+    while not os.path.exists(FIFO):
+        time.sleep(0.5)
+    with open(FIFO, "r") as fh:
+        for raw in fh:
+            if raw.strip() == "":
+                continue
+            _handle_bt_cmd(raw, loop, bt_agent, obex_agent, session_bus)
 
 
 def main():

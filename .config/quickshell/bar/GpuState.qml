@@ -39,7 +39,8 @@ QtObject {
 
     readonly property var _pollTimer: Timer {
         interval: 10000
-        running: root.hwmonPath !== ""
+        running: root.hwmonPath !== "" &&
+                 (SystemMonitorPopupState.visible || SystemMonitorPopupState.widgetVisible)
         repeat: true
         triggeredOnStart: true
         onTriggered: root._proc.running = true
