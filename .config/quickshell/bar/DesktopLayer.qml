@@ -32,7 +32,7 @@ Item {
             visible:       Config.desktopVisible
 
             WlrLayershell.namespace: "quickshell:desktop"
-            WlrLayershell.layer:     WlrLayer.Bottom
+            WlrLayershell.layer:     WlrLayer.Background
 
             anchors { top: true; bottom: true; left: true; right: true }
 
@@ -87,6 +87,41 @@ Item {
             property real   _menuX:       0
             property real   _menuY:       0
             property bool   _menuVisible: false
+
+            // ── Workspace-dispatch state ──────────────────────────────────
+            property string _wsPendingExec: ""
+            property int    _wsPendingWs:    0
+
+            // Step 1 — focus the target workspace immediately on button press
+            Process {
+                id: _wsDispatchProc
+                running: false
+            }
+
+            // Step 2 — launch with workspace rule 50 ms later, matching the
+            // GJS dock's GLib.timeout_add(50) pattern for Nautilus/Electron
+            Timer {
+                id: _wsLaunchTimer
+                interval: 50
+                repeat:   false
+                onTriggered: {
+                    if (win._wsPendingExec === "") return
+                    _wsExecProc.command = [
+                        "hyprctl", "dispatch",
+                        "hl.dsp.exec_cmd('" + win._wsPendingExec +
+                        "', { workspace = " + win._wsPendingWs + " })"
+                    ]
+                    _wsExecProc.running = false
+                    _wsExecProc.running = true
+                    win._wsPendingExec = ""
+                    win._wsPendingWs   = 0
+                }
+            }
+
+            Process {
+                id: _wsExecProc
+                running: false
+            }
 
             function _showMenu(idx, mx, my) {
                 _menuAppIdx = idx
@@ -370,15 +405,31 @@ Item {
                     anchors { top: parent.top; left: parent.left; right: parent.right; margins: 8 }
                     spacing: 2
 
-                    Text {
-                        width:          parent.width
-                        text:           contextMenu._app ? (contextMenu._app["name"] ?? "") : ""
-                        font.pixelSize: Config.desktopLabelSize + 1
-                        font.bold:      true
-                        color:          Theme.cPrimary
-                        elide:          Text.ElideRight
-                        horizontalAlignment: Text.AlignHCenter
-                        bottomPadding:  4
+                    // Header row — click anywhere on it to dismiss.
+                    // This is the primary dismiss path: clicks outside the
+                    // mask fall through to widgets, so there is no background
+                    // MouseArea that can catch an "outside" click.
+                    Item {
+                        width:  parent.width
+                        height: _headerText.implicitHeight + 12
+
+                        Text {
+                            id: _headerText
+                            anchors.centerIn: parent
+                            width:          parent.width - 20
+                            text:           contextMenu._app ? (contextMenu._app["name"] ?? "") : ""
+                            font.pixelSize: Config.desktopLabelSize + 1
+                            font.bold:      true
+                            color:          Theme.cPrimary
+                            elide:          Text.ElideRight
+                            horizontalAlignment: Text.AlignHCenter
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape:  Qt.PointingHandCursor
+                            onClicked:    win._hideMenu()
+                        }
                     }
 
                     Rectangle { width: parent.width; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2) }
@@ -440,6 +491,71 @@ Item {
                                 const cls = contextMenu._app["class"]
                                 win._hideMenu()
                                 DesktopPinnedState.removeApp(cls)
+                            }
+                        }
+                    }
+
+                    // ── Open on Workspace 1-10 ─────────────────────────────
+                    // Mirrors the GJS dock _attachWsSubPopover pattern:
+                    //   1. hl.dsp.focus({ workspace = N }) immediately
+                    //   2. hl.dsp.exec_cmd('...', { workspace = N }) after 50 ms
+                    //      — the delay avoids Nautilus/Electron race conditions.
+                    Rectangle {
+                        width: parent.width; height: 1
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                    }
+
+                    Text {
+                        width:              parent.width
+                        text:               "Open on Workspace"
+                        font.pixelSize:     Config.desktopLabelSize - 1
+                        color:              Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                    Theme.cPrimary.b, 0.6)
+                        horizontalAlignment: Text.AlignHCenter
+                        topPadding:    2
+                        bottomPadding: 2
+                    }
+
+                    Rectangle {
+                        width: parent.width; height: 1
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                    }
+
+                    Grid {
+                        width:         parent.width
+                        columns:       2
+                        columnSpacing: 4
+                        rowSpacing:    2
+
+                        Repeater {
+                            model: 10
+                            delegate: DeskMenuBtn {
+                                required property int index
+                                readonly property int _wsNum: index + 1
+                                label: "→ WS " + _wsNum
+                                width: (parent.width - 4) / 2
+
+                                onTriggered: {
+                                    if (!contextMenu._app) return
+                                    const exec = (contextMenu._app["exec"] || contextMenu._app["class"] || "")
+                                                 .replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
+                                    const ws   = _wsNum   // capture before hideMenu nulls the app
+                                    win._hideMenu()
+                                    if (exec === "") return
+
+                                    // Step 1: switch workspace focus
+                                    _wsDispatchProc.command = [
+                                        "hyprctl", "dispatch",
+                                        "hl.dsp.focus({ workspace = " + ws + " })"
+                                    ]
+                                    _wsDispatchProc.running = false
+                                    _wsDispatchProc.running = true
+
+                                    // Step 2: launch with workspace rule after 50 ms
+                                    win._wsPendingExec = exec
+                                    win._wsPendingWs   = ws
+                                    _wsLaunchTimer.restart()
+                                }
                             }
                         }
                     }
