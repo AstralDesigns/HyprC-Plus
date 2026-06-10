@@ -132,7 +132,7 @@ PanelWindow {
                 Rectangle {
                     width: 17; height: 17; radius: 15
                     color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.45)
-                    Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00) }
+                    Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
                 }
                 Text { text: "Brightness"; color: Theme.cOnSurf; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 SliderBg {
