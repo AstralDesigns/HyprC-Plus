@@ -115,7 +115,7 @@ Item {
         }
     }
     Timer {
-        id: minuteTick; interval: 60000; running: false; repeat: true
+        id: minuteTick; interval: 15000; running: false; repeat: true
         onTriggered: {
             root._time = Qt.formatDateTime(new Date(), "HH:mm")
             root._icon = root._clockIcon()
