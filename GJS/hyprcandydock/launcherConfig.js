@@ -7,7 +7,7 @@
 var LauncherConfig = {
 
     // ── Search bar width ──────────────────────────────────────────────
-    searchWidthFraction: 0.25,       // @LC:searchWidthFraction
+    searchWidthFraction: 0.20,       // @LC:searchWidthFraction
 
     // ── Icon size ─────────────────────────────────────────────────────
     iconSize: 44,                   // @LC:iconSize
@@ -22,11 +22,11 @@ var LauncherConfig = {
     tileHeight: 0,                  // @LC:tileHeight
 
     // ── Main frame — horizontal dock (bottom / top) ───────────────────
-    frameWidth:  780,               // @LC:frameWidth
-    frameHeight: 675,               // @LC:frameHeight
+    frameWidth:  1175,               // @LC:frameWidth
+    frameHeight: 670,               // @LC:frameHeight
 
     // ── Main frame — vertical dock (left / right) ─────────────────────
-    frameWidthVert:  780,           // @LC:frameWidthVert
+    frameWidthVert:  1175,           // @LC:frameWidthVert
     frameHeightVert: 675,           // @LC:frameHeightVert
 
     // ── Border ────────────────────────────────────────────────────────
