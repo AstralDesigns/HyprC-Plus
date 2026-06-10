@@ -143,18 +143,13 @@ Item {
             }
         }}
         onExited: {
-            // After device status, also poll wifi radio state (harmless on ethernet boxes)
             if (!netRadioProc.running) netRadioProc.running = true
-            // Refresh the network list whenever status settles and the panel is
-            // expanded — but only if the 30-second auto-scan gate is open.
-            // This prevents repeated nmcli dev wifi list calls from interrupting
-            // passkey entry; the user can still force an immediate rescan via the
-            // refresh button (startNetScan() bypasses the gate entirely).
             if (sm.networkExpanded && !sm._forgetInFlight && !netScanProc.running
                     && _autoScanGate.elapsed)
                 netScanProc.running = true
         }
-        Component.onCompleted: running=true
+        // Only run if the menu is visible or we need an initial seed
+        running: sm.menuVisible
     }
     Timer { interval:8000; repeat:true; running: sm._pollActive
         onTriggered: if(!netStatusProc.running) netStatusProc.running=true }
@@ -206,7 +201,8 @@ Item {
 
     Process { id: netSavedProc
         command: ["bash", "-c", "nmcli --escape no -t -f NAME con show 2>/dev/null"]
-        running: true
+        // Only run when the menu is visible
+        running: sm.menuVisible
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
             const n = l.trim(); if (n) sm._savedNets.push(n)
         }}
@@ -220,8 +216,6 @@ Item {
                     if (!netScanProc.running) netScanProc.running = true
                 } else if (sm._connSavedPending) {
                     sm._connSavedPending = false
-                    // _savedNets now includes the profile NM just created, so
-                    // the scan will correctly mark the network as saved:true.
                     if (sm.networkExpanded && !netScanProc.running)
                         netScanProc.running = true
                 }
@@ -444,6 +438,8 @@ Item {
                 }
             })
         }
+        // Run once at startup to seed device list and trigger auto-reconnect,
+        // then only on demand (menu open, poll timer, post-connect refresh).
         Component.onCompleted: running = true
     }
 
@@ -812,13 +808,13 @@ Item {
     
     Timer {
         id: smIconPreloadTimer
-    	interval: 1500   // after bar settles; avoids competing with heavier startup work
-    	repeat: false
-    	running: true
-    	onTriggered: {
+        interval: 1500   // after bar settles; avoids competing with heavier startup work
+        repeat: false
+        running: true    // fires once at bar startup so the icon is ready before first menu open
+        onTriggered: {
             if (sm._userIconPath === "" && !smIconProc.running)
                 smIconProc.running = true
-    	}
+        }
     }
 
     Timer {

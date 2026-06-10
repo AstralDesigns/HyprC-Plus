@@ -1264,10 +1264,11 @@ PanelWindow {
                                 id: userNameText
                                 Layout.alignment: Qt.AlignHCenter
                                 text: "—"
-                                color: Config.powerGlyphColor
-                                font.family: Config.labelFont
-                                font.pixelSize: 13
-                                font.weight: Font.Medium
+                                color: Theme.cPrimary
+                                font.family: C059
+                                font.pixelSize: 20
+                                font.weight: Font.Bold
+                                font.italic: true
                             }
                         }
                     }

@@ -996,7 +996,7 @@ const AppLauncherWindow = GObject.registerClass({
 
         this._dockPos     = readDockPos();
         this._isVert      = (this._dockPos === 'left' || this._dockPos === 'right');
-        this._allApps     = getAllApps();
+        this._allApps     = [];           // populated lazily on first show
         this._pinnedSet   = readPinnedApps();
         this._favoritesSet = readFavorites();
         this._runningApps = getRunningApps();
@@ -15264,7 +15264,7 @@ const LauncherApp = GObject.registerClass({
                     // positions since the launcher daemon last showed).
                     this._win._refreshLayerShell();
                     // Refresh app list and running apps from disk on each show
-                    this._win._allApps     = this._win._appsDirty ? getAllApps() : this._win._allApps;
+                    this._win._allApps     = (this._win._appsDirty || this._win._allApps.length === 0) ? getAllApps() : this._win._allApps;
                     this._win._appsDirty   = false;
                     this._win._runningApps = getRunningApps();
                     // Reset collapse state — favorites and groups start collapsed

@@ -80,9 +80,9 @@ PanelWindow {
                         font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                 }
                 ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    Text { text: Quickshell.env("USER"); color: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00); font.pixelSize: 13; font.weight: Font.Medium }
+                    Text { text: Quickshell.env("USER"); color: Theme.cPrimary; font.pixelSize: 20; font.family: CO59; font.weight: Font.Bold; font.italic: true }
                     Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm")
-                        color: Theme.cOnSurfVar; font.pixelSize: 10 }
+                        color: Theme.cOnSurf; font.pixelSize: 13 }
                 }
                 // Recorder
                 Rectangle {
@@ -129,33 +129,42 @@ PanelWindow {
 
             // ── Brightness ────────────────────────────────────────────
             RowLayout { Layout.fillWidth: true; spacing: 10
-                Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
-                Text { text: "Brightness"; color: Theme.cOnSurfVar; font.pixelSize: 13; Layout.preferredWidth: 72 }
+                Rectangle {
+                    width: 17; height: 17; radius: 15
+                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.45)
+                    Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
+                }
+                Text { text: "Brightness"; color: Theme.cOnSurf; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
                     value: StartMenuState.backlightValue
                     onMoved: function(v) { StartMenuState.backlightValue = v; StartMenuState.setBacklight(v) }
                     gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
                 }
-                Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cOnSurfVar
+                Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cOnSurf
                     font.pixelSize: 11; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
             }
 
             // ── Volume ────────────────────────────────────────────────
             RowLayout { Layout.fillWidth: true; spacing: 10
-                Text {
-                    text: StartMenuState.volumeMuted ? "󰖁" : "󰕾"
-                    font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
-                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
+                Rectangle {
+                    width: 17; height: 17; radius: 15
+                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.45)
+                    Text {
+                        text: StartMenuState.volumeMuted ? "󰖁" : "󰕾"
+                        font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
+                    }
                 }
-                Text { text: "Volume"; color: Theme.cOnSurfVar; font.pixelSize: 13; Layout.preferredWidth: 72 }
+                
+                Text { text: "Volume"; color: Theme.cOnSurf; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
                     value: StartMenuState.volumeValue
                     onMoved: function(v) { StartMenuState.volumeValue = v; StartMenuState.setVolume(v) }
                     gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
                 }
-                Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cOnSurfVar
+                Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cOnSurf
                     font.pixelSize: 11; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
             }
 
@@ -755,7 +764,7 @@ PanelWindow {
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
                                 font.pixelSize: 18; font.family: Config.fontFamily
-                                color: ph.containsMouse ? Config.powerGlyphColor : Config.glyphColor
+                                color: ph.containsMouse ? Config.mediabtGlyphColor : Config.powerGlyphColor
                                 Behavior on color { ColorAnimation { duration: 120 } } }
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.l
                                 color: Theme.cOnSurfVar; font.pixelSize: 9 }
@@ -779,7 +788,7 @@ PanelWindow {
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
                     Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"
-                        color: logh.containsMouse ? Config.powerGlyphColor : Config.glyphColor
+                        color: logh.containsMouse ? Config.mediabtGlyphColor : Config.powerGlyphColor
                         Behavior on color { ColorAnimation { duration: 120 } } }
                     Text { text: "Logout"; color: logh.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
                         font.pixelSize: 12; font.weight: Font.Medium

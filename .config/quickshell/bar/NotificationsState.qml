@@ -571,8 +571,9 @@ Item {
         command: ["bash", "-c",
             "[ -p /tmp/qs_bt_cmd ] || (rm -f /tmp/qs_bt_cmd && mkfifo /tmp/qs_bt_cmd); " +
             "sleep infinity >> /tmp/qs_bt_cmd"]
-        Component.onCompleted: running = true
-        onExited: btFifoHolderRestartTimer.restart()
+        // Only run when activated
+        running: LicenseState.activated
+        onExited: if (LicenseState.activated) btFifoHolderRestartTimer.restart()
     }
     Timer { id: btFifoHolderRestartTimer; interval: 500; repeat: false
         onTriggered: { if (!btFifoHolderProc.running) btFifoHolderProc.running = true }
@@ -589,12 +590,15 @@ Item {
         stderr: SplitParser { splitMarker: "\n"; onRead: function(l) {
             if (l.trim()) console.warn("bt-agent:", l)
         }}
-        Component.onCompleted: running = true
+        // Only run when activated
+        running: LicenseState.activated
         onRunningChanged: {
             if (running) return
             ns.btAgentReady = false
-            console.warn("bt-agent exited code=" + exitCode)
-            btAgentRestartTimer.restart()
+            if (LicenseState.activated) {
+                console.warn("bt-agent exited code=" + exitCode)
+                btAgentRestartTimer.restart()
+            }
         }
     }
     Timer { id: btAgentRestartTimer; interval: 3000; repeat: false

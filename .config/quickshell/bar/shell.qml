@@ -34,6 +34,9 @@ ShellRoot {
         id: cavaSizeWatch
         command: ["bash", "-c",
             "F=/tmp/qs-cava-size; " +
+            "LOCK=/tmp/qs-cava-size.lock; " +
+            "exec 200>\"$LOCK\"; " +
+            "if ! flock -n 200; then exit 0; fi; " +
             "while true; do " +
             "  if [ -f \"$F\" ]; then " +
             "    inotifywait -q -e modify,close_write \"$F\" 2>/dev/null || sleep 1; " +

@@ -72,10 +72,12 @@ Item {
         command: {
             const rev     = root.side === "right" ? 1 : 0
             const cfgPath = "/tmp/qs-cava-" + root.side + ".ini"
+            // Use lower framerate when no media is playing to save CPU/Memory
+            const fps = _mediaActive ? 60 : 15
             const lines = [
                 "[general]",
                 "bars = "             + Config.cavaWidth,
-                "framerate = 60",
+                "framerate = "        + fps,
                 "",
                 "[output]",
                 "method = raw",
@@ -90,6 +92,12 @@ Item {
             return ["bash", "-c", writeCmd + " && cava -p " + cfgPath]
         }
         Component.onCompleted: running = true
+        // Restart cava when _mediaActive changes to apply framerate optimization
+        onRunningChanged: {
+            if (!running && (root._autoHideActive ? _mediaActive : true)) {
+                quickRestartTimer.restart()
+            }
+        }
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(line) {
@@ -149,6 +157,14 @@ Item {
                 root._intentionalRestart = true
                 cavaProc.running = false
             }
+        }
+    }
+    
+    // Restart cava when media activity changes to toggle framerate
+    on_MediaActiveChanged: {
+        if (cavaProc.running) {
+            root._intentionalRestart = true
+            cavaProc.running = false
         }
     }
 
