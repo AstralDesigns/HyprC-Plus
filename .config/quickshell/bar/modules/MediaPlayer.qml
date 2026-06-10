@@ -133,7 +133,7 @@ Item {
                                         : (modelData.glyph || "")
                                     color: modelData.glyphplay !== undefined
                                         ? (ctlMa.containsMouse ? Config.powerGlyphColor : Theme.cPrimaryFixedDim)
-                                        : (ctlMa.containsMouse ? Config.powerGlyphColor : Config.mediabtGlyphColor)
+                                        : (ctlMa.containsMouse ? Config.powerGlyphColor : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00))
                                     opacity: 0.8
                                     font.family:    Config.fontFamily
                                     font.pixelSize: Config.mediaCtlSize
