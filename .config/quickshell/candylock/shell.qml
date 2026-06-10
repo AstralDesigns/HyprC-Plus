@@ -774,7 +774,7 @@ ShellRoot {
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:"󰫢  󰫢"; color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.80)
+                                        text:"󰫢  󰫢"; color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.85)
                                         font.family:"codicon"; font.pixelSize:14
                                         topPadding:8; bottomPadding:8
                                     }
@@ -837,12 +837,12 @@ ShellRoot {
                                                 Layout.fillWidth:true; spacing:4; Layout.alignment:Qt.AlignVCenter
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherTemp; color:root.cPrimary; opacity: 0.80
+                                                    text:root.weatherTemp; color:root.cPrimary; opacity: 0.85
                                                     font.family:"C059"; font.pixelSize:24; font.italic:true; font.weight:Font.DemiBold
                                                 }
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherIcon; color:root.cPrimary; opacity: 0.80
+                                                    text:root.weatherIcon; color:root.cPrimary; opacity: 0.85
                                                     font.pixelSize:24; font.family:"Symbols Nerd Font Mono"
                                                 }
                                             }
