@@ -15,7 +15,7 @@ Item {
     property var _now: new Date()
     property string _secStr: Qt.formatDateTime(_now, "ss")
     property string _dateStr: Qt.formatDateTime(_now, "dddd, MMMM d")
-    property bool _colonVisible: _now.getMilliseconds() < 250
+    property bool _colonVisible: _now.getMilliseconds() < 500
 
     property string _greeting: {
         const h = _now.getHours()
@@ -27,10 +27,13 @@ Item {
 
     // 1 Hz tick — enough for digital + analog; avoids 20 FPS canvas repaints.
     Timer {
-        interval: 100
+        interval: 1000
         running: scope._active
         repeat: true
-        onTriggered: { scope._now = new Date() }
+        onTriggered: {
+            scope._now = new Date()
+            scope._colonVisible = !scope._colonVisible
+        }
     }
 
     component ClockPanel: Rectangle {
