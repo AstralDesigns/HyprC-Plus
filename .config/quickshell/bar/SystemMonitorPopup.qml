@@ -385,7 +385,7 @@ Item {
         topRightRadius: 20
         bottomLeftRadius: 20
         bottomRightRadius: 20
-        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
+        color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.65)
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
 

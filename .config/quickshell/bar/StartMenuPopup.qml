@@ -51,7 +51,7 @@ PanelWindow {
         id: panelRect
         anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
         width: 340
-        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
+        color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.65)
         //radius: startMenuPanel._panelRadius
         topLeftRadius: 20
         topRightRadius: 20
@@ -82,7 +82,7 @@ PanelWindow {
                 ColumnLayout { Layout.fillWidth: true; spacing: 1
                     Text { text: Quickshell.env("USER"); color: Theme.cPrimary; font.pixelSize: 20; font.family: CO59; font.weight: Font.Bold; font.italic: true }
                     Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm")
-                        color: Theme.cOnSurf; font.pixelSize: 13 }
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize: 13 }
                 }
                 // Recorder
                 Rectangle {
@@ -131,17 +131,17 @@ PanelWindow {
             RowLayout { Layout.fillWidth: true; spacing: 10
                 Rectangle {
                     width: 17; height: 17; radius: 15
-                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.45)
+                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.00)
                     Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
                 }
-                Text { text: "Brightness"; color: Theme.cOnSurf; font.pixelSize: 11; Layout.preferredWidth: 72 }
+                Text { text: "Brightness"; color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize: 11; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
                     value: StartMenuState.backlightValue
                     onMoved: function(v) { StartMenuState.backlightValue = v; StartMenuState.setBacklight(v) }
                     gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
                 }
-                Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cOnSurf
+                Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
                     font.pixelSize: 11; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
             }
 
@@ -149,7 +149,7 @@ PanelWindow {
             RowLayout { Layout.fillWidth: true; spacing: 10
                 Rectangle {
                     width: 17; height: 17; radius: 15
-                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.45)
+                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.00)
                     Text {
                         text: StartMenuState.volumeMuted ? "󰖁" : "󰕾"
                         font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
@@ -157,14 +157,14 @@ PanelWindow {
                     }
                 }
                 
-                Text { text: "Volume"; color: Theme.cOnSurf; font.pixelSize: 11; Layout.preferredWidth: 72 }
+                Text { text: "Volume"; color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize: 11; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
                     value: StartMenuState.volumeValue
                     onMoved: function(v) { StartMenuState.volumeValue = v; StartMenuState.setVolume(v) }
                     gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
                 }
-                Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cOnSurf
+                Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
                     font.pixelSize: 11; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
             }
 
@@ -757,14 +757,14 @@ PanelWindow {
                     delegate: Rectangle {
                         required property var modelData
                         Layout.fillWidth: true; height: 52; radius: 12
-                        color: ph.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                        color: ph.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.1)
                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                         border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
                         Behavior on color { ColorAnimation { duration: 120 } }
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
                                 font.pixelSize: 18; font.family: Config.fontFamily
-                                color: ph.containsMouse ? Config.mediabtGlyphColor : Config.powerGlyphColor
+                                color: ph.containsMouse ? Config.mediabtGlyphColor : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                                 Behavior on color { ColorAnimation { duration: 120 } } }
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.l
                                 color: Theme.cOnSurfVar; font.pixelSize: 9 }
@@ -782,13 +782,13 @@ PanelWindow {
             // Logout button (full width)
             Rectangle {
                 Layout.fillWidth: true; height: 36; radius: 12
-                color: logh.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                color: logh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.1)
                     : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                 border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
                     Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"
-                        color: logh.containsMouse ? Config.mediabtGlyphColor : Config.powerGlyphColor
+                        color: logh.containsMouse ? Config.mediabtGlyphColor : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                         Behavior on color { ColorAnimation { duration: 120 } } }
                     Text { text: "Logout"; color: logh.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
                         font.pixelSize: 12; font.weight: Font.Medium

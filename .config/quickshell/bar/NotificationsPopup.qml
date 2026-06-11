@@ -207,7 +207,7 @@ Item {
                             }
                             ColumnLayout { Layout.fillWidth:true; spacing:1
                                 Text { Layout.fillWidth:true; text:notif.summary||notif.appName||"Notification"
-                                    color:Theme.cOnSurf; font.pixelSize:12; font.weight:Font.Medium; elide:Text.ElideRight }
+                                    color:Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize:12; font.weight:Font.Medium; elide:Text.ElideRight }
                                 Text { visible:notif.appName!=="" && notif.summary!==""; text:notif.appName
                                     color:Theme.cOnSurfVar; font.pixelSize:9; opacity:0.75 }
                             }
@@ -363,7 +363,7 @@ Item {
                                     color:aH.containsMouse?Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.22):Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.7)
                                     border.width:1; border.color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.35)
                                     Behavior on color{ColorAnimation{duration:80}}
-                                    Text { id:aLbl; anchors.centerIn:parent; text:modelData.label||modelData.key||""; color:Theme.cOnSurf; font.pixelSize:10 }
+                                    Text { id:aLbl; anchors.centerIn:parent; text:modelData.label||modelData.key||""; color:Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize:10 }
                                     MouseArea { id:aH; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
                                         onClicked: { NotificationsState.invokeAction(notif,modelData.key); NotificationsState.dismissNotification(notif.id) } } } } }
                         Item { height:2 }
@@ -447,7 +447,7 @@ Item {
             id: histPanel
             anchors { top: parent.top; left: parent.left; bottom: parent.bottom }
             width: 380
-            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
+            color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.65)
             //radius: historyWindow._panelRadius
             topLeftRadius: 20
             topRightRadius: 20
@@ -485,7 +485,7 @@ Item {
                     MouseArea { id:dndBtnMA; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
                         onClicked:NotificationsState.dndEnabled=!NotificationsState.dndEnabled } }
                 Text { text:NotificationsState.dndEnabled?"Do Not Disturb":"Notifications"
-                    color:NotificationsState.dndEnabled?Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.85):Config.powerGlyphColor
+                    color:NotificationsState.dndEnabled?Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.85):Qt.rgba(Theme.cPrimary.r,Theme.cSourceColor.g,Theme.cSourceColor.b,1.0)
                     font.pixelSize:14; font.weight:Font.Medium; font.family:Config.fontFamily
                     Layout.fillWidth:true; Behavior on color{ColorAnimation{duration:120}} }
                 Rectangle { width:8;height:8;radius:4
@@ -579,7 +579,7 @@ Item {
                                         Text{anchors.centerIn:parent;visible:!hcIcImg.visible;text:NotificationsState.iconGlyph(notif);font.pixelSize:12;font.family:Config.fontFamily;color:notif.urgency>=2?Theme.cErr:Theme.cOnSurfVar}
                                     }
                                     ColumnLayout{Layout.fillWidth:true;spacing:0
-                                        RowLayout{Text{Layout.fillWidth:true;text:notif.summary||notif.appName||"Notification";color:Theme.cOnSurf;font.pixelSize:11;font.weight:Font.Medium;elide:Text.ElideRight}
+                                        RowLayout{Text{Layout.fillWidth:true;text:notif.summary||notif.appName||"Notification";color:Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00);font.pixelSize:11;font.weight:Font.Medium;elide:Text.ElideRight}
                                             Rectangle{visible:(notif.count||1)>1;height:16;implicitWidth:cntT.implicitWidth+10;radius:8;color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.25);border.width:1;border.color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.4)
                                                 Text{id:cntT;anchors.centerIn:parent;text:"×"+(notif.count||1);font.pixelSize:9;color:Theme.cPrimary}
                                             }
@@ -608,7 +608,7 @@ Item {
                                         Repeater{model:notif.actions||[];delegate:Rectangle{required property var modelData;visible:modelData.key!=="default";height:22;implicitWidth:haL.implicitWidth+12;radius:6
                                             color:haH.containsMouse?Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.22):Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.7)
                                             border.width:1;border.color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.3);Behavior on color{ColorAnimation{duration:80}}
-                                            Text{id:haL;anchors.centerIn:parent;text:modelData.label||modelData.key||"";color:Theme.cOnSurf;font.pixelSize:9}
+                                            Text{id:haL;anchors.centerIn:parent;text:modelData.label||modelData.key||"";color:Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00);font.pixelSize:9}
                                             MouseArea{id:haH;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:NotificationsState.invokeAction(notif,modelData.key)}}}}
                                 }
                             }

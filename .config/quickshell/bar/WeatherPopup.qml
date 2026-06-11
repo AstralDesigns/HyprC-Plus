@@ -77,7 +77,7 @@ Item {
         topRightRadius: 20
         bottomLeftRadius: 20
         bottomRightRadius: 20
-        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
+        color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.65)
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
 
@@ -346,7 +346,7 @@ Item {
                                 spacing: 1
                                 Text {
                                     text: WeatherPopupState.hrTimes[index] || "--"
-                                    color: isCurrentHour ? Theme.cPrimary
+                                    color: isCurrentHour ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                                         : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.65)
                                     font.pixelSize: 9; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
@@ -362,7 +362,7 @@ Item {
                                 }
                                 Text {
                                     text: WeatherPopupState.hrTemps[index] || "--"
-                                    color: isCurrentHour ? Theme.cPrimary : Theme.cOnSurf
+                                    color: isCurrentHour ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurf
                                     font.pixelSize: 9; font.weight: Font.Medium; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -422,7 +422,7 @@ Item {
                             spacing: 3
                             Text {
                                 text: WeatherPopupState.fcDays[index] || "--"
-                                color: index === 0 ? Theme.cPrimary : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.65)
+                                color: index === 0 ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.65)
                                 font.pixelSize: 11; font.weight: index === 0 ? Font.Bold : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -436,7 +436,7 @@ Item {
                             }
                             Text {
                                 text: WeatherPopupState.fcHi[index] || "--"
-                                color: index === 0 ? Theme.cPrimary : Theme.cOnSurf; font.pixelSize: 10; font.weight: Font.Medium; font.family: Config.labelFont
+                                color: index === 0 ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurf; font.pixelSize: 10; font.weight: Font.Medium; font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }

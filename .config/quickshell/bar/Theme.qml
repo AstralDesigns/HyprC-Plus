@@ -99,9 +99,9 @@ QtObject {
     readonly property color cOnPrimaryFixedVariant: Qt.color(_onPrimaryFixedVariant)
 
     // ── Semantic composites ────────────────────────────────────────────────
-    // blur_background: matches waybar colors.css  alpha(rgba(bg), 0.35)
+    // blur_background: matches waybar colors.css  alpha(rgba(bg), 0.20)
     readonly property color blurBackground: Qt.rgba(
-        Qt.color(_inversePrimary).r, Qt.color(_inversePrimary).g, Qt.color(_inversePrimary).b, 0.35)
+        Qt.color(_inversePrimary).r, Qt.color(_inversePrimary).g, Qt.color(_inversePrimary).b, 0.20)
 
     // Desktop icon label background — onSecondary @ 0.35 opacity.
     // Blurred by Hyprland layerrule on quickshell:desktop so labels stay

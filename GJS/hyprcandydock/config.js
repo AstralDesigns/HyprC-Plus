@@ -7,7 +7,7 @@
 // Each tag is unique in the file so sed can target it unambiguously.
 //
 // Numeric @HCD variables (replace N with new value):
-//   sed -i 's/appIconSize: 22[ \t]*[0-9]*/appIconSize: 20N/' config.js
+//   sed -i 's/appIconSize: 24[ \t]*[0-9]*/appIconSize: 20N/' config.js
 //
 // String @HCD variables (replace GLYPH with new character or escape):
 //   sed -i "s/startIcon: '',
@@ -30,7 +30,7 @@ var DockConfig = {
     // ── App icon size (Gtk.Image pixel_size) ─────────────────────────────
     // Controls Gtk.Image icons from the theme (e.g. Nautilus, Firefox).
     // This is the primary value used for exclusive-zone and button footprint.
-    appIconSize: 22,               // @HCD:appIconSize
+    appIconSize: 24,               // @HCD:appIconSize
 
     // ── Glyph icon size (NerdFont unicode labels) ────────────────────────
     // Controls start, trash, and fallback glyph font-size independently.
@@ -39,7 +39,7 @@ var DockConfig = {
     // formula multiplies by glyphIconSizeFraction (default 1.1) to compensate.
     // Set glyphIconSize to an explicit px value to override auto-derive.
     glyphIconSize: null,
-    glyphIconSizeFraction: 1.0,   // auto = round(appIconSize * this)
+    glyphIconSizeFraction: 1.1,   // auto = round(appIconSize * this)
 
     // ── Indicator size ───────────────────────────────────────────────────
     // Active-window dot font-size in px. Set null to auto-derive.
@@ -65,10 +65,10 @@ var DockConfig = {
     borderWidth: 2,                // @HCD:borderWidth
     borderColorVar: 'background', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
-    borderTopLeftRadius: 20,       // @HCD:borderTopLeftRadius
-    borderTopRightRadius: 20,      // @HCD:borderTopRightRadius
-    borderBottomLeftRadius: 20,    // @HCD:borderBottomLeftRadius
-    borderBottomRightRadius: 20,   // @HCD:borderBottomRightRadius
+    borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
+    borderTopRightRadius: 30,      // @HCD:borderTopRightRadius
+    borderBottomLeftRadius: 30,    // @HCD:borderBottomLeftRadius
+    borderBottomRightRadius: 30,   // @HCD:borderBottomRightRadius
 
     // ── External margins (dock edge ↔ screen / window edge) ──────────────
     // The exclusive zone is auto-calculated from the rendered content height:

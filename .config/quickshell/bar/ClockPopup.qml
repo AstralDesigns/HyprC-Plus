@@ -42,7 +42,7 @@ Item {
         implicitHeight: 150
         radius: 20
         clip: true
-        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.40)
+        color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.65)
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
 
@@ -79,7 +79,7 @@ Item {
                     spacing: 2
                     Text {
                         text: Qt.formatDateTime(root._now, "HH")
-                        color: Theme.cOnSurf
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
@@ -98,7 +98,7 @@ Item {
                     }
                     Text {
                         text: Qt.formatDateTime(root._now, "mm")
-                        color: Theme.cOnSurf
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold

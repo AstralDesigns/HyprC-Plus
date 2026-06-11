@@ -55,11 +55,11 @@ ShellRoot {
         Qt.color(_m3inversePrimary).b, 0.65)
     // Sub-card backgrounds
     readonly property color cCardDark: Qt.rgba(
-        Qt.color(_m3onSecondary).r, Qt.color(_m3onSecondary).g,
-        Qt.color(_m3onSecondary).b, 0.60)
+        Qt.color(_m3background).r, Qt.color(_m3background).g,
+        Qt.color(_m3background).b, 0.80)
     readonly property color cCardWarm: Qt.rgba(
         Qt.color(_m3background).r, Qt.color(_m3background).g,
-        Qt.color(_m3background).b, 0.30)
+        Qt.color(_m3background).b, 0.6)
 
     function parseColors(t) {
         const re=/property color (\w+): "(#[0-9a-fA-F]+)"/g; let m
@@ -774,7 +774,7 @@ ShellRoot {
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:"󰫢  󰫢"; color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.85)
+                                        text:"󰫢  󰫢"; color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.65)
                                         font.family:"codicon"; font.pixelSize:14
                                         topPadding:8; bottomPadding:8
                                     }
@@ -837,12 +837,12 @@ ShellRoot {
                                                 Layout.fillWidth:true; spacing:4; Layout.alignment:Qt.AlignVCenter
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherTemp; color:root.cPrimary; opacity: 0.85
+                                                    text:root.weatherTemp; color:root.cPrimary; opacity: 0.65
                                                     font.family:"C059"; font.pixelSize:24; font.italic:true; font.weight:Font.DemiBold
                                                 }
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherIcon; color:root.cPrimary; opacity: 0.85
+                                                    text:root.weatherIcon; color:root.cPrimary; opacity: 0.65
                                                     font.pixelSize:24; font.family:"Symbols Nerd Font Mono"
                                                 }
                                             }
@@ -1360,11 +1360,11 @@ ShellRoot {
                     Rectangle {
                         anchors.fill: parent
                         radius: width / 2
-                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
-                        border.width: lockNotif.dndEnabled ? 2 : 1
+                        color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
+                        border.width: lockNotif.dndEnabled ? 3 : 3
                         border.color: lockNotif.dndEnabled
-                            ? Qt.rgba(root.cSecondry.r, root.cSecondry.g, root.cSecondry.b, 0.65)
-                            : Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.22)
+                            ? Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
+                            : Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
                     }
 
                     layer.enabled: true
@@ -1432,9 +1432,9 @@ ShellRoot {
                     Rectangle {
                         anchors.fill: parent
                         radius: width / 2
-                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
-                        border.width: 1
-                        border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.22)
+                        color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
+                        border.width: 3
+                        border.color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
                     }
 
                     layer.enabled: true
@@ -1580,7 +1580,7 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maRebt.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.85) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
                                 border.width: 1
-                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cPrimary.r, root.root.cPrimary.g, root.root.cPrimary.b,0.65) : "transparent"
+                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }

@@ -1099,8 +1099,7 @@ PanelWindow {
         width: ccWin._panelW
 
         radius: 20
-        color:  Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                        Theme.cOnSecondary.b, 0.6)
+        color:  Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.65)
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g,
                               Theme.cOutVar.b, 0.38)
