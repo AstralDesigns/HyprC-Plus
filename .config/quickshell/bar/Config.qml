@@ -670,7 +670,7 @@ QtObject {
     property bool   wsSeparators:        false  // show glyph separator between buttons
     property string wsSeparatorGlyph:    ""
     property real   wsSeparatorOpacity:  0.3
-    readonly property color wsSeparatorColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSecondaryContainer.b, wsSeparatorOpacity)
+    readonly property color wsSeparatorColor: Qt.rgba(Theme.cPrimaryFixedDim.r, Theme.cPrimaryFixedDim.g, Theme.cPrimaryFixedDim.b, wsSeparatorOpacity)
     property int    wsSeparatorSize:     10    // px — font size of the separator glyph
     property int    wsSeparatorPadLeft:  2     // px — space between left ws button and separator
     property int    wsSeparatorPadRight: 2     // px — space between separator and right ws button
