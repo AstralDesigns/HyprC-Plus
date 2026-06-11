@@ -589,7 +589,7 @@ QtObject {
     property color mediaGlyphColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
     property color discGlyphColor:       Theme.cPrimary
     property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80)
-    property color powerGlyphColor:      Qt.rgba(Theme.cPrimaryFixed.r, Theme.cPrimaryFixed.g, Theme.cPrimaryFixed.b, 1.00)
+    property color powerGlyphColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
     readonly property color ccGlyphColor: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, ccGlyphOpacity)
@@ -646,8 +646,8 @@ QtObject {
     property real wsActiveOpacity:     1.0
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
-    readonly property color wsActiveColor:     Qt.rgba(Theme.cPrimaryFixed.r, Theme.cPrimaryFixed.g, Theme.cPrimaryFixed.b, wsActiveOpacity)
-    readonly property color wsPersistentColor: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, wsPersistentOpacity)
+    readonly property color wsActiveColor:     Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsActiveOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cPrimary.r, Theme.cSecondaryContainer.g, Theme.cSecondaryContainer.b, wsPersistentOpacity)
     readonly property color wsEmptyColor:      Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSecondaryContainer.g, Theme.cSecondaryContainer.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────

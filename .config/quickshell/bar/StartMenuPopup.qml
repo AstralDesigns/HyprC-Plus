@@ -51,7 +51,7 @@ PanelWindow {
         id: panelRect
         anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
         width: 340
-        color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.65)
+        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
         //radius: startMenuPanel._panelRadius
         topLeftRadius: 20
         topRightRadius: 20
@@ -134,14 +134,14 @@ PanelWindow {
                     color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.00)
                     Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
                 }
-                Text { text: "Brightness"; color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize: 11; Layout.preferredWidth: 72 }
+                Text { text: "Brightness"; color: Theme.cOnSurf; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
                     value: StartMenuState.backlightValue
                     onMoved: function(v) { StartMenuState.backlightValue = v; StartMenuState.setBacklight(v) }
                     gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
                 }
-                Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
+                Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cOnSurf
                     font.pixelSize: 11; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
             }
 
@@ -157,14 +157,14 @@ PanelWindow {
                     }
                 }
                 
-                Text { text: "Volume"; color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize: 11; Layout.preferredWidth: 72 }
+                Text { text: "Volume"; color: Theme.cOnSurf; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 SliderBg {
                     Layout.fillWidth: true; Layout.fillHeight: true; height: 20
                     value: StartMenuState.volumeValue
                     onMoved: function(v) { StartMenuState.volumeValue = v; StartMenuState.setVolume(v) }
                     gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
                 }
-                Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
+                Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cOnSurf
                     font.pixelSize: 11; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
             }
 
