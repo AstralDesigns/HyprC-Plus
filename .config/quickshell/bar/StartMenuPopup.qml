@@ -82,7 +82,7 @@ PanelWindow {
                 ColumnLayout { Layout.fillWidth: true; spacing: 1
                     Text { text: Quickshell.env("USER"); color: Theme.cPrimary; font.pixelSize: 20; font.family: CO59; font.weight: Font.Bold; font.italic: true }
                     Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm")
-                        color: Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize: 13 }
+                        color: Theme.cOnSurf; font.pixelSize: 13 }
                 }
                 // Recorder
                 Rectangle {
