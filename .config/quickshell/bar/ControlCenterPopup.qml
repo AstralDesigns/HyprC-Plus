@@ -3226,7 +3226,7 @@ PanelWindow {
                                                   Theme.cInversePrimary.b, 0.82)
                                         : (_colorRegenMA.containsMouse
                                             ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                      Theme.cInversePrimary.b, 0.38)
+                                                      Theme.cInversePrimary.b, 1.0)
                                             : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                       Theme.cInversePrimary.b, 0.16))
                                     border.width: 1
@@ -6906,12 +6906,14 @@ PanelWindow {
                       Theme.cInversePrimary.b, 0.82)
             : (pbma.containsMouse
                 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                          Theme.cInversePrimary.b, 0.38)
+                          Theme.cInversePrimary.b, 1.0)
                 : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                           Theme.cInversePrimary.b, 0.16))
         border.width: 1
-        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                              Theme.cPrimary.b, active ? 0.6 : 0.0)
+	border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+	    Theme.cPrimary.b, pbma.containsMouse ? 0.55 : 0.2)
+	Behavior on color     { ColorAnimation { duration: 120 } }
+	Behavior on border.color { ColorAnimation { duration: 120 } }
 
         Text {
             id: _pbt; anchors.centerIn: parent
