@@ -1914,14 +1914,14 @@ PanelWindow {
                                         CCSection { text: "Thumbnail" }
                                         CCSlider { label:"Thumb Size"; from:10;to:40; value:Config.mediaThumbSize; onMoved:function(v){Config.mediaThumbSize=v} }
 
-                                        CCSection { text: "Controls" }
-                                        CCSlider { label:"Ctl Glyph Size"; from:6;to:24; value:Config.mediaCtlSize; onMoved:function(v){Config.mediaCtlSize=v} }
+                                        //CCSection { text: "Controls" }
+                                        //CCSlider { label:"Ctl Glyph Size"; from:6;to:24; value:Config.mediaCtlSize; onMoved:function(v){Config.mediaCtlSize=v} }
 
-                                        CCSection { text: "Padding (0 = true zero)" }
-                                        CCSlider { label:"Pad Left";   from:0;to:16; value:Config.mediaPadLeft;   onMoved:function(v){Config.mediaPadLeft=v} }
-                                        CCSlider { label:"Pad Right";  from:0;to:16; value:Config.mediaPadRight;  onMoved:function(v){Config.mediaPadRight=v} }
-                                        CCSlider { label:"Pad Top";    from:0;to:10; value:Config.mediaPadTop;    onMoved:function(v){Config.mediaPadTop=v} }
-                                        CCSlider { label:"Pad Bottom"; from:0;to:10; value:Config.mediaPadBottom; onMoved:function(v){Config.mediaPadBottom=v} }
+                                        //CCSection { text: "Padding (0 = true zero)" }
+                                        //CCSlider { label:"Pad Left";   from:0;to:16; value:Config.mediaPadLeft;   onMoved:function(v){Config.mediaPadLeft=v} }
+                                        //CCSlider { label:"Pad Right";  from:0;to:16; value:Config.mediaPadRight;  onMoved:function(v){Config.mediaPadRight=v} }
+                                        //CCSlider { label:"Pad Top";    from:0;to:10; value:Config.mediaPadTop;    onMoved:function(v){Config.mediaPadTop=v} }
+                                        //CCSlider { label:"Pad Bottom"; from:0;to:10; value:Config.mediaPadBottom; onMoved:function(v){Config.mediaPadBottom=v} }
 
                                         Item { height: 10 }
                                     }

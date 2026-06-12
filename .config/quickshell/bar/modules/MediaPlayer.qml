@@ -32,26 +32,6 @@ Item {
             anchors.centerIn: parent
             spacing: 0
 
-            // ── GJS toggle button ─────────────────────────────────────────────
-            Item {
-                implicitWidth:  gjsIcon.implicitWidth + Config.modPadH * 2
-                implicitHeight: Config.moduleHeight
-                Text {
-                    id: gjsIcon; anchors.centerIn: parent
-                    text: Config.mediaToggleGlyph
-                    color: Config.mediaGlyphColor
-                    font.family: Config.fontFamily; font.pixelSize: Config.mediaGlyphSize
-                    font.weight: Config.fontWeight
-                }
-                opacity: gjsMa.containsMouse ? 0.7 : 1.0
-                Behavior on opacity { NumberAnimation { duration: 80 } }
-                MouseArea {
-                    id: gjsMa; anchors.fill: parent; hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: if (!gjsMediaProc.running) gjsMediaProc.running = true
-                }
-            }
-
             // ── Active media area: thumb/disc + controls (hidden when stopped) ─
             Item {
                 id: activeMedia
@@ -105,6 +85,13 @@ Item {
                             opacity: status === Image.Ready ? 1.0 : 0.0
                             Behavior on opacity { NumberAnimation { duration: 120 } }
                         }
+                	opacity: gjsMa.containsMouse ? 0.7 : 1.0
+                	Behavior on opacity { NumberAnimation { duration: 80 } }
+                	MouseArea {
+                    	    id: gjsMa; anchors.fill: parent; hoverEnabled: true
+                    	    cursorShape: Qt.PointingHandCursor
+                    	    onClicked: if (!gjsMediaProc.running) gjsMediaProc.running = true
+                	}
                     }
 
                     // ── Prev / Play-Pause / Next controls ─────────────────────
