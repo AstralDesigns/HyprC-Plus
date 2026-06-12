@@ -45,6 +45,8 @@ window.background {
     background-image: linear-gradient(to bottom, @background, @scrim);
     padding: 0px;
     margin: 0px;
+    border: 2px solid;
+    border-color: @background; /* CC border picker → dock-border.sh writes @gtk_name here */
 }
 
 /* Fallback icon — shown when an app has no icon in the theme.

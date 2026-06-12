@@ -259,14 +259,14 @@ function _injectGlyphSizeCSS(display) {
     const _badgePos = DockConfig.position || 'bottom';
     let glyphBadgeGradient;
     if (_badgePos === 'top') {
-        glyphBadgeGradient = 'linear-gradient(to top, @surface, @on_secondary)';
+        glyphBadgeGradient = 'linear-gradient(to top, @surface, @on_primary_fixed_variant)';
     } else if (_badgePos === 'left') {
-        glyphBadgeGradient = 'linear-gradient(to left, @surface, @on_secondary)';
+        glyphBadgeGradient = 'linear-gradient(to left, @surface, @on_primary_fixed_variant)';
     } else if (_badgePos === 'right') {
-        glyphBadgeGradient = 'linear-gradient(to right, @surface, @on_secondary)';
+        glyphBadgeGradient = 'linear-gradient(to right, @surface, @on_primary_fixed_variant)';
     } else {
         // bottom (default)
-        glyphBadgeGradient = 'linear-gradient(to bottom, @on_secondary, @surface)';
+        glyphBadgeGradient = 'linear-gradient(to bottom, @on_primary_fixed_variant, @surface)';
     }
 
     const css = `

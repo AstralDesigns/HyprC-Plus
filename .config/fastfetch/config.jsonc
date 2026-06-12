@@ -50,11 +50,11 @@
             "type": "icons"
         },*/
         {
-            "key": "│ {#34} term    {#keys}││ ",
+            "key": "│ {#38} term    {#keys}││ ",
             "type": "terminal"
         },
         {
-            "key": "│ {#38} shell   {#keys}││ ",
+            "key": "│ {#33} shell   {#keys}││ ",
             "type": "shell"
         },
         /*{
@@ -62,15 +62,15 @@
             "type": "packages"
         },*/
         {
-            "key": "│ {#33}󰉉 disk    {#keys}││ ",
+            "key": "│ {#34}󰉉 disk    {#keys}││ ",
             "type": "disk"
         },
         {
-            "key": "│ {#38} memory  {#keys}││ ",
+            "key": "│ {#33} memory  {#keys}││ ",
             "type": "memory"
         },
         {
-            "key": "│ {#34}󰓡 swap    {#keys}││ ",
+            "key": "│ {#38}󰓡 swap    {#keys}││ ",
             "type": "swap"
         },
         {

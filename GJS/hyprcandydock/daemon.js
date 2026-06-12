@@ -402,6 +402,8 @@ var Daemon = class {
     // Unified app-info lookup via GLib's native XDG database.
     // Handles ~/.local/share, /usr/share, Flatpak, Snap automatically.
     // Results (including misses) are cached to avoid repeated scans.
+    // Cache is capped at 512 entries — evict oldest on overflow so long
+    // sessions with many transient apps don't leak unbounded memory.
     _findAppInfo(className) {
         if (this._appInfoCache.has(className)) return this._appInfoCache.get(className);
 
@@ -414,34 +416,37 @@ var Daemon = class {
             className.split('.').pop().toLowerCase(),
         ];
 
+        let found = null;
         for (const name of variants) {
             try {
                 const info = Gio.DesktopAppInfo.new(`${name}.desktop`);
-                if (info) {
-                    this._appInfoCache.set(className, info);
-                    return info;
+                if (info) { found = info; break; }
+            } catch (_) {}
+        }
+
+        if (!found) {
+            // Slow path: scan all installed apps for a matching StartupWMClass.
+            const normCls = this._normalizeClass(className);
+            try {
+                for (const info of Gio.AppInfo.get_all()) {
+                    const wm = info.get_startup_wm_class && info.get_startup_wm_class();
+                    if (!wm) continue;
+                    if (wm.toLowerCase() === className.toLowerCase() ||
+                            this._normalizeClass(wm) === normCls) {
+                        found = info;
+                        break;
+                    }
                 }
             } catch (_) {}
         }
 
-        // Slow path: scan all installed apps for a matching StartupWMClass.
-        // Note: Gio.AppInfo.get_all() returns AppInfo-typed wrappers in GJS
-        // so instanceof Gio.DesktopAppInfo is unreliable — use duck-typing.
-        const normCls = this._normalizeClass(className);
-        try {
-            for (const info of Gio.AppInfo.get_all()) {
-                const wm = info.get_startup_wm_class && info.get_startup_wm_class();
-                if (!wm) continue;
-                if (wm.toLowerCase() === className.toLowerCase() ||
-                        this._normalizeClass(wm) === normCls) {
-                    this._appInfoCache.set(className, info);
-                    return info;
-                }
-            }
-        } catch (_) {}
-
-        this._appInfoCache.set(className, null);
-        return null;
+        // Evict oldest entry when cache reaches 512 to bound memory use
+        if (this._appInfoCache.size >= 512) {
+            const firstKey = this._appInfoCache.keys().next().value;
+            this._appInfoCache.delete(firstKey);
+        }
+        this._appInfoCache.set(className, found);
+        return found;
     }
 
     // Human-readable app name via the XDG desktop entry (same source as rofi/nwg-dock).
@@ -460,7 +465,6 @@ var Daemon = class {
         if (info) {
             const gicon = info.get_icon();
             if (gicon) {
-                // Duck-type: ThemedIcon has get_names(), FileIcon has get_file()
                 const names = gicon.get_names && gicon.get_names();
                 if (names && names.length > 0) {
                     iconName = names[0];
@@ -472,6 +476,11 @@ var Daemon = class {
             }
         }
 
+        // Cap iconCache at 512 entries — same policy as _appInfoCache
+        if (this.iconCache.size >= 512) {
+            const firstKey = this.iconCache.keys().next().value;
+            this.iconCache.delete(firstKey);
+        }
         this.iconCache.set(className, iconName);
         return iconName;
     }
@@ -906,6 +915,10 @@ closeWindow(address) {
         if (this._refreshTimer) {
             GLib.source_remove(this._refreshTimer);
             this._refreshTimer = null;
+        }
+        if (this._ezUpdateId) {
+            GLib.source_remove(this._ezUpdateId);
+            this._ezUpdateId = 0;
         }
         if (this.socketConnection) {
             try { this.socketConnection.close(null); } catch (_) {}

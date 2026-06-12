@@ -1028,6 +1028,17 @@ const AppLauncherWindow = GObject.registerClass({
         this.connect('destroy', () => {
             this._teardownColorMonitor();
             this._teardownAppDirMonitors();
+            // Write "closed" to launcher.state so dock autohide is never left
+            // permanently suppressed if the launcher exits while visible.
+            try {
+                const stateDir  = GLib.build_filenamev([HOME, '.cache', 'hyprcandy']);
+                const statePath = GLib.build_filenamev([stateDir, 'launcher.state']);
+                GLib.file_set_contents(statePath, new TextEncoder().encode('closed\n'));
+            } catch (_) {}
+            // Null the module-level running-apps cache so the next launcher
+            // instance starts with a fresh query rather than stale data.
+            _runningAppsCache    = null;
+            _runningAppsCacheUs  = 0;
         });
         this.add_css_class('hyprcandy-launcher');
     }
@@ -15138,6 +15149,13 @@ const EMOJI_ALL = [
                 GLib.file_set_contents(statePath, bytes);
             } catch (e) {
                 // Non-fatal — dock autohide guard is best-effort
+            }
+            // Invalidate the module-level running-apps cache on hide so the
+            // next show always calls hyprctl fresh rather than returning
+            // potentially stale window data from the previous toggle.
+            if (!this.get_visible()) {
+                _runningAppsCache   = null;
+                _runningAppsCacheUs = 0;
             }
         });
 
