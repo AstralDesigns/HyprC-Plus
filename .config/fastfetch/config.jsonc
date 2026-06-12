@@ -30,7 +30,7 @@
             "format": "{5} {2}"
         },
         {
-            "key": "│ {#37}{icon} distro  {#keys}││ ",
+            "key": "│ {#35}{icon} distro  {#keys}││ ",
             "type": "os"
         },
         {
@@ -84,7 +84,7 @@
             "type": "uptime"
         },
         {
-            "key": "│ {#37}󰍛 cpu     {#keys}││ ",
+            "key": "│ {#35}󰍛 cpu     {#keys}││ ",
             "type": "cpu",
             "showPeCoreCount": true
         },
