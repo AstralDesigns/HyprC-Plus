@@ -135,7 +135,7 @@ PanelWindow {
                 color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
             	RowLayout { Layout.fillWidth: true; spacing: 10
                 	Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
-                	Text { text: "Brightness"; color: Config.wsPersistentColor; font.pixelSize: 11; Layout.preferredWidth: 72 }
+                	Text { text: "Brightness"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 	SliderBg {
                     		Layout.fillWidth: true; Layout.fillHeight: true; width: 154; height: 20
                     		value: StartMenuState.backlightValue
@@ -157,7 +157,7 @@ PanelWindow {
                         	MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
                 	}
                 
-                	Text { text: "Volume"; color: Config.wsPersistentColor; font.pixelSize: 11; Layout.preferredWidth: 72 }
+                	Text { text: "Volume"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 	SliderBg {
                     		Layout.fillWidth: true; Layout.fillHeight: true; width: 154; height: 20
                     		value: StartMenuState.volumeValue
