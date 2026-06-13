@@ -42,9 +42,10 @@ Item {
         implicitHeight: 150
         radius: 20
         clip: true
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
-        border.width: 1
-        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
+        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        border.width: Config.barBorderWidth
+        border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                      Config.barBorderColor.b, Config.barBorderAlpha)
 
         Rectangle {
             anchors { top: parent.top; left: parent.left; right: parent.right }
@@ -69,7 +70,7 @@ Item {
 
                 Text {
                     text: root._greeting
-                    color: Theme.cPrimary
+                    color: Config.wsPersistentColor
                     font.family: Config.labelFont
                     font.pixelSize: 13
                     font.weight: Font.Medium
@@ -127,7 +128,7 @@ Item {
 
                 Text {
                     text: root._dateStr
-                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.0)
+                    color: Config.wsPersistentColor
                     font.family: Config.labelFont
                     font.pixelSize: 12
                 }

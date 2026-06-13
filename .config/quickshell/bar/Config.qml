@@ -529,6 +529,7 @@ QtObject {
     // ── Fonts ────────────────────────────────────────────────────────────
     readonly property string fontFamily: "Symbols Nerd Font Mono"
     readonly property string labelFont:  "JetBrainsMono Nerd Font"
+    readonly property string styleFont:  "C059"
     readonly property int    fontWeight: Font.Normal
 
     // ── Glyph / icon sizes ───────────────────────────────────────────────

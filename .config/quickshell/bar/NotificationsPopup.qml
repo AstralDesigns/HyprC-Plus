@@ -207,7 +207,7 @@ Item {
                             }
                             ColumnLayout { Layout.fillWidth:true; spacing:1
                                 Text { Layout.fillWidth:true; text:notif.summary||notif.appName||"Notification"
-                                    color:Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize:12; font.weight:Font.Medium; elide:Text.ElideRight }
+                                    color:Config.wsPersistentColor; font.pixelSize:12; font.weight:Font.Medium; elide:Text.ElideRight }
                                 Text { visible:notif.appName!=="" && notif.summary!==""; text:notif.appName
                                     color:Theme.cOnSurfVar; font.pixelSize:9; opacity:0.75 }
                             }
@@ -363,7 +363,7 @@ Item {
                                     color:aH.containsMouse?Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.22):Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.7)
                                     border.width:1; border.color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.35)
                                     Behavior on color{ColorAnimation{duration:80}}
-                                    Text { id:aLbl; anchors.centerIn:parent; text:modelData.label||modelData.key||""; color:Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00); font.pixelSize:10 }
+                                    Text { id:aLbl; anchors.centerIn:parent; text:modelData.label||modelData.key||""; color:Config.wsPersistentColor ; font.pixelSize:10 }
                                     MouseArea { id:aH; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
                                         onClicked: { NotificationsState.invokeAction(notif,modelData.key); NotificationsState.dismissNotification(notif.id) } } } } }
                         Item { height:2 }
@@ -447,13 +447,15 @@ Item {
             id: histPanel
             anchors { top: parent.top; left: parent.left; bottom: parent.bottom }
             width: 380
-            color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
+            color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
             //radius: historyWindow._panelRadius
             topLeftRadius: 20
             topRightRadius: 20
             bottomLeftRadius: 20
             bottomRightRadius: 20
-            border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
+            border.width: Config.barBorderWidth
+            border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                          Config.barBorderColor.b, Config.barBorderAlpha)
             scale: NotificationsState.historyVisible ? 1.0 : 0.92
             transformOrigin: Item.TopLeft
             Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
@@ -579,7 +581,7 @@ Item {
                                         Text{anchors.centerIn:parent;visible:!hcIcImg.visible;text:NotificationsState.iconGlyph(notif);font.pixelSize:12;font.family:Config.fontFamily;color:notif.urgency>=2?Theme.cErr:Theme.cOnSurfVar}
                                     }
                                     ColumnLayout{Layout.fillWidth:true;spacing:0
-                                        RowLayout{Text{Layout.fillWidth:true;text:notif.summary||notif.appName||"Notification";color:Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00);font.pixelSize:11;font.weight:Font.Medium;elide:Text.ElideRight}
+                                        RowLayout{Text{Layout.fillWidth:true;text:notif.summary||notif.appName||"Notification";color:Config.wsPersistentColor;font.pixelSize:11;font.weight:Font.Medium;elide:Text.ElideRight}
                                             Rectangle{visible:(notif.count||1)>1;height:16;implicitWidth:cntT.implicitWidth+10;radius:8;color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.25);border.width:1;border.color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.4)
                                                 Text{id:cntT;anchors.centerIn:parent;text:"×"+(notif.count||1);font.pixelSize:9;color:Theme.cPrimary}
                                             }
@@ -608,7 +610,7 @@ Item {
                                         Repeater{model:notif.actions||[];delegate:Rectangle{required property var modelData;visible:modelData.key!=="default";height:22;implicitWidth:haL.implicitWidth+12;radius:6
                                             color:haH.containsMouse?Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.22):Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.7)
                                             border.width:1;border.color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.3);Behavior on color{ColorAnimation{duration:80}}
-                                            Text{id:haL;anchors.centerIn:parent;text:modelData.label||modelData.key||"";color:Qt.rgba(Theme.cPrimary.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00);font.pixelSize:9}
+                                            Text{id:haL;anchors.centerIn:parent;text:modelData.label||modelData.key||"";color:Config.wsPersistentColor;font.pixelSize:9}
                                             MouseArea{id:haH;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:NotificationsState.invokeAction(notif,modelData.key)}}}}
                                 }
                             }

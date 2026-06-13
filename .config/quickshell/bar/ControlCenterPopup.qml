@@ -1099,10 +1099,10 @@ PanelWindow {
         width: ccWin._panelW
 
         radius: 20
-        color:  Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
-        border.width: 1
-        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g,
-                              Theme.cOutVar.b, 0.38)
+        color:  Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        border.width: Config.barBorderWidth
+        border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                      Config.barBorderColor.b, Config.barBorderAlpha)
         clip: false
 
         // Scale-in animation from bar direction
@@ -1149,10 +1149,19 @@ PanelWindow {
             //  LEFT SIDEBAR — standalone rounded rect, left-anchored
             // ═══════════════════════════════════════════════════════════════
             Item {
-                
                 id: sidebar
                 anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                width: 190
+                width: 190 + 14  // card width + left padding
+                z: 2            // float over the content pane
+
+            Item {
+                id: sidebarCard
+                anchors {
+                    left: parent.left;   leftMargin:   14
+                    top: parent.top;     topMargin:    14
+                    bottom: parent.bottom; bottomMargin: 14
+                    right: parent.right
+                }
 
                 MouseArea {
                     anchors.fill: parent
@@ -1185,7 +1194,7 @@ PanelWindow {
                     anchors.fill: parent
                     radius: panel.radius
                     color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g,
-                                                       Theme.cBackground.b, 0.80)
+                                                       Theme.cBackground.b, 0.65)
                 }
 
                 ColumnLayout {
@@ -1195,10 +1204,10 @@ PanelWindow {
                     // ── User info card ─────────────────────────────────────
                     Rectangle {
                         Layout.fillWidth: true
-                        height: 110
+                        height: 125
                         radius: 16
-                        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                       Theme.cInversePrimary.b, 0.14)
+                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                       Theme.cOnSecondary.b, 0.65)
                         border.width: 1
                         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                               Theme.cPrimary.b, 0.18)
@@ -1211,7 +1220,7 @@ PanelWindow {
                             Rectangle {
                                 id: userIconCircle
                                 Layout.alignment: Qt.AlignHCenter
-                                width: 58; height: 58; radius: 29
+                                width: 80; height: 80; radius: 99
                                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                Theme.cInversePrimary.b, 0.32)
                                 border.width: 2
@@ -1264,8 +1273,8 @@ PanelWindow {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: "—"
                                 color: Theme.cPrimary
-                                font.family: C059
-                                font.pixelSize: 20
+                                font.family: Config.styleFont
+                                font.pixelSize: 16
                                 font.weight: Font.Bold
                                 font.italic: true
                             }
@@ -1395,7 +1404,8 @@ PanelWindow {
                         }
                     }
                 }
-            }
+              } // sidebarCard
+            } // sidebar
 
             // ═══════════════════════════════════════════════════════════════
             //  RIGHT CONTENT PANE — own rounded rect, no shared edge with sidebar
@@ -1403,7 +1413,7 @@ PanelWindow {
             Rectangle {
                 anchors {
                     left: sidebar.right; right: parent.right
-                    top: parent.top;     bottom: parent.bottom
+                    top: parent.top;   bottom: parent.bottom
                 }
                 radius: 20
                 color: "transparent"
@@ -2538,9 +2548,11 @@ PanelWindow {
                     // ── TAB 1: Hyprland ─────────────────────────────────────
                     CCScrollPane {
                         ColumnLayout {
-                            width: parent.width; spacing: 5
+                            Layout.fillWidth: true
+                            Layout.margins: 14
+                            spacing: 6
 
-                            CCSection { text: " Hyprland" }
+                            CCSection { text: "  Hyprland" }
 
                             // ── Desktop icon layer ────────────────────────────────
                             CCSection { text: "Desktop" }
@@ -2554,6 +2566,47 @@ PanelWindow {
                             CCSlider { label:"Label Radius"; from:0;  to:20;  stepSize:1;
                                        value:Config.desktopLabelRadius;
                                        onMoved:function(v){ Config.desktopLabelRadius=v } }
+
+                            // ── Keyboard Layout ───────────────────────────────────
+                            CCSection { text: "Keyboard Layout" }
+                            RowLayout {
+                                Layout.fillWidth: true; spacing: 8
+                                Text {
+                                    text: "Keyboard"
+                                    color: Theme.cPrimary
+                                    font.family: Config.labelFont; font.pixelSize: 13
+                                    Layout.preferredWidth: 100
+                                }
+                                Rectangle {
+                                    Layout.preferredWidth: 40; height: 28; radius: 7
+                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                    TextInput {
+                                        id: _kbLayoutTI
+                                        anchors { fill: parent; margins: 6 }
+                                        text: ccWin._kbLayout
+                                        color: Theme.cPrimary
+                                        font.family: Config.labelFont; font.pixelSize: 12
+                                        verticalAlignment: TextInput.AlignVCenter; clip: true
+                                        onAccepted: {
+                                            const v = text.trim()
+                                            if (v.length === 0) return
+                                            ccWin._kbLayout = v
+                                            ccWin._writeHyprState("kb_layout", v)
+                                            _kbLayoutSetProc.command = ["bash", "-c", "hyprctl reload 2>/dev/null || true"]
+                                            _kbLayoutSetProc.running = true
+                                        }
+                                        Connections {
+                                            target: ccWin
+                                            function on_KbLayoutChanged() {
+                                                if (!_kbLayoutTI.activeFocus) _kbLayoutTI.text = ccWin._kbLayout
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Process { id: _kbLayoutSetProc; running: false }
 
                             // ── Layout switcher ───────────────────────────────────
                             CCSection { text: "Layout" }
@@ -2617,47 +2670,6 @@ PanelWindow {
                                     if (v) ccWin._currentLayout = v
                                 }
                             }
-
-                            // ── Keyboard Layout ───────────────────────────────────
-                            CCSection { text: "Keyboard Layout" }
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 8
-                                Text {
-                                    text: "Keyboard"
-                                    color: Theme.cPrimary
-                                    font.family: Config.labelFont; font.pixelSize: 13
-                                    Layout.preferredWidth: 100
-                                }
-                                Rectangle {
-                                    Layout.preferredWidth: 80; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _kbLayoutTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: ccWin._kbLayout
-                                        color: Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                        verticalAlignment: TextInput.AlignVCenter; clip: true
-                                        onAccepted: {
-                                            const v = text.trim()
-                                            if (v.length === 0) return
-                                            ccWin._kbLayout = v
-                                            ccWin._writeHyprState("kb_layout", v)
-                                            _kbLayoutSetProc.command = ["bash", "-c", "hyprctl reload 2>/dev/null || true"]
-                                            _kbLayoutSetProc.running = true
-                                        }
-                                        Connections {
-                                            target: ccWin
-                                            function on_KbLayoutChanged() {
-                                                if (!_kbLayoutTI.activeFocus) _kbLayoutTI.text = ccWin._kbLayout
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Process { id: _kbLayoutSetProc; running: false }
 
                             // ── Hyprsunset toggle ─────────────────────────────────
                             CCToggle {
@@ -3195,8 +3207,10 @@ PanelWindow {
                     CCScrollPane {
                         ColumnLayout {
                             id: _themeTab
-                            width: parent.width; spacing: 5
-                            CCSection { text: "󰔎 Matugen Themes" }
+                            Layout.fillWidth: true
+                            Layout.margins: 14
+                            spacing: 6
+                            CCSection { text: " 󰔎 Matugen Themes" }
 
                             // ── Color Generation toggle ────────────────────────────
                             CCSection { text: "Color Generation" }
@@ -3433,8 +3447,10 @@ PanelWindow {
                     // ── TAB 3: Dock (hyprcandy-dock) ─────────────────────────
                     CCScrollPane {
                         ColumnLayout {
-                            width: parent.width; spacing: 5
-                            CCSection { text: "󰇜 Dock" }
+                            Layout.fillWidth: true
+                            Layout.margins: 14
+                            spacing: 6
+                            CCSection { text: " 󰇜 Dock" }
 
                             CCSection { text: "Screen Margin" }
                             CCSlider {
@@ -3855,8 +3871,10 @@ PanelWindow {
                     // ── TAB 4: Menus ─────────────────────────────────────────
                     CCScrollPane {
                         ColumnLayout {
-                            width: parent.width; spacing: 5
-                            CCSection { text: "󰮫 Menus" }
+                            Layout.fillWidth: true
+                            Layout.margins: 14
+                            spacing: 6
+                            CCSection { text: " 󰮫 Menus" }
 
                             // ── Application Launcher ──────────────────────────────
                             CCSection { text: "Application Launcher" }
@@ -4082,8 +4100,10 @@ PanelWindow {
                     // ── TAB 5: SDDM ──────────────────────────────────────────
                     CCScrollPane {
                         ColumnLayout {
-                            width: parent.width; spacing: 5
-                            CCSection { text: "󰍂 SDDM" }
+                            Layout.fillWidth: true
+                            Layout.margins: 14
+                            spacing: 6
+                            CCSection { text: " 󰍂 SDDM" }
 
                             CCEntryRow {
                                 label: "Header"
@@ -4758,9 +4778,9 @@ PanelWindow {
                                                 Layout.topMargin: 4; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰌌 hyprviz.lua"
-                                                    color: Theme.cPrimary
+                                                    color: Config.ccGlyphColor
                                                     font.family: Config.labelFont
-                                                    font.pixelSize: 12; font.weight: Font.Bold
+                                                    font.pixelSize: 14; font.weight: Font.Bold
                                                     font.letterSpacing: 0.5
                                                 }
                                                 Rectangle {
@@ -4834,9 +4854,9 @@ PanelWindow {
                                                 Layout.topMargin: 14; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰏫 custom.lua"
-                                                    color: Theme.cPrimary
+                                                    color: Config.ccGlyphColor
                                                     font.family: Config.labelFont
-                                                    font.pixelSize: 12; font.weight: Font.Bold
+                                                    font.pixelSize: 14; font.weight: Font.Bold
                                                     font.letterSpacing: 0.5
                                                 }
                                                 Rectangle {
@@ -5136,8 +5156,7 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                               Theme.cInversePrimary.b, 0.16)
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
                                                 border.width: kbKeysInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5176,8 +5195,7 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                               Theme.cInversePrimary.b, 0.16)
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
                                                 border.width: kbCmdInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5216,8 +5234,7 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                               Theme.cInversePrimary.b, 0.16)
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
                                                 border.width: kbDescInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5405,8 +5422,8 @@ PanelWindow {
                                 spacing: 8
 
                                 Text {
-                                    text: "󰗘 Animations"
-                                    color: Theme.cPrimary
+                                    text: " 󰗘 Animations"
+                                    color: Config.ccGlyphColor
                                     font.family: Config.labelFont
                                     font.pixelSize: 14
                                     font.weight: Font.Bold
@@ -6653,9 +6670,9 @@ PanelWindow {
         Layout.bottomMargin: 4
         Text {
             id: _sh
-            color: Config.powerGlyphColor
+            color: Config.ccGlyphColor
             font.family: Config.labelFont
-            font.pixelSize: 12
+            font.pixelSize: 14
             font.weight: Font.Bold
             font.letterSpacing: 0.5
         }
@@ -6925,7 +6942,6 @@ PanelWindow {
             hoverEnabled: true; cursorShape: Qt.PointingHandCursor
             onClicked: _pb.clicked()
         }
-        Behavior on color { ColorAnimation { duration: 120 } }
     }
 
     // ── Icon / glyph text entry ──────────────────────────────────────────
@@ -6950,8 +6966,8 @@ PanelWindow {
             horizontalAlignment: Text.AlignHCenter
         }
         Rectangle {
-            Layout.preferredWidth: 160; height: 28; radius: 7
-            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
+            Layout.preferredWidth: 40; height: 28; radius: 7
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
             TextInput {
@@ -6985,8 +7001,8 @@ PanelWindow {
             elide: Text.ElideRight
         }
         Rectangle {
-            Layout.preferredWidth: 180; height: 28; radius: 7
-            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.06)
+            Layout.preferredWidth: 100; height: 28; radius: 7
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
             TextInput {

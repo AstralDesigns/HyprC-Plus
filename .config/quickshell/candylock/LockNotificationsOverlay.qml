@@ -10,13 +10,24 @@ import Quickshell.Io
 Item {
     id: overlay
 
-    property color cOnSecondary
-    property color cInvPrimary
+    property color cSourceColor
     property color cPrimary
+    property color cOnPrimary
+    property color cPrimaryContainer
     property color cOnSurf
     property color cOnSurfVar
+    property color cBg
+    property color cInvPrimary
+    property color cSurfHi
     property color cOutVar
     property color cErr
+    property color cPrimFixedDim
+    property color cSecondary
+    property color cSecondaryContainer
+    property color cOnSecondary
+    property color cTertiary
+    property color cSecondaryFixedDim
+    property color cTertiaryFixedDim
     property string wallpaperPath: ""
 
     readonly property string _fontFamily: "Symbols Nerd Font Mono"
@@ -505,7 +516,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: 84
-        anchors.leftMargin: 24
+        anchors.leftMargin: 6
         width: 380
         clip: true
         implicitHeight: Math.min(histPanel.implicitHeight, 560)
@@ -535,7 +546,7 @@ Item {
                     spacing: 8
                     Text {
                         text: overlay.dndEnabled ? "Do Not Disturb" : "Notifications"
-                        color: overlay.dndEnabled ? Qt.rgba(overlay.cPrimary.r, overlay.cSourceColor.g, overlay.cSourceColor.b, 1.0) : overlay.cPrimary
+                        color: overlay.dndEnabled ? Qt.rgba(overlay.cPrimary.r, overlay.cPrimary.g, overlay.cPrimary.b, 1.0) : overlay.cPrimary
                         font.pixelSize: 14
                         font.weight: Font.Medium
                         Layout.fillWidth: true
@@ -543,8 +554,8 @@ Item {
                     Rectangle {
                         height: 24; implicitWidth: clrLbl.implicitWidth + 14; radius: 8
                         color: clrH.containsMouse
-                            ? Qt.rgba(overlay.cPrimary.r, overlay.cSourceColor.g,
-                            	      overlay.cSourceColor.b, 0.4)
+                            ? Qt.rgba(overlay.cPrimary.r, overlay.cPrimary.g,
+                            	      overlay.cPrimary.b, 0.4)
                             : Qt.rgba(overlay.cOnSecondary.r, overlay.cOnSecondary.g,
                                       overlay.cOnSecondary.b, 0.2)
                         border.width: 1

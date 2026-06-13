@@ -160,9 +160,10 @@ PanelWindow {
 
         radius: 20
         clip: true
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
-        border.width: 1
-        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
+        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        border.width: Config.barBorderWidth
+        border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                      Config.barBorderColor.b, Config.barBorderAlpha)
 
         // Subtle inner glass sheen — transparent base so only gradient alpha shows;
         // clip:true on parent keeps everything inside the rounded corners
@@ -427,7 +428,7 @@ PanelWindow {
                 Layout.bottomMargin: 6
                 horizontalAlignment: Text.AlignHCenter
                 text: Qt.formatDateTime(new Date(), "dddd, d MMMM yyyy")
-                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.0)
+                color: Config.ccGlyphColor
                 font.family: Config.labelFont
                 font.pixelSize: 11
             }

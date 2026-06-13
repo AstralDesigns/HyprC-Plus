@@ -385,9 +385,10 @@ Item {
         topRightRadius: 20
         bottomLeftRadius: 20
         bottomRightRadius: 20
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
-        border.width: 1
-        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
+        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        border.width: Config.barBorderWidth
+        border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                      Config.barBorderColor.b, Config.barBorderAlpha)
 
         scale: popupMode && SystemMonitorPopupState.visible ? 1.0 : (popupMode ? 0.92 : 1.0)
         transformOrigin: popupMode && Config.barPosition === "bottom" ? Item.BottomRight : Item.TopRight
