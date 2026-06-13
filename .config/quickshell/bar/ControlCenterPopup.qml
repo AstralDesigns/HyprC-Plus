@@ -1208,9 +1208,9 @@ PanelWindow {
                         radius: 16
                         color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
                                        Theme.cOnSecondary.b, 0.65)
-                        border.width: 1
-                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                              Theme.cPrimary.b, 0.18)
+                        border.width: 2
+                        border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
+                                              Theme.cScrim.b, 0.85)
 
                         ColumnLayout {
                             anchors.centerIn: parent
@@ -1224,8 +1224,8 @@ PanelWindow {
                                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                Theme.cInversePrimary.b, 0.32)
                                 border.width: 2
-                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                      Theme.cPrimary.b, 0.55)
+                        	border.color: Qt.rgba(Theme.cSurface.r, Theme.cSurface.g,
+                                              Theme.cSurface.b, 0.65)
                                 clip: true
 
                                 Image {

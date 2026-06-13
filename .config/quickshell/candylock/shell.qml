@@ -29,6 +29,7 @@ ShellRoot {
     property string _m3onTertiary:           ""
     property string _m3secondaryFixedDim:    ""
     property string _m3tertiaryFixedDim:     ""
+    property string _m3scrim:                ""
 
     readonly property color cSourceColor:	Qt.color(_m3sourceColor)
     readonly property color cPrimary:           Qt.color(_m3primary)
@@ -48,6 +49,7 @@ ShellRoot {
     readonly property color cTertiary:          Qt.color(_m3tertiary)
     readonly property color cSecondaryFixedDim: Qt.color(_m3secondaryFixedDim)
     readonly property color cTertiaryFixedDim:  Qt.color(_m3tertiaryFixedDim)
+    readonly property color cScrim:             Qt.color(_m3scrim)
 
     // Outer panel tint
     readonly property color cPanel: Qt.rgba(
@@ -83,6 +85,7 @@ ShellRoot {
             case "m3onTertiary":           root._m3onTertiary=m[2]; break
             case "m3secondaryFixedDim":    root._m3secondaryFixedDim=m[2]; break
             case "m3tertiaryFixedDim":     root._m3tertiaryFixedDim=m[2]; break
+            case "m3scrim":                root._m3scrim=m[2]; break
         }
     }
     FileView {
@@ -812,10 +815,10 @@ ShellRoot {
                                         }
 
                                         RowLayout {
-                                            Layout.fillWidth:true; spacing:20; Layout.alignment:Qt.AlignHCenter
+                                            Layout.fillWidth:true; spacing:15; Layout.alignment:Qt.AlignHCenter
 
                                             Item {
-                                                width:88; height:88
+                                                width:95; height:95
                                                 Image {
                                                     id:userImg; anchors.fill:parent
                                                     source: root._userIconPath!=="" ? ("file://"+root._userIconPath.split("?")[0]+"?v="+root._userIconPath.split("?")[1]) : ""
@@ -823,13 +826,10 @@ ShellRoot {
                                                     visible:status===Image.Ready
                                                 }
                                                 Rectangle {
-                                                    anchors.fill:parent; radius:44; color:root.cSurfHi
+                                                    anchors.fill:parent; radius:99; color:root.cSurfHi
                                                     visible:userImg.status!==Image.Ready
                                                     Text { anchors.centerIn:parent; text:"󰀄"; font.pixelSize:40; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
-                                                }
-                                                Rectangle {
-                                                    anchors.fill:parent; radius:44; color:"transparent"
-                                                    border.width:2; border.color:Qt.rgba(root.cSecondary.r,root.cSecondary.g,root.cSecondary.b,0.60)
+                                                    border.width:2; border.color:Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,1.0)
                                                 }
                                             }
 

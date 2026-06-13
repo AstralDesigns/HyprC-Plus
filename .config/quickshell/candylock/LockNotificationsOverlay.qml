@@ -339,7 +339,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: 84
-        anchors.leftMargin: 24
+        anchors.leftMargin: 6
         width: 364
         implicitHeight: toastCol.implicitHeight
 
