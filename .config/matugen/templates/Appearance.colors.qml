@@ -22,6 +22,7 @@ QtObject {
     property color m3background: "{{colors.on_secondary.default.hex}}"
     property color m3onBackground: "{{colors.on_background.default.hex}}"
     property color m3surface: "{{colors.surface.default.hex}}"
+    property color m3surfaceTint: "{{colors.surfaceTint.default.hex}}"
     property color m3surfaceContainerLow: "{{colors.surface_container_low.default.hex}}"
     property color m3surfaceContainer: "{{colors.surface_container.default.hex}}"
     property color m3surfaceContainerHigh: "{{colors.surface_container_high.default.hex}}"
