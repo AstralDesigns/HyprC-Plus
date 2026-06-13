@@ -1192,7 +1192,7 @@ PanelWindow {
                 // corners; the clip wrapper above trims the right two.
                 Rectangle {
                     anchors.fill: parent
-                    radius: panel.radius
+                    radius: 14
                     color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g,
                                                        Theme.cBackground.b, 0.65)
                 }
