@@ -447,7 +447,7 @@ Item {
             id: histPanel
             anchors { top: parent.top; left: parent.left; bottom: parent.bottom }
             width: 380
-            color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
+            color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
             //radius: historyWindow._panelRadius
             topLeftRadius: 20
             topRightRadius: 20

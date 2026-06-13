@@ -385,7 +385,7 @@ Item {
         topRightRadius: 20
         bottomLeftRadius: 20
         bottomRightRadius: 20
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
+        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
 
@@ -456,7 +456,7 @@ Item {
                         value:    root._tempOk ? Math.min(root._temp / 100, 1) : 0
                         glyph:    "󰔏"; label: "Temp"
                         valStr:   root._tempOk ? Math.round(root._temp) + "°" : "N/A"
-                        arcColor: root._tempOk && root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        arcColor: root._tempOk && root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.85)
                     }
                     ArcGauge {
                         visible:  root._swapOk
@@ -492,7 +492,7 @@ Item {
                         sub:      root._batStatus
                         arcColor: root._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
                                   : root._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
-                                  : Config.powerGlyphColor
+                                  : Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
                     }
                 }
             }

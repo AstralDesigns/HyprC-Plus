@@ -1099,7 +1099,7 @@ PanelWindow {
         width: ccWin._panelW
 
         radius: 20
-        color:  Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
+        color:  Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
         border.width: 1
         border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g,
                               Theme.cOutVar.b, 0.38)
@@ -1706,24 +1706,24 @@ PanelWindow {
 
                                         CCSection { text: "Corner Radius" }
                                         // bar / island — single rect corners
-                                        CCSlider { visible: Config.barMode !== "tri"; label:"Top-Left";     from:0;to:40; value:Config.barTopLeftRadius;     onMoved:function(v){Config.barTopLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode !== "tri"; label:"Top-Right";    from:0;to:40; value:Config.barTopRightRadius;    onMoved:function(v){Config.barTopRightRadius=v} }
-                                        CCSlider { visible: Config.barMode !== "tri"; label:"Bottom-Left";  from:0;to:40; value:Config.barBottomLeftRadius;  onMoved:function(v){Config.barBottomLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode !== "tri"; label:"Bottom-Right"; from:0;to:40; value:Config.barBottomRightRadius; onMoved:function(v){Config.barBottomRightRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri"; label:"Top-Left";     from:0;to:90; value:Config.barTopLeftRadius;     onMoved:function(v){Config.barTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri"; label:"Top-Right";    from:0;to:90; value:Config.barTopRightRadius;    onMoved:function(v){Config.barTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri"; label:"Bottom-Left";  from:0;to:90; value:Config.barBottomLeftRadius;  onMoved:function(v){Config.barBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri"; label:"Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius; onMoved:function(v){Config.barBottomRightRadius=v} }
                                         // tri — per-segment corners (left uses bar*Radius)
-                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Top-Left";     from:0;to:40; value:Config.barTopLeftRadius;          onMoved:function(v){Config.barTopLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Top-Right";    from:0;to:40; value:Config.triLeftTopRightRadius;    onMoved:function(v){Config.triLeftTopRightRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Bottom-Left";  from:0;to:40; value:Config.barBottomLeftRadius;       onMoved:function(v){Config.barBottomLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Bottom-Right"; from:0;to:40; value:Config.triLeftBottomRightRadius; onMoved:function(v){Config.triLeftBottomRightRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Top-Left";     from:0;to:40; value:Config.triCenterTopLeftRadius;     onMoved:function(v){Config.triCenterTopLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Top-Right";    from:0;to:40; value:Config.triCenterTopRightRadius;    onMoved:function(v){Config.triCenterTopRightRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Bottom-Left";  from:0;to:40; value:Config.triCenterBottomLeftRadius;  onMoved:function(v){Config.triCenterBottomLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Bottom-Right"; from:0;to:40; value:Config.triCenterBottomRightRadius; onMoved:function(v){Config.triCenterBottomRightRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Top-Left";     from:0;to:40; value:Config.triRightTopLeftRadius;     onMoved:function(v){Config.triRightTopLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Top-Right";    from:0;to:40; value:Config.barTopRightRadius;       onMoved:function(v){Config.barTopRightRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Left";  from:0;to:40; value:Config.triRightBottomLeftRadius;  onMoved:function(v){Config.triRightBottomLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Right"; from:0;to:40; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
-                                        CCSlider { label:"Island"; from:0;to:40; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Top-Left";     from:0;to:90; value:Config.barTopLeftRadius;          onMoved:function(v){Config.barTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Top-Right";    from:0;to:90; value:Config.triLeftTopRightRadius;    onMoved:function(v){Config.triLeftTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Bottom-Left";  from:0;to:90; value:Config.barBottomLeftRadius;       onMoved:function(v){Config.barBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Bottom-Right"; from:0;to:90; value:Config.triLeftBottomRightRadius; onMoved:function(v){Config.triLeftBottomRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Top-Left";     from:0;to:90; value:Config.triCenterTopLeftRadius;     onMoved:function(v){Config.triCenterTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Top-Right";    from:0;to:90; value:Config.triCenterTopRightRadius;    onMoved:function(v){Config.triCenterTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Bottom-Left";  from:0;to:90; value:Config.triCenterBottomLeftRadius;  onMoved:function(v){Config.triCenterBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"C.Bottom-Right"; from:0;to:90; value:Config.triCenterBottomRightRadius; onMoved:function(v){Config.triCenterBottomRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Top-Left";     from:0;to:90; value:Config.triRightTopLeftRadius;     onMoved:function(v){Config.triRightTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Top-Right";    from:0;to:90; value:Config.barTopRightRadius;       onMoved:function(v){Config.barTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Left";  from:0;to:90; value:Config.triRightBottomLeftRadius;  onMoved:function(v){Config.triRightBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
+                                        CCSlider { label:"Island"; from:0;to:90; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
 
                                         CCSection { text: "Dimensions" }
                                         CCSlider { label:"Bar Height";    from:20;to:80;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
@@ -2822,7 +2822,7 @@ PanelWindow {
                             // Border Radius (Rounding) slider
                             CCSlider {
                                 label: "Border R"
-                                from: 0; to: 40; stepSize: 1; decimals: 0
+                                from: 0; to: 90; stepSize: 1; decimals: 0
                                 value: ccWin.hyprBorderRVal
                                 onMoved: function(v) {
                                     ccWin._hyprBorderRSlider = v
@@ -3621,7 +3621,7 @@ PanelWindow {
                             CCSection { text: "Corner Radius" }
                             CCSlider {
                                 label: "Top-Left"
-                                from: 0; to: 40; stepSize: 1
+                                from: 0; to: 90; stepSize: 1
                                 value: parseInt(_dockBorderTLVal) || 0
                                 onMoved: function(v) {
                                     _dockBorderTLVal = v.toString()
@@ -3631,7 +3631,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Top-Right"
-                                from: 0; to: 40; stepSize: 1
+                                from: 0; to: 90; stepSize: 1
                                 value: parseInt(_dockBorderTRVal) || 0
                                 onMoved: function(v) {
                                     _dockBorderTRVal = v.toString()
@@ -3641,7 +3641,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Bottom-Left"
-                                from: 0; to: 40; stepSize: 1
+                                from: 0; to: 90; stepSize: 1
                                 value: parseInt(_dockBorderBLVal) || 0
                                 onMoved: function(v) {
                                     _dockBorderBLVal = v.toString()
@@ -3651,7 +3651,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Bottom-Right"
-                                from: 0; to: 40; stepSize: 1
+                                from: 0; to: 90; stepSize: 1
                                 value: parseInt(_dockBorderBRVal) || 0
                                 onMoved: function(v) {
                                     _dockBorderBRVal = v.toString()
@@ -3818,7 +3818,7 @@ PanelWindow {
 
                             CCSlider {
                                 label: "Icon Size"
-                                from: 12; to: 64; stepSize: 1
+                                from: 22; to: 64; stepSize: 1
                                 value: parseInt(_dockIconSizeVal) || 24
                                 onMoved: function(v) {
                                     _dockIconSizeVal = v.toString()

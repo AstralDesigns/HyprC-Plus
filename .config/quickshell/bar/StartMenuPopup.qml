@@ -51,7 +51,7 @@ PanelWindow {
         id: panelRect
         anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
         width: 340
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
+        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.5)
         //radius: startMenuPanel._panelRadius
         topLeftRadius: 20
         topRightRadius: 20
@@ -131,7 +131,7 @@ PanelWindow {
             RowLayout { Layout.fillWidth: true; spacing: 10
                 Rectangle {
                     width: 17; height: 17; radius: 15
-                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.00)
+                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.35)
                     Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
                 }
                 Text { text: "Brightness"; color: Theme.cOnSurf; font.pixelSize: 11; Layout.preferredWidth: 72 }
@@ -149,7 +149,7 @@ PanelWindow {
             RowLayout { Layout.fillWidth: true; spacing: 10
                 Rectangle {
                     width: 17; height: 17; radius: 15
-                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.00)
+                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.35)
                     Text {
                         text: StartMenuState.volumeMuted ? "󰖁" : "󰕾"
                         font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
@@ -326,7 +326,7 @@ PanelWindow {
                                             : netDelegate.modelData.signal > 40 ? "󰤥"
                                             : netDelegate.modelData.signal > 20 ? "󰤢" : "󰤟"
                                         font.pixelSize: 12; font.family: Config.fontFamily
-                                        color: netDelegate.modelData.active ? Config.powerGlyphColor : Theme.cOnSurfVar
+                                        color: netDelegate.modelData.active ? Config.ccGlyphColor : Theme.cOnSurfVar
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
                                     Text {
@@ -563,7 +563,7 @@ PanelWindow {
                                 RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 6
                                     Text {
                                         font.pixelSize: 13; font.family: Config.fontFamily
-                                        color: btDelegate.modelData.connected ? Config.powerGlyphColor : Theme.cOnSurfVar
+                                        color: btDelegate.modelData.connected ? Config.ccGlyphColor : Theme.cOnSurfVar
                                         text: {
                                             const ic = (btDelegate.modelData.icon || "").toLowerCase()
                                             if (ic === "audio-headset" || ic === "audio-headphones" || ic === "audio-headset-gateway") return "󰋎"

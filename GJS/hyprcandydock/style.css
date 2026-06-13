@@ -24,7 +24,7 @@ window.background {
    INDICATOR_FONT_SIZE = round(ICON_SIZE * indicatorSizeFraction).
    The rule here is a safe default; the JS-injected rule overrides it. */
 #active-indicator {
-    color: @on_surface;
+    color: @primary;
     font-size: 4px;
     padding: 0px;
     margin: 0px;
@@ -69,7 +69,7 @@ button.app-button, button.dock-button {
     border: none;
     border-radius: 999px;
     box-shadow: none;
-    padding: 2px;
+    padding: 0px;
     min-width: 0;
     min-height: 0;
     outline: none;
@@ -97,7 +97,7 @@ button.app-button:active, button.dock-button:active {
 button.app-button image, button.dock-button image {
     background: none;
     background-color: transparent;
-    padding: 2px;
+    padding: 4px;
     margin: 0px;
 }
 

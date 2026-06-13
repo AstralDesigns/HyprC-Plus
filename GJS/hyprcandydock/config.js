@@ -7,7 +7,7 @@
 // Each tag is unique in the file so sed can target it unambiguously.
 //
 // Numeric @HCD variables (replace N with new value):
-//   sed -i 's/appIconSize: 22[ \t]*[0-9]*/appIconSize: 20N/' config.js
+//   sed -i 's/appIconSize: 26[ \t]*[0-9]*/appIconSize: 20N/' config.js
 //
 // String @HCD variables (replace GLYPH with new character or escape):
 //   sed -i "s/startIcon: '',
@@ -30,7 +30,7 @@ var DockConfig = {
     // ── App icon size (Gtk.Image pixel_size) ─────────────────────────────
     // Controls Gtk.Image icons from the theme (e.g. Nautilus, Firefox).
     // This is the primary value used for exclusive-zone and button footprint.
-    appIconSize: 22,               // @HCD:appIconSize
+    appIconSize: 26,               // @HCD:appIconSize
 
     // ── Glyph icon size (NerdFont unicode labels) ────────────────────────
     // Controls start, trash, and fallback glyph font-size independently.
@@ -39,13 +39,13 @@ var DockConfig = {
     // formula multiplies by glyphIconSizeFraction (default 1.1) to compensate.
     // Set glyphIconSize to an explicit px value to override auto-derive.
     glyphIconSize: null,
-    glyphIconSizeFraction: 1.1,   // auto = round(appIconSize * this)
+    glyphIconSizeFraction: 1.0,   // auto = round(appIconSize * this)
 
     // ── Indicator size ───────────────────────────────────────────────────
     // Active-window dot font-size in px. Set null to auto-derive.
     // Auto = max(4, round(appIconSize * indicatorSizeFraction))
     indicatorSize: null,
-    indicatorSizeFraction: 0.18,  // used when indicatorSize is null
+    indicatorSizeFraction: 0.15,  // used when indicatorSize is null
     indicatorSpacing: 4,          // px gap between two dots
 
     // ── Legacy alias ─────────────────────────────────────────────────────

@@ -32,6 +32,7 @@ QtObject {
     property string _background:                "#091218"
     property string _onBackground:              "#dedfe2"
     property string _surface:                   "#000000"
+    property string _surfaceTint:               "#e3b57a"
     property string _surfaceContainerLow:       "#050606"
     property string _surfaceContainer:          "#0b0c0d"
     property string _surfaceContainerHigh:      "#171819"
@@ -73,6 +74,7 @@ QtObject {
     readonly property color cBackground:           Qt.color(_background)
     readonly property color cOnBackground:         Qt.color(_onBackground)
     readonly property color cSurface:              Qt.color(_surface)
+    readonly property color cSurfaceTint:          Qt.color(_surfaceTint)
     readonly property color cSurfLow:              Qt.color(_surfaceContainerLow)
     readonly property color cSurfMid:              Qt.color(_surfaceContainer)
     readonly property color cSurfHi:               Qt.color(_surfaceContainerHigh)
@@ -101,13 +103,13 @@ QtObject {
     // ── Semantic composites ────────────────────────────────────────────────
     // blur_background: matches waybar colors.css  alpha(rgba(bg), 0.30)
     readonly property color blurBackground: Qt.rgba(
-        Qt.color(_inversePrimary).r, Qt.color(_inversePrimary).g, Qt.color(_inversePrimary).b, 0.30)
+        Qt.color(_onPrimaryFixedVariant).r, Qt.color(_onPrimaryFixedVariant).g, Qt.color(_onPrimaryFixedVariant).b, 0.30)
 
     // Desktop icon label background — onSecondary @ 0.35 opacity.
     // Blurred by Hyprland layerrule on quickshell:desktop so labels stay
     // readable against any wallpaper color.
     readonly property color cPanelBg: Qt.rgba(
-        Qt.color(_inversePrimary).r, Qt.color(_inversePrimary).g, Qt.color(_inversePrimary).b, 0.50)
+        Qt.color(_onPrimaryFixedVariant).r, Qt.color(_onPrimaryFixedVariant).g, Qt.color(_onPrimaryFixedVariant).b, 0.50)
 
     // Island gradient: inverse_primary → scrim  (matches waybar island CSS)
     // Use in ShaderEffect or as gradient stops in a LinearGradient
@@ -204,6 +206,7 @@ QtObject {
                 case "background":                root._background = hex; break
                 case "onBackground":              root._onBackground = hex; break
                 case "surface":                   root._surface = hex; break
+                case "surfaceTint":               root._surfaceTint = hex; break
                 case "surfaceContainerLow":       root._surfaceContainerLow = hex; break
                 case "surfaceContainer":          root._surfaceContainer = hex; break
                 case "surfaceContainerHigh":      root._surfaceContainerHigh = hex; break

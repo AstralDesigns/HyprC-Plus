@@ -198,11 +198,11 @@ function _injectGlyphSizeCSS(display) {
     const appPx       = DockConfig.appIconSize;
     const glyphPx     = DockConfig.glyphIconSize !== null
         ? DockConfig.glyphIconSize
-        : Math.round(appPx * (DockConfig.glyphIconSizeFraction || 1.1));
+        : Math.round((appPx - 2) * (DockConfig.glyphIconSizeFraction || 1.2));
     const indicatorPx = DockConfig.indicatorSize !== null
         ? DockConfig.indicatorSize
-        : Math.max(4, Math.round(appPx * DockConfig.indicatorSizeFraction));
-    const btnSize  = appPx + 8;
+        : Math.max(6, Math.round(appPx * DockConfig.indicatorSizeFraction));
+    const btnSize  = appPx;
     const borderW  = DockConfig.borderWidth;
     const fallbackR = DockConfig.borderRadius;
     const storedTL = DockConfig.borderTopLeftRadius     ?? fallbackR;
@@ -286,21 +286,18 @@ function _injectGlyphSizeCSS(display) {
            The gradient direction is flipped to match the dock edge so the
            badge depth-illusion is consistent with the dock surface fill. */
         #start-icon, #trash-icon {
-            font-size: ${glyphPx}px;
+            font-size: calc(${glyphPx}px - 1px);
             min-width:  calc(${glyphPx}px + 4px);
             min-height: ${padPx}px;
             border-radius: 50%;
             background-image: ${glyphBadgeGradient};
-            padding-left: 1px;
-            padding-top: 1px;
-            padding-bottom: 0.25px;
-            padding-right: 0.125px;
         }
         .fallback-icon {
             font-size: ${glyphPx}px;
         }
         #active-indicator {
             font-size: ${indicatorPx}px;
+            padding: 0;
         }
         /* Separator length matches icon size (not button container) */
         separator.dock-sep-v {
