@@ -5789,7 +5789,7 @@ PanelWindow {
                                 radius: 18
                                 clip: true
                                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.14)
+                                               Theme.cInversePrimary.b, 0.25)
                                 border.width: 1
                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
 
@@ -7131,7 +7131,7 @@ PanelWindow {
         implicitWidth: _chipRow.implicitWidth + 24
         implicitHeight: 34
         radius: 12
-        color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.045)
+        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.2)
         border.width: 1
         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
 
