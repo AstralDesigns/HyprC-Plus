@@ -715,7 +715,7 @@ ShellRoot {
                     anchors.verticalCenter:   parent.verticalCenter
                     anchors.verticalCenterOffset: -36
                     width:660
-                    height:panelCol.implicitHeight+42
+                    height:panelCol.implicitHeight+40
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
@@ -838,12 +838,12 @@ ShellRoot {
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
                                                     text:root.weatherTemp; color:root.cPrimary; opacity: 0.65
-                                                    font.family:"C059"; font.pixelSize:24; font.italic:true; font.weight:Font.DemiBold
+                                                    font.family:"C059"; font.pixelSize:28; font.italic:true; font.weight:Font.DemiBold
                                                 }
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
                                                     text:root.weatherIcon; color:root.cPrimary; opacity: 0.65
-                                                    font.pixelSize:24; font.family:"Symbols Nerd Font Mono"
+                                                    font.pixelSize:28; font.family:"Symbols Nerd Font Mono"
                                                 }
                                             }
                                         }
