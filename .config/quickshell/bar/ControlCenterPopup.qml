@@ -1169,7 +1169,7 @@ PanelWindow {
                         // When not activated, scrolling is locked to tab 6 (activation tab)
                         if (!LicenseState.activated) return
 
-                        const tabs = [1, 0, 2, 3, 4, 5, 7, 8]
+                        const tabs = [1, 0, 2, 3, 4, 5, 7, 8, 9]
                         let currIdx = tabs.indexOf(ccTabSettings.activeTab)
                         if (currIdx === -1) currIdx = 0
 
@@ -1291,7 +1291,8 @@ PanelWindow {
                             { icon: "󰮫", label: "Menus",     idx: 4 },
                             { icon: "󰍂", label: "SDDM",      idx: 5 },
                             { icon: "󰌌", label: "Keybinds",  idx: 7 },
-                            { icon: "󰗘", label: "Animations", idx: 8 }
+                            { icon: "󰗘", label: "Animations", idx: 8 },
+                            { icon: "󰍛", label: "System",     idx: 9 }
                         ]
 
                         delegate: Rectangle {
@@ -5620,6 +5621,392 @@ PanelWindow {
                             }
                         }
                     }
+
+                    // ── TAB 9: System ────────────────────────────────────────
+                    CCScrollPane {
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.margins: 14
+                            spacing: 10
+
+                            CCSection { text: " 󰍛  System" }
+
+                            // ── Fetch system info once when this tab becomes active ──
+                            Item {
+                                id: sysInfoRoot
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 1
+
+                                property var info: ({})
+                                property bool loaded: false
+
+                                // Resolves distro PNG icon path from standard icon locations.
+                                // Priority: /usr/share/pixmaps distro logo →
+                                //           /usr/share/icons/hicolor/*/apps/distributor-logo →
+                                //           /usr/share/icons/hicolor/*/places/distributor-logo →
+                                //           "" (empty → Image falls back to visible-none)
+                                // The LOGOICON field from /etc/os-release is tried first when present.
+                                property string _distroIconPath: ""
+
+                                // Fetched once alongside the rest of sysinfo; stored in info.LOGOICON
+                                // and info.OSID so we can search systematically.
+
+                                Process {
+                                    id: sysInfoProc
+                                    property var _buf: []
+                                    running: false
+                                    command: ["bash", "-c",
+                                        // ── OS identity ──
+                                        ". /etc/os-release 2>/dev/null; " +
+                                        "OS_ID=${ID:-}; OS_NAME=${PRETTY_NAME:-Unknown}; LOGO=${LOGO:-}; " +
+                                        "printf 'OSID:%s\n' \"$OS_ID\"; " +
+                                        "printf 'OS:%s\n' \"$OS_NAME\"; " +
+                                        // ── Distro PNG icon: search pixmaps + hicolor by OS_ID and LOGO hint ──
+                                        "ICON_PATH=''; " +
+                                        "ID_LOWER=$(echo \"${OS_ID}\" | tr '[:upper:]' '[:lower:]'); " +
+                                        // Candidates: $LOGO hint → ID-based names → Arch fallback (CachyOS etc) → generic
+                                        "for cand in \"$LOGO\" \"distributor-logo-${ID_LOWER}\" \"${ID_LOWER}-logo\" \"${ID_LOWER}\" \"distributor-logo-archlinux\" \"archlinux-logo\" \"distributor-logo\" \"logo\"; do " +
+                                        "  [ -z \"$cand\" ] && continue; " +
+                                        "  for ext in png svg; do f=\"/usr/share/pixmaps/${cand}.${ext}\"; [ -f \"$f\" ] && ICON_PATH=\"$f\" && break 2; done; " +
+                                        "  for sz in 256x256 128x128 64x64 48x48 scalable; do " +
+                                        "    for cat in apps places; do " +
+                                        "      for ext in png svg; do f=\"/usr/share/icons/hicolor/${sz}/${cat}/${cand}.${ext}\"; [ -f \"$f\" ] && ICON_PATH=\"$f\" && break 3; done; " +
+                                        "    done; " +
+                                        "  done; " +
+                                        "done; " +
+                                        "printf 'LOGOICON:%s\n' \"$ICON_PATH\"; " +
+                                        // ── System facts ──
+                                        "printf 'HOST:%s\n' \"$(cat /sys/class/dmi/id/product_name 2>/dev/null || hostname)\"; " +
+                                        "printf 'USERHOST:%s@%s\n' \"$(whoami)\" \"$(hostname)\"; " +
+                                        "printf 'KERNEL:%s\n' \"$(uname -r)\"; " +
+                                        "printf 'UPTIME:%s\n' \"$(cut -d. -f1 /proc/uptime)\"; " +
+                                        "printf 'SHELL:%s\n' \"$(basename $SHELL)\"; " +
+                                        "WMVER=$(hyprctl version 2>/dev/null | head -1 | grep -oP 'v[0-9.]+'); " +
+                                        "printf 'WM:Hyprland %s\n' \"$WMVER\"; " +
+                                        "printf 'CPU:%s\n' \"$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2 | sed 's/^ *//;s/(R)//g;s/(TM)//g;s/CPU//;s/  */ /g')\"; " +
+                                        // ── GPUs: enumerate all cards with iGPU/dGPU heuristic (~ separator) ──
+                                        // NVIDIA first
+                                        "command -v nvidia-smi >/dev/null 2>&1 && " +
+                                        "  nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null " +
+                                        "  | while read gname; do printf 'GPUINFO:%s~%s\n' \"${gname# }\" '0'; done; " +
+                                        // AMD/Intel via driver symlinks — same heuristic as SystemMonitorPopup
+                                        "for dp in /sys/class/drm/card*/device/driver; do " +
+                                        "  [ -L \"$dp\" ] || continue; " +
+                                        "  card=$(echo \"$dp\" | grep -oE 'card[0-9]+'); " +
+                                        "  drv=$(readlink -f \"$dp\" 2>/dev/null | grep -oE '[^/]+$'); " +
+                                        "  echo \"$drv\" | grep -qE '^(amdgpu|radeon|i915|xe)$' || continue; " +
+                                        "  pci=$(cat /sys/class/drm/$card/device/address 2>/dev/null); " +
+                                        "  pname=$(cat /sys/class/drm/$card/device/product_name 2>/dev/null); " +
+                                        "  if [ -z \"$pname\" ] && [ -n \"$pci\" ]; then pname=$(lspci -D -s \"$pci\" 2>/dev/null | sed 's/.*: //'); fi; " +
+                                        "  [ -z \"$pname\" ] && pname=$drv; " +
+                                        "  is_igpu=0; " +
+                                        "  if echo \"$drv\" | grep -qE '^(i915|xe)$'; then is_igpu=1; echo \"$pname\" | grep -qiE '\\bArc\\b|\\bAlchemist\\b|\\bBattlemage\\b' && is_igpu=0; fi; " +
+                                        "  echo \"$pname\" | grep -qiE 'Radeon Graphics|RENOIR|CEZANNE|REMBRANDT|RAPHAEL|PHOENIX|BARCELO|MENDOCINO|HAWK.?POINT|STRIX.?POINT|780M|760M|740M|VEGA|Radeon RX Vega [0-9]' && is_igpu=1; " +
+                                        "  printf 'GPUINFO:%s~%s\n' \"$pname\" \"$is_igpu\"; " +
+                                        "done; " +
+                                        "printf 'RAM:%s\n' \"$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.1f / %.1f GiB\", (t-a)/1048576, t/1048576}' /proc/meminfo)\"; " +
+                                        "printf 'RAMPCT:%s\n' \"$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.0f\", (t-a)/t*100}' /proc/meminfo)\"; " +
+                                        "printf 'DISK:%s\n' \"$(df -h / 2>/dev/null | awk 'NR==2{printf \"%s / %s\", $3, $2}')\"; " +
+                                        "printf 'DISKPCT:%s\n' \"$(df -h / 2>/dev/null | awk 'NR==2{gsub(\"%\",\"\",$5); printf \"%s\", $5}')\"; " +
+                                        "printf 'PKGS:%s\n' \"$(command -v pacman >/dev/null && pacman -Qq 2>/dev/null | wc -l || (command -v dpkg >/dev/null && dpkg -l 2>/dev/null | grep -c '^ii') || echo '?')\"; " +
+                                        // ── Displays: all monitors, one DISPLAY:name|WxH@hz line each ──
+                                        "hyprctl monitors 2>/dev/null | awk '" +
+                                        "/^Monitor /{name=$2} " +
+                                        "/^[[:space:]]+[0-9]+x[0-9]+@/{match($0,/([0-9]+x[0-9]+@[0-9.]+)/,a); printf \"DISPLAY:%s|%s\\n\",name,a[1]}'"
+                                    ]
+                                    stdout: SplitParser {
+                                        splitMarker: "\n"
+                                        onRead: function(line) {
+                                            const i = line.indexOf(":")
+                                            if (i < 0) return
+                                            sysInfoProc._buf.push([line.slice(0, i), line.slice(i + 1)])
+                                        }
+                                    }
+                                    onRunningChanged: if (running) _buf = []
+                                    onExited: function() {
+                                        const m = {}
+                                        const gpus = []        // [{name, isIgpu}]
+                                        const displays = []    // [{name, res}]
+                                        for (const [k, v] of sysInfoProc._buf) {
+                                            if (k === "GPUINFO") {
+                                                // v = "name~is_igpu"  (~ tilde separator)
+                                                const sep = v.indexOf("~")
+                                                const gname   = sep >= 0 ? v.slice(0, sep) : v
+                                                const isIgpu  = sep >= 0 && v.slice(sep + 1) === "1"
+                                                // Clean verbose vendor prefixes (mirrors SystemMonitorPopup)
+                                                const clean = gname
+                                                    .replace(/Advanced Micro Devices[^,]*,?\s*/i, "")
+                                                    .replace(/\bAMD\s+/i, "")
+                                                    .replace(/ATI(\s+Technologies\s+Inc\.?)?\s*/i, "")
+                                                    .replace(/Intel\s+Corporation\s*/i, "")
+                                                    .replace(/\bIntel\s+/i, "")
+                                                    .replace(/NVIDIA\s*GeForce\s*/i, "")
+                                                    .replace(/\[([^\]]+)\]/g, "$1")
+                                                    .replace(/\s+/g, " ").trim()
+                                                gpus.push({ name: clean || gname || "GPU", isIgpu })
+                                            } else if (k === "DISPLAY") {
+                                                // v = "monitorName|WxH@hz"
+                                                const bar = v.indexOf("|")
+                                                const dname = bar >= 0 ? v.slice(0, bar) : v
+                                                const res   = bar >= 0 ? v.slice(bar + 1) : v
+                                                displays.push({ name: dname, res })
+                                            } else {
+                                                m[k] = v
+                                            }
+                                        }
+                                        m._gpus    = gpus
+                                        m._displays = displays
+                                        sysInfoRoot.info = m
+                                        sysInfoRoot._distroIconPath = m.LOGOICON || ""
+                                        sysInfoRoot.loaded = true
+                                    }
+                                }
+
+                                function _fmtUptime(sec) {
+                                    sec = parseInt(sec) || 0
+                                    const d = Math.floor(sec / 86400)
+                                    const h = Math.floor((sec % 86400) / 3600)
+                                    const m = Math.floor((sec % 3600) / 60)
+                                    return d > 0 ? d+"d "+h+"h "+m+"m" : h > 0 ? h+"h "+m+"m" : m+"m"
+                                }
+
+                                Connections {
+                                    target: ccTabSettings
+                                    function onActiveTabChanged() {
+                                        if (ccTabSettings.activeTab === 9 && !sysInfoRoot.loaded && !sysInfoProc.running)
+                                            sysInfoProc.running = true
+                                    }
+                                }
+                                Component.onCompleted: {
+                                    if (ccTabSettings.activeTab === 9) sysInfoProc.running = true
+                                }
+                            }
+
+                            // ── Header banner: distro icon + identity ────────────
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 92
+                                radius: 18
+                                clip: true
+                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                               Theme.cInversePrimary.b, 0.14)
+                                border.width: 1
+                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 22
+                                    anchors.rightMargin: 18
+                                    spacing: 18
+
+                                    // Distro icon: PNG/SVG image when found, Nerd Font glyph fallback
+                                    Item {
+                                        Layout.alignment: Qt.AlignVCenter
+                                        implicitWidth: 44
+                                        implicitHeight: 44
+
+                                        Image {
+                                            id: distroImg
+                                            anchors.fill: parent
+                                            // Only set source when we have a path — empty source avoids
+                                            // QML's broken-image ghost placeholder entirely.
+                                            source: sysInfoRoot._distroIconPath.length > 0
+                                                    ? "file://" + sysInfoRoot._distroIconPath
+                                                    : ""
+                                            visible: source.length > 0 && status === Image.Ready
+                                            fillMode: Image.PreserveAspectFit
+                                            smooth: true
+                                            mipmap: true
+                                            // Clear path on load failure so fallback glyph takes over
+                                            onStatusChanged: {
+                                                if (status === Image.Error)
+                                                    sysInfoRoot._distroIconPath = ""
+                                            }
+                                        }
+
+                                        // Fallback Nerd Font glyph — shown whenever no image loaded
+                                        Text {
+                                            anchors.centerIn: parent
+                                            visible: !distroImg.visible
+                                            text: {
+                                                const id = (sysInfoRoot.info.OSID || "").toLowerCase()
+                                                const m = {
+                                                    "arch": "", "cachyos": "",
+                                                    "archcraft": "", "endeavouros": "",
+                                                    "manjaro": "", "garuda": "",
+                                                    "ubuntu": "", "debian": "",
+                                                    "fedora": "", "linuxmint": "",
+                                                    "opensuse": "", "opensuse-tumbleweed": "",
+                                                    "gentoo": "", "void": "",
+                                                    "nixos": "", "pop": "",
+                                                    "alpine": "", "centos": "",
+                                                    "rhel": "", "kali": "",
+                                                    "raspbian": "", "artix": "",
+                                                }
+                                                return m[id] || ""
+                                            }
+                                            font.family: Config.fontFamily
+                                            font.pixelSize: 44
+                                            color: Theme.cPrimary
+                                        }
+                                    }
+
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 3
+                                        Text {
+                                            text: sysInfoRoot.info.USERHOST || "—"
+                                            color: Theme.cPrimary
+                                            font.family: Config.labelFont
+                                            font.pixelSize: 17
+                                            font.weight: Font.Bold
+                                        }
+                                        Text {
+                                            text: sysInfoRoot.info.OS || "Loading…"
+                                            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.75)
+                                            font.family: Config.labelFont
+                                            font.pixelSize: 12
+                                        }
+                                        Text {
+                                            text: (sysInfoRoot.info.WM || "Hyprland") +
+                                                  "  ·  " + (sysInfoRoot.info.KERNEL || "—")
+                                            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.55)
+                                            font.family: Config.labelFont
+                                            font.pixelSize: 11
+                                        }
+                                    }
+
+                                    // Uptime pill
+                                    Rectangle {
+                                        Layout.alignment: Qt.AlignVCenter
+                                        implicitWidth: upRow.implicitWidth + 24
+                                        implicitHeight: 32
+                                        radius: 16
+                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                                        RowLayout {
+                                            id: upRow
+                                            anchors.centerIn: parent
+                                            spacing: 6
+                                            Text {
+                                                text: ""
+                                                font.family: Config.fontFamily
+                                                font.pixelSize: 13
+                                                color: Theme.cPrimary
+                                            }
+                                            Text {
+                                                text: sysInfoRoot.loaded ? sysInfoRoot._fmtUptime(sysInfoRoot.info.UPTIME) : "—"
+                                                font.family: Config.labelFont
+                                                font.pixelSize: 12
+                                                font.weight: Font.DemiBold
+                                                color: Theme.cPrimary
+                                            }
+                                        }
+                                    }
+
+                                    // Refresh button
+                                    Rectangle {
+                                        Layout.alignment: Qt.AlignVCenter
+                                        implicitWidth: 32; implicitHeight: 32
+                                        radius: 16
+                                        color: refreshHov.containsMouse
+                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                        Behavior on color { ColorAnimation { duration: 120 } }
+                                        Text {
+                                            id: refreshGlyph
+                                            anchors.centerIn: parent
+                                            text: "󰑐"
+                                            font.family: Config.fontFamily
+                                            font.pixelSize: 15
+                                            color: Theme.cPrimary
+                                            RotationAnimator {
+                                                target: refreshGlyph
+                                                from: 0; to: 360
+                                                duration: 900
+                                                loops: Animation.Infinite
+                                                running: sysInfoProc.running
+                                            }
+                                        }
+                                        MouseArea {
+                                            id: refreshHov
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: if (!sysInfoProc.running) sysInfoProc.running = true
+                                        }
+                                    }
+                                }
+                            }
+
+                                // ── Bento grid: hardware stat cards ───────────────────
+                            GridLayout {
+                                Layout.fillWidth: true
+                                columns: 2
+                                columnSpacing: 10
+                                rowSpacing: 10
+
+                                SysStatCard {
+                                    glyph: ""
+                                    title: "Processor"
+                                    value: sysInfoRoot.info.CPU || "—"
+                                }
+
+                                // GPU cards — one per detected GPU (iGPU and dGPU shown separately)
+                                // Falls back to a single "Graphics" card with lspci output if _gpus is empty
+                                Repeater {
+                                    model: (sysInfoRoot.info._gpus && sysInfoRoot.info._gpus.length > 0)
+                                           ? sysInfoRoot.info._gpus
+                                           : [{ name: "—", isIgpu: false }]
+                                    SysStatCard {
+                                        required property var modelData
+                                        glyph:  modelData.isIgpu ? "󱤓" : "󰢮"
+                                        title:  modelData.isIgpu ? "iGPU" : "dGPU"
+                                        value:  modelData.name || "—"
+                                    }
+                                }
+
+                                SysStatCard {
+                                    glyph: ""
+                                    title: "Memory"
+                                    value: sysInfoRoot.info.RAM || "—"
+                                    progress: parseInt(sysInfoRoot.info.RAMPCT || "0") / 100
+                                }
+                                SysStatCard {
+                                    glyph: "󰉋"
+                                    title: "Storage (/)"
+                                    value: sysInfoRoot.info.DISK || "—"
+                                    progress: parseInt(sysInfoRoot.info.DISKPCT || "0") / 100
+                                }
+                            }
+
+                            // ── Detail strip: smaller chip-style facts ────────────
+                            Flow {
+                                Layout.fillWidth: true
+                                Layout.topMargin: 4
+                                spacing: 8
+
+                                SysChip { glyph: "";  label: "Shell";    value: sysInfoRoot.info.SHELL || "—" }
+
+                                // Display chips — one per monitor (name + resolution@hz)
+                                Repeater {
+                                    model: (sysInfoRoot.info._displays && sysInfoRoot.info._displays.length > 0)
+                                           ? sysInfoRoot.info._displays
+                                           : [{ name: "Display", res: sysInfoRoot.info.RES || "—" }]
+                                    SysChip {
+                                        required property var modelData
+                                        glyph: "󰍹"
+                                        label: modelData.name || "Display"
+                                        value: modelData.res  || "—"
+                                    }
+                                }
+
+                                SysChip { glyph: "󰏖"; label: "Packages"; value: sysInfoRoot.info.PKGS || "—" }
+                                SysChip { glyph: "󰸗"; label: "Host";     value: sysInfoRoot.info.HOST || "—" }
+                            }
+
+                            Item { height: 4 }
+                        }
+                    }
                 }
             }
         }
@@ -6663,6 +7050,117 @@ PanelWindow {
     }
 
     // ── Section heading ──────────────────────────────────────────────────
+    // ── Fastfetch-style info row (icon + label + value) ───────────────────
+    // ── Bento-style stat card with optional progress bar ───────────────────
+    component SysStatCard: Rectangle {
+        id: _card
+        property string glyph: ""
+        property string title: ""
+        property string value: ""
+        property real   progress: -1   // -1 = no bar shown
+
+        Layout.fillWidth: true
+        Layout.preferredHeight: 78
+        radius: 14
+        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+        border.width: 1
+        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 12
+            spacing: 4
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Text {
+                    text: _card.glyph
+                    font.family: Config.fontFamily
+                    font.pixelSize: 16
+                    color: Theme.cPrimary
+                }
+                Text {
+                    text: _card.title
+                    font.family: Config.labelFont
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                    color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.55)
+                    Layout.fillWidth: true
+                }
+            }
+
+            Text {
+                text: _card.value
+                font.family: Config.labelFont
+                font.pixelSize: 12
+                font.weight: Font.Medium
+                color: Theme.cOnSurf
+                elide: Text.ElideRight
+                Layout.fillWidth: true
+                Layout.topMargin: 2
+            }
+
+            Item { Layout.fillHeight: true }
+
+            // Progress bar — only rendered when progress >= 0
+            Rectangle {
+                visible: _card.progress >= 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: 4
+                radius: 2
+                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.10)
+                Rectangle {
+                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+                    width: parent.width * Math.max(0, Math.min(1, _card.progress))
+                    radius: 2
+                    color: _card.progress > 0.85 ? Theme.cTertiary : Theme.cPrimary
+                    Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
+                }
+            }
+        }
+    }
+
+    // ── Small chip — glyph + label + value, used for secondary facts ───────
+    component SysChip: Rectangle {
+        id: _chip
+        property string glyph: ""
+        property string label: ""
+        property string value: ""
+
+        implicitWidth: _chipRow.implicitWidth + 24
+        implicitHeight: 34
+        radius: 12
+        color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.045)
+        border.width: 1
+        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+
+        RowLayout {
+            id: _chipRow
+            anchors.centerIn: parent
+            spacing: 7
+            Text {
+                text: _chip.glyph
+                font.family: Config.fontFamily
+                font.pixelSize: 13
+                color: Theme.cPrimary
+            }
+            Text {
+                text: _chip.label + ":"
+                font.family: Config.labelFont
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.55)
+            }
+            Text {
+                text: _chip.value
+                font.family: Config.labelFont
+                font.pixelSize: 11
+                color: Theme.cOnSurf
+            }
+        }
+    }
+
     component CCSection: RowLayout {
         property alias text: _sh.text
         Layout.fillWidth: true
