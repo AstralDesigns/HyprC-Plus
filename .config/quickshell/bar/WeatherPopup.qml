@@ -149,7 +149,7 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true; height: 1
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28)
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
             }
 
             // ── Current Conditions + Hourly Forecast Orbit ────────────────
@@ -383,7 +383,7 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true; height: 1
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28)
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
             }
 
             // ── 7-day forecast ────────────────────────────────────────────

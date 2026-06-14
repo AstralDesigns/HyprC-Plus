@@ -417,28 +417,6 @@ PanelWindow {
                 }
             }
 
-            // ── Footer: today string ──────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true; height: 1; Layout.bottomMargin: 8
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.22)
-            }
-
-            Text {
-                Layout.fillWidth: true
-                Layout.bottomMargin: 6
-                horizontalAlignment: Text.AlignHCenter
-                text: Qt.formatDateTime(new Date(), "dddd, d MMMM yyyy")
-                color: Config.ccGlyphColor
-                font.family: Config.labelFont
-                font.pixelSize: 11
-            }
-
-            // ── Upcoming 3 days strip ─────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true; height: 1; Layout.bottomMargin: 6
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.16)
-            }
-
             RowLayout {
                 Layout.fillWidth: true
                 Layout.bottomMargin: 2

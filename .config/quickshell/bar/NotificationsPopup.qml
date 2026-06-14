@@ -506,7 +506,7 @@ Item {
 
             Rectangle { id:histDivider
                 anchors{top:histHeader.bottom;topMargin:8;left:parent.left;right:parent.right;leftMargin:16;rightMargin:16}
-                height:1; color:Qt.rgba(Theme.cOutVar.r,Theme.cOutVar.g,Theme.cOutVar.b,0.3) }
+                height:1; color:Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             Flickable {
                 id: histFlickable

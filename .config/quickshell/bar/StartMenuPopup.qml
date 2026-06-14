@@ -127,7 +127,7 @@ PanelWindow {
                 }
             }
 
-            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 0.30) }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             // ── Brightness ────────────────────────────────────────────
             Rectangle {
@@ -169,7 +169,7 @@ PanelWindow {
               	  }
             }
 
-            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 0.30) }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             // ── Network + Bluetooth ────────────────────────────────────
             ColumnLayout { Layout.fillWidth: true; spacing: 4
@@ -743,7 +743,7 @@ PanelWindow {
                 }
             }
 
-            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 0.30) }
+            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             // ── Power / actions grid ──────────────────────────────────
             GridLayout { Layout.fillWidth: true; columns: 4; rowSpacing: 6; columnSpacing: 6
