@@ -238,9 +238,12 @@ Item {
                             anchors.top: appIcon.bottom
                             anchors.topMargin: 4
                             width:  Math.min(nameLabel.implicitWidth + 10, parent.width)
-                            height: nameLabel.implicitHeight + 5
+                            height: nameLabel.implicitHeight + 6
                             radius: Config.desktopLabelRadius
                             color:  Theme.cPanelBg
+                            border.width: 1
+       			    border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                      			  Config.barBorderColor.b, Config.barBorderAlpha)
 
                             Text {
                                 id: nameLabel
@@ -248,6 +251,7 @@ Item {
                                 width:            parent.width - 10
                                 text:             iconItem._name
                                 font.pixelSize:   Config.desktopLabelSize
+                                font.weight: 	  Font.Bold
                                 color:            Theme.cScrim
                                 elide:            Text.ElideRight
                                 maximumLineCount: 1
