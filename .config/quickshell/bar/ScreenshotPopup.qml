@@ -34,9 +34,10 @@ PanelWindow {
         height: col.height + 48
 
         color:        Theme.background
-        border.color: Theme.separator
-        border.width: 1
-        radius:       Config.islandRadius
+        border.width: Config.barBorderWidth
+        border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                      Config.barBorderColor.b, Config.barBorderAlpha)
+        radius:       20
 
         ColumnLayout {
             id: col
