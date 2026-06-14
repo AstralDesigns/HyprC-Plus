@@ -771,7 +771,7 @@ ShellRoot {
                                     anchors.centerIn:parent; spacing:0
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockHour; color:Qt.rgba(root.cInvPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00)
+                                        text:root.clockHour; color:Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00)
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
@@ -800,7 +800,7 @@ ShellRoot {
                                     Layout.fillWidth:true
                                     height:infoCardCol.implicitHeight+36
                                     radius:20; color:root.cCardWarm
-                                    border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.22)
+                                    border.width:1; border.color:Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
 
                                     ColumnLayout {
                                         id:infoCardCol
@@ -863,7 +863,7 @@ ShellRoot {
                                                 border.color: root.authFailed ? root.cErr
                                                     : (root.authChecking
                                                         ? Qt.rgba(root.cPrimaryContainer.r,root.cPrimaryContainer.g,root.cPrimaryContainer.b,0.40)
-                                                        : Qt.rgba(root.cInvPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00))
+                                                        : Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
                                                 Behavior on border.color { ColorAnimation{duration:250} }
                                             }
                                             RowLayout {
@@ -1274,7 +1274,7 @@ ShellRoot {
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
                                             readonly property color arcColor: index===0 ? Qt.rgba(root.cPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 0.80)
-                                                : (index===1 ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 1.00) : Qt.rgba(root.cInvPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00))
+                                                : (index===1 ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 1.00) : Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00))
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
 
@@ -1629,14 +1629,14 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maShut.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.85) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
                                 border.width: 1
-                                border.color: _maShut.containsMouse ? Qt.rgba(root.cInvPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 0.65) : "transparent"
+                                border.color: _maShut.containsMouse ? Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰐥"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: Qt.rgba(root.cInvPrimary.r, root.cSourceColor.g, root.cSourceColor.b, 1.00); opacity: _maShut.containsMouse ? 1.0 : 0.72
+                                color: Qt.rgba(root.cInvPrimary.r, root.cPrimaryContainer.g, root.cPrimaryContainer.b, 1.00); opacity: _maShut.containsMouse ? 1.0 : 0.72
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
