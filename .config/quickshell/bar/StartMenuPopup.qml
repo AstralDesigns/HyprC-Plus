@@ -71,73 +71,86 @@ PanelWindow {
             id: mainCol
             anchors { top: parent.top; left: parent.left; right: parent.right; margins: 16 }
             spacing: 10
-
-            // ── Row 1: user + power ────────────────────────────────────
-            RowLayout { Layout.fillWidth: true; spacing: 8
-                Rectangle { width: 70; height: 70; radius: 99; color: Theme.cSurfHi
-                    Image { id: smAvatar; anchors.fill: parent; fillMode: Image.PreserveAspectCrop
-                        source: StartMenuState._userIconPath ? "file://" + StartMenuState._userIconPath : ""
-                        smooth: true; mipmap: true; visible: StartMenuState._userIconPath !== "" }
-                    Text { anchors.centerIn: parent; visible: !smAvatar.visible; text: "󰀄"
-                        font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
-                }
-                ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    Text { text: Quickshell.env("USER"); color: Config.wsActiveColor; font.pixelSize: 22; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
-                    Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm")
-                        color: Config.ccGlyphColor; font.pixelSize: 14 }
-                }
-                // Recorder
-                Rectangle {
-                    width: 30; height: 30; radius: 15
-                    color: StartMenuState.isRecording ? "transparent"
-                        : rrh.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
-                        : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
-                    border.width: 1
-                    border.color: StartMenuState.isRecording ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.85)
-                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
-                    Behavior on color { ColorAnimation { duration: 100 } }
-                    Rectangle { anchors.fill: parent; radius: parent.radius; visible: StartMenuState.isRecording
-                        gradient: Gradient {
-                            orientation: Gradient.Horizontal
-                            GradientStop { position: 0.0; color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.85) }
-                            GradientStop { position: 1.0; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.70) }
-                        }
+            
+            Rectangle {
+                Layout.fillWidth: true; height: 88; radius: 12; clip: true
+                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                border.width: 1
+        	border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+            	// ── Row 1: user + power ────────────────────────────────────
+            	RowLayout { 
+            	   anchors {
+		        left: parent.left; right: parent.right
+			verticalCenter: parent.verticalCenter
+			margins: 8
+                   }
+            	   Layout.fillWidth: true; spacing: 4
+                   Rectangle { width: 70; height: 70; radius: 99; color: Theme.cSurfHi
+                    	Image { id: smAvatar; anchors.fill: parent; fillMode: Image.PreserveAspectCrop
+                            source: StartMenuState._userIconPath ? "file://" + StartMenuState._userIconPath : ""
+                            smooth: true; mipmap: true; visible: StartMenuState._userIconPath !== "" }
+                    	Text { anchors.centerIn: parent; visible: !smAvatar.visible; text: "󰀄"
+                        	font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
+                   }
+                    ColumnLayout { Layout.fillWidth: true; spacing: 1
+                    	Text { text: Quickshell.env("USER"); color: Config.wsPersistentColor; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
+                    	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Config.wsActiveColor; font.pixelSize: 13 }
                     }
-                    Text { anchors.centerIn: parent; text: "󰑋"; font.pixelSize: 15; font.family: Config.fontFamily
-                        color: StartMenuState.isRecording ? Theme.cOnPrim : Theme.cOnSurfVar
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        SequentialAnimation on opacity { running: StartMenuState.isRecording; loops: Animation.Infinite
-                            NumberAnimation { to: 0.3; duration: 500 }
-                            NumberAnimation { to: 1.0; duration: 500 }
-                        }
+                    // Recorder
+                    Rectangle {
+			width: 30; height: 30; radius: 15
+			color: StartMenuState.isRecording ? "transparent"
+                            : rrh.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
+                            : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
+			border.width: 1
+			border.color: StartMenuState.isRecording ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.85)
+                        	: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+			Behavior on color { ColorAnimation { duration: 100 } }
+                    	    Rectangle { anchors.fill: parent; radius: parent.radius; visible: StartMenuState.isRecording
+                        	gradient: Gradient {
+                            	orientation: Gradient.Horizontal
+                            	GradientStop { position: 0.0; color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.85) }
+                            	GradientStop { position: 1.0; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.70) }
+                        	}
+                    	    }
+                            Text { anchors.centerIn: parent; text: "󰑋"; font.pixelSize: 15; font.family: Config.fontFamily
+                        	color: StartMenuState.isRecording ? Theme.cOnPrim : Theme.cOnSurfVar
+                        	Behavior on color { ColorAnimation { duration: 100 } }
+                        	SequentialAnimation on opacity { running: StartMenuState.isRecording; loops: Animation.Infinite
+                            	NumberAnimation { to: 0.3; duration: 500 }
+                            	NumberAnimation { to: 1.0; duration: 500 }
+                        	}
+                    	    }
+                    	    MouseArea { id: rrh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                        	onClicked: StartMenuState.toggleRecorder() }
+                     }
+                     // Screenshot
+                     Rectangle {
+                    	width: 30; height: 30; radius: 15
+                    	color: ssh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                        		: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
+                    	border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+                    	Behavior on color { ColorAnimation { duration: 100 } }
+                    	Text { anchors.centerIn: parent; text: "󰹑"; font.pixelSize: 15; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
+                    	MouseArea { id: ssh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                        	onClicked: { StartMenuState.close(); ScreenshotPopupState.toggle() } }
                     }
-                    MouseArea { id: rrh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: StartMenuState.toggleRecorder() }
-                }
-                // Screenshot
-                Rectangle {
-                    width: 30; height: 30; radius: 15
-                    color: ssh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
-                        : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
-                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
-                    Behavior on color { ColorAnimation { duration: 100 } }
-                    Text { anchors.centerIn: parent; text: "󰹑"; font.pixelSize: 15; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
-                    MouseArea { id: ssh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: { StartMenuState.close(); ScreenshotPopupState.toggle() } }
-                }
+            	}
             }
 
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             // ── Brightness ────────────────────────────────────────────
             Rectangle {
-                Layout.fillWidth: true; height: 20; radius: 10; clip: true
+                Layout.fillWidth: true; height: 25; radius: 99; clip: true
                 color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                border.width: 1
+        	border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
             	RowLayout { Layout.fillWidth: true; spacing: 10
-                	Text { text: "󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
-                	Text { text: "Brightness"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
+                	Text { text: " 󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
+                	//Text { text: "Brightness"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 	SliderBg {
-                    		Layout.fillWidth: true; Layout.fillHeight: true; width: 154; height: 20
+                    		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
                     		value: StartMenuState.backlightValue
                     		onMoved: function(v) { StartMenuState.backlightValue = v; StartMenuState.setBacklight(v) }
                     		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
@@ -149,17 +162,19 @@ PanelWindow {
 
             // ── Volume ────────────────────────────────────────────────
             Rectangle {
-                    Layout.fillWidth: true; height: 20; radius: 10; clip: true
+                    Layout.fillWidth: true; height: 25; radius: 99; clip: true
                     color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                    border.width: 1
+        	    border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
                     RowLayout { Layout.fillWidth: true; spacing: 10
                 	Text {
-                        	text: StartMenuState.volumeMuted ? "󰖁" : "󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        	text: StartMenuState.volumeMuted ? " 󰖁" : " 󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
                         	MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
                 	}
                 
-                	Text { text: "Volume"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
+                	//Text { text: "Volume"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 	SliderBg {
-                    		Layout.fillWidth: true; Layout.fillHeight: true; width: 154; height: 20
+                    		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
                     		value: StartMenuState.volumeValue
                     		onMoved: function(v) { StartMenuState.volumeValue = v; StartMenuState.setVolume(v) }
                     		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
@@ -757,9 +772,9 @@ PanelWindow {
                     delegate: Rectangle {
                         required property var modelData
                         Layout.fillWidth: true; height: 52; radius: 12
-                        color: ph.containsMouse ? "transparent"
+                        color: ph.containsMouse ? Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
-                        gradient: ph.containsMouse ? powerGradient : null
+                        //gradient: ph.containsMouse ? powerGradient : null
                         border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
                         Behavior on color { ColorAnimation { duration: 120 } }
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
@@ -783,9 +798,9 @@ PanelWindow {
             // Logout button (full width)
             Rectangle {
                 Layout.fillWidth: true; height: 36; radius: 12
-                color: logh.containsMouse ? "transparent"
+                color: logh.containsMouse ? Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
-                gradient: logh.containsMouse ? powerGradient : null
+                //gradient: logh.containsMouse ? powerGradient : null
                 border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
@@ -800,11 +815,11 @@ PanelWindow {
                     onClicked: { StartMenuState.menuVisible = false; StartMenuState.logout() } }
             }
             
-            Gradient {
-		id: powerGradient
-		GradientStop { position: 0.0; color: Theme.cOnsecondary }
-		GradientStop { position: 1.0; color: Theme.cOnPrimaryFixedVariant }
-	    }
+            //Gradient {
+		//id: powerGradient
+		//GradientStop { position: 0.0; color: Theme.cOnsecondary }
+		//GradientStop { position: 1.0; color: Theme.cOnPrimaryFixedVariant }
+	    //}
 
             Item { height: 4 }
         }

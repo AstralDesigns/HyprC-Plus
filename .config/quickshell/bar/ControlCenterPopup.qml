@@ -1272,7 +1272,7 @@ PanelWindow {
                                 id: userNameText
                                 Layout.alignment: Qt.AlignHCenter
                                 text: "—"
-                                color: Theme.cPrimary
+                                color: Theme.cTertiaryContainer
                                 font.family: Config.styleFont
                                 font.pixelSize: 16
                                 font.weight: Font.Bold
@@ -4779,7 +4779,8 @@ PanelWindow {
                                                 Layout.topMargin: 4; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰌌 hyprviz.lua"
-                                                    color: Config.ccGlyphColor
+                                                    color: Theme.cTertiaryContainer
+            					    opacity: 1.0
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 14; font.weight: Font.Bold
                                                     font.letterSpacing: 0.5
@@ -4855,7 +4856,8 @@ PanelWindow {
                                                 Layout.topMargin: 14; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰏫 custom.lua"
-                                                    color: Config.ccGlyphColor
+                                                    color: cTertiaryContainer
+            					    opacity: 1.0
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 14; font.weight: Font.Bold
                                                     font.letterSpacing: 0.5
@@ -5424,7 +5426,8 @@ PanelWindow {
 
                                 Text {
                                     text: " 󰗘 Animations"
-                                    color: Config.ccGlyphColor
+                                    color: Theme.cTertiaryContainer
+				    opacity: 1.0
                                     font.family: Config.labelFont
                                     font.pixelSize: 14
                                     font.weight: Font.Bold
@@ -5629,7 +5632,7 @@ PanelWindow {
                             Layout.margins: 14
                             spacing: 10
 
-                            CCSection { text: " 󰍛  System" }
+                            CCSection { text: " 󰍛 System" }
 
                             // ── Fetch system info once when this tab becomes active ──
                             Item {
@@ -5973,7 +5976,7 @@ PanelWindow {
                                 }
                                 SysStatCard {
                                     glyph: "󰉋"
-                                    title: "Storage (/)"
+                                    title: "Storage"
                                     value: sysInfoRoot.info.DISK || "—"
                                     progress: parseInt(sysInfoRoot.info.DISKPCT || "0") / 100
                                 }
@@ -7168,7 +7171,8 @@ PanelWindow {
         Layout.bottomMargin: 4
         Text {
             id: _sh
-            color: Config.ccGlyphColor
+            color: Theme.cTertiaryContainer
+            opacity: 1.0
             font.family: Config.labelFont
             font.pixelSize: 14
             font.weight: Font.Bold
@@ -7327,7 +7331,7 @@ PanelWindow {
                 : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                  Theme.cPrimary.b, value ? 0.6 : 0.0)
+                                  Theme.cPrimary.b, value ? 0.6 : 0.6)
 
             Rectangle {
                 width: 20; height: 20; radius: 10
