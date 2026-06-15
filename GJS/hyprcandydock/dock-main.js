@@ -60,7 +60,7 @@ const GLYPH_ICON_SIZE = DockConfig.glyphIconSize !== null
     : Math.round(APP_ICON_SIZE * (DockConfig.glyphIconSizeFraction || 1.1));
 const INDICATOR_SIZE  = DockConfig.indicatorSize !== null
     ? DockConfig.indicatorSize
-    : Math.max(4, Math.round(APP_ICON_SIZE * DockConfig.indicatorSizeFraction));
+    : Math.max(6, Math.round(APP_ICON_SIZE * DockConfig.indicatorSizeFraction));
 const INDICATOR_SPACING = DockConfig.indicatorSpacing;
 // Legacy alias used throughout
 const ICON_SIZE = APP_ICON_SIZE;
@@ -198,11 +198,11 @@ function _injectGlyphSizeCSS(display) {
     const appPx       = DockConfig.appIconSize;
     const glyphPx     = DockConfig.glyphIconSize !== null
         ? DockConfig.glyphIconSize
-        : Math.round((appPx - 2) * (DockConfig.glyphIconSizeFraction || 1.2));
+        : Math.round((appPx - 2) * (DockConfig.glyphIconSizeFraction || 1.1));
     const indicatorPx = DockConfig.indicatorSize !== null
         ? DockConfig.indicatorSize
         : Math.max(6, Math.round(appPx * DockConfig.indicatorSizeFraction));
-    const btnSize  = appPx;
+    const btnSize  = appPx ;
     const borderW  = DockConfig.borderWidth;
     const fallbackR = DockConfig.borderRadius;
     const storedTL = DockConfig.borderTopLeftRadius     ?? fallbackR;
@@ -297,7 +297,7 @@ function _injectGlyphSizeCSS(display) {
         }
         #active-indicator {
             font-size: ${indicatorPx}px;
-            padding: 0;
+            padding-left: 2px;
         }
         /* Separator length matches icon size (not button container) */
         separator.dock-sep-v {
