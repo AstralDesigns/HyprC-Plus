@@ -1207,7 +1207,7 @@ PanelWindow {
                         height: 125
                         radius: 16
                         color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
-                                       Theme.cScrim.b, 0.65)
+                                       Theme.cScrim.b, 0.25)
                         border.width: 2
                         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
                                               Theme.cScrim.b, 0.85)
