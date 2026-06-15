@@ -252,7 +252,7 @@ Item {
                                 text:             iconItem._name
                                 font.pixelSize:   Config.desktopLabelSize
                                 font.weight: 	  Font.Bold
-                                color:            Theme.cScrim
+                                color:            Theme.cOnSurf
                                 elide:            Text.ElideRight
                                 maximumLineCount: 1
                                 horizontalAlignment: Text.AlignHCenter
