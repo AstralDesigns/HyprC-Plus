@@ -5965,7 +5965,7 @@ PanelWindow {
                                     SysStatCard {
                                         required property var modelData
                                         glyph:  modelData.isIgpu ? "󱤓" : "󰢮"
-                                        title:  modelData.isIgpu ? "iGPU Driver" : "dGPU Driver"
+                                        title:  modelData.isIgpu ? "GPU Driver" : "dGPU Driver"
                                         value:  modelData.name || "—"
                                     }
                                 }
