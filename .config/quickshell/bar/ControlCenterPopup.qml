@@ -3273,11 +3273,11 @@ PanelWindow {
                                                 "bash", "-c",
                                                 nowEnabled
                                                     ? 'f="$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh"; ' +
-                                                      'sed -i \'30s/^#[[:space:]]*//' + "'" + ' "$f"; ' +
-                                                      'sed -i \'31s/^#[[:space:]]*//' + "'" + ' "$f"'
+                                                      'sed -i \'31s/^#[[:space:]]*//' + "'" + ' "$f"; ' +
+                                                      'sed -i \'32s/^#[[:space:]]*//' + "'" + ' "$f"'
                                                     : 'f="$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh"; ' +
-                                                      'sed -i \'30s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"; ' +
-                                                      'sed -i \'31s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"'
+                                                      'sed -i \'31s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"; ' +
+                                                      'sed -i \'32s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"'
                                             ]
                                             _colorRegenSedProc._runAfter = nowEnabled
                                             _colorRegenSedProc.running = true
