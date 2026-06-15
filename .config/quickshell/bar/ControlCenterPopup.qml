@@ -1206,8 +1206,8 @@ PanelWindow {
                         Layout.fillWidth: true
                         height: 125
                         radius: 16
-                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                                       Theme.cOnSecondary.b, 0.65)
+                        color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
+                                       Theme.cScrim.b, 0.65)
                         border.width: 2
                         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
                                               Theme.cScrim.b, 0.85)
@@ -1272,7 +1272,7 @@ PanelWindow {
                                 id: userNameText
                                 Layout.alignment: Qt.AlignHCenter
                                 text: "—"
-                                color: Theme.cTertiaryContainer
+                                color: Config.glyphColor
                                 font.family: Config.styleFont
                                 font.pixelSize: 16
                                 font.weight: Font.Bold
@@ -4781,7 +4781,7 @@ PanelWindow {
                                                 Layout.topMargin: 4; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰌌 hyprviz.lua"
-                                                    color: Theme.cTertiaryContainer
+                                                    color: Theme.cOnPrimaryFixed
             					    opacity: 1.0
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 14; font.weight: Font.Bold
@@ -4858,7 +4858,7 @@ PanelWindow {
                                                 Layout.topMargin: 14; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰏫 custom.lua"
-                                                    color: cTertiaryContainer
+                                                    color: Theme.cOnPrimaryFixed
             					    opacity: 1.0
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 14; font.weight: Font.Bold
@@ -5428,7 +5428,7 @@ PanelWindow {
 
                                 Text {
                                     text: " 󰗘 Animations"
-                                    color: Theme.cTertiaryContainer
+                                    color: Theme.cOnPrimaryFixed
 				    opacity: 1.0
                                     font.family: Config.labelFont
                                     font.pixelSize: 14
@@ -7173,7 +7173,7 @@ PanelWindow {
         Layout.bottomMargin: 4
         Text {
             id: _sh
-            color: Theme.cTertiaryContainer
+            color: Theme.cOnPrimaryFixed
             opacity: 1.0
             font.family: Config.labelFont
             font.pixelSize: 14

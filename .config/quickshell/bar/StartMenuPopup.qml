@@ -93,7 +93,7 @@ PanelWindow {
                         	font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                    }
                     ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    	Text { text: Quickshell.env("USER"); color: Config.wsPersistentColor; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
+                    	Text { text: Quickshell.env("USER"); color: Config.glyphColor; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
                     	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Config.wsActiveColor; font.pixelSize: 13 }
                     }
                     // Recorder
@@ -147,7 +147,7 @@ PanelWindow {
                 border.width: 1
         	border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
             	RowLayout { Layout.fillWidth: true; spacing: 10
-                	Text { text: " 󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) }
+                	Text { text: " 󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Config.wsPersistentColor }
                 	//Text { text: "Brightness"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 	SliderBg {
                     		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
@@ -168,7 +168,7 @@ PanelWindow {
         	    border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
                     RowLayout { Layout.fillWidth: true; spacing: 10
                 	Text {
-                        	text: StartMenuState.volumeMuted ? " 󰖁" : " 󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        	text: StartMenuState.volumeMuted ? " 󰖁" : " 󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Config.wsPersistentColor
                         	MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
                 	}
                 
