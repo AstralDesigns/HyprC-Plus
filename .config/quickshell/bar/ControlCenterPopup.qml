@@ -4182,7 +4182,9 @@ PanelWindow {
                     // ── TAB 6: HyprCandy+ ────────────────────────────────────
                     CCScrollPane {
                         ColumnLayout {
-                            width: parent.width; spacing: 8
+                            Layout.fillWidth: true
+                            Layout.margins: 14
+                            spacing: 6
 
                             // ── Status card ───────────────────────────────────
                             Rectangle {
@@ -5963,7 +5965,7 @@ PanelWindow {
                                     SysStatCard {
                                         required property var modelData
                                         glyph:  modelData.isIgpu ? "󱤓" : "󰢮"
-                                        title:  modelData.isIgpu ? "iGPU" : "dGPU"
+                                        title:  modelData.isIgpu ? "iGPU Driver" : "dGPU Driver"
                                         value:  modelData.name || "—"
                                     }
                                 }
