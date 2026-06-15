@@ -74,9 +74,9 @@ PanelWindow {
             
             Rectangle {
                 Layout.fillWidth: true; height: 88; radius: 12; clip: true
-                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
-                border.width: 1
-        	border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.65)
+                border.width: 2
+        	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	// ── Row 1: user + power ────────────────────────────────────
             	RowLayout { 
             	   anchors {
@@ -99,7 +99,7 @@ PanelWindow {
                     // Recorder
                     Rectangle {
 			width: 30; height: 30; radius: 15
-			color: StartMenuState.isRecording ? "transparent"
+			color: StartMenuState.isRecording ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                             : rrh.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
                             : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
 			border.width: 1

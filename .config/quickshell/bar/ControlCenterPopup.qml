@@ -4781,8 +4781,8 @@ PanelWindow {
                                                 Layout.topMargin: 4; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰌌 hyprviz.lua"
-                                                    color: Theme.cOnPrimaryFixed
-            					    opacity: 1.0
+                                                    color: Theme.cOnSurf
+            					    opacity: 0.85
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 14; font.weight: Font.Bold
                                                     font.letterSpacing: 0.5
@@ -4858,8 +4858,8 @@ PanelWindow {
                                                 Layout.topMargin: 14; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰏫 custom.lua"
-                                                    color: Theme.cOnPrimaryFixed
-            					    opacity: 1.0
+                                                    color: Theme.cOnSurf
+            					    opacity: 0.85
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 14; font.weight: Font.Bold
                                                     font.letterSpacing: 0.5
@@ -5428,8 +5428,8 @@ PanelWindow {
 
                                 Text {
                                     text: " 󰗘 Animations"
-                                    color: Theme.cOnPrimaryFixed
-				    opacity: 1.0
+                                    color: Theme.cOnSurf
+				    opacity: 0.85
                                     font.family: Config.labelFont
                                     font.pixelSize: 14
                                     font.weight: Font.Bold
@@ -7173,8 +7173,8 @@ PanelWindow {
         Layout.bottomMargin: 4
         Text {
             id: _sh
-            color: Theme.cOnPrimaryFixed
-            opacity: 1.0
+            color: Theme.cOnSurf
+            opacity: 0.85
             font.family: Config.labelFont
             font.pixelSize: 14
             font.weight: Font.Bold
