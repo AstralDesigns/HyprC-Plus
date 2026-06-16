@@ -780,7 +780,7 @@ PanelWindow {
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
                                 font.pixelSize: 18; font.family: Config.fontFamily
-                                color: ph.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                                color: ph.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Config.glyphColor
                                 Behavior on color { ColorAnimation { duration: 120 } } }
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.l
                                 color: Theme.cPrimary; font.pixelSize: 10 }
@@ -805,7 +805,7 @@ PanelWindow {
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
                     Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"
-                        color: logh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        color: logh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Config.glyphColor
                         Behavior on color { ColorAnimation { duration: 120 } } }
                     Text { text: "Logout"; color: logh.containsMouse ? Theme.cPrimary : Theme.cPrimary
                         font.pixelSize: 10; font.weight: Font.Medium
