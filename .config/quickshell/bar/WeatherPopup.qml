@@ -77,7 +77,7 @@ Item {
         topRightRadius: 20
         bottomLeftRadius: 20
         bottomRightRadius: 20
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        color: Theme.blurBackground
         border.width: Config.barBorderWidth
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
@@ -115,7 +115,7 @@ Item {
                     color: unitHov.containsMouse
                         ? Qt.rgba(Theme.cPrimary.r,  Theme.cPrimary.g,  Theme.cPrimary.b,  0.22)
                         : Qt.rgba(Theme.cSurfHi.r,   Theme.cSurfHi.g,   Theme.cSurfHi.b,   0.55)
-                    border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+                    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     border.width: 1
                     Behavior on color { ColorAnimation { duration: 120 } }
                     Text {
@@ -166,9 +166,10 @@ Item {
                     implicitHeight: 172
                     radius: 20
                     clip: true
-                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                               Theme.cInversePrimary.b, 0.25)
                     border.width: 1
-                    border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28)
+                    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
                     RowLayout {
                         anchors.fill: parent
@@ -326,9 +327,9 @@ Item {
 
                             border.width: 1
                             border.color: isCurrentHour
-                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                                 : isOrbitFront
-                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.30)
+                                    ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.65)
                                     : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.18)
 
                             HoverHandler {
@@ -414,8 +415,8 @@ Item {
 
                         border.width: 1
                         border.color: index === 0
-                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
-                            : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.18)
+                            ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+                            : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
                         Column {
                             id: fcCol

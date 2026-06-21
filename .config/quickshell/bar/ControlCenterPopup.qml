@@ -1099,7 +1099,7 @@ PanelWindow {
         width: ccWin._panelW
 
         radius: 20
-        color:  Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        color:  Theme.blurBackground
         border.width: Config.barBorderWidth
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
@@ -1195,6 +1195,9 @@ PanelWindow {
                     radius: 14
                     color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g,
                                                        Theme.cBackground.b, 0.65)
+                                                       
+		    border.width: 2
+        	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 }
 
                 ColumnLayout {
@@ -1206,8 +1209,8 @@ PanelWindow {
                         Layout.fillWidth: true
                         height: 125
                         radius: 16
-                        color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
-                                       Theme.cScrim.b, 0.25)
+                        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                               Theme.cInversePrimary.b, 0.25)
                         border.width: 2
                         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
                                               Theme.cScrim.b, 0.85)

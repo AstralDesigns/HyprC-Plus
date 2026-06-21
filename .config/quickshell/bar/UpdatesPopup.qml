@@ -46,7 +46,7 @@ PanelWindow {
         implicitWidth:  Math.max(220, col.implicitWidth + 32)
         implicitHeight: col.implicitHeight + 24
 
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        color: Theme.blurBackground
         radius:       20
         border.width: Config.barBorderWidth
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
@@ -66,7 +66,7 @@ PanelWindow {
             // ════════════════════════════════════════════════════════════════
             Rectangle {
                 width: parent.width; height: 1
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
             }
             
             // ════════════════════════════════════════════════════════════════
@@ -95,7 +95,7 @@ PanelWindow {
 
             Rectangle {
                 width: parent.width; height: 1
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
             }
 
             Text {
@@ -118,6 +118,8 @@ PanelWindow {
                 color: sysUpdateHover.containsMouse
                     ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
                     : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
+                border.width: 1
+        	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 visible: UpdatesPopupState.hasUpdates
                 clip: true
                 Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
@@ -143,7 +145,7 @@ PanelWindow {
             // ════════════════════════════════════════════════════════════════
             Rectangle {
                 width: parent.width; height: 1
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
             }
 
             // ════════════════════════════════════════════════════════════════
@@ -199,7 +201,7 @@ PanelWindow {
 
             Rectangle {
                 width: parent.width; height: 1
-                color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
             }
 
             Text {
@@ -222,6 +224,8 @@ PanelWindow {
                 color: hcUpdateHover.containsMouse
                     ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.12)
                     : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
+                border.width: 1
+        	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 visible: UpdatesPopupState.hcHasUpdates
                 clip: true
                 Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }

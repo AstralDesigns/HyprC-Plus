@@ -160,7 +160,7 @@ PanelWindow {
 
         radius: 20
         clip: true
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        color: Theme.blurBackground
         border.width: Config.barBorderWidth
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
@@ -275,9 +275,10 @@ PanelWindow {
                 Layout.bottomMargin: 8
                 implicitHeight: headersRow.implicitHeight + 12
                 radius: 20
-                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                               Theme.cInversePrimary.b, 0.25)
                 border.width: 1
-                border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.22)
+                border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
                 Row {
                     id: headersRow
@@ -305,8 +306,8 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 text: modelData
                                 color: (index === 5 || index === 6)
-                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.70)
-                                    : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.70)
+                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.0)
+                                    : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.80)
                                 font.family: Config.labelFont
                                 font.pixelSize: 10
                                 font.weight: Font.Medium
@@ -324,7 +325,7 @@ PanelWindow {
                 radius: 20
                 color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
                 border.width: 1
-                border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.22)
+                border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
                 Column {
                     id: gridCol
@@ -429,9 +430,10 @@ PanelWindow {
                         Layout.fillWidth: true
                         height: upcomingCol.implicitHeight + 10
                         radius: 6
-                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                               Theme.cInversePrimary.b, 0.25)
                         border.width: 1
-                        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.18)
+                        border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
                         ColumnLayout {
                             id: upcomingCol

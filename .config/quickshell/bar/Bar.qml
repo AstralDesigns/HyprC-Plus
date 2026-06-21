@@ -507,7 +507,7 @@ PanelWindow {
                 opacity: isl._bgOpacity
                 gradient: Gradient {
                     orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: Theme.cOnPrimaryFixedVariant }
+                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
                     GradientStop { position: 1.0; color: Theme.cSurface }
                 }
                 Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }

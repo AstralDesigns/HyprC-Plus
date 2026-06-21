@@ -5,6 +5,7 @@
 
 STYLE="$HOME/.hyprcandy/GJS/hyprcandydock/style.css"
 CONFIG="$HOME/.hyprcandy/GJS/hyprcandydock/config.js"
+LAUNCHER="$HOME/.hyprcandy/GJS/hyprcandydock/app-launcher.js"
 
 gtk="${1#@}"
 gtk="${gtk#\$}"   # tolerate accidental $ prefix from bar-style vars
@@ -30,7 +31,9 @@ sed -i "s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$STYLE"
 # Mirror into config.js for @HCD hot-reload metadata (optional, not the visual source)
 if [ -f "$CONFIG" ] && grep -q 'borderColorVar:' "$CONFIG"; then
     sed -i "s/^\([[:space:]]*borderColorVar:\)[[:space:]]*'[^']*'/\1 '${gtk}'/" "$CONFIG"
+    sed -i "447s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$LAUNCHER"
 fi
 
+pkill -f 'gjs.*app-launcher.js' 2>/dev/null || true
 pkill -SIGUSR2 -f 'gjs dock-main.js' 2>/dev/null || pkill -12 -f 'gjs dock-main.js' 2>/dev/null || true
 echo "$gtk"

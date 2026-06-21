@@ -51,7 +51,7 @@ PanelWindow {
         id: panelRect
         anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
         width: 340
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        color: Theme.blurBackground
         //radius: startMenuPanel._panelRadius
         topLeftRadius: 20
         topRightRadius: 20
@@ -74,7 +74,8 @@ PanelWindow {
             
             Rectangle {
                 Layout.fillWidth: true; height: 88; radius: 12; clip: true
-                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.25)
+                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                               Theme.cInversePrimary.b, 0.25)
                 border.width: 2
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	// ── Row 1: user + power ────────────────────────────────────
@@ -143,9 +144,9 @@ PanelWindow {
             // ── Brightness ────────────────────────────────────────────
             Rectangle {
                 Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.35)
                 border.width: 1
-        	border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+        	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	RowLayout { Layout.fillWidth: true; spacing: 10
                 	Text { text: " 󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Config.wsPersistentColor }
                 	//Text { text: "Brightness"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
@@ -163,9 +164,9 @@ PanelWindow {
             // ── Volume ────────────────────────────────────────────────
             Rectangle {
                     Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.35)
                     border.width: 1
-        	    border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+        	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     RowLayout { Layout.fillWidth: true; spacing: 10
                 	Text {
                         	text: StartMenuState.volumeMuted ? " 󰖁" : " 󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Config.wsPersistentColor
@@ -772,10 +773,10 @@ PanelWindow {
                     delegate: Rectangle {
                         required property var modelData
                         Layout.fillWidth: true; height: 52; radius: 12
-                        color: ph.containsMouse ? Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
-                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                        color: ph.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.75)
+                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.25)
                         //gradient: ph.containsMouse ? powerGradient : null
-                        border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+                        border.width: 2; border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                         Behavior on color { ColorAnimation { duration: 120 } }
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
@@ -798,10 +799,10 @@ PanelWindow {
             // Logout button (full width)
             Rectangle {
                 Layout.fillWidth: true; height: 36; radius: 12
-                color: logh.containsMouse ? Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.65)
-                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                color: logh.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.75)
+                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.25)
                 //gradient: logh.containsMouse ? powerGradient : null
-                border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+                border.width: 2; border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
                     Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"

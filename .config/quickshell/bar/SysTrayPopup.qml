@@ -46,7 +46,7 @@ PanelWindow {
         implicitWidth:  Math.max(win._minSlot, trayRow.implicitWidth + win._pad * 2)
 
         radius: implicitHeight / 2
-        color: Qt.rgba(Theme.cOnPrimaryFixedVariant.r, Theme.cOnPrimaryFixedVariant.g, Theme.cOnPrimaryFixedVariant.b, 0.3)
+        color: Theme.blurBackground
         border.width: Config.barBorderWidth
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
