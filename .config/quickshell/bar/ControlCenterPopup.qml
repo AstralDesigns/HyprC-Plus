@@ -6009,7 +6009,7 @@ PanelWindow {
                                 }
 
                                 SysChip { glyph: "󰏖"; label: "Packages"; value: sysInfoRoot.info.PKGS || "—" }
-                                SysChip { glyph: "󰸗"; label: "Host";     value: sysInfoRoot.info.HOST || "—" }
+                                SysChip { glyph: "󰟀"; label: "Host";     value: sysInfoRoot.info.HOST || "—" }
                             }
 
                             Item { height: 4 }
