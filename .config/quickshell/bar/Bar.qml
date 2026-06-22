@@ -74,6 +74,7 @@ PanelWindow {
                                        || ClockPopupState.visible
                                        || WeatherPopupState.visible
                                        || SystemMonitorPopupState.visible
+                                       || CalendarPopupState.visible
 
     // Tri AH: only pin the segment that owns the open popup. CC pins all three.
     readonly property bool _triLeftPinned:  ControlCenterState.visible
