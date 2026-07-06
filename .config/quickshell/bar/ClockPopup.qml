@@ -70,7 +70,7 @@ Item {
 
                 Text {
                     text: root._greeting
-                    color: Config.wsPersistentColor
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
                     font.family: Config.labelFont
                     font.pixelSize: 13
                     font.weight: Font.Medium
@@ -128,7 +128,7 @@ Item {
 
                 Text {
                     text: root._dateStr
-                    color: Config.wsPersistentColor
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
                     font.family: Config.labelFont
                     font.pixelSize: 12
                 }
@@ -187,7 +187,7 @@ Item {
                         ctx.rotate(hrAngle)
                         ctx.lineWidth = 4.0
                         ctx.lineCap = "round"
-                        ctx.strokeStyle = Theme.cWc4.toString()
+                        ctx.strokeStyle = Theme.cWc9.toString()
                         ctx.beginPath()
                         ctx.moveTo(0, 8)
                         ctx.lineTo(0, -(r - 18))
@@ -213,12 +213,12 @@ Item {
                         ctx.moveTo(0, 12)
                         ctx.lineTo(0, -(r - 6))
                         ctx.stroke()
-                        ctx.fillStyle = Theme.cWc4.toString()
+                        ctx.fillStyle = Theme.cWc9.toString()
                         ctx.beginPath()
                         ctx.arc(0, -(r - 16), 3, 0, 2 * Math.PI)
                         ctx.fill()
                         ctx.restore()
-                        ctx.fillStyle = Theme.cWc4.toString()
+                        ctx.fillStyle = Theme.cWc9.toString()
                         ctx.beginPath()
                         ctx.arc(cx, cy, 4, 0, 2 * Math.PI)
                         ctx.fill()

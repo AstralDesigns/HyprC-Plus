@@ -577,7 +577,7 @@ QtObject {
     //  textColor   → info text (time, date, weather value, battery %)
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
-    readonly property color glyphColor:  Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 1.00)
+    readonly property color glyphColor:  Qt.rgba(Theme.cWc9.r, Theme.cWc9.g, Theme.cWc9.b, 1.00)
     readonly property color textColor:   Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
     readonly property color activeColor: Config.glyphColor
     readonly property color dimColor:    Theme.cOnSurfVar
