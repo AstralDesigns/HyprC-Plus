@@ -10,7 +10,7 @@
 //   sed -i 's/appIconSize: 20[ \t]*[0-9]*/appIconSize: 20N/' config.js
 //
 // String @HCD variables (replace GLYPH with new character or escape):
-//   sed -i "s/startIcon: '󰳭',
+//   sed -i "s/startIcon: '',
 //
 // Same pattern applies to all @HCD-tagged variables — just swap the key name.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,8 +20,8 @@ var DockConfig = {
     // ── Start button icon (NerdFont glyph) ────────────────────────────────
     // Paste any glyph directly (use rofi glyph menu or any NerdFont codepoint).
     // null = fall back to the GLYPH_START const in dock-main.js.
-    // candy-utils sed pattern:  sed -i "s/startIcon: '󰳭',
-    startIcon: '󰳭',              // @HCD:startIcon
+    // candy-utils sed pattern:  sed -i "s/startIcon: '',
+    startIcon: '',              // @HCD:startIcon
     // ── Button spacing (gap between every button in the dock) ─────────────
     // Controls GtkBox spacing — applies uniformly between start↔first-app,
     // app↔app, and last-app↔trash so all gaps are edited in one place.
@@ -64,7 +64,7 @@ var DockConfig = {
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 2,                // @HCD:borderWidth
-    borderColorVar: 'background', // @HCD:borderColorVar  (GTK @name, matugen)
+    borderColorVar: 'scrim', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
     borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
     borderTopRightRadius: 30,      // @HCD:borderTopRightRadius

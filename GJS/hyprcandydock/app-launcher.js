@@ -534,7 +534,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @background;
+    border-color: @scrim;
 }
 
 /* ── Inner section frames (rofi inputbar / listbox equivalent) ────────── */
