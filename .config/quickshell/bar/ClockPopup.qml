@@ -165,7 +165,7 @@ Item {
                         ctx.beginPath()
                         ctx.arc(cx, cy, r, 0, 2 * Math.PI)
                         ctx.stroke()
-                        ctx.fillStyle = Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, 0.80).toString()
+                        ctx.fillStyle = Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80).toString()
                         for (let i = 0; i < 12; i++) {
                             const angle = (i * 30) * Math.PI / 180
                             const mx = cx + (r - 6) * Math.sin(angle)
@@ -213,7 +213,7 @@ Item {
                         ctx.moveTo(0, 12)
                         ctx.lineTo(0, -(r - 6))
                         ctx.stroke()
-                        ctx.fillStyle = Theme.cWc3.toString()
+                        ctx.fillStyle = Theme.cWc4.toString()
                         ctx.beginPath()
                         ctx.arc(0, -(r - 16), 3, 0, 2 * Math.PI)
                         ctx.fill()

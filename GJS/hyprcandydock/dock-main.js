@@ -72,7 +72,7 @@ const GLYPH_TRASH_EMPTY = '󰩺';   //  nf-md-trash_can_outline — no files in 
 const GLYPH_TRASH_FULL  = '󰩹';   //  nf-md-trash_can         — files present (replaces delete_empty)
 const GLYPH_TRASH_HEAVY = '󰆴';   //  nf-md-delete            — heavily loaded (>20 items)
 // Hyprland logo glyph (nf-linux-hyprland, NerdFonts >= 3.2)
-const GLYPH_FALLBACK  = '󱙝';   //  shown when app has no icon
+const GLYPH_FALLBACK  = '\u200a\u200a\u200a\u200a󱙝\u200a\u200a\u200a\u200a';   //  shown when app has no icon
 
 // --- CSS Management ---------------------------------------------------
 const HOME = GLib.get_home_dir();
