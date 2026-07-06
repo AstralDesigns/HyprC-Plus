@@ -425,7 +425,8 @@ PanelWindow {
             opacity: 1.0
             gradient: Gradient {
                 orientation: Gradient.Vertical
-                GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                GradientStop { position: 0.0; color: Theme.cScrim }
+                GradientStop { position: 0.5; color: Theme.cInversePrimary }
                 GradientStop { position: 1.0; color: Theme.cScrim }
             }
             Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
@@ -494,6 +495,7 @@ PanelWindow {
             radius: Config.islandRadius
             color: "transparent"
             clip: true
+            z: 0
 
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
@@ -509,7 +511,9 @@ PanelWindow {
                 gradient: Gradient {
                     orientation: Gradient.Vertical
                     GradientStop { position: 0.0; color: Theme.cInversePrimary }
-                    GradientStop { position: 1.0; color: Theme.cSurface }
+                    GradientStop { position: 0.35; color: Theme.cOnSecondary }
+                    GradientStop { position: 0.7; color: Theme.cOnSecondary }
+                    GradientStop { position: 1.0; color: Theme.cInversePrimary }
                 }
                 Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
             }
@@ -627,8 +631,12 @@ PanelWindow {
             spacing: Config.islandSpacing
             layoutDirection: Qt.RightToLeft
             Island { bgType: "startmenu"; Modules.PowerButton {} }
-            Island { bgType: "weatherbat"; visible_: Config.showBattery;  Modules.Battery {} }
-            Island { bgType: "weatherbat"; visible_: Config.showWeather;  Modules.Weather {} }
+            Island {
+                bgType: "weatherbat"
+                visible_: Config.showBattery || Config.showWeather
+                Modules.Weather { visible: Config.showWeather }
+                Modules.Battery { visible: Config.showBattery }
+            }
 
             Island {
                 bgType: "rightgroup"
@@ -693,7 +701,8 @@ PanelWindow {
                 opacity: 1.0
                 gradient: Gradient {
                     orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                    GradientStop { position: 0.0; color: Theme.cScrim }
+                    GradientStop { position: 0.5; color: Theme.cInversePrimary }
                     GradientStop { position: 1.0; color: Theme.cScrim }
                 }
                 Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
@@ -784,7 +793,8 @@ PanelWindow {
                 opacity: 1.0
                 gradient: Gradient {
                     orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                    GradientStop { position: 0.0; color: Theme.cScrim }
+                    GradientStop { position: 0.5; color: Theme.cInversePrimary }
                     GradientStop { position: 1.0; color: Theme.cScrim }
                 }
                 Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
@@ -863,7 +873,8 @@ PanelWindow {
                 opacity: 1.0
                 gradient: Gradient {
                     orientation: Gradient.Vertical
-                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                    GradientStop { position: 0.0; color: Theme.cScrim }
+                    GradientStop { position: 0.5; color: Theme.cInversePrimary }
                     GradientStop { position: 1.0; color: Theme.cScrim }
                 }
                 Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
@@ -880,8 +891,12 @@ PanelWindow {
                 layoutDirection: Qt.RightToLeft
 
                 Island { bgType: "startmenu"; Modules.PowerButton {} }
-                Island { bgType: "weatherbat"; visible_: Config.showBattery;  Modules.Battery {} }
-                Island { bgType: "weatherbat"; visible_: Config.showWeather;  Modules.Weather {} }
+                Island {
+                    bgType: "weatherbat"
+                    visible_: Config.showBattery || Config.showWeather
+                    Modules.Battery { visible: Config.showBattery }
+                    Modules.Weather { visible: Config.showWeather }
+                }
 
                 Island {
                     bgType: "rightgroup"

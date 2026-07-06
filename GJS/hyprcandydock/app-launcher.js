@@ -205,6 +205,20 @@ function getRunningApps() {
                 const cls = (c.class || '').toLowerCase();
                 if (!running.has(cls)) running.set(cls, []);
                 running.get(cls).push({ title: c.title || '(no title)', address: c.address });
+
+                // Steam game heuristic: Hyprland reports Steam games as "steam_app_<id>".
+                // Also register the instances under the bare numeric app ID so that
+                // getAllApps() entries (whose className is derived from the .desktop
+                // file ID, e.g. "caliber") can find them via their steamAppId field.
+                const steamMatch = cls.match(/^steam_app_(\d+)$/);
+                if (steamMatch) {
+                    const appId = steamMatch[1];
+                    if (!running.has(appId)) running.set(appId, []);
+                    // Avoid duplicate entries when multiple instances exist
+                    const entry = { title: c.title || '(no title)', address: c.address };
+                    if (!running.get(appId).some(e => e.address === entry.address))
+                        running.get(appId).push(entry);
+                }
             }
         }
     } catch (_) {}
@@ -221,7 +235,14 @@ function getAllApps() {
     const apps = [];
     const seen = new Set();
     for (const info of Gio.AppInfo.get_all()) {
-        if (!info.should_show()) continue;
+        // Steam sets NoDisplay=true on game .desktop files so they don't clutter
+        // system app menus — but we want them in the launcher. Pass them through
+        // when their Exec contains a Steam game URL; skip everything else that
+        // fails should_show() (hidden system entries, OnlyShowIn mismatches, etc.).
+        if (!info.should_show()) {
+            const cmd = info.get_commandline && info.get_commandline();
+            if (!cmd || !cmd.includes('steam://rungameid')) continue;
+        }
         const id = info.get_id();
         if (seen.has(id)) continue;
         seen.add(id);
@@ -252,8 +273,77 @@ function getAllApps() {
         const cmd  = info.get_commandline && info.get_commandline();
         const exec = cmd ? cmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim() : null;
 
-        apps.push({ name, iconName, className, desktopId, wmClass, exec, info });
+        // Steam game heuristic: Steam creates .desktop files with no StartupWMClass
+        // but with Exec=steam steam://rungameid/<id>. Extract the app ID so the
+        // running-apps map (keyed by app ID via getRunningApps) can match this entry.
+        let steamAppId = null;
+        if (exec) {
+            const steamIdMatch = exec.match(/rungameid\/(\d+)/);
+            if (steamIdMatch) steamAppId = steamIdMatch[1];
+        }
+
+        apps.push({ name, iconName, className, desktopId, wmClass, exec, steamAppId, info });
     }
+
+    // ── ~/Desktop/ scan ────────────────────────────────────────────────────
+    // Gio.AppInfo.get_all() only walks XDG data dirs (e.g. ~/.local/share/applications).
+    // Steam creates game shortcuts directly on ~/Desktop/ as plain .desktop files,
+    // which Gio never finds. Scan the Desktop directory manually and merge any
+    // .desktop files not already present in the list (de-dup by desktopId).
+    const seenDesktopIds = new Set(apps.map(a => a.desktopId));
+    const desktopDir = GLib.build_filenamev([HOME, 'Desktop']);
+    if (GLib.file_test(desktopDir, GLib.FileTest.IS_DIR)) {
+        try {
+            const dir = Gio.File.new_for_path(desktopDir);
+            const iter = dir.enumerate_children('standard::name,standard::type', Gio.FileQueryInfoFlags.NONE, null);
+            let fileInfo;
+            while ((fileInfo = iter.next_file(null))) {
+                const fname = fileInfo.get_name();
+                if (!fname.endsWith('.desktop')) continue;
+                const fpath = GLib.build_filenamev([desktopDir, fname]);
+                try {
+                    const dinfo = Gio.DesktopAppInfo.new_from_filename(fpath);
+                    if (!dinfo) continue;
+                    // Skip non-application entries (links, directories, etc.)
+                    if (dinfo.get_string('Type') !== 'Application') continue;
+
+                    const did = fname.replace(/\.desktop$/, '');
+                    if (seenDesktopIds.has(did)) continue;
+                    seenDesktopIds.add(did);
+
+                    const dname  = dinfo.get_display_name() || dinfo.get_name() || fname;
+                    const dgicon = dinfo.get_icon();
+                    let diconName = 'application-x-executable';
+                    if (dgicon) {
+                        const dnames = dgicon.get_names && dgicon.get_names();
+                        if (dnames && dnames.length > 0) {
+                            diconName = dnames[0];
+                        } else {
+                            const df = dgicon.get_file && dgicon.get_file();
+                            diconName = (df && df.get_path && df.get_path()) || dgicon.to_string() || diconName;
+                        }
+                    }
+
+                    const dwm      = dinfo.get_startup_wm_class && dinfo.get_startup_wm_class();
+                    const dwmClass = dwm || null;
+                    const dcls     = dwm || did;
+                    const dcmd     = dinfo.get_commandline && dinfo.get_commandline();
+                    const dexec    = dcmd ? dcmd.replace(/%[UuFfIiDdNnVvKk]/g, '').trim() : null;
+
+                    let dsteamAppId = null;
+                    if (dexec) {
+                        const sm = dexec.match(/rungameid\/(\d+)/);
+                        if (sm) dsteamAppId = sm[1];
+                    }
+
+                    apps.push({ name: dname, iconName: diconName, className: dcls,
+                                desktopId: did, wmClass: dwmClass, exec: dexec,
+                                steamAppId: dsteamAppId, info: dinfo });
+                } catch (_) {}
+            }
+        } catch (_) {}
+    }
+
     apps.sort((a, b) => a.name.localeCompare(b.name));
     return apps;
 }
@@ -444,7 +534,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @on_primary_fixed_variant;
+    border-color: @background;
 }
 
 /* ── Inner section frames (rofi inputbar / listbox equivalent) ────────── */
@@ -458,7 +548,7 @@ window.hyprcandy-launcher {
     background-color: @blur_background8;
     border-radius: ${sr}px;
     border-style: solid;
-    border-width: ${ib}px;
+    border-width: 0px;
     border-color: @primary;
     margin-top: ${ip}px;
     margin-bottom: ${Math.round(ip / 2)}px;
@@ -600,7 +690,7 @@ button.app-tile:focus {
 }
 
 .app-tile-label {
-    color: @on_surface;
+    color: @surface_tint;
     font-size: ${TEXT_FONT_SIZE}px;
     margin-top: 5px;
 }
@@ -691,7 +781,7 @@ popover.launcher-popover button {
 }
 
 .fav-glyph {
-    color: @primary;
+    color: @color4;
     font-size: ${Math.round(TEXT_FONT_SIZE * 1.27)}px;
     margin-right: 4px;
 }
@@ -779,7 +869,7 @@ window.hyprcandy-group-dialog {
 /* Glyph label — same fixed size as button so it never widens the circle. */
 .tab-glyph {
     font-family: 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
-    color: alpha(@on_surface, 0.55);
+    color: alpha(@color5, 0.8);
     font-size: 17px;
     min-width: 36px;
     min-height: 36px;
@@ -788,7 +878,7 @@ window.hyprcandy-group-dialog {
 }
 
 .tab-btn.active .tab-glyph {
-    color: @primary;
+    color: @color4;
 }
 
 /* ── Clipboard tab ───────────────────────────────────────────────────── */
@@ -14052,9 +14142,13 @@ const EMOJI_ALL = [
         // ── Running-app dot indicators (same pattern as dock-main.js) ─
         // Check _runningApps for this app's class — 0 dots if not running,
         // 1 dot for a single instance, 2 dots for 2+ (capped like the dock).
+        // For Steam games (no StartupWMClass), also check by steamAppId since
+        // Hyprland reports them as "steam_app_<id>" and getRunningApps() indexes
+        // them under the bare app ID for exactly this purpose.
         const _appKey       = app.className.toLowerCase();
         const _instances    = this._runningApps.get(_appKey)
                            ?? this._runningApps.get(app.className)
+                           ?? (app.steamAppId ? this._runningApps.get(app.steamAppId) : null)
                            ?? [];
         const _instanceCount = _instances.length;
 
@@ -14180,6 +14274,7 @@ const EMOJI_ALL = [
         const key = app.className.toLowerCase();
         const instances = this._runningApps.get(key)
             ?? this._runningApps.get(app.className)
+            ?? (app.steamAppId ? this._runningApps.get(app.steamAppId) : null)
             ?? [];
 
         if (instances.length > 0) {
@@ -15038,6 +15133,12 @@ const EMOJI_ALL = [
         try {
             const flatpakSystem = '/var/lib/flatpak/exports/share/applications';
             if (GLib.file_test(flatpakSystem, GLib.FileTest.EXISTS)) dirs.push(flatpakSystem);
+        } catch (_) {}
+        // ~/Desktop — Steam creates game shortcuts here as plain .desktop files.
+        // Gio.AppInfo.get_all() doesn't scan it, but we do in getAllApps().
+        try {
+            const desktopDir = GLib.build_filenamev([HOME, 'Desktop']);
+            if (GLib.file_test(desktopDir, GLib.FileTest.EXISTS)) dirs.push(desktopDir);
         } catch (_) {}
 
         for (const dirPath of dirs) {

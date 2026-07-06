@@ -434,7 +434,7 @@ Item {
                 implicitHeight: 112 + 16
                 radius: 20
                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.25)
+                                               Theme.cInversePrimary.b, 0.45)
                 border.width: 1
                 border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
@@ -446,26 +446,26 @@ Item {
                     ArcGauge {
                         value:    root._cpu;  glyph: "󰻠"; label: "CPU"
                         valStr:   Math.round(root._cpu * 100) + "%"
-                        arcColor: Theme.cPrimary
+                        arcColor: Theme.cWc5
                     }
                     ArcGauge {
                         value:    root._ram;  glyph: "󰍛"; label: "RAM"
                         valStr:   Math.round(root._ram * 100) + "%"
                         sub:      root._fmtBytes(root._ramUsed)
-                        arcColor: Qt.rgba(Theme.cInversePrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                        arcColor: Theme.cWc5
                     }
                     ArcGauge {
                         value:    root._tempOk ? Math.min(root._temp / 100, 1) : 0
                         glyph:    "󰔏"; label: "Temp"
                         valStr:   root._tempOk ? Math.round(root._temp) + "°" : "N/A"
-                        arcColor: root._tempOk && root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 0.85)
+                        arcColor: root._tempOk && root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cWc4
                     }
                     ArcGauge {
                         visible:  root._swapOk
                         value:    root._swap; glyph: "󰾴"; label: "Swap"
                         valStr:   Math.round(root._swap * 100) + "%"
                         sub:      root._swapOk ? root._fmtBytes(root._swapUsed) : ""
-                        arcColor: Theme.cPrimaryFixedDim; opacity: 0.8
+                        arcColor: Theme.cWc4
                     }
 
                     // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
@@ -478,7 +478,7 @@ Item {
                             label:    modelData.isIgpu ? "iGPU" : "dGPU"
                             valStr:   modelData.pct + "%"
                             sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
-                            arcColor: modelData.isIgpu ? Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g, Theme.cSecondary.b, 1.00) : Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00)
+                            arcColor: modelData.isIgpu ? Theme.cWc3 : Theme.cWc3
                         }
                     }
 
@@ -494,7 +494,7 @@ Item {
                         sub:      root._batStatus
                         arcColor: root._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
                                   : root._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
-                                  : Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
+                                  : Theme.cWc9
                     }
                 }
             }

@@ -5,11 +5,17 @@ import QtCore
 import Quickshell.Io
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  Theme.qml — Live matugen M3 color bridge for the qs bar
+//  Theme.qml — Live matugen M3 + wallust + pywal color bridge for the qs bar
 //
-//  Colors are read from MatugenColors.qml (written by matugen on wallpaper
-//  change) and re-parsed whenever that file changes.  All values below are
-//  defaults matching the current wallpaper; they are overwritten at runtime.
+//  Matugen colors are read from MatugenColors.qml (written by matugen on
+//  wallpaper change) and re-parsed whenever that file changes.
+//
+//  Wallust colors (color0–color15) are read from WallustColors.qml (written
+//  by wallust on wallpaper change) and exposed as cWc0…cWc15 typed colors
+//  plus a wallustColors JS object { color0: "#hex", … } for lookups.
+//
+//  Pywal colors are read from ~/.cache/wal/colors-hyprland.conf and exposed
+//  via the walColors JS object.
 //
 //  Color naming follows the waybar colors.css convention so porting styles
 //  is mechanical: @primary → cPrimary, @inverse_primary → cInversePrimary, etc.
@@ -142,6 +148,88 @@ QtObject {
     readonly property int margin:        6
     readonly property int borderRadius:  14
     readonly property int modulePadding: 8
+
+    // ── Wallust colors (from ~/.cache/quickshell/wallpaper/WallustColors.qml) ───
+    // wallustColors is a JS object: { color0: "#rrggbb", color1: ..., color15: ... }
+    // Typed color properties cWc0–cWc15 are reactive to string changes.
+    // Re-parsed whenever WallustColors.qml changes (wallust runs on wallpaper change).
+    property var wallustColors: ({})
+
+    // ── Raw wallust hex strings ───────────────────────────────────────────────
+    property string _wc0:  "#0B0000"
+    property string _wc1:  "#803E23"
+    property string _wc2:  "#86472F"
+    property string _wc3:  "#A14C23"
+    property string _wc4:  "#924A29"
+    property string _wc5:  "#AA682E"
+    property string _wc6:  "#CA7847"
+    property string _wc7:  "#DCD5D0"
+    property string _wc8:  "#9A9592"
+    property string _wc9:  "#803E23"
+    property string _wc10: "#86472F"
+    property string _wc11: "#A14C23"
+    property string _wc12: "#924A29"
+    property string _wc13: "#AA682E"
+    property string _wc14: "#CA7847"
+    property string _wc15: "#DCD5D0"
+
+    // ── Typed wallust color properties (reactive to string changes) ────────
+    readonly property color cWc0:  Qt.color(_wc0)
+    readonly property color cWc1:  Qt.color(_wc1)
+    readonly property color cWc2:  Qt.color(_wc2)
+    readonly property color cWc3:  Qt.color(_wc3)
+    readonly property color cWc4:  Qt.color(_wc4)
+    readonly property color cWc5:  Qt.color(_wc5)
+    readonly property color cWc6:  Qt.color(_wc6)
+    readonly property color cWc7:  Qt.color(_wc7)
+    readonly property color cWc8:  Qt.color(_wc8)
+    readonly property color cWc9:  Qt.color(_wc9)
+    readonly property color cWc10: Qt.color(_wc10)
+    readonly property color cWc11: Qt.color(_wc11)
+    readonly property color cWc12: Qt.color(_wc12)
+    readonly property color cWc13: Qt.color(_wc13)
+    readonly property color cWc14: Qt.color(_wc14)
+    readonly property color cWc15: Qt.color(_wc15)
+
+    property var _wallustColorFile: FileView {
+        path: root._home + "/.cache/quickshell/wallpaper/WallustColors.qml"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root._applyWallustColors(text())
+        Component.onCompleted: reload()
+    }
+
+    // Parse WallustColors.qml — extracts: property color m3colorN: "#hex"
+    function _applyWallustColors(t) {
+        if (!t || t.length === 0) return
+        const result = {}
+        const re = /property color m3color(\d+):\s*"(#[0-9a-fA-F]{6,8})"/g
+        let m
+        while ((m = re.exec(t)) !== null) {
+            const n = parseInt(m[1])
+            const hex = m[2]
+            result["color" + n] = hex
+            switch (n) {
+                case 0:  root._wc0  = hex; break
+                case 1:  root._wc1  = hex; break
+                case 2:  root._wc2  = hex; break
+                case 3:  root._wc3  = hex; break
+                case 4:  root._wc4  = hex; break
+                case 5:  root._wc5  = hex; break
+                case 6:  root._wc6  = hex; break
+                case 7:  root._wc7  = hex; break
+                case 8:  root._wc8  = hex; break
+                case 9:  root._wc9  = hex; break
+                case 10: root._wc10 = hex; break
+                case 11: root._wc11 = hex; break
+                case 12: root._wc12 = hex; break
+                case 13: root._wc13 = hex; break
+                case 14: root._wc14 = hex; break
+                case 15: root._wc15 = hex; break
+            }
+        }
+        wallustColors = result
+    }
 
     // ── Pywal colors (from ~/.cache/wal/colors-hyprland.conf) ────────────────
     // walColors is a JS object: { color0: "#rrggbb", color1: ..., foreground: ..., background: ... }

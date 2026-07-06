@@ -89,9 +89,13 @@ QtObject {
         v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
         v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
         v = _settings.value("islandBorderVar"); if (v !== undefined && v !== null) islandBorderVar = v
+        v = _settings.value("islandBorderMode"); if (v !== undefined && v !== null) islandBorderMode = v
+        v = _settings.value("islandBorderWallustVar"); if (v !== undefined && v !== null) islandBorderWallustVar = v
         v = _settings.value("barBorderWidth"); if (v !== undefined && v !== null) barBorderWidth = v
         v = _settings.value("barBorderAlpha"); if (v !== undefined && v !== null) barBorderAlpha = v
         v = _settings.value("barBorderVar"); if (v !== undefined && v !== null) barBorderVar = v
+        v = _settings.value("barBorderMode"); if (v !== undefined && v !== null) barBorderMode = v
+        v = _settings.value("barBorderWallustVar"); if (v !== undefined && v !== null) barBorderWallustVar = v
         v = _settings.value("islandBgStyle");  if (v !== undefined && v !== null) islandBgStyle  = v
         v = _settings.value("barRectBgStyle"); if (v !== undefined && v !== null) barRectBgStyle = v
         v = _settings.value("moduleBgOpacity"); if (v !== undefined && v !== null) moduleBgOpacity = v
@@ -158,6 +162,8 @@ QtObject {
         v = _settings.value("cavaEndVar");    if (v !== undefined && v !== null) cavaEndVar    = v
         v = _settings.value("cavaStartPywalVar"); if (v !== undefined && v !== null) cavaStartPywalVar = v
         v = _settings.value("cavaEndPywalVar");   if (v !== undefined && v !== null) cavaEndPywalVar   = v
+        v = _settings.value("cavaStartWallustVar"); if (v !== undefined && v !== null) cavaStartWallustVar = v
+        v = _settings.value("cavaEndWallustVar");   if (v !== undefined && v !== null) cavaEndWallustVar   = v
         v = _settings.value("cavaStartCustomColor"); if (v !== undefined && v !== null) _cavaStartCustomColor = v
         v = _settings.value("cavaEndCustomColor");   if (v !== undefined && v !== null) _cavaEndCustomColor   = v
         v = _settings.value("cavaGlyphCustomColor"); if (v !== undefined && v !== null) _cavaGlyphCustomColor = v
@@ -259,9 +265,13 @@ QtObject {
         _settings.setValue("islandBorder", islandBorder)
         _settings.setValue("islandBorderAlpha", islandBorderAlpha)
         _settings.setValue("islandBorderVar", islandBorderVar)
+        _settings.setValue("islandBorderMode", islandBorderMode)
+        _settings.setValue("islandBorderWallustVar", islandBorderWallustVar)
         _settings.setValue("barBorderWidth", barBorderWidth)
         _settings.setValue("barBorderAlpha", barBorderAlpha)
         _settings.setValue("barBorderVar", barBorderVar)
+        _settings.setValue("barBorderMode", barBorderMode)
+        _settings.setValue("barBorderWallustVar", barBorderWallustVar)
         _settings.setValue("islandBgStyle",  islandBgStyle)
         _settings.setValue("barRectBgStyle", barRectBgStyle)
         _settings.setValue("moduleBgOpacity", moduleBgOpacity)
@@ -328,6 +338,8 @@ QtObject {
         _settings.setValue("cavaEndVar",           cavaEndVar)
         _settings.setValue("cavaStartPywalVar",    cavaStartPywalVar)
         _settings.setValue("cavaEndPywalVar",      cavaEndPywalVar)
+        _settings.setValue("cavaStartWallustVar",  cavaStartWallustVar)
+        _settings.setValue("cavaEndWallustVar",    cavaEndWallustVar)
         _settings.setValue("cavaStartCustomColor", _cavaStartCustomColor)
         _settings.setValue("cavaEndCustomColor",   _cavaEndCustomColor)
         _settings.setValue("cavaGlyphCustomColor", _cavaGlyphCustomColor)
@@ -489,14 +501,22 @@ QtObject {
     // ── Island border ────────────────────────────────────────────────────
     property int  islandBorder:      0     // px — 0 to remove
     property real islandBorderAlpha: 0.22  // 0–1
-    property string islandBorderVar: "$outline_variant"
-    readonly property color islandBorderColor: _cavaThemeColor(islandBorderVar)
+    property string islandBorderVar:        "$outline_variant"  // matugen variable
+    property string islandBorderMode:       "matugen"           // "matugen" | "wallust"
+    property string islandBorderWallustVar: "$color0"           // wallust color0–color15
+    readonly property color islandBorderColor: islandBorderMode === "wallust"
+        ? _wallustThemeColor(islandBorderWallustVar)
+        : _cavaThemeColor(islandBorderVar)
 
     // ── Main bar border (bar mode only) ──────────────────────────────────
     property int  barBorderWidth: 2    // px — 0 to hide
     property real barBorderAlpha: 1.0  // opacity
-    property string barBorderVar: "$on_secondary"
-    readonly property color barBorderColor: _cavaThemeColor(barBorderVar)
+    property string barBorderVar:        "$on_secondary"  // matugen variable
+    property string barBorderMode:       "matugen"        // "matugen" | "wallust"
+    property string barBorderWallustVar: "$color7"        // wallust color0–color15
+    readonly property color barBorderColor: barBorderMode === "wallust"
+        ? _wallustThemeColor(barBorderWallustVar)
+        : _cavaThemeColor(barBorderVar)
 
     // ── Island background opacity ─────────────────────────────────────────
     //  moduleBgOpacity  — flat tint alpha in bar mode (also used by islandBgOpacityBar)
@@ -557,19 +577,19 @@ QtObject {
     //  textColor   → info text (time, date, weather value, battery %)
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
-    readonly property color glyphColor:  Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.70)
-    readonly property color textColor:   Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
-    readonly property color activeColor: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.70)
+    readonly property color glyphColor:  Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 1.00)
+    readonly property color textColor:   Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
+    readonly property color activeColor: Config.glyphColor
     readonly property color dimColor:    Theme.cOnSurfVar
 
     // ── Per-module color overrides ───────────────────────────────────────
-    property color batteryIconColor:     Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.70)
-    property color batteryTextColor:     Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
-    property color batteryChargingColor: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.70)
+    property color batteryIconColor:     Config.glyphColor //Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 0.8)
+    property color batteryTextColor:     Config.textColor
+    property color batteryChargingColor: Config.glyphColor //Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 0.8)
     property color batteryLowColor:      Theme.cErr
-    property color clockIconColor:       Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.70)
-    property color clockTextColor:       Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
-    property color rightGroupColor:      Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.70)
+    property color clockIconColor:       Config.glyphColor
+    property color clockTextColor:       Config.textColor
+    property color rightGroupColor:      Config.glyphColor
 
     // ── Clock popup sizing ────────────────────────────────────────────────
     property int clockTextSize: 38   // C059 Bold Italic time font size in ClockPopup
@@ -585,15 +605,15 @@ QtObject {
         { "city": "Dubai",     "timezone": "Asia/Dubai"       }
     ]
 
-    property color dateIconColor:        Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.70)
-    property color dateTextColor:        Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
-    property color mediaGlyphColor:      Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.70)
-    property color discGlyphColor:       Theme.cPrimary
+    property color dateIconColor:        Config.glyphColor
+    property color dateTextColor:        Config.textColor
+    property color mediaGlyphColor:      Config.glyphColor
+    property color discGlyphColor:       Theme.cSurfaceTint
     property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80)
-    property color powerGlyphColor:      Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
+    property color powerGlyphColor:      Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
-    readonly property color ccGlyphColor: Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, ccGlyphOpacity)
+    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc2.r, Theme.cWc2.g, Theme.cWc2.b, ccGlyphOpacity)
 
     // ── Battery radial indicator ─────────────────────────────────────────
     property bool batteryRadialVisible: true
@@ -647,9 +667,9 @@ QtObject {
     property real wsActiveOpacity:     1.0
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
-    readonly property color wsActiveColor:     Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, wsActiveOpacity)
-    readonly property color wsPersistentColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, wsPersistentOpacity)
-    readonly property color wsEmptyColor:      Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, wsEmptyOpacity)
+    readonly property color wsActiveColor:     Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, wsActiveOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, wsPersistentOpacity)
+    readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
     //  wsGlyphSize controls the font size of workspace button icons.
@@ -755,6 +775,8 @@ QtObject {
     property string cavaEndVar:         "$scrim"       // selected matugen variable
     property string cavaStartPywalVar:  "$color4"      // selected pywal variable
     property string cavaEndPywalVar:    "$color1"      // selected pywal variable
+    property string cavaStartWallustVar: "$color4"     // selected wallust variable
+    property string cavaEndWallustVar:   "$color0"     // selected wallust variable
 
     // Resolve a matugen "$varname" → the live Theme.cXxx color.
     function _cavaThemeColor(varName) {
@@ -794,6 +816,29 @@ QtObject {
         }
     }
 
+    // Resolve a wallust "$colorN" → the live Theme.cWcN color.
+    function _wallustThemeColor(varName) {
+        switch (varName) {
+            case "$color0":  return Theme.cWc0
+            case "$color1":  return Theme.cWc1
+            case "$color2":  return Theme.cWc2
+            case "$color3":  return Theme.cWc3
+            case "$color4":  return Theme.cWc4
+            case "$color5":  return Theme.cWc5
+            case "$color6":  return Theme.cWc6
+            case "$color7":  return Theme.cWc7
+            case "$color8":  return Theme.cWc8
+            case "$color9":  return Theme.cWc9
+            case "$color10": return Theme.cWc10
+            case "$color11": return Theme.cWc11
+            case "$color12": return Theme.cWc12
+            case "$color13": return Theme.cWc13
+            case "$color14": return Theme.cWc14
+            case "$color15": return Theme.cWc15
+            default:         return Theme.cWc7
+        }
+    }
+
     // Resolve a pywal "$varname" → color from Theme.walColors map.
     function _cavaPywalColor(varName) {
         if (typeof Theme.walColors === "object" && Theme.walColors !== null) {
@@ -812,7 +857,9 @@ QtObject {
         ? _cavaThemeColor(cavaStartVar)
         : cavaStartMode === "pywal"
             ? _cavaPywalColor(cavaStartPywalVar)
-            : _cavaGlyphCustomColor
+            : cavaStartMode === "wallust"
+                ? _wallustThemeColor(cavaStartWallustVar)
+                : _cavaGlyphCustomColor
     property color _cavaGlyphCustomColor: Theme.cPrimary   // overwritten by CC custom pick
 
     property bool  cavaGradientEnabled:    false
@@ -821,14 +868,18 @@ QtObject {
         ? _cavaThemeColor(cavaStartVar)
         : cavaStartMode === "pywal"
             ? _cavaPywalColor(cavaStartPywalVar)
-            : _cavaStartCustomColor
+            : cavaStartMode === "wallust"
+                ? _wallustThemeColor(cavaStartWallustVar)
+                : _cavaStartCustomColor
     property color _cavaStartCustomColor: Theme.cPrimary   // overwritten by CC custom pick
 
     property color cavaGradientEndColor: cavaEndMode === "matugen"
         ? _cavaThemeColor(cavaEndVar)
         : cavaEndMode === "pywal"
             ? _cavaPywalColor(cavaEndPywalVar)
-            : _cavaEndCustomColor
+            : cavaEndMode === "wallust"
+                ? _wallustThemeColor(cavaEndWallustVar)
+                : _cavaEndCustomColor
     property color _cavaEndCustomColor: Theme.cScrim       // overwritten by CC custom pick
 
     // Fraction of glyph height at which start→end color splits (0.0–1.0, default 0.5)

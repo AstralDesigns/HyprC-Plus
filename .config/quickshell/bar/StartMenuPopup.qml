@@ -75,7 +75,7 @@ PanelWindow {
             Rectangle {
                 Layout.fillWidth: true; height: 88; radius: 12; clip: true
                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.25)
+                                               Theme.cInversePrimary.b, 0.45)
                 border.width: 2
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	// ── Row 1: user + power ────────────────────────────────────
@@ -94,8 +94,8 @@ PanelWindow {
                         	font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                    }
                     ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    	Text { text: Quickshell.env("USER"); color: Config.glyphColor; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
-                    	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Config.wsActiveColor; font.pixelSize: 13 }
+                    	Text { text: Quickshell.env("USER"); color: Theme.cWc4; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
+                    	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Theme.cWc5; font.pixelSize: 13 }
                     }
                     // Recorder
                     Rectangle {
@@ -144,11 +144,11 @@ PanelWindow {
             // ── Brightness ────────────────────────────────────────────
             Rectangle {
                 Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.35)
+                color: Qt.rgba(Theme.cSecondaryContainer.r, Theme.cSecondaryContainer.g, Theme.cSecondaryContainer.b, 0.35)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	RowLayout { Layout.fillWidth: true; spacing: 10
-                	Text { text: " 󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Config.wsPersistentColor }
+                	Text { text: " 󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc5 }
                 	//Text { text: "Brightness"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 	SliderBg {
                     		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
@@ -156,7 +156,7 @@ PanelWindow {
                     		onMoved: function(v) { StartMenuState.backlightValue = v; StartMenuState.setBacklight(v) }
                     		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
                 	}
-                	Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Config.wsPersistentColor
+                	Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cWc5
                     		font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
                 }
             }
@@ -164,12 +164,12 @@ PanelWindow {
             // ── Volume ────────────────────────────────────────────────
             Rectangle {
                     Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g, Theme.cBackground.b, 0.35)
+                    color: Qt.rgba(Theme.cSecondaryContainer.r, Theme.cSecondaryContainer.g, Theme.cSecondaryContainer.b, 0.35)
                     border.width: 1
         	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     RowLayout { Layout.fillWidth: true; spacing: 10
                 	Text {
-                        	text: StartMenuState.volumeMuted ? " 󰖁" : " 󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Config.wsPersistentColor
+                        	text: StartMenuState.volumeMuted ? " 󰖁" : " 󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc5
                         	MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
                 	}
                 
@@ -180,7 +180,7 @@ PanelWindow {
                     		onMoved: function(v) { StartMenuState.volumeValue = v; StartMenuState.setVolume(v) }
                     		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
                 	}
-                	Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Config.wsPersistentColor
+                	Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cWc5
                     	font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
               	  }
             }
@@ -198,7 +198,7 @@ PanelWindow {
                             : StartMenuState.netIsEthernet ? "󰈀"
                             : StartMenuState.netRadioEnabled ? "󰤨" : "󰤮"
                         color: StartMenuState.netIsWifi
-                            ? (StartMenuState.netRadioEnabled ? Theme.cPrimary : Theme.cOnSurf)
+                            ? (StartMenuState.netRadioEnabled ? Theme.cWc4 : Theme.cOnSurf)
                             : (StartMenuState.networkStatus === "connected" ? Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurf)
                         Behavior on color { ColorAnimation { duration: 150 } }
                         MouseArea {
@@ -221,7 +221,7 @@ PanelWindow {
                         border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Text { anchors.centerIn: parent; text: StartMenuState.networkExpanded ? "󰁆" : "󰁄"
-                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cPrimary }
+                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cWc5 }
                         MouseArea { id: nxh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 StartMenuState.networkExpanded = !StartMenuState.networkExpanded
@@ -264,7 +264,7 @@ PanelWindow {
                     Text {
                         font.pixelSize: 15; font.family: Config.fontFamily
                         text: StartMenuState.btPowered ? "󰂱" : "󰂲"
-                        color: StartMenuState.btPowered ? Theme.cPrimary : Theme.cOnSurf
+                        color: StartMenuState.btPowered ? Theme.cWc4 : Theme.cOnSurf
                         Behavior on color { ColorAnimation { duration: 150 } }
                         MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: StartMenuState.toggleBtPower() }
@@ -275,7 +275,7 @@ PanelWindow {
                         border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Text { anchors.centerIn: parent; text: StartMenuState.btExpanded ? "󰁆" : "󰁄"
-                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cPrimary }
+                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cWc5 }
                         MouseArea { id: bxh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 StartMenuState.btExpanded = !StartMenuState.btExpanded
@@ -342,7 +342,7 @@ PanelWindow {
                                             : netDelegate.modelData.signal > 40 ? "󰤥"
                                             : netDelegate.modelData.signal > 20 ? "󰤢" : "󰤟"
                                         font.pixelSize: 12; font.family: Config.fontFamily
-                                        color: netDelegate.modelData.active ? Config.ccGlyphColor : Theme.cOnSurfVar
+                                        color: netDelegate.modelData.active ? Theme.cWc4 : Theme.cOnSurfVar
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
                                     Text {
@@ -579,7 +579,7 @@ PanelWindow {
                                 RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 6
                                     Text {
                                         font.pixelSize: 13; font.family: Config.fontFamily
-                                        color: btDelegate.modelData.connected ? Config.ccGlyphColor : Theme.cOnSurfVar
+                                        color: btDelegate.modelData.connected ? Theme.cWc4 : Theme.cOnSurfVar
                                         text: {
                                             const ic = (btDelegate.modelData.icon || "").toLowerCase()
                                             if (ic === "audio-headset" || ic === "audio-headphones" || ic === "audio-headset-gateway") return "󰋎"
@@ -773,15 +773,15 @@ PanelWindow {
                     delegate: Rectangle {
                         required property var modelData
                         Layout.fillWidth: true; height: 52; radius: 12
-                        color: ph.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.75)
-                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.25)
+                        color: ph.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.8)
+                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.45)
                         //gradient: ph.containsMouse ? powerGradient : null
                         border.width: 2; border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                         Behavior on color { ColorAnimation { duration: 120 } }
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
                                 font.pixelSize: 18; font.family: Config.fontFamily
-                                color: ph.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Config.glyphColor
+                                color: ph.containsMouse ? Theme.cWc5 : Theme.cWc4
                                 Behavior on color { ColorAnimation { duration: 120 } } }
                             Text { Layout.alignment: Qt.AlignHCenter; text: modelData.l
                                 color: Theme.cPrimary; font.pixelSize: 10 }
@@ -799,14 +799,14 @@ PanelWindow {
             // Logout button (full width)
             Rectangle {
                 Layout.fillWidth: true; height: 36; radius: 12
-                color: logh.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.75)
-                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.25)
+                color: logh.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.8)
+                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.45)
                 //gradient: logh.containsMouse ? powerGradient : null
                 border.width: 2; border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
                     Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"
-                        color: logh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Config.glyphColor
+                        color: logh.containsMouse ? Theme.cWc5 : Theme.cWc4
                         Behavior on color { ColorAnimation { duration: 120 } } }
                     Text { text: "Logout"; color: logh.containsMouse ? Theme.cPrimary : Theme.cPrimary
                         font.pixelSize: 10; font.weight: Font.Medium
@@ -880,7 +880,7 @@ PanelWindow {
             }
             Text {
                 text: "󰟃"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: sl.innerH + 2
-                color: sl.accent; style: Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.25)
+                color: Theme.cWc4; style: Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.25)
                 x: { const tw = parent.width - sl.pad * 2; const cx = sl.pad + tw * sl.value - implicitWidth / 2
                      return Math.max(sl.pad - implicitWidth/2 + 1, Math.min(parent.width - sl.pad - implicitWidth/2 - 1, cx)) }
                 y: (sl.trackH - implicitHeight) / 2

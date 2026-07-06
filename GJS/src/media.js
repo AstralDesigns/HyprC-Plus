@@ -299,8 +299,8 @@ function createMediaBox() {
             background: transparent;
             border: none;
             box-shadow: none;
-            color: @primary;
-            opacity: 0.45;
+            color: @color2;
+            opacity: 1.0;
             font-size: 10px;
             transition: all 0.15s ease;
         }
@@ -310,7 +310,7 @@ function createMediaBox() {
         }
         .media-source-btn.source-active {
             opacity: 1.0;
-            color: @primary;
+            color: @color6;
             text-shadow: 0 0 8px @primary;
         }
         .media-source-btn.source-playing {
@@ -348,7 +348,7 @@ function createMediaBox() {
             min-height: 14px;
             border: 1px solid @primary;
             border-radius: 4px;
-            background-color: @inverse_primary;
+            background-color: @color1;
             box-shadow: none;
         }
         .media-volume-bar slider:hover {
@@ -377,7 +377,7 @@ function createMediaBox() {
             const [ok2, c2] = sc.lookup_color('background');
             const [ok3, c3] = sc.lookup_color('blur_background');
             const [ok4, c4] = sc.lookup_color('primary');
-            const [ok5, c5] = sc.lookup_color('primary_container');
+            const [ok5, c5] = sc.lookup_color('color6');
             if (ok1 && ok2) {
                 _bgColors = {
                     inv: { r: c1.red, g: c1.green, b: c1.blue, a: c1.alpha },

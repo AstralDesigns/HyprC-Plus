@@ -78,6 +78,8 @@ const GLYPH_FALLBACK  = '󱙝';   //  shown when app has no icon
 const HOME = GLib.get_home_dir();
 const GTK3_COLORS_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors.css']);
 const GTK4_COLORS_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
+const GTK3_WALLUST_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors-wallust.css']);
+const GTK4_WALLUST_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors-wallust.css']);
 const DOCK_STYLE_PATH       = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'style.css']);
 const DOCK_CONFIG_PATH      = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'config.js']);
 // Absolute path so the toggle script is found regardless of working-directory
@@ -125,6 +127,30 @@ function loadCSS() {
         const gtk4Provider = new Gtk.CssProvider();
         try {
             gtk4Provider.load_from_path(GTK4_COLORS_PATH);
+            Gtk.StyleContext.add_provider_for_display(display, gtk4Provider, Gtk.STYLE_PROVIDER_PRIORITY_USER);
+            cssProviders.push(gtk4Provider);
+        } catch (e) {
+            log('[dock] Failed to load GTK4 colors: ' + e.message);
+        }
+    }
+
+    // Load GTK3 colors (wallust named colors)
+    if (GLib.file_test(GTK3_WALLUST_PATH, GLib.FileTest.EXISTS)) {
+        const gtk3Provider = new Gtk.CssProvider();
+        try {
+            gtk3Provider.load_from_path(GTK3_WALLUST_PATH);
+            Gtk.StyleContext.add_provider_for_display(display, gtk3Provider, Gtk.STYLE_PROVIDER_PRIORITY_USER);
+            cssProviders.push(gtk3Provider);
+        } catch (e) {
+            log('[dock] Failed to load GTK3 colors: ' + e.message);
+        }
+    }
+
+    // Load GTK4 colors
+    if (GLib.file_test(GTK4_WALLUST_PATH, GLib.FileTest.EXISTS)) {
+        const gtk4Provider = new Gtk.CssProvider();
+        try {
+            gtk4Provider.load_from_path(GTK4_WALLUST_PATH);
             Gtk.StyleContext.add_provider_for_display(display, gtk4Provider, Gtk.STYLE_PROVIDER_PRIORITY_USER);
             cssProviders.push(gtk4Provider);
         } catch (e) {
@@ -198,7 +224,7 @@ function _injectGlyphSizeCSS(display) {
     const appPx       = DockConfig.appIconSize;
     const glyphPx     = DockConfig.glyphIconSize !== null
         ? DockConfig.glyphIconSize
-        : Math.round((appPx - 2) * (DockConfig.glyphIconSizeFraction || 1.1));
+        : Math.round(appPx * (DockConfig.glyphIconSizeFraction || 1.1));
     const indicatorPx = DockConfig.indicatorSize !== null
         ? DockConfig.indicatorSize
         : Math.max(6, Math.round(appPx * DockConfig.indicatorSizeFraction));
@@ -233,16 +259,16 @@ function _injectGlyphSizeCSS(display) {
         let gradientRule;
         if (pos === 'right') {
             // inverse_primary on the right (screen edge), scrim on the left (desktop side)
-            gradientRule = 'linear-gradient(to right, @scrim, @inverse_primary)';
+            gradientRule = 'linear-gradient(to right, @scrim, @inverse_primary, @scrim)';
         } else if (pos === 'left') {
             // inverse_primary on the left (screen edge), scrim on the right (desktop side)
-            gradientRule = 'linear-gradient(to left, @scrim, @inverse_primary)';
+            gradientRule = 'linear-gradient(to left, @scrim, @inverse_primary, @scrim)';
         } else if (pos === 'top') {
             // inverse_primary on the bottom (desktop-facing), scrim on the top (screen edge)
-            gradientRule = 'linear-gradient(to bottom, @inverse_primary, @scrim)';
+            gradientRule = 'linear-gradient(to bottom, @scrim, @inverse_primary, @scrim)';
         } else {
             // bottom (default): inverse_primary on top, scrim on bottom — original behaviour
-            gradientRule = 'linear-gradient(to bottom, @inverse_primary, @scrim)';
+            gradientRule = 'linear-gradient(to bottom, @scrim, @inverse_primary, @scrim)';
         }
         bgStyle = `background-image: ${gradientRule}; background-color: transparent;`;
     } else {
@@ -257,16 +283,70 @@ function _injectGlyphSizeCSS(display) {
     //   left   → light from left   → inverse_primary left,  scrim right
     //   right  → light from right  → inverse_primary right, scrim left
     const _badgePos = DockConfig.position || 'bottom';
+    const islandStyle = DockConfig.islandBgStyle || 'flat';
     let glyphBadgeGradient;
-    if (_badgePos === 'top') {
-        glyphBadgeGradient = 'linear-gradient(to top, @surface, @on_primary_fixed_variant)';
-    } else if (_badgePos === 'left') {
-        glyphBadgeGradient = 'linear-gradient(to left, @surface, @on_primary_fixed_variant)';
-    } else if (_badgePos === 'right') {
-        glyphBadgeGradient = 'linear-gradient(to right, @surface, @on_primary_fixed_variant)';
+    if (islandStyle === 'gradient') {
+        if (_badgePos === 'top') {
+            glyphBadgeGradient = 'linear-gradient(to bottom, @inverse_primary, @on_secondary, @on_secondary, @inverse_primary)';
+        } else if (_badgePos === 'left') {
+            glyphBadgeGradient = 'linear-gradient(to left, @inverse_primary, @on_secondary, @on_secondary, @inverse_primary)';
+        } else if (_badgePos === 'right') {
+            glyphBadgeGradient = 'linear-gradient(to right, @inverse_primary, @on_secondary, @on_secondary, @inverse_primary)';
+        } else {
+            // bottom (default)
+            glyphBadgeGradient = 'linear-gradient(to bottom, @inverse_primary, @on_secondary, @on_secondary, @inverse_primary)';
+        }
     } else {
-        // bottom (default)
-        glyphBadgeGradient = 'linear-gradient(to bottom, @on_primary_fixed_variant, @surface)';
+        // flat
+        glyphBadgeGradient = 'linear-gradient(to bottom, @on_secondary, @on_secondary)';
+    }
+    
+    const _dockPos = DockConfig.position || 'bottom';
+    let padRule;
+    if (_dockPos === 'top') {
+        padRule = `padding-left: 1px; padding-right: 1px; padding-top: 0px; padding-bottom: 0px;`;
+    } else if (_dockPos === 'left') {
+        padRule = `padding-left: 0px; padding-right: 0px; padding-top: 1px; padding-bottom: 1px;`;
+    } else if (_dockPos === 'right') {
+        padRule = `padding-left: 0px; padding-right: 0px; padding-top: 1px; padding-bottom: 1px;`;
+    } else {
+        padRule = `padding-left: 1px; padding-right: 1px; padding-top: 0px; padding-bottom: 0px;`;
+    }
+    
+    const _dockpos = DockConfig.position || 'bottom';
+    let pRule;
+    if (_dockPos === 'top') {
+        pRule = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
+    } else if (_dockpos === 'left') {
+        pRule = `padding-left: 0px; padding-right: 0px; padding-top: 2px; padding-bottom: 2px;`;
+    } else if (_dockpos === 'right') {
+        pRule = `padding-left: 0px; padding-right: 0px; padding-top: 2px; padding-bottom: 2px;`;
+    } else {
+        pRule = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
+    }
+    
+    const _dpos = DockConfig.position || 'bottom';
+    let btRule;
+    if (_dpos === 'top') {
+        btRule = `padding-left: 2px; padding-right: 2px; padding-top: 4px; padding-bottom: 4px;`;
+    } else if (_dpos === 'left') {
+        btRule = `padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px;`;
+    } else if (_dpos === 'right') {
+        btRule = `padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px;`;
+    } else {
+        btRule = `padding-left: 2px; padding-right: 2px; padding-top: 4px; padding-bottom: 4px;`;
+    }
+    
+    const _pos = DockConfig.position || 'bottom';
+    let pd;
+    if (_pos === 'top') {
+        pd = `padding-left: 1px; padding-top: 1px;`;
+    } else if (_pos === 'left') {
+        pd = `padding-left: 1px; padding-top: 1px;`;
+    } else if (_pos === 'right') {
+        pd = `padding-left: 1px; padding-top: 1px;`;
+    } else {
+        pd = `padding-left: 1px; padding-top: 1px;`;
     }
 
     const css = `
@@ -274,11 +354,12 @@ function _injectGlyphSizeCSS(display) {
         window.background {
             border-width: ${borderW}px;
             border-style: solid;
+            ${padRule}
             border-radius: ${borderTL}px ${borderTR}px ${borderBR}px ${borderBL}px;
             ${bgStyle}
         }
         #box {
-            padding: ${padPx}px;
+            padding: 2px;
         }
         /* ── Circular badge for start / trash glyphs ──────────────────────
            min-width = min-height = glyphPx ensures the label is always a
@@ -286,11 +367,12 @@ function _injectGlyphSizeCSS(display) {
            The gradient direction is flipped to match the dock edge so the
            badge depth-illusion is consistent with the dock surface fill. */
         #start-icon, #trash-icon {
-            font-size: calc(${glyphPx}px - 1px);
-            min-width:  calc(${glyphPx}px + 4px);
-            min-height: ${padPx}px;
-            border-radius: 50%;
+            font-size: ${glyphPx}px;
+            min-width:  calc(${btnSize}px + 8px);
+            min-height: ${btnSize}px;
+            border-radius: 999px;
             background-image: ${glyphBadgeGradient};
+            ${pd}
         }
         .fallback-icon {
             font-size: ${glyphPx}px;
@@ -303,10 +385,12 @@ function _injectGlyphSizeCSS(display) {
         separator.dock-sep-v {
             min-height: ${appPx}px;
             max-height: ${appPx}px;
+            ${pRule}
         }
         separator.dock-sep-h {
             min-width: ${appPx}px;
             max-width: ${appPx}px;
+            ${pRule}
         }
         button.app-button, button.dock-button {
             min-width: ${btnSize}px;
@@ -314,10 +398,7 @@ function _injectGlyphSizeCSS(display) {
             min-height: ${btnSize}px;
             max-height: ${btnSize}px;
             overflow: hidden;
-            padding-top: 4px;
-            padding-bottom: 4px;
-            padding-left: 5px;
-            padding-right: 4px;
+            padding: 4px;/*${btRule}*/
         }
         button.app-button image, button.dock-button image {
             min-width: ${appPx}px;

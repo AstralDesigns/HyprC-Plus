@@ -24,7 +24,7 @@ window.background {
    INDICATOR_FONT_SIZE = round(ICON_SIZE * indicatorSizeFraction).
    The rule here is a safe default; the JS-injected rule overrides it. */
 #active-indicator {
-    color: @primary;
+    color: primary;
     font-size: 4px;
     padding: 0px;
     margin: 0px;
@@ -37,7 +37,7 @@ window.background {
    The gradient direction is overridden at runtime to match the dock
    position so the badge depth-matches the dock fill on all four edges. */
 #start-icon, #trash-icon {
-    color: @primary_fixed_dim;
+    color: @color2;
     font-size: 22px;            /* overridden at runtime — do not rely on this */
     min-width:  22px;           /* overridden at runtime — keeps circle square  */
     min-height: 22px;           /* overridden at runtime — keeps circle square  */

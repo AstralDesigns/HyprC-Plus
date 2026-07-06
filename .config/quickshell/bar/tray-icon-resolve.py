@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """
-tray-icon-resolve.py — icon resolver for SystemTray.qml and ActiveWindow.qml
+tray-icon-resolve.py — icon resolver for SystemTray.qml, ActiveWindow.qml,
+                        and DesktopPinnedState.qml
 
 Resolution order:
   1. Absolute path / image:// URL → pass through
-  2. Gio.DesktopAppInfo lookup (class → icon name):
+  2. ~/Desktop/<name>.desktop → extract Icon= field, then resolve that icon
+  3. Gio.DesktopAppInfo lookup (class → icon name):
        a. Try <variant>.desktop ID combinations
        b. Scan all apps for matching StartupWMClass
-  3. GTK icon theme lookup on resolved/original name
-  4. Manual XDG search (hicolor, Papirus, user theme…)
-  5. /usr/share/pixmaps fallback
+  4. GTK icon theme lookup on resolved/original name
+  5. Manual XDG search (hicolor, Papirus, user theme…)
+  6. /usr/share/pixmaps fallback
 """
 import sys, os, warnings
 warnings.filterwarnings("ignore")
@@ -17,6 +19,9 @@ warnings.filterwarnings("ignore")
 os.environ.setdefault("G_MESSAGES_DEBUG", "none")
 os.environ.setdefault("GTK_DEBUG", "")
 import logging; logging.disable(logging.CRITICAL)
+
+HOME = os.path.expanduser("~")
+DESKTOP_DIR = os.path.join(HOME, "Desktop")
 
 
 def _desktop_variants(cls: str):
@@ -32,6 +37,77 @@ def _desktop_variants(cls: str):
         add("-".join(parts[1:]))
     add(cls.lower().replace(" ", "-").replace("_", "-"))
     return variants
+
+
+def _read_desktop_file(path: str) -> dict:
+    """Parse a .desktop file; return a dict of [Desktop Entry] keys."""
+    result = {}
+    in_main = False
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                line = line.strip()
+                if line == "[Desktop Entry]":
+                    in_main = True
+                elif line.startswith("["):
+                    in_main = False
+                elif in_main and "=" in line:
+                    k, _, v = line.partition("=")
+                    result[k.strip()] = v.strip()
+    except OSError:
+        pass
+    return result
+
+
+def _icon_from_desktop_dir(name: str) -> str:
+    """
+    Check ~/Desktop/<name>.desktop (exact and case-insensitive) for an Icon=
+    field, then resolve that icon name to an absolute path.
+    Steam game shortcuts land here as e.g. Caliber.desktop / Combat_Master.desktop.
+    """
+    if not os.path.isdir(DESKTOP_DIR):
+        return ""
+    # Build a case-insensitive map of stem → filename on first call pattern.
+    # We rebuild it every call since the directory can change; it's small.
+    candidates = []
+    name_lower = name.lower()
+    try:
+        for fname in os.listdir(DESKTOP_DIR):
+            if not fname.endswith(".desktop"):
+                continue
+            stem = fname[:-8]  # strip ".desktop"
+            # Match by stem exactly, case-insensitively, or with underscores/spaces
+            stem_norm = stem.lower().replace("_", " ").replace("-", " ")
+            name_norm = name_lower.replace("_", " ").replace("-", " ")
+            if stem.lower() == name_lower or stem_norm == name_norm:
+                candidates.append(fname)
+    except OSError:
+        return ""
+
+    for fname in candidates:
+        fpath = os.path.join(DESKTOP_DIR, fname)
+        entry = _read_desktop_file(fpath)
+        if entry.get("Type") != "Application":
+            continue
+        icon = entry.get("Icon", "")
+        if not icon:
+            continue
+        # If the Icon field is already an absolute path, use it directly
+        if os.path.isabs(icon) and os.path.isfile(icon):
+            return icon
+        # Otherwise resolve the icon name through the normal lookup chain
+        # (GTK theme + XDG manual search), skipping the Gio step to avoid
+        # infinite recursion since we're already in a file-based resolution.
+        p = _gtk_lookup(icon)
+        if p:
+            return p
+        p = _xdg_lookup(icon)
+        if p:
+            return p
+        # Last resort: return the icon name itself so QML can try Quickshell.iconPath
+        return icon
+
+    return ""
 
 
 def _gio_icon_name(cls: str) -> str:
@@ -143,13 +219,23 @@ def resolve(name: str) -> str:
     if os.path.isabs(name) and os.path.isfile(name):
         return name
 
-    # Step 1: gio DesktopAppInfo → icon name or path
+    # Step 1: ~/Desktop/<name>.desktop — catches Steam game shortcuts and any
+    # other .desktop files that live outside XDG application directories.
+    p = _icon_from_desktop_dir(name)
+    if p and (os.path.isabs(p) or not p.startswith("/")):
+        # If it's an absolute path, we're done; if it's a theme name, fall through
+        if os.path.isabs(p) and os.path.isfile(p):
+            return p
+        # It's a theme name returned by _icon_from_desktop_dir — resolve it below
+        name = p  # swap in the resolved icon name (e.g. "steam")
+
+    # Step 2: gio DesktopAppInfo → icon name or path
     gio = _gio_icon_name(name)
     if gio and os.path.isabs(gio) and os.path.isfile(gio):
         return gio  # absolute path from gio
     lookup = gio if gio else name  # theme name to resolve
 
-    # Step 2: GTK theme lookup
+    # Step 3: GTK theme lookup
     p = _gtk_lookup(lookup)
     if p:
         return p
@@ -159,7 +245,7 @@ def resolve(name: str) -> str:
         if p:
             return p
 
-    # Step 3: manual XDG search
+    # Step 4: manual XDG search
     p = _xdg_lookup(lookup)
     if p:
         return p

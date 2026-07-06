@@ -1,6 +1,7 @@
 #!/bin/bash
-# Write dock window border color (GTK4 matugen @name) into style.css and hot-reload.
-# Usage: dock-border.sh <gtk_name>     e.g. primary, on_secondary, outline_variant
+# Write dock WINDOW border color (GTK4 @name) into style.css line 10 and hot-reload.
+# Handles both matugen named tokens (primary, background, …) and wallust tokens (color0–color15).
+# Usage: dock-border.sh <gtk_name>     e.g. primary, on_secondary, color4
 #        dock-border.sh @primary      (@ prefix is stripped)
 
 STYLE="$HOME/.hyprcandy/GJS/hyprcandydock/style.css"
@@ -25,13 +26,13 @@ if ! grep -q 'border-color:' "$STYLE"; then
     exit 1
 fi
 
-# Primary write target — GTK reads @name from style.css
-sed -i "s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$STYLE"
+# Primary write target — GTK reads @name from style.css (line 10: dock window border)
+sed -i "10s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$STYLE"
 
 # Mirror into config.js for @HCD hot-reload metadata (optional, not the visual source)
 if [ -f "$CONFIG" ] && grep -q 'borderColorVar:' "$CONFIG"; then
     sed -i "s/^\([[:space:]]*borderColorVar:\)[[:space:]]*'[^']*'/\1 '${gtk}'/" "$CONFIG"
-    sed -i "447s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$LAUNCHER"
+    sed -i "537s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$LAUNCHER"
 fi
 
 pkill -f 'gjs.*app-launcher.js' 2>/dev/null || true

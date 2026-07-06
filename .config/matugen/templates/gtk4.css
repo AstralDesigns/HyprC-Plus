@@ -1,4 +1,5 @@
 @import 'colors.css';
+@import 'colors-wallust.css';
 /* GTK NAMED COLORS ---------------- use responsibly! */
 @define-color destructive_bg_color @red_4;
 @define-color destructive_fg_color @primary;

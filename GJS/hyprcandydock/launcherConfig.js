@@ -31,7 +31,7 @@ var LauncherConfig = {
 
     // ── Border ────────────────────────────────────────────────────────
     borderRadius: 18,               // @LC:borderRadius
-    borderWidth:  1,                // @LC:borderWidth
+    borderWidth:  2,                // @LC:borderWidth
     searchRadius: 19,               // @LC:searchRadius
     listRadius:   10,               // @LC:listRadius
     innerBorderWidth: 1,            // @LC:innerBorderWidth

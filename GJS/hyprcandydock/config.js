@@ -7,10 +7,10 @@
 // Each tag is unique in the file so sed can target it unambiguously.
 //
 // Numeric @HCD variables (replace N with new value):
-//   sed -i 's/appIconSize: 26[ \t]*[0-9]*/appIconSize: 20N/' config.js
+//   sed -i 's/appIconSize: 20[ \t]*[0-9]*/appIconSize: 20N/' config.js
 //
 // String @HCD variables (replace GLYPH with new character or escape):
-//   sed -i "s/startIcon: '',
+//   sed -i "s/startIcon: '󰳭',
 //
 // Same pattern applies to all @HCD-tagged variables — just swap the key name.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,8 +20,8 @@ var DockConfig = {
     // ── Start button icon (NerdFont glyph) ────────────────────────────────
     // Paste any glyph directly (use rofi glyph menu or any NerdFont codepoint).
     // null = fall back to the GLYPH_START const in dock-main.js.
-    // candy-utils sed pattern:  sed -i "s/startIcon: '',
-    startIcon: '',              // @HCD:startIcon
+    // candy-utils sed pattern:  sed -i "s/startIcon: '󰳭',
+    startIcon: '󰳭',              // @HCD:startIcon
     // ── Button spacing (gap between every button in the dock) ─────────────
     // Controls GtkBox spacing — applies uniformly between start↔first-app,
     // app↔app, and last-app↔trash so all gaps are edited in one place.
@@ -30,7 +30,7 @@ var DockConfig = {
     // ── App icon size (Gtk.Image pixel_size) ─────────────────────────────
     // Controls Gtk.Image icons from the theme (e.g. Nautilus, Firefox).
     // This is the primary value used for exclusive-zone and button footprint.
-    appIconSize: 26,               // @HCD:appIconSize
+    appIconSize: 20,               // @HCD:appIconSize
 
     // ── Glyph icon size (NerdFont unicode labels) ────────────────────────
     // Controls start, trash, and fallback glyph font-size independently.
@@ -39,7 +39,7 @@ var DockConfig = {
     // formula multiplies by glyphIconSizeFraction (default 1.1) to compensate.
     // Set glyphIconSize to an explicit px value to override auto-derive.
     glyphIconSize: null,
-    glyphIconSizeFraction: 1.0,   // auto = round(appIconSize * this)
+    glyphIconSizeFraction: 1.15,   // auto = round(appIconSize * this)
 
     // ── Indicator size ───────────────────────────────────────────────────
     // Active-window dot font-size in px. Set null to auto-derive.
@@ -60,6 +60,7 @@ var DockConfig = {
     // 'glass'    → solid @blur_background (default, matches style.css)
     // 'gradient' → vertical linear-gradient: @inverse_primary → @scrim
     rectBgStyle: 'glass',          // @HCD:rectBgStyle
+    islandBgStyle: 'gradient',         // @HCD:islandBgStyle
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 2,                // @HCD:borderWidth

@@ -130,7 +130,7 @@ Item {
         text:  root._anyChecking ? root._loaderFrames[root._loaderIdx]
                                  : (root._anyUpdates ? "󰏖" : "󰏗")
         color: root._anyChecking ? Config.rightGroupColor
-             : root._anyUpdates  ? Theme.cOnSurf
+             : root._anyUpdates  ? Theme.cWc5
              :                     Config.rightGroupColor
         font.family:    Config.fontFamily
         font.pixelSize: Config.fontSize

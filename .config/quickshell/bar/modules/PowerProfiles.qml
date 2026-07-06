@@ -22,8 +22,8 @@ Item {
     }
     readonly property color _color: {
         switch (root._profile) {
-            case "performance": return Theme.cSecondary
-            case "power-saver":  return Theme.cOnSurf
+            case "performance": return Theme.cWc6
+            case "power-saver":  return Theme.cWc5
             default:             return Config.rightGroupColor
         }
     }

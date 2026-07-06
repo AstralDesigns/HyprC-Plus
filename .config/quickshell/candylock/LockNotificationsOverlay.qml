@@ -30,6 +30,23 @@ Item {
     property color cTertiaryFixedDim
     property string wallpaperPath: ""
 
+    property color cWc0
+    property color cWc1
+    property color cWc2
+    property color cWc3
+    property color cWc4
+    property color cWc5
+    property color cWc6
+    property color cWc7
+    property color cWc8
+    property color cWc9
+    property color cWc10
+    property color cWc11
+    property color cWc12
+    property color cWc13
+    property color cWc14
+    property color cWc15
+
     readonly property string _fontFamily: "Symbols Nerd Font Mono"
 
     property bool historyVisible: false

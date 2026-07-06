@@ -440,6 +440,71 @@ var Daemon = class {
             } catch (_) {}
         }
 
+        if (!found) {
+            // Steam game heuristic: Hyprland reports Steam games as "steam_app_<id>"
+            // (e.g. "steam_app_307950" for Caliber). Steam .desktop files have no
+            // StartupWMClass, so the WMClass scan above finds nothing. Extract the
+            // numeric app ID and match against Exec=steam steam://rungameid/<id>.
+            const steamMatch = className.match(/^steam_app_(\d+)$/i);
+            if (steamMatch) {
+                const appId = steamMatch[1];
+                try {
+                    for (const info of Gio.AppInfo.get_all()) {
+                        const cmd = info.get_commandline && info.get_commandline();
+                        if (cmd && cmd.includes(`rungameid/${appId}`)) {
+                            found = info;
+                            break;
+                        }
+                    }
+                } catch (_) {}
+            }
+        }
+
+        if (!found) {
+            // ~/Desktop fallback: Steam places game shortcuts in ~/Desktop/ as plain
+            // .desktop files. Gio.AppInfo.get_all() and DesktopAppInfo.new() only
+            // search XDG data dirs, so they never find these files. Scan ~/Desktop/
+            // directly and match by class name, desktop file stem, display name,
+            // or Steam app ID extracted from the Exec line.
+            const HOME = GLib.get_home_dir();
+            const desktopDir = GLib.build_filenamev([HOME, 'Desktop']);
+            if (GLib.file_test(desktopDir, GLib.FileTest.IS_DIR)) {
+                try {
+                    const dir = Gio.File.new_for_path(desktopDir);
+                    const iter = dir.enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+                    const normCls = this._normalizeClass(className);
+                    const steamFallbackId = (() => {
+                        const m = className.match(/^steam_app_(\d+)$/i);
+                        return m ? m[1] : null;
+                    })();
+                    let fileInfo;
+                    while ((fileInfo = iter.next_file(null)) && !found) {
+                        const fname = fileInfo.get_name();
+                        if (!fname.endsWith('.desktop')) continue;
+                        const fpath = GLib.build_filenamev([desktopDir, fname]);
+                        try {
+                            const dinfo = Gio.DesktopAppInfo.new_from_filename(fpath);
+                            if (!dinfo) continue;
+                            const stem  = fname.replace(/\.desktop$/, '');
+                            const dname = (dinfo.get_display_name() || '').toLowerCase();
+                            const dwm   = dinfo.get_startup_wm_class && dinfo.get_startup_wm_class();
+                            const cmd   = dinfo.get_commandline && dinfo.get_commandline();
+                            // Match by: StartupWMClass, desktop file stem, display name, or rungameid
+                            if ((dwm && (dwm.toLowerCase() === className.toLowerCase() ||
+                                         this._normalizeClass(dwm) === normCls)) ||
+                                stem.toLowerCase() === className.toLowerCase() ||
+                                stem.toLowerCase() === normCls ||
+                                dname === className.toLowerCase() ||
+                                dname === normCls ||
+                                (steamFallbackId && cmd && cmd.includes(`rungameid/${steamFallbackId}`))) {
+                                found = dinfo;
+                            }
+                        } catch (_) {}
+                    }
+                } catch (_) {}
+            }
+        }
+
         // Evict oldest entry when cache reaches 512 to bound memory use
         if (this._appInfoCache.size >= 512) {
             const firstKey = this._appInfoCache.keys().next().value;
@@ -609,7 +674,25 @@ var Daemon = class {
             // Resolve desktop ID -> WM class for the clients lookup.
             const info  = this._findAppInfo(pinnedOrig);
             const wmCls = (info && info.get_startup_wm_class && info.get_startup_wm_class()) || pinnedOrig;
-            const instances = this.clients.get(wmCls) || this.clients.get(pinnedOrig) || [];
+
+            // Steam game heuristic: Steam .desktop files have no StartupWMClass so
+            // wmCls falls back to the desktop ID (e.g. "steam_307950"). But Hyprland
+            // reports the running game window as "steam_app_307950". Bridge that gap
+            // by extracting the numeric app ID from the Exec line and trying both forms.
+            let instances = this.clients.get(wmCls) || this.clients.get(pinnedOrig);
+            if (!instances) {
+                const cmd = info && info.get_commandline && info.get_commandline();
+                if (cmd) {
+                    const steamIdMatch = cmd.match(/rungameid\/(\d+)/);
+                    if (steamIdMatch) {
+                        const steamWmCls = `steam_app_${steamIdMatch[1]}`;
+                        instances = this.clients.get(steamWmCls);
+                        if (instances) pinnedWmClasses.add(steamWmCls);
+                    }
+                }
+            }
+            instances = instances || [];
+
             pinnedWmClasses.add(wmCls);
             pinnedWmClasses.add(pinnedOrig); // cover legacy WM-class entries too
             data.push({

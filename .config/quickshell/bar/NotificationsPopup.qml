@@ -487,7 +487,7 @@ Item {
                     MouseArea { id:dndBtnMA; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
                         onClicked:NotificationsState.dndEnabled=!NotificationsState.dndEnabled } }
                 Text { text:NotificationsState.dndEnabled?"Do Not Disturb":"Notifications"
-                    color:NotificationsState.dndEnabled?Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.85):Config.glyphColor
+                    color:NotificationsState.dndEnabled?Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.85):Theme.cWc4
                     font.pixelSize:14; font.weight:Font.Medium; font.family:Config.fontFamily
                     Layout.fillWidth:true; Behavior on color{ColorAnimation{duration:120}} }
                 Rectangle { width:8;height:8;radius:4

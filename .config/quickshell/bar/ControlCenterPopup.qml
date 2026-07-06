@@ -160,7 +160,8 @@ PanelWindow {
         {label: "$surface_container", var: "$surface_container"},
         {label: "$outline", var: "$outline"},
         {label: "$outline_variant", var: "$outline_variant"},
-        {label: "$on_secondary", var: "$on_secondary"}
+        {label: "$on_secondary", var: "$on_secondary"},
+        {label: "$scrim", var: "$scrim"}
     ]
 
     // Available pywal border variables (color0–color15 + foreground/background)
@@ -185,6 +186,26 @@ PanelWindow {
         {label: "$background",  var: "$background"}
     ]
 
+    // Available wallust border variables (color0–color15)
+    readonly property var _wallustBorderVars: [
+        {label: "$color0",  var: "$color0"},
+        {label: "$color1",  var: "$color1"},
+        {label: "$color2",  var: "$color2"},
+        {label: "$color3",  var: "$color3"},
+        {label: "$color4",  var: "$color4"},
+        {label: "$color5",  var: "$color5"},
+        {label: "$color6",  var: "$color6"},
+        {label: "$color7",  var: "$color7"},
+        {label: "$color8",  var: "$color8"},
+        {label: "$color9",  var: "$color9"},
+        {label: "$color10", var: "$color10"},
+        {label: "$color11", var: "$color11"},
+        {label: "$color12", var: "$color12"},
+        {label: "$color13", var: "$color13"},
+        {label: "$color14", var: "$color14"},
+        {label: "$color15", var: "$color15"}
+    ]
+
     // Helper: resolve a pywal $varname to a live color via Theme.walColors
     // (Theme.walColors is a JS object populated from ~/.cache/wal/colors-hyprland.conf)
     function _resolvePywalColor(varName) {
@@ -194,6 +215,36 @@ PanelWindow {
             if (val) return val
         }
         return Theme.cPrimary
+    }
+
+    // Helper: resolve a wallust $colorN to a live color via Theme.wallustColors
+    // (Theme.wallustColors is a JS object populated from WallustColors.qml)
+    function _resolveWallustColor(varName) {
+        if (typeof Theme.wallustColors === "object" && Theme.wallustColors !== null) {
+            const key = varName.replace(/^\$/, "")
+            const val = Theme.wallustColors[key]
+            if (val) return val
+        }
+        // Fallback to typed cWc* properties when map isn't populated yet
+        switch (varName) {
+            case "$color0":  return Theme.cWc0
+            case "$color1":  return Theme.cWc1
+            case "$color2":  return Theme.cWc2
+            case "$color3":  return Theme.cWc3
+            case "$color4":  return Theme.cWc4
+            case "$color5":  return Theme.cWc5
+            case "$color6":  return Theme.cWc6
+            case "$color7":  return Theme.cWc7
+            case "$color8":  return Theme.cWc8
+            case "$color9":  return Theme.cWc9
+            case "$color10": return Theme.cWc10
+            case "$color11": return Theme.cWc11
+            case "$color12": return Theme.cWc12
+            case "$color13": return Theme.cWc13
+            case "$color14": return Theme.cWc14
+            case "$color15": return Theme.cWc15
+            default:         return Theme.cWc7
+        }
     }
 
     // Helper: resolve a matugen $varname to live Theme color (mirrors Config._cavaThemeColor)
@@ -230,6 +281,23 @@ PanelWindow {
             case "$error":                  return Theme.cErr
             case "$scrim":                  return Theme.cScrim
             case "$shadow":                 return Theme.cShadow
+            // Wallust colors
+            case "$color0":                 return Theme.cWc0
+            case "$color1":                 return Theme.cWc1
+            case "$color2":                 return Theme.cWc2
+            case "$color3":                 return Theme.cWc3
+            case "$color4":                 return Theme.cWc4
+            case "$color5":                 return Theme.cWc5
+            case "$color6":                 return Theme.cWc6
+            case "$color7":                 return Theme.cWc7
+            case "$color8":                 return Theme.cWc8
+            case "$color9":                 return Theme.cWc9
+            case "$color10":                return Theme.cWc10
+            case "$color11":                return Theme.cWc11
+            case "$color12":                return Theme.cWc12
+            case "$color13":                return Theme.cWc13
+            case "$color14":                return Theme.cWc14
+            case "$color15":                return Theme.cWc15
             default:                        return Theme.cPrimary
         }
     }
@@ -1096,7 +1164,7 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        width: ccWin._panelW
+        width: 825//ccWin._panelW
 
         radius: 20
         color:  Theme.blurBackground
@@ -1210,7 +1278,7 @@ PanelWindow {
                         height: 125
                         radius: 16
                         color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.25)
+                                               Theme.cInversePrimary.b, 0.45)
                         border.width: 2
                         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
                                               Theme.cScrim.b, 0.85)
@@ -1275,7 +1343,7 @@ PanelWindow {
                                 id: userNameText
                                 Layout.alignment: Qt.AlignHCenter
                                 text: "—"
-                                color: Config.glyphColor
+                                color: Theme.cWc4
                                 font.family: Config.styleFont
                                 font.pixelSize: 16
                                 font.weight: Font.Bold
@@ -1326,7 +1394,7 @@ PanelWindow {
                                 Text {
                                     text: modelData.icon
                                     font.family: Config.fontFamily; font.pixelSize: 15
-                                    color: Config.powerGlyphColor; opacity: 0.55
+                                    color: Theme.cWc4; opacity: 0.55
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
@@ -1342,7 +1410,7 @@ PanelWindow {
                                 anchors { right: parent.right; rightMargin: 4
                                           verticalCenter: parent.verticalCenter }
                                 width: 3; height: 20; radius: 2
-                                color: Config.glyphColor
+                                color: Theme.cWc5
                                 visible: parent._stackIdx === modelData.idx
                             }
 
@@ -1757,63 +1825,291 @@ PanelWindow {
                                         CCSlider { label:"Island B-α";   from:0;to:1;stepSize:0.05;decimals:2; value:Config.islandBorderAlpha;  onMoved:function(v){Config.islandBorderAlpha=v} }
 
                                         CCSection { text: "Bar Border Color" }
-                                        Flow {
-                                            Layout.fillWidth: true; spacing: 5
-                                            Repeater {
-                                                model: ccWin._matugenBorderVars
-                                                delegate: Item {
-                                                    required property var modelData
-                                                    width: 28; height: 28
-                                                    Rectangle {
-                                                        anchors.fill: parent; radius: 6
-                                                        color: ccWin._cavaThemeColorLocal(modelData.var)
-                                                        border.width: Config.barBorderVar === modelData.var ? 2 : 1
-                                                        border.color: Config.barBorderVar === modelData.var
-                                                            ? Theme.cPrimary
-                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                        ToolTip.visible: _barBordHov.containsMouse
-                                                        ToolTip.text: modelData.var
-                                                        ToolTip.delay: 400
-                                                        MouseArea {
-                                                            id: _barBordHov
-                                                            anchors.fill: parent
-                                                            hoverEnabled: true
-                                                            cursorShape: Qt.PointingHandCursor
-                                                            onClicked: { Config.barBorderVar = modelData.var }
+                                        // ── matugen / wallust 2-option pill ─────────────────────────
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Rectangle {
+                                                Layout.preferredWidth: 174; height: 28; radius: 9
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                               Theme.cInversePrimary.b, 0.12)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                                Row {
+                                                    anchors.fill: parent; anchors.margins: 2; spacing: 2
+                                                    Repeater {
+                                                        model: ["matugen", "wallust"]
+                                                        delegate: Rectangle {
+                                                            required property string modelData
+                                                            property bool _sel: Config.barBorderMode === modelData
+                                                            width: (parent.width - 4) / 2; height: parent.height; radius: 7
+                                                            color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                                  Theme.cInversePrimary.b, 0.82) : "transparent"
+                                                            border.width: _sel ? 1 : 0
+                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                            Text {
+                                                                anchors.centerIn: parent
+                                                                text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                                color: Theme.cPrimary
+                                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                                font.weight: _sel ? 600 : 400
+                                                            }
+                                                            MouseArea {
+                                                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                onClicked: { Config.barBorderMode = modelData }
+                                                            }
+                                                            Behavior on color { ColorAnimation { duration: 120 } }
                                                         }
-                                                        Behavior on border.width { NumberAnimation { duration: 100 } }
                                                     }
+                                                }
+                                            }
+                                        }
+                                        // ── Matugen swatches (bar border) ───────────────────────────
+                                        Item {
+                                            Layout.fillWidth: true
+                                            implicitHeight: Config.barBorderMode === "matugen"
+                                                ? (_barBorderMatLoader.item ? _barBorderMatLoader.item.height : 0)
+                                                : (_barBorderWalLoader.item ? _barBorderWalLoader.item.height : 0)
+                                            Loader {
+                                                id: _barBorderMatLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.barBorderMode === "matugen"
+                                                sourceComponent: Flow {
+                                                    width: parent ? parent.width : 0; spacing: 5
+                                                    Repeater {
+                                                        model: ccWin._matugenBorderVars
+                                                        delegate: Item {
+                                                            required property var modelData
+                                                            width: 28; height: 28
+                                                            Rectangle {
+                                                                anchors.fill: parent; radius: 6
+                                                                color: ccWin._cavaThemeColorLocal(modelData.var)
+                                                                border.width: Config.barBorderVar === modelData.var ? 2 : 1
+                                                                border.color: Config.barBorderVar === modelData.var
+                                                                    ? Theme.cPrimary
+                                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                ToolTip.visible: _bbMatHov.containsMouse
+                                                                ToolTip.text: modelData.var
+                                                                ToolTip.delay: 400
+                                                                MouseArea {
+                                                                    id: _bbMatHov
+                                                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                    hoverEnabled: true
+                                                                    onClicked: {
+                                                                        Config.barBorderVar = modelData.var
+                                                                        // Sync dock window border (line 10 of style.css)
+                                                                        const gtk = modelData.var.replace(/^\$/, "").replace(/_/g, "_")
+                                                                        if (_barBorderDockWrite.running) {
+                                                                            _barBorderDockWrite._pending = [scriptDir + "/dock-border.sh", gtk]
+                                                                        } else {
+                                                                            _barBorderDockWrite.command = [scriptDir + "/dock-border.sh", gtk]
+                                                                            _barBorderDockWrite.running = true
+                                                                        }
+                                                                    }
+                                                                }
+                                                                Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // ── Wallust swatches (bar border) ─────────────────────
+                                            Loader {
+                                                id: _barBorderWalLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.barBorderMode === "wallust"
+                                                sourceComponent: Flow {
+                                                    width: parent ? parent.width : 0; spacing: 5
+                                                    Repeater {
+                                                        model: ccWin._wallustBorderVars
+                                                        delegate: Item {
+                                                            required property var modelData
+                                                            width: 28; height: 28
+                                                            Rectangle {
+                                                                anchors.fill: parent; radius: 6
+                                                                color: ccWin._resolveWallustColor(modelData.var)
+                                                                border.width: Config.barBorderWallustVar === modelData.var ? 2 : 1
+                                                                border.color: Config.barBorderWallustVar === modelData.var
+                                                                    ? Theme.cPrimary
+                                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                ToolTip.visible: _bbWalHov.containsMouse
+                                                                ToolTip.text: modelData.var
+                                                                ToolTip.delay: 400
+                                                                MouseArea {
+                                                                    id: _bbWalHov
+                                                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                    hoverEnabled: true
+                                                                    onClicked: {
+                                                                        Config.barBorderWallustVar = modelData.var
+                                                                        // Sync dock window border (line 10 of style.css) with wallust colorN name
+                                                                        const gtk = modelData.var.replace(/^\$/, "")
+                                                                        if (_barBorderDockWrite.running) {
+                                                                            _barBorderDockWrite._pending = [scriptDir + "/dock-border.sh", gtk]
+                                                                        } else {
+                                                                            _barBorderDockWrite.command = [scriptDir + "/dock-border.sh", gtk]
+                                                                            _barBorderDockWrite.running = true
+                                                                        }
+                                                                    }
+                                                                }
+                                                                Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Process {
+                                            id: _barBorderDockWrite
+                                            property var _pending: null
+                                            running: false
+                                            onExited: {
+                                                running = false
+                                                if (_pending !== null) {
+                                                    command = _pending; _pending = null; running = true
                                                 }
                                             }
                                         }
 
                                         CCSection { text: "Island Border Color" }
-                                        Flow {
-                                            Layout.fillWidth: true; spacing: 5
-                                            Repeater {
-                                                model: ccWin._matugenBorderVars
-                                                delegate: Item {
-                                                    required property var modelData
-                                                    width: 28; height: 28
-                                                    Rectangle {
-                                                        anchors.fill: parent; radius: 6
-                                                        color: ccWin._cavaThemeColorLocal(modelData.var)
-                                                        border.width: Config.islandBorderVar === modelData.var ? 2 : 1
-                                                        border.color: Config.islandBorderVar === modelData.var
-                                                            ? Theme.cPrimary
-                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                        ToolTip.visible: _islBordHov.containsMouse
-                                                        ToolTip.text: modelData.var
-                                                        ToolTip.delay: 400
-                                                        MouseArea {
-                                                            id: _islBordHov
-                                                            anchors.fill: parent
-                                                            hoverEnabled: true
-                                                            cursorShape: Qt.PointingHandCursor
-                                                            onClicked: { Config.islandBorderVar = modelData.var }
+                                        // ── matugen / wallust 2-option pill ─────────────────────────
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Rectangle {
+                                                Layout.preferredWidth: 174; height: 28; radius: 9
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                               Theme.cInversePrimary.b, 0.12)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                                Row {
+                                                    anchors.fill: parent; anchors.margins: 2; spacing: 2
+                                                    Repeater {
+                                                        model: ["matugen", "wallust"]
+                                                        delegate: Rectangle {
+                                                            required property string modelData
+                                                            property bool _sel: Config.islandBorderMode === modelData
+                                                            width: (parent.width - 4) / 2; height: parent.height; radius: 7
+                                                            color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                                                  Theme.cInversePrimary.b, 0.82) : "transparent"
+                                                            border.width: _sel ? 1 : 0
+                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                            Text {
+                                                                anchors.centerIn: parent
+                                                                text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                                color: Theme.cPrimary
+                                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                                font.weight: _sel ? 600 : 400
+                                                            }
+                                                            MouseArea {
+                                                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                onClicked: { Config.islandBorderMode = modelData }
+                                                            }
+                                                            Behavior on color { ColorAnimation { duration: 120 } }
                                                         }
-                                                        Behavior on border.width { NumberAnimation { duration: 100 } }
                                                     }
+                                                }
+                                            }
+                                        }
+                                        // ── Matugen swatches (island border) ────────────────────────
+                                        Item {
+                                            Layout.fillWidth: true
+                                            implicitHeight: Config.islandBorderMode === "matugen"
+                                                ? (_islBorderMatLoader.item ? _islBorderMatLoader.item.height : 0)
+                                                : (_islBorderWalLoader.item ? _islBorderWalLoader.item.height : 0)
+                                            Loader {
+                                                id: _islBorderMatLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.islandBorderMode === "matugen"
+                                                sourceComponent: Flow {
+                                                    width: parent ? parent.width : 0; spacing: 5
+                                                    Repeater {
+                                                        model: ccWin._matugenBorderVars
+                                                        delegate: Item {
+                                                            required property var modelData
+                                                            width: 28; height: 28
+                                                            Rectangle {
+                                                                anchors.fill: parent; radius: 6
+                                                                color: ccWin._cavaThemeColorLocal(modelData.var)
+                                                                border.width: Config.islandBorderVar === modelData.var ? 2 : 1
+                                                                border.color: Config.islandBorderVar === modelData.var
+                                                                    ? Theme.cPrimary
+                                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                ToolTip.visible: _ibMatHov.containsMouse
+                                                                ToolTip.text: modelData.var
+                                                                ToolTip.delay: 400
+                                                                MouseArea {
+                                                                    id: _ibMatHov
+                                                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                    hoverEnabled: true
+                                                                    onClicked: {
+                                                                        Config.islandBorderVar = modelData.var
+                                                                        // Sync dock start/trash border (line 49 of style.css)
+                                                                        const gtk = modelData.var.replace(/^\$/, "")
+                                                                        if (_islBorderDockWrite.running) {
+                                                                            _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", gtk]
+                                                                        } else {
+                                                                            _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", gtk]
+                                                                            _islBorderDockWrite.running = true
+                                                                        }
+                                                                    }
+                                                                }
+                                                                Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // ── Wallust swatches (island border) ──────────────────
+                                            Loader {
+                                                id: _islBorderWalLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.islandBorderMode === "wallust"
+                                                sourceComponent: Flow {
+                                                    width: parent ? parent.width : 0; spacing: 5
+                                                    Repeater {
+                                                        model: ccWin._wallustBorderVars
+                                                        delegate: Item {
+                                                            required property var modelData
+                                                            width: 28; height: 28
+                                                            Rectangle {
+                                                                anchors.fill: parent; radius: 6
+                                                                color: ccWin._resolveWallustColor(modelData.var)
+                                                                border.width: Config.islandBorderWallustVar === modelData.var ? 2 : 1
+                                                                border.color: Config.islandBorderWallustVar === modelData.var
+                                                                    ? Theme.cPrimary
+                                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                ToolTip.visible: _ibWalHov.containsMouse
+                                                                ToolTip.text: modelData.var
+                                                                ToolTip.delay: 400
+                                                                MouseArea {
+                                                                    id: _ibWalHov
+                                                                    anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                    hoverEnabled: true
+                                                                    onClicked: {
+                                                                        Config.islandBorderWallustVar = modelData.var
+                                                                        // Sync dock start/trash border (line 49 of style.css) with wallust colorN
+                                                                        const gtk = modelData.var.replace(/^\$/, "")
+                                                                        if (_islBorderDockWrite.running) {
+                                                                            _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", gtk]
+                                                                        } else {
+                                                                            _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", gtk]
+                                                                            _islBorderDockWrite.running = true
+                                                                        }
+                                                                    }
+                                                                }
+                                                                Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        Process {
+                                            id: _islBorderDockWrite
+                                            property var _pending: null
+                                            running: false
+                                            onExited: {
+                                                running = false
+                                                if (_pending !== null) {
+                                                    command = _pending; _pending = null; running = true
                                                 }
                                             }
                                         }
@@ -2040,7 +2336,7 @@ PanelWindow {
                                             }
                                             // Three-button mode selector
                                             Rectangle {
-                                                Layout.preferredWidth: 144; height: 28; radius: 9
+                                                Layout.preferredWidth: 216; height: 28; radius: 9
                                                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                Theme.cInversePrimary.b, 0.12)
                                                 border.width: 1
@@ -2048,11 +2344,11 @@ PanelWindow {
                                                 Row {
                                                     anchors.fill: parent; anchors.margins: 2; spacing: 2
                                                     Repeater {
-                                                        model: ["matugen", "pywal"]
+                                                        model: ["matugen", "pywal", "wallust"]
                                                         delegate: Rectangle {
                                                             required property string modelData
                                                             property bool _sel: Config.cavaStartMode === modelData
-                                                            width: (parent.width - 4) / 2; height: parent.height; radius: 7
+                                                            width: (parent.width - 6) / 3; height: parent.height; radius: 7
                                                             color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                                   Theme.cInversePrimary.b, 0.82) : "transparent"
                                                             border.width: _sel ? 1 : 0
@@ -2078,7 +2374,9 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             implicitHeight: Config.cavaStartMode === "matugen"
                                                 ? (_cavaStartMatugenLoader.item ? _cavaStartMatugenLoader.item.height : 0)
-                                                : (_cavaStartPywalLoader.item ? _cavaStartPywalLoader.item.height : 0)
+                                                : (Config.cavaStartMode === "pywal"
+                                                    ? (_cavaStartPywalLoader.item ? _cavaStartPywalLoader.item.height : 0)
+                                                    : (_cavaStartWallustLoader.item ? _cavaStartWallustLoader.item.height : 0))
                                             // Matugen color swatches
                                             Loader {
                                                 id: _cavaStartMatugenLoader
@@ -2086,11 +2384,6 @@ PanelWindow {
                                                 active: Config.cavaStartMode === "matugen"
                                                 sourceComponent: ColumnLayout {
                                                     spacing: 4
-                                                    //Text {
-                                                        //text: "  Matugen color:"
-                                                        //color: Theme.cOnSurfVar
-                                                        //font.family: Config.labelFont; font.pixelSize: 11
-                                                    //}
                                                     Flow {
                                                         Layout.fillWidth: true; spacing: 5
                                                         Repeater {
@@ -2128,11 +2421,6 @@ PanelWindow {
                                                 active: Config.cavaStartMode === "pywal"
                                                 sourceComponent: ColumnLayout {
                                                     spacing: 4
-                                                    //Text {
-                                                        //text: "  Pywal color:"
-                                                        //color: Theme.cOnSurfVar
-                                                        //font.family: Config.labelFont; font.pixelSize: 11
-                                                    //}
                                                     Flow {
                                                         Layout.fillWidth: true; spacing: 5
                                                         Repeater {
@@ -2163,6 +2451,43 @@ PanelWindow {
                                                     }
                                                 }
                                             }
+                                            // Wallust color swatches
+                                            Loader {
+                                                id: _cavaStartWallustLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.cavaStartMode === "wallust"
+                                                sourceComponent: ColumnLayout {
+                                                    spacing: 4
+                                                    Flow {
+                                                        Layout.fillWidth: true; spacing: 5
+                                                        Repeater {
+                                                            model: ccWin._wallustBorderVars
+                                                            delegate: Item {
+                                                                required property var modelData
+                                                                width: 28; height: 28
+                                                                Rectangle {
+                                                                    anchors.fill: parent; radius: 6
+                                                                    color: ccWin._resolveWallustColor(modelData.var)
+                                                                    border.width: Config.cavaStartWallustVar === modelData.var ? 2 : 1
+                                                                    border.color: Config.cavaStartWallustVar === modelData.var
+                                                                        ? Theme.cPrimary
+                                                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                    ToolTip.visible: _csWallustHover.containsMouse
+                                                                    ToolTip.text: modelData.var
+                                                                    ToolTip.delay: 400
+                                                                    MouseArea {
+                                                                        id: _csWallustHover
+                                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                        hoverEnabled: true
+                                                                        onClicked: { Config.cavaStartWallustVar = modelData.var }
+                                                                    }
+                                                                    Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         Item { height: 6 }
@@ -2179,7 +2504,7 @@ PanelWindow {
                                             }
                                             // Three-button mode selector
                                             Rectangle {
-                                                Layout.preferredWidth: 144; height: 28; radius: 9
+                                                Layout.preferredWidth: 216; height: 28; radius: 9
                                                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                Theme.cInversePrimary.b, 0.12)
                                                 border.width: 1
@@ -2187,11 +2512,11 @@ PanelWindow {
                                                 Row {
                                                     anchors.fill: parent; anchors.margins: 2; spacing: 2
                                                     Repeater {
-                                                        model: ["matugen", "pywal"]
+                                                        model: ["matugen", "pywal", "wallust"]
                                                         delegate: Rectangle {
                                                             required property string modelData
                                                             property bool _sel: Config.cavaEndMode === modelData
-                                                            width: (parent.width - 4) / 2; height: parent.height; radius: 7
+                                                            width: (parent.width - 6) / 3; height: parent.height; radius: 7
                                                             color: _sel ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                                   Theme.cInversePrimary.b, 0.82) : "transparent"
                                                             border.width: _sel ? 1 : 0
@@ -2222,7 +2547,9 @@ PanelWindow {
                                             opacity: Config.cavaGradientEnabled ? 1.0 : 0.4
                                             implicitHeight: Config.cavaEndMode === "matugen"
                                                 ? (_cavaEndMatugenLoader.item ? _cavaEndMatugenLoader.item.height : 0)
-                                                : (_cavaEndPywalLoader.item ? _cavaEndPywalLoader.item.height : 0)
+                                                : (Config.cavaEndMode === "pywal"
+                                                    ? (_cavaEndPywalLoader.item ? _cavaEndPywalLoader.item.height : 0)
+                                                    : (_cavaEndWallustLoader.item ? _cavaEndWallustLoader.item.height : 0))
                                             // Matugen color swatches
                                             Loader {
                                                 id: _cavaEndMatugenLoader
@@ -2230,11 +2557,6 @@ PanelWindow {
                                                 active: Config.cavaEndMode === "matugen"
                                                 sourceComponent: ColumnLayout {
                                                     spacing: 4
-                                                    //Text {
-                                                        //text: "  Matugen color:"
-                                                        //color: Theme.cOnSurfVar
-                                                        //font.family: Config.labelFont; font.pixelSize: 11
-                                                    //}
                                                     Flow {
                                                         Layout.fillWidth: true; spacing: 5
                                                         Repeater {
@@ -2275,11 +2597,6 @@ PanelWindow {
                                                 active: Config.cavaEndMode === "pywal"
                                                 sourceComponent: ColumnLayout {
                                                     spacing: 4
-                                                    //Text {
-                                                        //text: "  Pywal color:"
-                                                        //color: Theme.cOnSurfVar
-                                                        //font.family: Config.labelFont; font.pixelSize: 11
-                                                    //}
                                                     Flow {
                                                         Layout.fillWidth: true; spacing: 5
                                                         Repeater {
@@ -2304,6 +2621,46 @@ PanelWindow {
                                                                         onClicked: {
                                                                             if (!Config.cavaGradientEnabled) return
                                                                             Config.cavaEndPywalVar = modelData.var
+                                                                        }
+                                                                    }
+                                                                    Behavior on border.width { NumberAnimation { duration: 100 } }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            // Wallust color swatches
+                                            Loader {
+                                                id: _cavaEndWallustLoader
+                                                anchors { left: parent.left; right: parent.right; top: parent.top }
+                                                active: Config.cavaEndMode === "wallust"
+                                                sourceComponent: ColumnLayout {
+                                                    spacing: 4
+                                                    Flow {
+                                                        Layout.fillWidth: true; spacing: 5
+                                                        Repeater {
+                                                            model: ccWin._wallustBorderVars
+                                                            delegate: Item {
+                                                                required property var modelData
+                                                                width: 28; height: 28
+                                                                Rectangle {
+                                                                    anchors.fill: parent; radius: 6
+                                                                    color: ccWin._resolveWallustColor(modelData.var)
+                                                                    border.width: Config.cavaEndWallustVar === modelData.var ? 2 : 1
+                                                                    border.color: Config.cavaEndWallustVar === modelData.var
+                                                                        ? Theme.cPrimary
+                                                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                                    ToolTip.visible: _ceWallustHover.containsMouse
+                                                                    ToolTip.text: modelData.var
+                                                                    ToolTip.delay: 400
+                                                                    MouseArea {
+                                                                        id: _ceWallustHover
+                                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                        hoverEnabled: true
+                                                                        onClicked: {
+                                                                            if (!Config.cavaGradientEnabled) return
+                                                                            Config.cavaEndWallustVar = modelData.var
                                                                         }
                                                                     }
                                                                     Behavior on border.width { NumberAnimation { duration: 100 } }
@@ -2344,6 +2701,12 @@ PanelWindow {
                                             value: Config.islandBgStyle === "gradient"
                                             onToggled: function(v) {
                                                 Config.islandBgStyle = v ? "gradient" : "flat"
+                                                const style = v ? "gradient" : "flat"
+                                                const cmd = "sed -i \"s/islandBgStyle: '[^']*'/islandBgStyle: '" + style + "'/;\" " +
+                                                      "\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\" && " +
+                                                      "pkill -SIGUSR2 -f 'gjs dock-main.js' 2>/dev/null || true"
+                                                if (_confWriteProc.running) _confWriteProc._pendingCmd = cmd
+                                                else { _confWriteProc._cmd = cmd; _confWriteProc.running = true }
                                             }
                                         }
 
@@ -3257,7 +3620,7 @@ PanelWindow {
                                         id: _colorRegenLabel
                                         anchors.centerIn: parent
                                         text: _colorRegenPill.regenEnabled ? " ON " : " OFF"
-                                        color: Theme.cPrimary
+                                        color: Theme.cWc5
                                         font.family: Config.labelFont
                                         font.pixelSize: 12
                                     }
@@ -3594,50 +3957,6 @@ PanelWindow {
                             }
                             Process { id: _dockBorderWStateWrite; running: false; onExited: running = false }
 
-                            CCSection { text: "Border Color" }
-                            Flow {
-                                Layout.fillWidth: true; spacing: 5
-                                Repeater {
-                                    model: ccWin._matugenBorderVars
-                                    delegate: Item {
-                                        required property var modelData
-                                        // GTK4 matugen names — no $ prefix (bar uses $ from colors.conf)
-                                        readonly property string gtkName: modelData.var.replace(/^\$/, "")
-                                        width: 28; height: 28
-
-                                        Rectangle {
-                                            anchors.fill: parent; radius: 6
-                                            color: ccWin._cavaThemeColorLocal(modelData.var)
-                                            border.width: _dockBorderColorVar === parent.gtkName ? 2 : 1
-                                            border.color: _dockBorderColorVar === parent.gtkName
-                                                ? Theme.cPrimary
-                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                            Behavior on border.width { NumberAnimation { duration: 100 } }
-                                        }
-
-                                        MouseArea {
-                                            id: _dockBordHov
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            cursorShape: Qt.PointingHandCursor
-                                            ToolTip.visible: containsMouse
-                                            ToolTip.text: "@" + parent.gtkName
-                                            ToolTip.delay: 400
-                                            onClicked: {
-                                                _dockBorderColorVar = parent.gtkName
-                                                const args = [scriptDir + "/dock-border.sh", parent.gtkName]
-                                                if (_dockBorderColorWrite.running) {
-                                                    _dockBorderColorWrite._pending = args
-                                                } else {
-                                                    _dockBorderColorWrite.command = args
-                                                    _dockBorderColorWrite.running = true
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-
                             CCSection { text: "Corner Radius" }
                             CCSlider {
                                 label: "Top-Left"
@@ -3838,7 +4157,7 @@ PanelWindow {
 
                             CCSlider {
                                 label: "Icon Size"
-                                from: 22; to: 64; stepSize: 1
+                                from: 18; to: 64; stepSize: 1
                                 value: parseInt(_dockIconSizeVal) || 24
                                 onMoved: function(v) {
                                     _dockIconSizeVal = v.toString()
@@ -4784,7 +5103,7 @@ PanelWindow {
                                                 Layout.topMargin: 4; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰌌 hyprviz.lua"
-                                                    color: Theme.cOnSurf
+                                                    color: Theme.cWc5
             					    opacity: 0.85
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 14; font.weight: Font.Bold
@@ -4861,7 +5180,7 @@ PanelWindow {
                                                 Layout.topMargin: 14; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰏫 custom.lua"
-                                                    color: Theme.cOnSurf
+                                                    color: Theme.cWc5
             					    opacity: 0.85
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 14; font.weight: Font.Bold
@@ -5431,7 +5750,7 @@ PanelWindow {
 
                                 Text {
                                     text: " 󰗘 Animations"
-                                    color: Theme.cOnSurf
+                                    color: Theme.cWc5
 				    opacity: 0.85
                                     font.family: Config.labelFont
                                     font.pixelSize: 14
@@ -5855,7 +6174,7 @@ PanelWindow {
                                             }
                                             font.family: Config.fontFamily
                                             font.pixelSize: 44
-                                            color: Theme.cPrimary
+                                            color: Theme.cWc1
                                         }
                                     }
 
@@ -5864,7 +6183,7 @@ PanelWindow {
                                         spacing: 3
                                         Text {
                                             text: sysInfoRoot.info.USERHOST || "—"
-                                            color: Theme.cPrimary
+                                            color: Theme.cWc5
                                             font.family: Config.labelFont
                                             font.pixelSize: 17
                                             font.weight: Font.Bold
@@ -5926,7 +6245,7 @@ PanelWindow {
                                             text: "󰑐"
                                             font.family: Config.fontFamily
                                             font.pixelSize: 15
-                                            color: Theme.cPrimary
+                                            color: Theme.cWc5
                                             RotationAnimator {
                                                 target: refreshGlyph
                                                 from: 0; to: 360
@@ -7086,7 +7405,7 @@ PanelWindow {
                     text: _card.glyph
                     font.family: Config.fontFamily
                     font.pixelSize: 16
-                    color: Theme.cPrimary
+                    color: Theme.cWc4
                 }
                 Text {
                     text: _card.title
@@ -7151,7 +7470,7 @@ PanelWindow {
                 text: _chip.glyph
                 font.family: Config.fontFamily
                 font.pixelSize: 13
-                color: Theme.cPrimary
+                color: Theme.cWc5
             }
             Text {
                 text: _chip.label + ":"
@@ -7176,7 +7495,7 @@ PanelWindow {
         Layout.bottomMargin: 4
         Text {
             id: _sh
-            color: Theme.cOnSurf
+            color: Theme.cWc5
             opacity: 0.85
             font.family: Config.labelFont
             font.pixelSize: 14
@@ -7262,7 +7581,7 @@ PanelWindow {
                     text: "󰟃"
                     font.family: "Symbols Nerd Font Mono"
                     font.pixelSize: _trough.iH + 2
-                    color: Theme.cPrimary
+                    color: Theme.cWc4
                     style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.25)
                     x: {
                         const tw = parent.width - _trough.pad * 2
@@ -7319,7 +7638,7 @@ PanelWindow {
         Text {
             id: _tl
             Layout.preferredWidth: 130
-            color: Config.glyphColor
+            color: Theme.cPrimary
             font.family: Config.labelFont; font.pixelSize: 13
             elide: Text.ElideRight
         }
@@ -7340,7 +7659,7 @@ PanelWindow {
 
             Rectangle {
                 width: 20; height: 20; radius: 10
-                color: value ? Theme.cPrimary : Theme.cOnSurfVar
+                color: value ? Theme.cWc4 : Theme.cWc5
                 anchors.verticalCenter: parent.verticalCenter
                 x: value ? parent.width - width - 3 : 3
                 Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }

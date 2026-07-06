@@ -181,7 +181,53 @@ Item {
                         width:  Config.desktopIconSize + 25
                         height: Config.desktopIconSize + Config.desktopLabelSize + 16
 
+                        // Resolved icon path — set by iconResolver below.
+                        // Starts as "" so the fallback glyph shows while resolving.
+                        property string _resolvedIcon: ""
+
+                        // ── Per-icon resolver ──────────────────────────────
+                        // Mirrors the SystemTray.qml pattern: one Process per
+                        // delegate, argv[1] mode (no stdin), runs once per icon.
+                        // DesktopLayer is a visual component so all Quickshell.Io
+                        // types (including StdinWriter) are available here, unlike
+                        // in the pragma Singleton DesktopPinnedState.qml context.
+                        Process {
+                            id: iconResolver
+                            property string _buf: ""
+                            command: ["python3", Config.barDir + "/tray-icon-resolve.py",
+                                      iconItem._icon]
+                            running: iconItem._icon !== ""
+                            stdout: SplitParser {
+                                splitMarker: "\n"
+                                onRead: function(line) { iconResolver._buf += line }
+                            }
+                            onExited: {
+                                const p = _buf.trim()
+                                if (p) iconItem._resolvedIcon = p
+                            }
+                        }
+
+                        // Re-resolve when the icon name changes (e.g. model refresh).
+                        onModelDataChanged: {
+                            _resolvedIcon = ""
+                            iconResolver._buf = ""
+                            iconResolver.running = false
+                            iconResolver.running = iconItem._icon !== ""
+                        }
+
                         readonly property string _iconSrc: {
+                            const r = _resolvedIcon
+                            if (r !== "") {
+                                if (r.startsWith("file://") || r.startsWith("image://"))
+                                    return r
+                                if (r.startsWith("/"))
+                                    return "file://" + r
+                                // Resolver returned a theme name — let Qt resolve it
+                                return Quickshell.iconPath(r, "application-x-executable")
+                            }
+                            // Still resolving — use theme name directly as best-effort
+                            if (_icon.startsWith("file://") || _icon.startsWith("image://"))
+                                return _icon
                             if (_icon.startsWith("/"))
                                 return "file://" + _icon
                             return Quickshell.iconPath(_icon, "application-x-executable")
@@ -240,8 +286,7 @@ Item {
                             width:  Math.min(nameLabel.implicitWidth + 10, parent.width)
                             height: nameLabel.implicitHeight + 6
                             radius: Config.desktopLabelRadius
-                            color:  Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                      			  Theme.cInversePrimary.b, 0.50)//Theme.cPanelBg
+                            color:  Theme.cPanelBg // Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,Theme.cInversePrimary.b, 0.50)
                             border.width: 1
        			    border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       			  Config.barBorderColor.b, Config.barBorderAlpha)
@@ -253,7 +298,7 @@ Item {
                                 text:             iconItem._name
                                 font.pixelSize:   Config.desktopLabelSize
                                 font.weight: 	  Font.Bold
-                                color:            Theme.cScrim
+                                color:            Theme.cSurfaceTint
                                 elide:            Text.ElideRight
                                 maximumLineCount: 1
                                 horizontalAlignment: Text.AlignHCenter

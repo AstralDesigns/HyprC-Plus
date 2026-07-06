@@ -61,7 +61,7 @@ Item {
                             visible: MediaPlayerState.artPath === "" || artImage.status !== Image.Ready
                             anchors.centerIn: parent
                             text: "" //󰎆 󰎍 󰺕 󱥸 󱨧
-                            color: Config.discGlyphColor
+                            color: Qt.rgba(Theme.cWc6.r, Theme.cWc4.g, Theme.cWc4.b, 1.00)
                             font.family: Config.fontFamily
                             font.pixelSize: MediaPlayerState.thumbSize - 2
                         }
@@ -119,9 +119,9 @@ Item {
                                         ? modelData.glyphplay
                                         : (modelData.glyph || "")
                                     color: modelData.glyphplay !== undefined
-                                        ? (ctlMa.containsMouse ? Config.textColor : Theme.cPrimaryFixedDim)
-                                        : (ctlMa.containsMouse ? Config.textColor : Theme.cSecondaryContainer)
-                                    opacity: 0.85
+                                        ? (ctlMa.containsMouse ? Config.textColor : Theme.cWc1)
+                                        : (ctlMa.containsMouse ? Config.textColor : Theme.cWc6)
+                                    opacity: 0.8
                                     font.family:    Config.fontFamily
                                     font.pixelSize: Config.mediaCtlSize
                                     font.weight:    Config.fontWeight
