@@ -781,7 +781,7 @@ popover.launcher-popover button {
 }
 
 .fav-glyph {
-    color: @color4;
+    color: @color9;
     font-size: ${Math.round(TEXT_FONT_SIZE * 1.27)}px;
     margin-right: 4px;
 }
@@ -878,7 +878,7 @@ window.hyprcandy-group-dialog {
 }
 
 .tab-btn.active .tab-glyph {
-    color: @color4;
+    color: @color9;
 }
 
 /* ── Clipboard tab ───────────────────────────────────────────────────── */

@@ -577,7 +577,7 @@ QtObject {
     //  textColor   → info text (time, date, weather value, battery %)
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
-    readonly property color glyphColor:  Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 1.00)
+    readonly property color glyphColor:  Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, 1.00)
     readonly property color textColor:   Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
     readonly property color activeColor: Config.glyphColor
     readonly property color dimColor:    Theme.cOnSurfVar
@@ -613,7 +613,7 @@ QtObject {
     property color powerGlyphColor:      Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
-    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc1.r, Theme.cWc1.g, Theme.cWc1.b, ccGlyphOpacity)
+    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc9.r, Theme.cWc9.g, Theme.cWc9.b, ccGlyphOpacity)
 
     // ── Battery radial indicator ─────────────────────────────────────────
     property bool batteryRadialVisible: true
