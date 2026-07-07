@@ -577,7 +577,7 @@ QtObject {
     //  textColor   → info text (time, date, weather value, battery %)
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
-    readonly property color glyphColor:  Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, 1.00)
+    readonly property color glyphColor:  Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, 1.00)
     readonly property color textColor:   Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
     readonly property color activeColor: Config.glyphColor
     readonly property color dimColor:    Theme.cOnSurfVar
@@ -668,7 +668,7 @@ QtObject {
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
     readonly property color wsActiveColor:     Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, wsActiveOpacity)
-    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, wsPersistentOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, wsPersistentOpacity)
     readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc2.r, Theme.cWc2.g, Theme.cWc2.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
