@@ -323,7 +323,8 @@ PanelWindow {
                 Layout.bottomMargin: 10
                 implicitHeight: gridCol.implicitHeight + 16
                 radius: 20
-                color: Qt.rgba(Theme.cSecondaryContainer.r, Theme.cSecondaryContainer.g, Theme.cSecondaryContainer.b, 0.35)
+                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                               Theme.cOnSecondary.b, 0.45)
                 border.width: 1
                 border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
