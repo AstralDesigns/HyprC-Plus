@@ -233,7 +233,7 @@ Item {
 
                                     Text {
                                         text: modelData.glyph
-                                        color: Theme.cWc4
+                                        color: Theme.cWc6
                                         font.pixelSize: 12
                                         font.family: Config.fontFamily
                                     }
