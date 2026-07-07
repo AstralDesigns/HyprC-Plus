@@ -494,7 +494,7 @@ Item {
                         sub:      root._batStatus
                         arcColor: root._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
                                   : root._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
-                                  : Theme.cWc9
+                                  : Theme.cWc6
                     }
                 }
             }
