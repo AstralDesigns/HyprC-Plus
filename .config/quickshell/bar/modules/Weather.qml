@@ -33,7 +33,7 @@ Item {
             text: WeatherPopupState.icon
             color: Config.batteryIconColor
             font.family: Config.fontFamily
-            font.pixelSize: Config.infoGlyphSize
+            font.pixelSize: Config.infoGlyphSize + 2
             font.weight: Config.fontWeight
             anchors.verticalCenter: parent.verticalCenter
         }

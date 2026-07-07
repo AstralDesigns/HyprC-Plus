@@ -167,7 +167,7 @@ Item {
                     radius: 20
                     clip: true
                     color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.45)
+                                               Theme.cInversePrimary.b, 0.75)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
@@ -193,7 +193,7 @@ Item {
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: WeatherPopupState.temp
-                                color: Theme.cOnSurf
+                                color: Theme.cWc5
                                 font.pixelSize: 21
                                 font.weight: Font.Bold
                                 font.family: Config.labelFont
@@ -348,8 +348,8 @@ Item {
                                 spacing: 1
                                 Text {
                                     text: WeatherPopupState.hrTimes[index] || "--"
-                                    color: isCurrentHour ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
-                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
+                                    color: isCurrentHour ? Theme.cWc5
+                                        : Theme.cWc5
                                     font.pixelSize: 9; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -424,7 +424,7 @@ Item {
                             spacing: 3
                             Text {
                                 text: WeatherPopupState.fcDays[index] || "--"
-                                color: index === 0 ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65) : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.65)
+                                color: index === 0 ? Theme.cWc5 : Theme.cWc5
                                 font.pixelSize: 11; font.weight: index === 0 ? Font.Bold : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter

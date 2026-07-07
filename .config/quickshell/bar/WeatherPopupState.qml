@@ -73,26 +73,26 @@ QtObject {
     function _cvtWind(kmh) { return _metric ? Math.round(kmh) + " km/h" : Math.round(kmh * 0.621371) + " mph" }
 
     function _cond(code, isDay, h) {
-        if (code===0)             return {t:'Clear Sky',             i:isDay?'󰖙':'󰖔'};
-        if (code===1)             return {t:'Mainly Clear',          i:isDay?'󰖕':'󰼱'};
-        if (code===2)             return {t:'Partly Cloudy',         i:isDay?'󰖕':'󰼱'};
-        if (code===3)             return h>=85?{t:'Overcast (Rainy)',i:isDay?'':''}:{t:'Overcast',i:isDay?'󰼰':'󰖑'};
-        if (code===45||code===48) return {t:'Fog',              i:isDay?'':''};
-        if (code>=51)             return {t:'Rainy',            i:isDay?'':''};
-        if (code>=53)             return {t:'Moderate Drizzle', i:isDay?'':''};
-        if (code>=55)             return {t:'Dense Drizzle',    i:'󰖖'};
-        if (code===56)            return {t:'Light Freezing Rain',   i:'󰖒'};
-        if (code===57)            return {t:'Dense Freezing Drizzle',i:'󰖒'};
-        if (code===61)            return {t:'Slight Rain',           i:'󰖗'};
-        if (code===63)            return {t:'Moderate Rain',         i:'󰖖'};
-        if (code===65)            return {t:'Heavy Rain',            i:'󰙾'};
-        if (code===66||code===67) return {t:'Freezing Rain',         i:'󰙿'};
-        if (code>=71&&code<=75)   return {t:code===71?'Light Snow':code===73?'Moderate Snow':'Heavy Snow',i:'󰜗'};
-        if (code===77)            return {t:'Snow Grains',           i:'󰖘'};
-        if (code>=80&&code<=82)   return {t:'Rain Showers',          i:'󰙾'};
-        if (code===85||code===86) return {t:'Snow Showers',          i:'󰼶'};
-        if (code===95)            return {t:'Thunderstorm',          i:'󰖓'};
-        if (code===96||code===99) return {t:'Thunderstorm + Hail',   i:isDay?'':''};
+        if (code===0)             return {t:'Clear Sky',             i:isDay?'☀️':'🌙'};
+        if (code===1)             return {t:'Mainly Clear',          i:isDay?'☀️':'🌙'};
+        if (code===2)             return {t:'Partly Cloudy',         i:isDay?'⛅':'☁️'};
+        if (code===3)             return h>=85?{t:'Overcast (Rainy)',i:isDay?'🌦️':'🌧️'}:{t:'Overcast',i:isDay?'⛅':'☁️'};
+        if (code===45||code===48) return {t:'Fog',              i:isDay?'🌫':'🌫'};
+        if (code>=51)             return {t:'Rainy',            i:isDay?'🌦️':'🌧️'};
+        if (code>=53)             return {t:'Moderate Drizzle', i:isDay?'🌦️':'🌧️'};
+        if (code>=55)             return {t:'Dense Drizzle',    i:isDay?'🌦️':'🌧️'};
+        if (code===56)            return {t:'Light Freezing Rain',   i:isDay?'🌦️':'🌧️'};
+        if (code===57)            return {t:'Dense Freezing Drizzle',i:isDay?'🌦️':'🌧️'};
+        if (code===61)            return {t:'Slight Rain',           i:isDay?'🌦️':'🌧️'};
+        if (code===63)            return {t:'Moderate Rain',         i:isDay?'🌦️':'🌧️'};
+        if (code===65)            return {t:'Heavy Rain',            i:'⛈️'};
+        if (code===66||code===67) return {t:'Freezing Rain',         i:'⛈️'};
+        if (code>=71&&code<=75)   return {t:code===71?'Light Snow':code===73?'Moderate Snow':'Heavy Snow',i:'❄️'};
+        if (code===77)            return {t:'Snow Grains',           i:'🌨️'};
+        if (code>=80&&code<=82)   return {t:'Rain Showers',          i:'🌨️'};
+        if (code===85||code===86) return {t:'Snow Showers',          i:'🌨️'};
+        if (code===95)            return {t:'Thunderstorm',          i:'⚡'};
+        if (code===96||code===99) return {t:'Thunderstorm + Hail',   i:isDay?'⛈':'⛈'};
         return {t:'Unknown', i:'󰖐'};
     }
 

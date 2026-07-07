@@ -240,25 +240,25 @@ ShellRoot {
 
     // Identical icon mapping to WeatherPopupState._cond()
     function _wxCond(code, isDay, h) {
-        if (code===0)             return isDay ? "󰖙" : "󰖔"
-        if (code===1)             return isDay ? "󰖕" : "󰼱"
-        if (code===2)             return isDay ? "󰖕" : "󰼱"
+        if (code===0)             return isDay ? "☀️" : "🌙"
+        if (code===1)             return isDay ? "☀️" : "🌙"
+        if (code===2)             return isDay ? "⛅" : "☁️"
         if (code===3)             return h >= 85
-            ? (isDay ? "":"")
-            : (isDay ? "󰼰" : "󰖑")
-        if (code===45||code===48) return isDay ? "":""
-        if (code>=51&&code<=55)   return "󰖗"
-        if (code===56||code===57) return "󰖒"
-        if (code===61)            return "󰖗"
-        if (code===63)            return "󰖖"
-        if (code===65)            return "󰙾"
-        if (code===66||code===67) return "󰙿"
-        if (code>=71&&code<=75)   return "󰜗"
-        if (code===77)            return "󰖘"
-        if (code>=80&&code<=82)   return "󰙾"
-        if (code===85||code===86) return "󰼶"
-        if (code===95)            return "󰖓"
-        if (code===96||code===99) return isDay ? "":""
+            ? (isDay ? "🌦️":"🌧️")
+            : (isDay ? "⛅" : "☁️")
+        if (code===45||code===48) return "🌫"
+        if (code>=51&&code<=55)   return isDay ? "🌦️" : "🌧️"
+        if (code===56||code===57) return isDay ? "🌦️" : "🌧️"
+        if (code===61)            return isDay ? "🌦️" : "🌧️"
+        if (code===63)            return isDay ? "🌦️" : "🌧️"
+        if (code===65)            return "⛈️"
+        if (code===66||code===67) return "⛈️"
+        if (code>=71&&code<=75)   return "❄️"
+        if (code===77)            return "🌨️"
+        if (code>=80&&code<=82)   return "🌨️"
+        if (code===85||code===86) return "🌨️"
+        if (code===95)            return "⚡"
+        if (code===96||code===99) return isDay ? "⛈":"⛈"
         return "󰖐"
     }
 
