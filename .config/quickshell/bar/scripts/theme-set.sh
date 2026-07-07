@@ -29,22 +29,7 @@ if [ "$SCHEME" = "light" ]; then
     sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @primary_fixed_dim;/' "$G4"
     sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @inverse_primary;/'  "$G4"
 
-# ── Dark — Fidelity / Monochrome ──────────────────────────────────────────────
-elif [ "$SCHEME" = "scheme-monochrome" ]; then
-    sed -i 's/wal -l -i "$bg_path" -n --cols16 lighten/wal -i "$bg_path" -n --cols16 darken/g' "$WI"
-    sed -i 's/-m light/-m dark/g' "$WI"
-    sed -i "s/--type scheme-[^ ]*/--type ${SCHEME}/" "$WI"
-
-    # GTK3: global swap @on_secondary → @on_primary_fixed_variant, then dialog colors
-    sed -i 's/@on_secondary/@on_primary_fixed_variant/g' "$G3"
-    sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @on_primary_fixed_variant;/' "$G3"
-    sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @primary;/'                  "$G3"
-    # GTK4: same
-    sed -i 's/@on_secondary/@on_primary_fixed_variant/g' "$G4"
-    sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @on_primary_fixed_variant;/' "$G4"
-    sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @primary;/'                  "$G4"
-
-# ── Dark — all other schemes (scheme-content, scheme-expressive, scheme-neutral, …) ──
+# ── Dark — all other schemes ──
 else
     sed -i 's/wal -l -i "$bg_path" -n --cols16 lighten/wal -i "$bg_path" -n --cols16 darken/g' "$WI"
     sed -i 's/-m light/-m dark/g' "$WI"

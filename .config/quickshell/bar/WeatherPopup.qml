@@ -185,7 +185,7 @@ Item {
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: WeatherPopupState.icon
-                                color: Theme.cWc5
+                                color: Theme.cWc6
                                 font.pixelSize: 40
                                 font.family: Config.fontFamily
                                 horizontalAlignment: Text.AlignHCenter
@@ -193,7 +193,7 @@ Item {
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: WeatherPopupState.temp
-                                color: Theme.cWc5
+                                color: Theme.cSurfaceTint
                                 font.pixelSize: 21
                                 font.weight: Font.Bold
                                 font.family: Config.labelFont
@@ -348,16 +348,16 @@ Item {
                                 spacing: 1
                                 Text {
                                     text: WeatherPopupState.hrTimes[index] || "--"
-                                    color: isCurrentHour ? Theme.cWc5
-                                        : Theme.cWc5
+                                    color: isCurrentHour ? Theme.cSurfaceTint
+                                        : Theme.cSurfaceTint
                                     font.pixelSize: 9; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text {
                                     text: WeatherPopupState.hrIcons[index] || "󰖐"
-                                    color: isCurrentHour ? Theme.cWc5
-                                        : Theme.cWc5
+                                    color: isCurrentHour ? Theme.cSurfaceTint
+                                        : Theme.cSurfaceTint
                                     font.pixelSize: 18; font.family: Config.fontFamily
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -424,7 +424,7 @@ Item {
                             spacing: 3
                             Text {
                                 text: WeatherPopupState.fcDays[index] || "--"
-                                color: index === 0 ? Theme.cWc5 : Theme.cWc5
+                                color: index === 0 ? Theme.cSurfaceTint : Theme.cSurfaceTint
                                 font.pixelSize: 11; font.weight: index === 0 ? Font.Bold : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -432,7 +432,7 @@ Item {
                             }
                             Text {
                                 text: WeatherPopupState.fcIcons[index] || "󰖐"
-                                color: index === 0 ? Theme.cWc5 : Theme.cWc5; font.pixelSize: 22; font.family: Config.fontFamily
+                                color: index === 0 ? Theme.cSurfaceTint : Theme.cSurfaceTint; font.pixelSize: 22; font.family: Config.fontFamily
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
