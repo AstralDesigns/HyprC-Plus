@@ -23,7 +23,7 @@ var LauncherConfig = {
 
     // ── Main frame — horizontal dock (bottom / top) ───────────────────
     frameWidth:  1175,               // @LC:frameWidth
-    frameHeight: 670,               // @LC:frameHeight
+    frameHeight: 665,               // @LC:frameHeight
 
     // ── Main frame — vertical dock (left / right) ─────────────────────
     frameWidthVert:  1175,           // @LC:frameWidthVert
