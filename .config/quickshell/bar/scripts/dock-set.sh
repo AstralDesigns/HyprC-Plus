@@ -52,3 +52,5 @@ case "$key" in
         _dock_hot_reload
         ;;
 esac
+
+pkill -SIGUSR2 -f 'gjs dock-main.js' 2>/dev/null || pkill -12 -f 'gjs dock-main.js' 2>/dev/null || true

@@ -398,7 +398,7 @@ function _injectGlyphSizeCSS(display) {
             min-height: ${btnSize}px;
             max-height: ${btnSize}px;
             overflow: hidden;
-            padding: 4px;/*${btRule}*/
+            padding: ${padPx}px;/*${btRule}*/
         }
         button.app-button image, button.dock-button image {
             min-width: ${appPx}px;
