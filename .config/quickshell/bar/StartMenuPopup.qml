@@ -93,7 +93,7 @@ PanelWindow {
                         	font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                    }
                     ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    	Text { text: Quickshell.env("USER"); color: Theme.cWc4; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
+                    	Text { text: Quickshell.env("USER"); color: Theme.cWc6; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
                     	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Theme.cWc5; font.pixelSize: 13 }
                     }
                     // Recorder
@@ -197,7 +197,7 @@ PanelWindow {
                             : StartMenuState.netIsEthernet ? "󰈀"
                             : StartMenuState.netRadioEnabled ? "󰤨" : "󰤮"
                         color: StartMenuState.netIsWifi
-                            ? (StartMenuState.netRadioEnabled ? Theme.cWc4 : Theme.cOnSurf)
+                            ? (StartMenuState.netRadioEnabled ? Theme.cWc6 : Theme.cOnSurf)
                             : (StartMenuState.networkStatus === "connected" ? Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurf)
                         Behavior on color { ColorAnimation { duration: 150 } }
                         MouseArea {
@@ -263,7 +263,7 @@ PanelWindow {
                     Text {
                         font.pixelSize: 15; font.family: Config.fontFamily
                         text: StartMenuState.btPowered ? "󰂱" : "󰂲"
-                        color: StartMenuState.btPowered ? Theme.cWc4 : Theme.cOnSurf
+                        color: StartMenuState.btPowered ? Theme.cWc6 : Theme.cOnSurf
                         Behavior on color { ColorAnimation { duration: 150 } }
                         MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: StartMenuState.toggleBtPower() }

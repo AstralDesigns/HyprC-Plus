@@ -563,7 +563,7 @@ Item {
                     spacing: 8
                     Text {
                         text: overlay.dndEnabled ? "Do Not Disturb" : "Notifications"
-                        color: overlay.dndEnabled ? Qt.rgba(overlay.cPrimary.r, overlay.cPrimary.g, overlay.cPrimary.b, 1.0) : overlay.cPrimary
+                        color: overlay.dndEnabled ? Qt.rgba(overlay.cWc6.r, overlay.cWc6.g, overlay.cWc6.b, 1.0) : overlay.cWc5
                         font.pixelSize: 14
                         font.weight: Font.Medium
                         Layout.fillWidth: true

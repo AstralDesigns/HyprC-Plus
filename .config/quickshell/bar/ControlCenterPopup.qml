@@ -1343,7 +1343,7 @@ PanelWindow {
                                 id: userNameText
                                 Layout.alignment: Qt.AlignHCenter
                                 text: "—"
-                                color: Theme.cWc4
+                                color: Theme.cWc6
                                 font.family: Config.styleFont
                                 font.pixelSize: 16
                                 font.weight: Font.Bold
@@ -7657,7 +7657,7 @@ PanelWindow {
 
             Rectangle {
                 width: 20; height: 20; radius: 10
-                color: value ? Theme.cWc4 : Theme.cWc5
+                color: value ? Theme.cWc6 : Theme.cWc5
                 anchors.verticalCenter: parent.verticalCenter
                 x: value ? parent.width - width - 3 : 3
                 Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
