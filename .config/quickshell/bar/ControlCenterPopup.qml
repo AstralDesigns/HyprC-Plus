@@ -3620,7 +3620,7 @@ PanelWindow {
                                         id: _colorRegenLabel
                                         anchors.centerIn: parent
                                         text: _colorRegenPill.regenEnabled ? " ON " : " OFF"
-                                        color: Theme.cWc5
+                                        color: Theme.cPrimary
                                         font.family: Config.labelFont
                                         font.pixelSize: 12
                                     }
