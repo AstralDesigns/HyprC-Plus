@@ -187,7 +187,7 @@ Item {
                         ctx.rotate(hrAngle)
                         ctx.lineWidth = 4.0
                         ctx.lineCap = "round"
-                        ctx.strokeStyle = Theme.cWc9.toString()
+                        ctx.strokeStyle = Theme.cWc6.toString()
                         ctx.beginPath()
                         ctx.moveTo(0, 8)
                         ctx.lineTo(0, -(r - 18))
