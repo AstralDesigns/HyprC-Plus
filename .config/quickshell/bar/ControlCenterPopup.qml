@@ -3585,7 +3585,7 @@ PanelWindow {
                                 Layout.fillWidth: true; spacing: 8
 
                                 Text {
-                                    text: "Process Colors"
+                                    text: "Process Matugen Colors"
                                     color: Theme.cPrimary
                                     font.family: Config.labelFont
                                     font.pixelSize: 13
@@ -3639,11 +3639,9 @@ PanelWindow {
                                                 "bash", "-c",
                                                 nowEnabled
                                                     ? 'f="$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh"; ' +
-                                                      'sed -i \'31s/^#[[:space:]]*//' + "'" + ' "$f"; ' +
-                                                      'sed -i \'32s/^#[[:space:]]*//' + "'" + ' "$f"'
+                                                      'sed -i \'33s/^#[[:space:]]*//' + "'" + ' "$f"'
                                                     : 'f="$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh"; ' +
-                                                      'sed -i \'31s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"; ' +
-                                                      'sed -i \'32s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"'
+                                                      'sed -i \'33s/^\\([^#]\\)/# \\1/' + "'" + ' "$f"'
                                             ]
                                             _colorRegenSedProc._runAfter = nowEnabled
                                             _colorRegenSedProc.running = true
@@ -3657,7 +3655,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 Layout.topMargin: 2
                                 visible: _colorRegenPill.regenEnabled
-                                text: " Color palette will be reloaded on all theme and background changes"
+                                text: " Matugen color palette will be reloaded on all theme and background changes"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                Theme.cPrimary.b, 0.55)
                                 font.family: Config.labelFont
@@ -3670,7 +3668,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 Layout.topMargin: 2
                                 visible: !_colorRegenPill.regenEnabled
-                                text: " Current color palette will be used on all themes and backgrounds"
+                                text: " Current color palette generation paused for matugen only"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                Theme.cPrimary.b, 0.55)
                                 font.family: Config.labelFont
