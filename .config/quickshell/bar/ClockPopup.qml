@@ -118,7 +118,7 @@ Item {
                         Text {
                             anchors.centerIn: parent
                             text: root._secStr
-                            color: Theme.cWc3
+                            color: Theme.cWc6
                             font.family: Config.labelFont
                             font.pixelSize: 11
                             font.weight: Font.Bold
