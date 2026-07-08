@@ -6,7 +6,10 @@
 
 STYLE="$HOME/.hyprcandy/GJS/hyprcandydock/style.css"
 CONFIG="$HOME/.hyprcandy/GJS/hyprcandydock/config.js"
-LAUNCHER="$HOME/.hyprcandy/GJS/hyprcandydock/app-launcher.js"
+DIR="$HOME/.hyprcandy/GJS/hyprcandydock"
+POS_FILE="$DIR/dock.pos"
+STATE_FILE="$DIR/dock.state"
+LAUNCHER="$DIR/app-launcher.js"
 
 gtk="${1#@}"
 gtk="${gtk#\$}"   # tolerate accidental $ prefix from bar-style vars
@@ -37,4 +40,19 @@ fi
 
 pkill -f 'gjs.*app-launcher.js' 2>/dev/null || true
 pkill -SIGUSR2 -f 'gjs dock-main.js' 2>/dev/null || pkill -12 -f 'gjs dock-main.js' 2>/dev/null || true
+sleep 0.5
+
+# ── Start the app-launcher daemon ──────────────────────────────────────────
+# Kill any stale instance first, then launch fresh in the background.
+pkill -f "gjs $LAUNCHER" 2>/dev/null
+
+if   [ -f "/usr/lib/libgtk4-layer-shell.so"   ]; then
+    export LD_PRELOAD="/usr/lib/libgtk4-layer-shell.so:${LD_PRELOAD}"
+elif [ -f "/usr/lib64/libgtk4-layer-shell.so" ]; then
+    export LD_PRELOAD="/usr/lib64/libgtk4-layer-shell.so:${LD_PRELOAD}"
+fi
+
+cd "$DIR"
+setsid gjs "$LAUNCHER" </dev/null >/dev/null 2>&1 &
+
 echo "$gtk"
