@@ -6172,7 +6172,7 @@ PanelWindow {
                                             }
                                             font.family: Config.fontFamily
                                             font.pixelSize: 44
-                                            color: Theme.cWc1
+                                            color: Theme.cWc6
                                         }
                                     }
 
@@ -6243,7 +6243,7 @@ PanelWindow {
                                             text: "󰑐"
                                             font.family: Config.fontFamily
                                             font.pixelSize: 15
-                                            color: Theme.cWc5
+                                            color: Theme.cWc6
                                             RotationAnimator {
                                                 target: refreshGlyph
                                                 from: 0; to: 360
