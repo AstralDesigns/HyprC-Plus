@@ -89,7 +89,7 @@ Item {
                     }
                     Text {
                         text: ":"
-                        color: Theme.cWc3
+                        color: Theme.cWc5
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
