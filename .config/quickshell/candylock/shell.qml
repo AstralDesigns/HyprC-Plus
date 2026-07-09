@@ -243,8 +243,8 @@ ShellRoot {
         if (code===0)             return isDay ? "☀️" : "🌙"
         if (code===1)             return isDay ? "☀️" : "🌙"
         if (code===2)             return isDay ? "⛅" : "☁️"
-        if (code===3)             return h >= 90
-            ? (isDay ? "🌦️":"🌧️")
+        if (code===3)             return h >= 85
+            ? (isDay ? "⛅" : "☁️")
             : (isDay ? "⛅" : "☁️")
         if (code===45||code===48) return "🌫"
         if (code>=51&&code<=55)   return isDay ? "🌦️" : "🌧️"
