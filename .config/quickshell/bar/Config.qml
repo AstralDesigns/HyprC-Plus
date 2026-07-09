@@ -577,8 +577,8 @@ QtObject {
     //  textColor   → info text (time, date, weather value, battery %)
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
-    readonly property color glyphColor:  Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, 1.00)
-    readonly property color textColor:   Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
+    readonly property color glyphColor:  Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 1.00)
+    readonly property color textColor:   Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
     readonly property color activeColor: Config.glyphColor
     readonly property color dimColor:    Theme.cOnSurfVar
 
@@ -610,10 +610,10 @@ QtObject {
     property color mediaGlyphColor:      Config.glyphColor
     property color discGlyphColor:       Theme.cSurfaceTint
     property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80)
-    property color powerGlyphColor:      Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 1.00)
+    property color powerGlyphColor:      Qt.rgba(Theme.cWc14.r, Theme.cWc14.g, Theme.cWc14.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
-    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, ccGlyphOpacity)
+    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, ccGlyphOpacity)
 
     // ── Battery radial indicator ─────────────────────────────────────────
     property bool batteryRadialVisible: true
@@ -667,8 +667,8 @@ QtObject {
     property real wsActiveOpacity:     1.0
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
-    readonly property color wsActiveColor:     Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, wsActiveOpacity)
-    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, wsPersistentOpacity)
+    readonly property color wsActiveColor:     Qt.rgba(Theme.cWc14.r, Theme.cWc14.g, Theme.cWc14.b, wsActiveOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, wsPersistentOpacity)
     readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
@@ -691,7 +691,7 @@ QtObject {
     property bool   wsSeparators:        false  // show glyph separator between buttons
     property string wsSeparatorGlyph:    ""
     property real   wsSeparatorOpacity:  0.3
-    readonly property color wsSeparatorColor: Qt.rgba(Theme.cPrimaryFixedDim.r, Theme.cPrimaryFixedDim.g, Theme.cPrimaryFixedDim.b, wsSeparatorOpacity)
+    readonly property color wsSeparatorColor: Qt.rgba(Theme.cWc13.r, Theme.cWc13.g, Theme.cWc13.b, wsSeparatorOpacity)
     property int    wsSeparatorSize:     10    // px — font size of the separator glyph
     property int    wsSeparatorPadLeft:  2     // px — space between left ws button and separator
     property int    wsSeparatorPadRight: 2     // px — space between separator and right ws button
