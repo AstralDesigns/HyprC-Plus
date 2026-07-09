@@ -367,7 +367,7 @@ function _injectGlyphSizeCSS(display) {
            The gradient direction is flipped to match the dock edge so the
            badge depth-illusion is consistent with the dock surface fill. */
         #start-icon, #trash-icon {
-            font-size: calc(${appPx}px + 4px);
+            font-size: calc(${appPx}px + 2px);
             border-radius: 999px;
             background-image: ${glyphBadgeGradient};
             padding-left: calc(${appPx}px * 0.35);

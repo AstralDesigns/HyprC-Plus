@@ -7,7 +7,7 @@
 // Each tag is unique in the file so sed can target it unambiguously.
 //
 // Numeric @HCD variables (replace N with new value):
-//   sed -i 's/appIconSize: 18[ \t]*[0-9]*/appIconSize: 20N/' config.js
+//   sed -i 's/appIconSize: 30[ \t]*[0-9]*/appIconSize: 20N/' config.js
 //
 // String @HCD variables (replace GLYPH with new character or escape):
 //   sed -i "s/startIcon: '',
@@ -30,7 +30,7 @@ var DockConfig = {
     // ── App icon size (Gtk.Image pixel_size) ─────────────────────────────
     // Controls Gtk.Image icons from the theme (e.g. Nautilus, Firefox).
     // This is the primary value used for exclusive-zone and button footprint.
-    appIconSize: 18,               // @HCD:appIconSize
+    appIconSize: 30,               // @HCD:appIconSize
 
     // ── Glyph icon size (NerdFont unicode labels) ────────────────────────
     // Controls start, trash, and fallback glyph font-size independently.
