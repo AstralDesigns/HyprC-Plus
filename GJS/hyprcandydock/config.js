@@ -7,7 +7,7 @@
 // Each tag is unique in the file so sed can target it unambiguously.
 //
 // Numeric @HCD variables (replace N with new value):
-//   sed -i 's/appIconSize: 20[ \t]*[0-9]*/appIconSize: 20N/' config.js
+//   sed -i 's/appIconSize: 18[ \t]*[0-9]*/appIconSize: 20N/' config.js
 //
 // String @HCD variables (replace GLYPH with new character or escape):
 //   sed -i "s/startIcon: '',
@@ -30,7 +30,7 @@ var DockConfig = {
     // ── App icon size (Gtk.Image pixel_size) ─────────────────────────────
     // Controls Gtk.Image icons from the theme (e.g. Nautilus, Firefox).
     // This is the primary value used for exclusive-zone and button footprint.
-    appIconSize: 20,               // @HCD:appIconSize
+    appIconSize: 18,               // @HCD:appIconSize
 
     // ── Glyph icon size (NerdFont unicode labels) ────────────────────────
     // Controls start, trash, and fallback glyph font-size independently.
@@ -39,14 +39,14 @@ var DockConfig = {
     // formula multiplies by glyphIconSizeFraction (default 1.1) to compensate.
     // Set glyphIconSize to an explicit px value to override auto-derive.
     glyphIconSize: null,
-    glyphIconSizeFraction: 1.15,   // auto = round(appIconSize * this)
+    glyphIconSizeFraction: 1.0,   // auto = round(appIconSize * this)
 
     // ── Indicator size ───────────────────────────────────────────────────
     // Active-window dot font-size in px. Set null to auto-derive.
     // Auto = max(4, round(appIconSize * indicatorSizeFraction))
     indicatorSize: null,
-    indicatorSizeFraction: 0.15,  // used when indicatorSize is null
-    indicatorSpacing: 4,          // px gap between two dots
+    indicatorSizeFraction: 0.3,  // used when indicatorSize is null
+    indicatorSpacing: 2,          // px gap between two dots
 
     // ── Legacy alias ─────────────────────────────────────────────────────
     // For backward compat. Reads appIconSize.
@@ -54,7 +54,7 @@ var DockConfig = {
 
     // ── Internal padding ──────────────────────────────────────────────────
     // Space between the icons and the dock outer edges (px).
-    innerPadding: 4,               // @HCD:innerPadding
+    innerPadding: 0,               // @HCD:innerPadding
 
     // ── Background fill style ─────────────────────────────────────────────
     // 'glass'    → solid @blur_background (default, matches style.css)
@@ -64,7 +64,7 @@ var DockConfig = {
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 2,                // @HCD:borderWidth
-    borderColorVar: 'color3', // @HCD:borderColorVar  (GTK @name, matugen)
+    borderColorVar: 'inverse_primary', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
     borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
     borderTopRightRadius: 30,      // @HCD:borderTopRightRadius

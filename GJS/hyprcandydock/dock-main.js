@@ -227,7 +227,7 @@ function _injectGlyphSizeCSS(display) {
         : Math.round(appPx * (DockConfig.glyphIconSizeFraction || 1.1));
     const indicatorPx = DockConfig.indicatorSize !== null
         ? DockConfig.indicatorSize
-        : Math.max(6, Math.round(appPx * DockConfig.indicatorSizeFraction));
+        : Math.max(Math.round(24 * DockConfig.indicatorSizeFraction));
     const btnSize  = appPx ;
     const borderW  = DockConfig.borderWidth;
     const fallbackR = DockConfig.borderRadius;
@@ -340,13 +340,13 @@ function _injectGlyphSizeCSS(display) {
     const _pos = DockConfig.position || 'bottom';
     let pd;
     if (_pos === 'top') {
-        pd = `padding-left: 1px; padding-top: 1px;`;
+        pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
     } else if (_pos === 'left') {
-        pd = `padding-left: 1px; padding-top: 1px;`;
+        pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
     } else if (_pos === 'right') {
-        pd = `padding-left: 1px; padding-top: 1px;`;
+        pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
     } else {
-        pd = `padding-left: 1px; padding-top: 1px;`;
+        pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
     }
 
     const css = `
@@ -354,12 +354,12 @@ function _injectGlyphSizeCSS(display) {
         window.background {
             border-width: ${borderW}px;
             border-style: solid;
-            ${padRule}
+            padding: ${padPx}px;
             border-radius: ${borderTL}px ${borderTR}px ${borderBR}px ${borderBL}px;
             ${bgStyle}
         }
         #box {
-            padding: 2px;
+            padding: 0px;
         }
         /* ── Circular badge for start / trash glyphs ──────────────────────
            min-width = min-height = glyphPx ensures the label is always a
@@ -367,15 +367,14 @@ function _injectGlyphSizeCSS(display) {
            The gradient direction is flipped to match the dock edge so the
            badge depth-illusion is consistent with the dock surface fill. */
         #start-icon, #trash-icon {
-            font-size: ${glyphPx}px;
-            min-width:  calc(${btnSize}px + 8px);
-            min-height: ${btnSize}px;
+            font-size: calc(${appPx}px + 4px);
             border-radius: 999px;
             background-image: ${glyphBadgeGradient};
-            ${pd}
+            padding-left: calc(${appPx}px * 0.35);
+            padding-right: calc(${appPx}px * 0.35)
         }
         .fallback-icon {
-            font-size: ${glyphPx}px;
+            font-size: calc(${glyphPx}px + 4px);
         }
         #active-indicator {
             font-size: ${indicatorPx}px;
@@ -393,12 +392,11 @@ function _injectGlyphSizeCSS(display) {
             ${pRule}
         }
         button.app-button, button.dock-button {
-            min-width: ${btnSize}px;
-            max-width: ${btnSize}px;
-            min-height: ${btnSize}px;
-            max-height: ${btnSize}px;
-            overflow: hidden;
-            padding: ${padPx}px;/*${btRule}*/
+            min-width: ${appPx}px;
+            max-width: ${appPx}px;
+            min-height: ${appPx}px;
+            max-height: ${appPx}px;
+            padding: calc((${appPx}px * 0.25) + 2px);/*${btRule}*/
         }
         button.app-button image, button.dock-button image {
             min-width: ${appPx}px;

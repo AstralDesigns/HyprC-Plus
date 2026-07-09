@@ -3927,7 +3927,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Padding"
-                                from: 0; to: 30; stepSize: 1
+                                from: 0; to: 3; stepSize: 1
                                 value: parseInt(_dockPaddingVal) || 0
                                 onMoved: function(v) {
                                     _dockPaddingVal = v.toString()
