@@ -861,13 +861,13 @@ ShellRoot {
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:"󰫢  󰫢"; color: root.cWc1
+                                        text:"󰫢  󰫢"; color: root.cWc3
                                         font.family:"codicon"; font.pixelSize:14
                                         topPadding:8; bottomPadding:8
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockMin; color: Qt.rgba(root.cWc3.r,root.cWc3.g,root.cWc3.b,1.0)
+                                        text:root.clockMin; color:root.cWc1
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
@@ -954,7 +954,7 @@ ShellRoot {
                                                 anchors.centerIn:parent; spacing:7
                                                 visible:root.pinEntry.length===0 && !root.authChecking
                                                 Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:root.cWc1}
-                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cWc3; opacity:1.00 }
+                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cWc2; opacity:1.00 }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; visible:root.authChecking
@@ -1358,7 +1358,7 @@ ShellRoot {
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
                                             readonly property color arcColor: index===0 ? root.cWc4
-                                                : (index===1 ? root.cWc1 : root.cWc3)
+                                                : (index===1 ? root.cWc3 : root.cWc1)
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
 
