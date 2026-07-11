@@ -921,12 +921,12 @@ ShellRoot {
                                                 Layout.fillWidth:true; spacing:4; Layout.alignment:Qt.AlignVCenter
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherTemp; color:root.cWc5; opacity: 1.0
+                                                    text:root.weatherTemp; color:root.cWc2; opacity: 1.0
                                                     font.family:"C059"; font.pixelSize:28; font.italic:true; font.weight:Font.DemiBold
                                                 }
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherIcon; color:root.cWc5; opacity: 1.0
+                                                    text:root.weatherIcon; color:root.cWc2; opacity: 1.0
                                                     font.pixelSize:28; font.family:"Symbols Nerd Font Mono"
                                                 }
                                             }
@@ -1121,7 +1121,7 @@ ShellRoot {
                                                 text: root._volumeMuted ? "󰝟" : "󰕾"
                                                 font.family: "Symbols Nerd Font Mono"
                                                 font.pixelSize: 14
-                                                color: root.cWc2
+                                                color: root.cWc5
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     cursorShape: Qt.PointingHandCursor
