@@ -370,8 +370,8 @@ function _injectGlyphSizeCSS(display) {
             font-size: calc(${appPx}px + 2px);
             border-radius: 999px;
             background-image: ${glyphBadgeGradient};
-            padding-left: calc(${appPx}px * 0.35);
-            padding-right: calc(${appPx}px * 0.3)
+            padding-left: calc(${appPx}px * 0.3);
+            padding-right: calc(${appPx}px * 0.25)
         }
         .fallback-icon {
             font-size: calc(${glyphPx}px + 4px);
