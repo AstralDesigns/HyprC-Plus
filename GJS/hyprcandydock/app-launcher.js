@@ -13,7 +13,7 @@
 //       – ─────────────────────────
 //       – Pin to Dock / Unpin from Dock
 //   • Styling: uses the same matugen GTK CSS variables as the dock
-//     (@blur_background, @primary, @on_secondary, @on_primary_fixed_variant …)
+//     (@blur_background, @primary, @on_secondary, @inverse_primary …)
 //     so it matches your theme automatically.
 //   • ESC or app-launch closes the window.
 //
@@ -534,7 +534,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @inverse_primary;
+    border-color: @color5;
 }
 
 /* ── Inner section frames (rofi inputbar / listbox equivalent) ────────── */
@@ -612,7 +612,7 @@ flowboxchild {
 
 flowboxchild:selected,
 flowboxchild:focus {
-    background-color: @on_primary_fixed_variant;
+    background-color: @inverse_primary;
     outline: none;
     border-radius: 10px;
 }
@@ -679,7 +679,7 @@ button.app-tile:hover {
 }
 
 button.app-tile:active {
-    background-color: alpha(@on_primary_fixed_variant, 0.55);
+    background-color: alpha(@inverse_primary, 0.55);
     border-color: @primary;
 }
 
@@ -810,7 +810,7 @@ popover.launcher-popover button {
 
 /* ── New-group naming dialog ──────────────────────────────────────── */
 window.hyprcandy-group-dialog {
-    background-color: @on_primary_fixed_variant;
+    background-color: @inverse_primary;
     border-radius: 16px;
     border-style: solid;
     border-width: 1px;
@@ -896,7 +896,7 @@ window.hyprcandy-group-dialog {
     border-color: alpha(@primary, 0.15);
 }
 .clip-item-btn:active {
-    background-color: alpha(@on_primary_fixed_variant, 0.5);
+    background-color: alpha(@inverse_primary, 0.5);
 }
 .clip-item-label {
     color: @on_surface;
@@ -937,7 +937,7 @@ window.hyprcandy-group-dialog {
     box-shadow: none;
 }
 .emoji-mode-btn.active {
-    background-color: @on_primary_fixed_variant;
+    background-color: @inverse_primary;
     border-color: transparent;
     color: @primary;
 }
@@ -962,7 +962,7 @@ window.hyprcandy-group-dialog {
     border-color: alpha(@primary, 0.16);
 }
 .emoji-btn:active {
-    background-color: alpha(@on_primary_fixed_variant, 0.5);
+    background-color: alpha(@inverse_primary, 0.5);
 }
 /* Nerd glyph buttons — same layout as emoji but use NF font */
 .nerd-btn {
@@ -984,7 +984,7 @@ window.hyprcandy-group-dialog {
     border-color: alpha(@primary, 0.16);
 }
 .nerd-btn:active {
-    background-color: alpha(@on_primary_fixed_variant, 0.5);
+    background-color: alpha(@inverse_primary, 0.5);
 }
 /* Category bar buttons — NF font so glyph previews render in nerd mode */
 .emoji-cat-btn {
@@ -1001,7 +1001,7 @@ window.hyprcandy-group-dialog {
     font-family: 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', emoji, monospace;
 }
 .emoji-cat-btn.active {
-    background-color: @on_primary_fixed_variant;
+    background-color: @inverse_primary;
     color: @primary;
 }
 .emoji-cat-btn:hover {
@@ -1009,7 +1009,7 @@ window.hyprcandy-group-dialog {
     color: @primary;
 }
 .emoji-copied-bar {
-    background-color: alpha(@on_primary_fixed_variant, 0.85);
+    background-color: alpha(@inverse_primary, 0.85);
     border-radius: 8px;
     padding: 5px 14px;
     margin: 0 ${ip}px 4px ${ip}px;

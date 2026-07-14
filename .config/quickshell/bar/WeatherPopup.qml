@@ -322,7 +322,7 @@ Item {
                             Gradient {
                                 id: hrGradient
                                 GradientStop { position: 0.0; color: Theme.cInversePrimary }
-                                GradientStop { position: 1.0; color: Theme.cOnPrimaryFixedVariant }
+                                GradientStop { position: 1.0; color: Theme.cOnSecondary }
                             }
 
                             border.width: 1
@@ -410,7 +410,7 @@ Item {
                         Gradient {
                             id: fcGradient
                             GradientStop { position: 0.0; color: Theme.cInversePrimary }
-                            GradientStop { position: 1.0; color: Theme.cOnPrimaryFixedVariant }
+                            GradientStop { position: 1.0; color: Theme.cOnSecondary }
                         }
 
                         border.width: 1
