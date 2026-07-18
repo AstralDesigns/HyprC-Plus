@@ -70,7 +70,7 @@ button.titlebutton { /* GTK3 */
 button.titlebutton.close,
   windowcontrols > button.close > image {
   color: @background;
-  background: @color4;
+  background: @color6;
 }
 
 button.titlebutton.close:hover,
