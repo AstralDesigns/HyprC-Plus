@@ -119,7 +119,7 @@ Item {
                                         ? modelData.glyphplay
                                         : (modelData.glyph || "")
                                     color: modelData.glyphplay !== undefined
-                                        ? (ctlMa.containsMouse ? Config.textColor : Theme.cWc13)
+                                        ? (ctlMa.containsMouse ? Config.textColor : Theme.cWc14)
                                         : (ctlMa.containsMouse ? Config.textColor : Theme.cWc9)
                                     opacity: 0.8
                                     font.family:    Config.fontFamily

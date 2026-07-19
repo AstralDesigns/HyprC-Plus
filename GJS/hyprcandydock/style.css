@@ -37,7 +37,7 @@ window.background {
    The gradient direction is overridden at runtime to match the dock
    position so the badge depth-matches the dock fill on all four edges. */
 #start-icon, #trash-icon {
-    color: @color6;
+    color: @color5;
     font-size: 22px;            /* overridden at runtime — do not rely on this */
     /*min-width:  22px;           /* overridden at runtime — keeps circle square  */
     /*min-height: 22px;           /* overridden at runtime — keeps circle square  */
