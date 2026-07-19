@@ -1394,7 +1394,7 @@ PanelWindow {
                                 Text {
                                     text: modelData.icon
                                     font.family: Config.fontFamily; font.pixelSize: 15
-                                    color: Theme.cWc4; opacity: 0.55
+                                    color: Theme.cWc5; opacity: 0.55
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
@@ -1410,7 +1410,7 @@ PanelWindow {
                                 anchors { right: parent.right; rightMargin: 4
                                           verticalCenter: parent.verticalCenter }
                                 width: 3; height: 20; radius: 2
-                                color: Theme.cWc5
+                                color: Theme.cWc4
                                 visible: parent._stackIdx === modelData.idx
                             }
 
