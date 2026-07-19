@@ -774,7 +774,7 @@ PanelWindow {
                         Layout.fillWidth: true; height: 52; radius: 12
                         color: ph.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.8)
                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
-                        //gradient: ph.containsMouse ? powerGradient : null
+                        gradient: ph.containsMouse ? onmouseGradient : powerGradient
                         border.width: 2; border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                         Behavior on color { ColorAnimation { duration: 120 } }
                         ColumnLayout { anchors.centerIn: parent; spacing: 2
@@ -800,7 +800,7 @@ PanelWindow {
                 Layout.fillWidth: true; height: 36; radius: 12
                 color: logh.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.8)
                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
-                //gradient: logh.containsMouse ? powerGradient : null
+                gradient: logh.containsMouse ? onmouseGradient : powerGradient
                 border.width: 2; border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout { anchors.centerIn: parent; spacing: 8
@@ -815,11 +815,17 @@ PanelWindow {
                     onClicked: { StartMenuState.menuVisible = false; StartMenuState.logout() } }
             }
             
-            //Gradient {
-		//id: powerGradient
-		//GradientStop { position: 0.0; color: Theme.cOnsecondary }
-		//GradientStop { position: 1.0; color: Theme.cOnPrimaryFixedVariant }
-	    //}
+            Gradient {
+		id: powerGradient
+		GradientStop { position: 0.0; color: Theme.cInversePrimary }
+		GradientStop { position: 1.0; color: Theme.cOnsecondary }
+	    }
+	    
+	    Gradient {
+		id: onmouseGradient
+		GradientStop { position: 0.0; color: Theme.cOnsecondary }
+		GradientStop { position: 1.0; color: Theme.cInversePrimary }
+	    }
 
             Item { height: 4 }
         }
