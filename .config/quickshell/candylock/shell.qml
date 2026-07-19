@@ -169,7 +169,7 @@ ShellRoot {
     }
 
     // ── Auth ─────────────────────────────────────────────────────────────────
-    property string pinEntry:""; property bool authFailed:false; property bool authChecking:false
+    property string pinEntry:""; property bool authFailed:false; property bool authChecking:false; property bool pinVisible:false
     property string _pendingPin:""; property bool focusPinRequest:false
     function submitPin() {
         if(authChecking||root.pinEntry.length===0) return
@@ -861,13 +861,13 @@ ShellRoot {
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:"󰫢  󰫢"; color: root.cWc3
+                                        text:"󰫢  󰫢"; color: root.cWc2
                                         font.family:"codicon"; font.pixelSize:14
                                         topPadding:8; bottomPadding:8
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockMin; color:root.cWc1
+                                        text:root.clockMin; color:root.cWc3
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
@@ -893,7 +893,7 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:root.cWc4
+                                            text:root.clockDate; color:root.cWc2
                                             font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
@@ -921,12 +921,12 @@ ShellRoot {
                                                 Layout.fillWidth:true; spacing:4; Layout.alignment:Qt.AlignVCenter
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherTemp; color:root.cWc2; opacity: 1.0
+                                                    text:root.weatherTemp; color:root.cWc3; opacity: 1.0
                                                     font.family:"C059"; font.pixelSize:28; font.italic:true; font.weight:Font.DemiBold
                                                 }
                                                 Text {
                                                     Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherIcon; color:root.cWc2; opacity: 1.0
+                                                    text:root.weatherIcon; color:root.cWc3; opacity: 1.0
                                                     font.pixelSize:28; font.family:"Symbols Nerd Font Mono"
                                                 }
                                             }
@@ -954,7 +954,7 @@ ShellRoot {
                                                 anchors.centerIn:parent; spacing:7
                                                 visible:root.pinEntry.length===0 && !root.authChecking
                                                 Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:root.cWc1}
-                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cWc2; opacity:1.00 }
+                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cWc5; opacity:1.00 }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; visible:root.authChecking
@@ -963,8 +963,31 @@ ShellRoot {
                                             }
                                             Row {
                                                 anchors.centerIn:parent; spacing:6
-                                                visible:root.pinEntry.length>0 && !root.authChecking
+                                                visible:root.pinEntry.length>0 && !root.authChecking && !root.pinVisible
                                                 Repeater { model:root.pinEntry.length; delegate:Rectangle{width:9;height:9;radius:5;color:root.cSecondary;opacity:0.90} }
+                                            }
+                                            Text {
+                                                anchors.centerIn:parent; width:parent.width-24
+                                                visible:root.pinEntry.length>0 && !root.authChecking && root.pinVisible
+                                                text:root.pinEntry; color:root.cSecondary
+                                                font.family:"C059"; font.pixelSize:16
+                                                horizontalAlignment:Text.AlignHCenter
+                                                elide:Text.ElideMiddle
+                                            }
+
+                                            // PIN VISIBILITY TOGGLE — only shown once typing begins
+                                            Text {
+                                                anchors.right:parent.right; anchors.rightMargin:14
+                                                anchors.verticalCenter:parent.verticalCenter
+                                                visible:root.pinEntry.length>0 && !root.authChecking
+                                                text: root.pinVisible ? "󰛐" : "󰛑"
+                                                font.family:"Symbols Nerd Font Mono"; font.pixelSize:14
+                                                color:root.cWc1; opacity:0.85
+                                                MouseArea {
+                                                    anchors.fill:parent; anchors.margins:-8
+                                                    cursorShape:Qt.PointingHandCursor
+                                                    onClicked: root.pinVisible = !root.pinVisible
+                                                }
                                             }
                                         }
 
@@ -1358,7 +1381,7 @@ ShellRoot {
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
                                             readonly property color arcColor: index===0 ? root.cWc4
-                                                : (index===1 ? root.cWc3 : root.cWc1)
+                                                : (index===1 ? root.cWc2 : root.cWc3)
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
 
@@ -1664,14 +1687,14 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maRebt.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.85) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
                                 border.width: 1
-                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cWc5.r, root.cWc5.g, root.cWc5.b,0.65) : "transparent"
+                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cWc2.r, root.cWc2.g, root.cWc2.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰑙"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cWc5; opacity: _maRebt.containsMouse ? 1.0 : 0.72
+                                color: root.cWc2; opacity: _maRebt.containsMouse ? 1.0 : 0.72
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
@@ -1713,14 +1736,14 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maShut.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.85) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
                                 border.width: 1
-                                border.color: _maShut.containsMouse ? Qt.rgba(root.cWc2.r, root.cWc2.g, root.cWc2.b, 0.65) : "transparent"
+                                border.color: _maShut.containsMouse ? Qt.rgba(root.cWc4.r, root.cWc4.g, root.cWc4.b, 0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰐥"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cWc2; opacity: _maShut.containsMouse ? 1.0 : 0.72
+                                color: root.cWc4; opacity: _maShut.containsMouse ? 1.0 : 0.72
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
