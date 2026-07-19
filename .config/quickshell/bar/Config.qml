@@ -668,7 +668,7 @@ QtObject {
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
     readonly property color wsActiveColor:     Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, wsActiveOpacity)
-    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, wsPersistentOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, wsPersistentOpacity)
     readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
@@ -691,7 +691,7 @@ QtObject {
     property bool   wsSeparators:        false  // show glyph separator between buttons
     property string wsSeparatorGlyph:    ""
     property real   wsSeparatorOpacity:  0.3
-    readonly property color wsSeparatorColor: Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, wsSeparatorOpacity)
+    readonly property color wsSeparatorColor: Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, wsSeparatorOpacity)
     property int    wsSeparatorSize:     10    // px — font size of the separator glyph
     property int    wsSeparatorPadLeft:  2     // px — space between left ws button and separator
     property int    wsSeparatorPadRight: 2     // px — space between separator and right ws button
