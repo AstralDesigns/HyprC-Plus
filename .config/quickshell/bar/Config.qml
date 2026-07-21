@@ -577,7 +577,7 @@ QtObject {
     //  textColor   → info text (time, date, weather value, battery %)
     //  activeColor → active workspace, accent highlights
     //  dimColor    → empty workspaces, secondary info
-    readonly property color glyphColor:  Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, 1.00)
+    readonly property color glyphColor:  Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, 1.00)
     readonly property color textColor:   Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
     readonly property color activeColor: Config.glyphColor
     readonly property color dimColor:    Theme.cOnSurfVar
@@ -669,7 +669,7 @@ QtObject {
     property real wsEmptyOpacity:      0.55
     readonly property color wsActiveColor:     Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, wsActiveOpacity)
     readonly property color wsPersistentColor: Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, wsPersistentOpacity)
-    readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, wsEmptyOpacity)
+    readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
     //  wsGlyphSize controls the font size of workspace button icons.
