@@ -76,11 +76,9 @@ PanelWindow {
                                        || SystemMonitorPopupState.visible
                                        || CalendarPopupState.visible
 
-    // Tri AH: only pin the segment that owns the open popup. CC pins all three.
-    readonly property bool _triLeftPinned:  ControlCenterState.visible
-                                         || NotificationsState.historyVisible
-    readonly property bool _triRightPinned: ControlCenterState.visible
-                                          || StartMenuState.menuVisible
+    // Tri AH: only pin the segment that owns the open popup. CC pins center island only.
+    readonly property bool _triLeftPinned:  NotificationsState.historyVisible
+    readonly property bool _triRightPinned: StartMenuState.menuVisible
                                           || TrayMenuState.visible
                                           || SysTrayPopupState.visible
                                           || UpdatesPopupState.visible
