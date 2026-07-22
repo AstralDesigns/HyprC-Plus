@@ -891,9 +891,9 @@ PanelWindow {
                 Island { bgType: "startmenu"; Modules.PowerButton {} }
                 Island {
                     bgType: "weatherbat"
-                    visible_: Config.showBattery || Config.showWeather
-                    Modules.Battery { visible: Config.showBattery }
+                    visible_:  Config.showWeather || Config.showBattery
                     Modules.Weather { visible: Config.showWeather }
+                    Modules.Battery { visible: Config.showBattery }
                 }
 
                 Island {
