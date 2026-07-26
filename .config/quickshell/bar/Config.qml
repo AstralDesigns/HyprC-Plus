@@ -613,7 +613,7 @@ QtObject {
     property color powerGlyphColor:      Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
-    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, ccGlyphOpacity)
+    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, ccGlyphOpacity)
 
     // ── Battery radial indicator ─────────────────────────────────────────
     property bool batteryRadialVisible: true
@@ -668,8 +668,8 @@ QtObject {
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
     readonly property color wsActiveColor:     Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, wsActiveOpacity)
-    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, wsPersistentOpacity)
-    readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc14.r, Theme.cWc14.g, Theme.cWc14.b, wsEmptyOpacity)
+    readonly property color wsPersistentColor: Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, wsPersistentOpacity)
+    readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc4.r, Theme.cWc4.g, Theme.cWc4.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
     //  wsGlyphSize controls the font size of workspace button icons.
