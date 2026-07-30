@@ -235,8 +235,8 @@ Item {
     PanelWindow {
         id: clkPopup
         readonly property bool _barAtBottom: Config.barPosition === "bottom"
-        readonly property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop) : Config.outerMarginTop) + Config.barHeight - 4
-    readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight - 4
+        readonly property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop - 8) : Config.outerMarginTop + 4) + Config.barHeight
+    readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom - 8) : Config.outerMarginBottom + 4) + Config.barHeight
 
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
         margins {

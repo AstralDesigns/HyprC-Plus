@@ -42,8 +42,8 @@ PanelWindow {
 
     // ── Bar state (read from qs_bar_state.json, same as startmenu) ───────
     property bool   _barAtBottom: Config.barPosition === "bottom"
-    property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop) : Config.outerMarginTop) + Config.barHeight - 6
-    property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight - 6
+    property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop  - 8) : Config.outerMarginTop + 4) + Config.barHeight
+    property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom - 8) : Config.outerMarginBottom + 4) + Config.barHeight
     property real   _sideMargin:  Config.outerMarginSide
 
     // ── Scripts directory
@@ -1807,11 +1807,11 @@ PanelWindow {
                                         CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"R.Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
                                         CCSlider { label:"Island"; from:0;to:90; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
                                         // Shell-specific geometry
-                                        CCSlider { visible: Config.barMode === "shell"; label:"Arm Width";   from:4;to:120; stepSize:1;  value:Config.shellArmThickness;         onMoved:function(v){Config.shellArmThickness=v} }
                                         CCSlider { visible: Config.barMode === "shell"; label:"Inner Radii"; from:0;to:90;               value:Config.shellInnerRadius;           onMoved:function(v){Config.shellInnerRadius=v} }
                                         //CCSlider { visible: Config.barMode === "shell"; label:"C.Junction";  from:0;to:90;               value:Config.shellCenterJunctionRadius;  onMoved:function(v){Config.shellCenterJunctionRadius=v} }
 
                                         CCSection { text: "Dimensions" }
+                                        CCSlider { visible: Config.barMode === "shell"; label:"Shell Pad";   from:4;to:120; stepSize:1;  value:Config.shellArmThickness;         onMoved:function(v){Config.shellArmThickness=v} }
                                         CCSlider { label:"Bar Height";    from:20;to:80;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
                                         CCSlider { label:"Module Height";  from:12;to:70;  stepSize:2;  value:Config.moduleHeight;  onMoved:function(v){Config.moduleHeight=v} }
 
