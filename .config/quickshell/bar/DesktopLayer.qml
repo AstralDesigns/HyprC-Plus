@@ -155,7 +155,7 @@ Item {
                     top:    parent.top
                     left:   parent.left
                     bottom: parent.bottom
-                    topMargin:    _isShell ? (Config.shellArmThickness + 6) : (Config.barPosition === "top" ? (Config.barHeight + Config.outerMarginTop + 6) : 6)
+                    topMargin:    _isShell ? (Config.shellArmThickness + 15) : (Config.barPosition === "top" ? (Config.barHeight + Config.outerMarginTop - 26) : 6)
                     bottomMargin: _isShell ? (Config.shellArmThickness + 6) : (Config.barPosition === "bottom" ? (Config.barHeight + Config.outerMarginBottom + 6) : 6)
                     leftMargin:   _isShell ? (Config.shellArmThickness + 6) : (Config.barPosition === "left" ? (Config.barHeight + 6) : 6)
                     rightMargin:  _isShell ? (Config.shellArmThickness + 6) : (Config.barPosition === "right" ? (Config.barHeight + 6) : 6)
