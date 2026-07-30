@@ -59,11 +59,11 @@ var DockConfig = {
     // ── Background fill style ─────────────────────────────────────────────
     // 'glass'    → solid @blur_background (default, matches style.css)
     // 'gradient' → vertical linear-gradient: @inverse_primary → @scrim
-    rectBgStyle: 'gradient',          // @HCD:rectBgStyle
+    rectBgStyle: 'glass',          // @HCD:rectBgStyle
     islandBgStyle: 'gradient',         // @HCD:islandBgStyle
 
     // ── Border ────────────────────────────────────────────────────────────
-    borderWidth: 0,                // @HCD:borderWidth
+    borderWidth: 2,                // @HCD:borderWidth
     borderColorVar: 'inverse_primary', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
     borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
@@ -102,7 +102,7 @@ var DockConfig = {
     // from the base config above.
     //
     // Example: if you want a thicker border for left dock:
-    //   positionOverrides: { left: { borderWidth: 0 } }
+    //   positionOverrides: { left: { borderWidth: 2 } }
     positionOverrides: {
         left: {
             marginLeft:   6,   // screen edge gap
