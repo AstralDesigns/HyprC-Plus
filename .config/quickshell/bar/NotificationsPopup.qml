@@ -36,8 +36,8 @@ Item {
         readonly property real  _panelMargin: Config.outerMarginSide * 2
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true }
         margins {
-            top:    _barAtBottom ? 6 : (Config.barHeight + Config.outerMarginTop + 6)
-            bottom: _barAtBottom ? (Config.barHeight + Config.outerMarginBottom + 6) : 6
+            top:    _barAtBottom ? 10 : (Config.barHeight + Config.outerMarginTop + 10)
+            bottom: _barAtBottom ? (Config.barHeight + Config.outerMarginBottom + 10) : 10
             left:   10 // changed from '_panelMargin' because toasts don't need margin tracking but keep pos tracking
         }
         implicitWidth:  364
