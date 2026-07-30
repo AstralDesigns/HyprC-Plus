@@ -343,10 +343,14 @@ PanelWindow {
             height: shellLeftPW.visible ? shellLeftPW.height : 0
         }
 
-        // Add back input region for Shell Center Protrusion when visible
+        // Add back input region for Shell Center Protrusion when visible.
+        // shellCenter.x/y are relative to barLayout (which sits inside barBg),
+        // so we must add barBg's own position within the bar PanelWindow to get
+        // window-root coordinates — critical for bottom-positioned shell mode
+        // where barBg.y = bar.height - _shellActiveThickness (not 0).
         Region {
-            x:      shellCenter.x
-            y:      shellCenter.y
+            x:      barBg.x + shellCenter.x
+            y:      barBg.y + shellCenter.y
             width:  shellCenter.visible ? shellCenter.width : 0
             height: shellCenter.visible ? shellCenter.height : 0
         }
@@ -813,6 +817,12 @@ PanelWindow {
                                                   Config.barBorderColor.b,
                                                   Config.barBorderAlpha)
 
+        // Mirror bar position so a barPosition change in the CC triggers
+        // requestPaint() — _shellHollowPath uses isTop/isBot to decide which
+        // edge gets the center-island protrusion tab.
+        readonly property bool _isTop: bar._isTop
+        readonly property bool _isBot: bar._isBottom
+
         onWidthChanged:    requestPaint()
         onHeightChanged:   requestPaint()
         on_LeftTChanged:   requestPaint()
@@ -824,6 +834,8 @@ PanelWindow {
         on_FillChanged:    requestPaint()
         on_BorderChanged:  requestPaint()
         onVisibleChanged:  if (visible) requestPaint()
+        on_IsTopChanged:   requestPaint()
+        on_IsBotChanged:   requestPaint()
 
         onPaint: {
             const ctx = getContext("2d")
