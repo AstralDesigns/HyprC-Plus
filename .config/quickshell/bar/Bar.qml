@@ -135,7 +135,7 @@ PanelWindow {
                  && (!bar._triLeftAhHidden || bar._triLeftPinned)
         screen: bar.screen
         WlrLayershell.layer:          WlrLayer.Top
-        WlrLayershell.namespace:       "quickshell:shell-left-island"
+        WlrLayershell.namespace:       "quickshell"
         WlrLayershell.exclusionMode:   ExclusionMode.Ignore
         exclusionMode:                 ExclusionMode.Ignore
         exclusiveZone:                 0
@@ -227,7 +227,7 @@ PanelWindow {
                  && (!bar._triRightAhHidden || bar._triRightPinned)
         screen: bar.screen
         WlrLayershell.layer:          WlrLayer.Top
-        WlrLayershell.namespace:       "quickshell:shell-right-island"
+        WlrLayershell.namespace:       "quickshell"
         WlrLayershell.exclusionMode:   ExclusionMode.Ignore
         exclusionMode:                 ExclusionMode.Ignore
         exclusiveZone:                 0
