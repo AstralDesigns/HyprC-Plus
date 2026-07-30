@@ -637,7 +637,7 @@ QtObject {
     property color powerGlyphColor:      Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
-    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, ccGlyphOpacity)
+    readonly property color ccGlyphColor: Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, ccGlyphOpacity)
 
     // ── Battery radial indicator ─────────────────────────────────────────
     property bool batteryRadialVisible: true
