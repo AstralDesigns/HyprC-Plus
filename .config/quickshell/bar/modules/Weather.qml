@@ -31,7 +31,7 @@ Item {
 
         Text {
             text: WeatherPopupState.icon
-            color: Config.batteryIconColor
+            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
             font.family: Config.fontFamily
             font.pixelSize: Config.infoGlyphSize + 2
             font.weight: Config.fontWeight
