@@ -150,11 +150,15 @@ Item {
             //  This way icons never go off the bottom of the screen.
             Flow {
                 id: iconGrid
+                readonly property bool _isShell: Config.barMode === "shell"
                 anchors {
                     top:    parent.top
                     left:   parent.left
                     bottom: parent.bottom
-                    margins: 6
+                    topMargin:    _isShell ? (Config.shellArmThickness + 6) : (Config.barPosition === "top" ? (Config.barHeight + Config.outerMarginTop + 6) : 6)
+                    bottomMargin: _isShell ? (Config.shellArmThickness + 6) : (Config.barPosition === "bottom" ? (Config.barHeight + Config.outerMarginBottom + 6) : 6)
+                    leftMargin:   _isShell ? (Config.shellArmThickness + 6) : (Config.barPosition === "left" ? (Config.barHeight + 6) : 6)
+                    rightMargin:  _isShell ? (Config.shellArmThickness + 6) : (Config.barPosition === "right" ? (Config.barHeight + 6) : 6)
                 }
                 // No explicit width — let it grow rightward as columns fill.
                 // TopToBottom flow: items fill column top→bottom, wrap right.

@@ -10,7 +10,7 @@
 //   sed -i 's/appIconSize: 22[ \t]*[0-9]*/appIconSize: 20N/' config.js
 //
 // String @HCD variables (replace GLYPH with new character or escape):
-//   sed -i "s/startIcon: '',
+//   sed -i "s/startIcon: '󰳭',
 //
 // Same pattern applies to all @HCD-tagged variables — just swap the key name.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -20,8 +20,8 @@ var DockConfig = {
     // ── Start button icon (NerdFont glyph) ────────────────────────────────
     // Paste any glyph directly (use rofi glyph menu or any NerdFont codepoint).
     // null = fall back to the GLYPH_START const in dock-main.js.
-    // candy-utils sed pattern:  sed -i "s/startIcon: '',
-    startIcon: '',              // @HCD:startIcon
+    // candy-utils sed pattern:  sed -i "s/startIcon: '󰳭',
+    startIcon: '󰳭',              // @HCD:startIcon
     // ── Button spacing (gap between every button in the dock) ─────────────
     // Controls GtkBox spacing — applies uniformly between start↔first-app,
     // app↔app, and last-app↔trash so all gaps are edited in one place.
@@ -59,12 +59,12 @@ var DockConfig = {
     // ── Background fill style ─────────────────────────────────────────────
     // 'glass'    → solid @blur_background (default, matches style.css)
     // 'gradient' → vertical linear-gradient: @inverse_primary → @scrim
-    rectBgStyle: 'glass',          // @HCD:rectBgStyle
+    rectBgStyle: 'gradient',          // @HCD:rectBgStyle
     islandBgStyle: 'gradient',         // @HCD:islandBgStyle
 
     // ── Border ────────────────────────────────────────────────────────────
-    borderWidth: 2,                // @HCD:borderWidth
-    borderColorVar: 'color5', // @HCD:borderColorVar  (GTK @name, matugen)
+    borderWidth: 0,                // @HCD:borderWidth
+    borderColorVar: 'inverse_primary', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
     borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
     borderTopRightRadius: 30,      // @HCD:borderTopRightRadius
@@ -102,7 +102,7 @@ var DockConfig = {
     // from the base config above.
     //
     // Example: if you want a thicker border for left dock:
-    //   positionOverrides: { left: { borderWidth: 2 } }
+    //   positionOverrides: { left: { borderWidth: 0 } }
     positionOverrides: {
         left: {
             marginLeft:   6,   // screen edge gap

@@ -170,6 +170,7 @@ ShellRoot {
     //    survives bar autohide (bar.visible = false unmaps the bar surface).
     InhibitorAnchor {}
 
+
     // ── One bar instance per monitor ────────────────────────────────────────
     Variants {
         id: barVariants

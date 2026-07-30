@@ -348,6 +348,18 @@ function _injectGlyphSizeCSS(display) {
     } else {
         pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
     }
+    
+    const _mgpos = DockConfig.position || 'bottom';
+    let mg;
+    if (_mgpos === 'top') {
+        mg = `margin-bottom: 6px;`;
+    } else if (_mgpos === 'left') {
+        mg = `margin-right: 6px;`;
+    } else if (_mgpos === 'right') {
+        mg = `margin-left: 6px;`;
+    } else {
+        mg = `margin-top: 6px;`;
+    }
 
     const css = `
         /* Config-driven values — updated in-place on SIGUSR2 hot-reload */

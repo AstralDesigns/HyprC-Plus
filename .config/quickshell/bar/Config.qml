@@ -85,6 +85,12 @@ QtObject {
         if (v !== undefined && v !== null) barTopRightRadius = parseInt(v)
         v = _settings.value("triRightBottomRightRadius")
         if (v !== undefined && v !== null) barBottomRightRadius = parseInt(v)
+        v = _settings.value("shellArmThickness");          if (v !== undefined && v !== null) shellArmThickness          = parseInt(v)
+        v = _settings.value("shellInnerRadius");           if (v !== undefined && v !== null) shellInnerRadius           = parseInt(v)
+        v = _settings.value("shellModuleSideMargin");      if (v !== undefined && v !== null) shellModuleSideMargin      = parseInt(v)
+        v = _settings.value("shellModuleAutoHide");        if (v !== undefined && v !== null) shellModuleAutoHide        = _toBool(v)
+        v = _settings.value("shellModuleAutoHideDelay");   if (v !== undefined && v !== null) shellModuleAutoHideDelay   = parseInt(v)
+        v = _settings.value("shellCenterJunctionRadius");  if (v !== undefined && v !== null) shellCenterJunctionRadius  = parseInt(v)
         v = _settings.value("islandRadius"); if (v !== undefined && v !== null) islandRadius = v
         v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
         v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
@@ -261,6 +267,12 @@ QtObject {
         _settings.setValue("triRightBottomLeftRadius",  triRightBottomLeftRadius)
         _settings.setValue("triRightTopRightRadius",    barTopRightRadius)
         _settings.setValue("triRightBottomRightRadius", barBottomRightRadius)
+        _settings.setValue("shellArmThickness",         shellArmThickness)
+        _settings.setValue("shellInnerRadius",          shellInnerRadius)
+        _settings.setValue("shellCenterJunctionRadius", shellCenterJunctionRadius)
+        _settings.setValue("shellModuleSideMargin",     shellModuleSideMargin)
+        _settings.setValue("shellModuleAutoHide",       shellModuleAutoHide)
+        _settings.setValue("shellModuleAutoHideDelay",  shellModuleAutoHideDelay)
         _settings.setValue("islandRadius", islandRadius)
         _settings.setValue("islandBorder", islandBorder)
         _settings.setValue("islandBorderAlpha", islandBorderAlpha)
@@ -423,7 +435,11 @@ QtObject {
     //  "tri"    — three separate bar-background rects (left / center / right),
     //             each styled like "bar" mode but physically split. Internal
     //             module layout is unchanged; edit options are shared with bar mode.
-    property string barMode:     "bar"   // "bar" | "island" | "tri"
+    //  "shell" — 4-sided frame around screen edges, painted by the shellFrame
+    //            Canvas inside Bar.qml itself (not a separate window).
+    //            Left/right islands float inside the hollow. Center island is
+    //            pinned to and protrudes inward from the active arm.
+    property string barMode: "bar"   // "bar" | "island" | "tri" | "shell"
     property string barPosition: "top"   // "top" | "bottom" | "left" | "right"
 
     // ── Bar geometry ─────────────────────────────────────────────────────
@@ -461,6 +477,14 @@ QtObject {
     property int triCenterBottomRightRadius: 20
     property int triRightTopLeftRadius:     20
     property int triRightBottomLeftRadius:  20
+
+    // ── Shell mode properties ─────────────────────────────────────────────
+    property int shellArmThickness:         40   // px — frame arm width on all 4 sides
+    property int shellInnerRadius:          20   // px — inner corner radius (all 4)
+    property int shellCenterJunctionRadius: 20   // px — island junction corner radius
+    property int  shellModuleSideMargin:    6    // px — side margin for the module strip in shell mode
+    property bool shellModuleAutoHide:      false
+    property int  shellModuleAutoHideDelay: 5    // seconds
 
     property string _lastBarPosition: ""
     property bool   _cornerSwapReady: false
@@ -1068,6 +1092,8 @@ QtObject {
     property int  triCenterAutoHideDelay: 5
     property bool triRightAutoHide:      false
     property int  triRightAutoHideDelay: 5
+    // Shell module strip auto-hide (separate from the full-bar auto-hide)
+    // shellModuleAutoHide / shellModuleAutoHideDelay live above with the shell geometry props
 
     // ═══════════════════════════════════════════════════════════════════════
     //  Dock runtime state (source of truth for CC display; GJS dock reads

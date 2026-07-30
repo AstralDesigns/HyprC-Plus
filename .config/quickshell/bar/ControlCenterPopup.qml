@@ -42,8 +42,8 @@ PanelWindow {
 
     // ── Bar state (read from qs_bar_state.json, same as startmenu) ───────
     property bool   _barAtBottom: Config.barPosition === "bottom"
-    property real   _barGap:      Config.outerMarginTop + Config.barHeight + 6
-    property real   _barGapBot:   Config.outerMarginBottom + Config.barHeight + 6
+    property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop) : Config.outerMarginTop) + Config.barHeight - 6
+    property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight - 6
     property real   _sideMargin:  Config.outerMarginSide
 
     // ── Scripts directory
@@ -1394,7 +1394,7 @@ PanelWindow {
                                 Text {
                                     text: modelData.icon
                                     font.family: Config.fontFamily; font.pixelSize: 15
-                                    color: Theme.cWc5; opacity: 0.55
+                                    color: Theme.cWc4; opacity: 0.55
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
@@ -1410,7 +1410,7 @@ PanelWindow {
                                 anchors { right: parent.right; rightMargin: 4
                                           verticalCenter: parent.verticalCenter }
                                 width: 3; height: 20; radius: 2
-                                color: Theme.cWc4
+                                color: Theme.cWc5
                                 visible: parent._stackIdx === modelData.idx
                             }
 
@@ -1775,7 +1775,7 @@ PanelWindow {
                                         CCSection { text: "Mode & Position" }
                                         CCSegmented {
                                             label: "Bar Mode"
-                                            options: ["bar", "island", "tri"]
+                                            options: ["bar", "island", "tri", "shell"]
                                             current: Config.barMode
                                             onPicked: function(v) { Config.barMode = v }
                                         }
@@ -1788,24 +1788,28 @@ PanelWindow {
 
                                         CCSection { text: "Corner Radius" }
                                         // bar / island — single rect corners
-                                        CCSlider { visible: Config.barMode !== "tri"; label:"Top-Left";     from:0;to:90; value:Config.barTopLeftRadius;     onMoved:function(v){Config.barTopLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode !== "tri"; label:"Top-Right";    from:0;to:90; value:Config.barTopRightRadius;    onMoved:function(v){Config.barTopRightRadius=v} }
-                                        CCSlider { visible: Config.barMode !== "tri"; label:"Bottom-Left";  from:0;to:90; value:Config.barBottomLeftRadius;  onMoved:function(v){Config.barBottomLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode !== "tri"; label:"Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius; onMoved:function(v){Config.barBottomRightRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri" && Config.barMode !== "shell"; label:"Top-Left";     from:0;to:90; value:Config.barTopLeftRadius;     onMoved:function(v){Config.barTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri" && Config.barMode !== "shell"; label:"Top-Right";    from:0;to:90; value:Config.barTopRightRadius;    onMoved:function(v){Config.barTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri" && Config.barMode !== "shell"; label:"Bottom-Left";  from:0;to:90; value:Config.barBottomLeftRadius;  onMoved:function(v){Config.barBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode !== "tri" && Config.barMode !== "shell"; label:"Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius; onMoved:function(v){Config.barBottomRightRadius=v} }
                                         // tri — per-segment corners (left uses bar*Radius)
-                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Top-Left";     from:0;to:90; value:Config.barTopLeftRadius;          onMoved:function(v){Config.barTopLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Top-Right";    from:0;to:90; value:Config.triLeftTopRightRadius;    onMoved:function(v){Config.triLeftTopRightRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Bottom-Left";  from:0;to:90; value:Config.barBottomLeftRadius;       onMoved:function(v){Config.barBottomLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"L.Bottom-Right"; from:0;to:90; value:Config.triLeftBottomRightRadius; onMoved:function(v){Config.triLeftBottomRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"L.Top-Left";     from:0;to:90; value:Config.barTopLeftRadius;          onMoved:function(v){Config.barTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"L.Top-Right";    from:0;to:90; value:Config.triLeftTopRightRadius;    onMoved:function(v){Config.triLeftTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"L.Bottom-Left";  from:0;to:90; value:Config.barBottomLeftRadius;       onMoved:function(v){Config.barBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"L.Bottom-Right"; from:0;to:90; value:Config.triLeftBottomRightRadius; onMoved:function(v){Config.triLeftBottomRightRadius=v} }
                                         CCSlider { visible: Config.barMode === "tri"; label:"C.Top-Left";     from:0;to:90; value:Config.triCenterTopLeftRadius;     onMoved:function(v){Config.triCenterTopLeftRadius=v} }
                                         CCSlider { visible: Config.barMode === "tri"; label:"C.Top-Right";    from:0;to:90; value:Config.triCenterTopRightRadius;    onMoved:function(v){Config.triCenterTopRightRadius=v} }
                                         CCSlider { visible: Config.barMode === "tri"; label:"C.Bottom-Left";  from:0;to:90; value:Config.triCenterBottomLeftRadius;  onMoved:function(v){Config.triCenterBottomLeftRadius=v} }
                                         CCSlider { visible: Config.barMode === "tri"; label:"C.Bottom-Right"; from:0;to:90; value:Config.triCenterBottomRightRadius; onMoved:function(v){Config.triCenterBottomRightRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Top-Left";     from:0;to:90; value:Config.triRightTopLeftRadius;     onMoved:function(v){Config.triRightTopLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Top-Right";    from:0;to:90; value:Config.barTopRightRadius;       onMoved:function(v){Config.barTopRightRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Left";  from:0;to:90; value:Config.triRightBottomLeftRadius;  onMoved:function(v){Config.triRightBottomLeftRadius=v} }
-                                        CCSlider { visible: Config.barMode === "tri"; label:"R.Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"R.Top-Left";     from:0;to:90; value:Config.triRightTopLeftRadius;     onMoved:function(v){Config.triRightTopLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"R.Top-Right";    from:0;to:90; value:Config.barTopRightRadius;       onMoved:function(v){Config.barTopRightRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"R.Bottom-Left";  from:0;to:90; value:Config.triRightBottomLeftRadius;  onMoved:function(v){Config.triRightBottomLeftRadius=v} }
+                                        CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"R.Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
                                         CCSlider { label:"Island"; from:0;to:90; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
+                                        // Shell-specific geometry
+                                        CCSlider { visible: Config.barMode === "shell"; label:"Arm Width";   from:4;to:120; stepSize:1;  value:Config.shellArmThickness;         onMoved:function(v){Config.shellArmThickness=v} }
+                                        CCSlider { visible: Config.barMode === "shell"; label:"Inner Radii"; from:0;to:90;               value:Config.shellInnerRadius;           onMoved:function(v){Config.shellInnerRadius=v} }
+                                        //CCSlider { visible: Config.barMode === "shell"; label:"C.Junction";  from:0;to:90;               value:Config.shellCenterJunctionRadius;  onMoved:function(v){Config.shellCenterJunctionRadius=v} }
 
                                         CCSection { text: "Dimensions" }
                                         CCSlider { label:"Bar Height";    from:20;to:80;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
@@ -1814,7 +1818,9 @@ PanelWindow {
                                         CCSection { text: "Screen Margins" }
                                         CCSlider { label:"Top Margin";    from:0;to:30; value:Config.outerMarginTop;    onMoved:function(v){Config.outerMarginTop=v} }
                                         CCSlider { label:"Bottom Margin"; from:0;to:30; value:Config.outerMarginBottom; onMoved:function(v){Config.outerMarginBottom=v} }
-                                        CCSlider { label:"Side Margin";   from:0;to:200; value:Config.outerMarginSide;   onMoved:function(v){Config.outerMarginSide=v} }
+                                        // In shell mode a separate side margin controls only the module strip
+                                        CCSlider { visible: Config.barMode !== "shell"; label:"Side Margin";        from:0;to:200; value:Config.outerMarginSide;        onMoved:function(v){Config.outerMarginSide=v} }
+                                        CCSlider { visible: Config.barMode === "shell"; label:"Side Margin (Shell)"; from:0;to:200; value:Config.shellModuleSideMargin; onMoved:function(v){Config.shellModuleSideMargin=v} }
                                         CCSlider { label:"Edge Pad Left"; from:0;to:30; value:Config.barEdgePaddingLeft; onMoved:function(v){Config.barEdgePaddingLeft=v} }
                                         CCSlider { label:"Edge Pad Right";from:0;to:30; value:Config.barEdgePaddingRight;onMoved:function(v){Config.barEdgePaddingRight=v} }
 
@@ -2794,7 +2800,7 @@ PanelWindow {
                                         CCToggle {
                                             id: _barAhToggle
                                             label: "Auto-Hide Bar"
-                                            visible: Config.barMode !== "tri"
+                                            visible: Config.barMode !== "tri" && Config.barMode !== "shell"
                                             value: _barAhEnabled
                                             onToggled: function(v) {
                                                 _barAhEnabled = v
@@ -2804,7 +2810,7 @@ PanelWindow {
 
                                         CCSlider {
                                             label: "Delay (s)"
-                                            visible: Config.barMode !== "tri"
+                                            visible: Config.barMode !== "tri" && Config.barMode !== "shell"
                                             from: 1; to: 60; stepSize: 1
                                             value: Config.barAutoHideDelay
                                             opacity: _barAhEnabled ? 1.0 : 0.4
@@ -2818,7 +2824,7 @@ PanelWindow {
                                         CCToggle {
                                             id: _triLeftAhToggle
                                             label: "Auto-Hide Left Panel"
-                                            visible: Config.barMode === "tri"
+                                            visible: Config.barMode === "tri" || Config.barMode === "shell"
                                             value: Config.triLeftAutoHide
                                             onToggled: function(v) {
                                                 Config.triLeftAutoHide = v
@@ -2827,7 +2833,7 @@ PanelWindow {
 
                                         CCSlider {
                                             label: "Left Delay (s)"
-                                            visible: Config.barMode === "tri"
+                                            visible: Config.barMode === "tri" || Config.barMode === "shell"
                                             from: 1; to: 60; stepSize: 1
                                             value: Config.triLeftAutoHideDelay
                                             opacity: Config.triLeftAutoHide ? 1.0 : 0.4
@@ -2840,7 +2846,7 @@ PanelWindow {
                                         CCToggle {
                                             id: _triCenterAhToggle
                                             label: "Auto-Hide Center Panel"
-                                            visible: Config.barMode === "tri"
+                                            visible: Config.barMode === "tri" || Config.barMode === "shell"
                                             value: Config.triCenterAutoHide
                                             onToggled: function(v) {
                                                 Config.triCenterAutoHide = v
@@ -2849,7 +2855,7 @@ PanelWindow {
 
                                         CCSlider {
                                             label: "Center Delay (s)"
-                                            visible: Config.barMode === "tri"
+                                            visible: Config.barMode === "tri" || Config.barMode === "shell"
                                             from: 1; to: 60; stepSize: 1
                                             value: Config.triCenterAutoHideDelay
                                             opacity: Config.triCenterAutoHide ? 1.0 : 0.4
@@ -2862,7 +2868,7 @@ PanelWindow {
                                         CCToggle {
                                             id: _triRightAhToggle
                                             label: "Auto-Hide Right Panel"
-                                            visible: Config.barMode === "tri"
+                                            visible: Config.barMode === "tri" || Config.barMode === "shell"
                                             value: Config.triRightAutoHide
                                             onToggled: function(v) {
                                                 Config.triRightAutoHide = v
@@ -2871,7 +2877,7 @@ PanelWindow {
 
                                         CCSlider {
                                             label: "Right Delay (s)"
-                                            visible: Config.barMode === "tri"
+                                            visible: Config.barMode === "tri" || Config.barMode === "shell"
                                             from: 1; to: 60; stepSize: 1
                                             value: Config.triRightAutoHideDelay
                                             opacity: Config.triRightAutoHide ? 1.0 : 0.4
