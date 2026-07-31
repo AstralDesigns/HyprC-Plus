@@ -103,10 +103,17 @@ Item {
                             font.pixelSize: MediaPlayerState.thumbSize - 2
                         }
 
-                        RotationAnimator on rotation {
+                        RotationAnimator {
+                            id: discAnim
+                            target: discContainer
                             from: 0; to: 360
-                            duration: 80000; loops: Animation.Infinite
-                            running: MediaPlayerState.playing
+                            duration: 8000; loops: Animation.Infinite
+                            running: MediaPlayerState.playing && discContainer.visible
+                        }
+
+                        onVisibleChanged: {
+                            if (visible && MediaPlayerState.playing)
+                                discAnim.restart()
                         }
                     }
 
@@ -151,8 +158,11 @@ Item {
                     acceptedButtons: Qt.LeftButton | Qt.RightButton
                     cursorShape: Qt.PointingHandCursor
                     onClicked: function(ev) {
-                        if (ev.button === Qt.RightButton) MediaPlayerState.ctl("next")
-                        else MediaPlayerState.ctl("play-pause")
+                        if (ev.button === Qt.RightButton) {
+                            if (!gjsMediaProc.running) gjsMediaProc.running = true
+                        } else {
+                            MediaPlayerPopupState.toggleWidget()
+                        }
                     }
                     onWheel: function(ev) {
                         MediaPlayerState.ctl(ev.angleDelta.y > 0 ? "previous" : "next")

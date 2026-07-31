@@ -82,6 +82,7 @@ ShellRoot {
     Loader { active: LicenseState.activated && NetworkPopupState.visible;  source: "NetworkPopup.qml"  }
     Loader { active: LicenseState.activated && CalendarPopupState.visible; source: "CalendarPopup.qml" }
     Loader { active: LicenseState.activated && (ClockPopupState.visible || ClockPopupState.widgetVisible); source: "ClockPopup.qml" }
+    Loader { active: LicenseState.activated && MediaPlayerPopupState.widgetVisible; source: "MediaPlayerPopup.qml" }
     Loader { active: LicenseState.activated && TrayMenuState.visible;      source: "TrayMenuPopup.qml" }
     // Wrapped in a Loader so wallpaper changes can fully destroy+recreate
     // it, forcing Qt to re-apply the new QT color palette for native menus.

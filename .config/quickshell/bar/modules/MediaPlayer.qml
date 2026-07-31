@@ -66,10 +66,17 @@ Item {
                             font.pixelSize: MediaPlayerState.thumbSize - 2
                         }
 
-                        RotationAnimator on rotation {
-                            from: discContainer.rotation; to: discContainer.rotation + 360
+                        RotationAnimator {
+                            id: discAnim
+                            target: discContainer
+                            from: 0; to: 360
                             duration: 8000; loops: Animation.Infinite
-                            running: MediaPlayerState.playing
+                            running: MediaPlayerState.playing && discContainer.visible
+                        }
+
+                        onVisibleChanged: {
+                            if (visible && MediaPlayerState.playing)
+                                discAnim.restart()
                         }
 
                         // Album art image (fades in over placeholder)
@@ -85,12 +92,19 @@ Item {
                             opacity: status === Image.Ready ? 1.0 : 0.0
                             Behavior on opacity { NumberAnimation { duration: 120 } }
                         }
-                	opacity: gjsMa.containsMouse ? 0.7 : 1.0
+                	opacity: discMa.containsMouse ? 0.7 : 1.0
                 	Behavior on opacity { NumberAnimation { duration: 80 } }
                 	MouseArea {
-                    	    id: gjsMa; anchors.fill: parent; hoverEnabled: true
+                    	    id: discMa; anchors.fill: parent; hoverEnabled: true
+                    	    acceptedButtons: Qt.LeftButton | Qt.RightButton
                     	    cursorShape: Qt.PointingHandCursor
-                    	    onClicked: if (!gjsMediaProc.running) gjsMediaProc.running = true
+                    	    onClicked: function(ev) {
+                    	        if (ev.button === Qt.RightButton) {
+                    	            if (!gjsMediaProc.running) gjsMediaProc.running = true
+                    	        } else {
+                    	            MediaPlayerPopupState.toggleWidget()
+                    	        }
+                    	    }
                 	}
                     }
 
