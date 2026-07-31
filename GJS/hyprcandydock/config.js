@@ -64,7 +64,7 @@ var DockConfig = {
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 2,                // @HCD:borderWidth
-    borderColorVar: 'inverse_primary', // @HCD:borderColorVar  (GTK @name, matugen)
+    borderColorVar: 'color2', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
     borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
     borderTopRightRadius: 30,      // @HCD:borderTopRightRadius
