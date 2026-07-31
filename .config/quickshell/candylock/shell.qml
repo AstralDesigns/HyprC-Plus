@@ -525,6 +525,7 @@ ShellRoot {
     }
 
     // ── Media ─────────────────────────────────────────────────────────────────
+    property string mediaSource: ""
     property string mediaStatus:"Stopped"; property string mediaTitle:"No media"
     property string mediaArtist:""; property string mediaArtUrl:""
     property string _circularArtPath: ""
@@ -536,23 +537,44 @@ ShellRoot {
 
     Process {
         id:mediaProc
-        command:["playerctl","-F","metadata","--format","{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{shuffle}}\t{{loop}}"]
+        command: ["playerctl", "-F", "metadata", "--format", "{{playerName}}\t{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{shuffle}}\t{{loop}}"]
         stdout: SplitParser {
             splitMarker:"\n"
             onRead: function(l){
-                const p=l.split("\t")
-                if(p.length>=6){
-                    root.mediaStatus=p[0].trim()||"Stopped"
-                    const newUrl=p[1].trim()
-                    if(newUrl!==root.mediaArtUrl){
-                        root.mediaArtUrl=newUrl
-                        root._circularArtPath=""
-                        if(newUrl) artConvProc.launch(newUrl)
+                const p = l.split("\t")
+                if(p.length >= 1){
+                    const newSource = p[0].trim() || ""
+                    const newStatus = (p.length > 1 ? p[1].trim() : "") || "Stopped"
+                    const newUrl    = p.length > 2 ? p[2].trim() : ""
+                    const newTitle  = p.length > 3 ? p[3].trim() : ""
+                    const newArtist = p.length > 4 ? p[4].trim() : ""
+                    const newShuffle= (p.length > 5 ? p[5].trim() : "off").toLowerCase()
+                    const newLoop   = (p.length > 6 ? p[6].trim() : "none").toLowerCase()
+
+                    const sourceChanged = (newSource !== root.mediaSource) && (newSource !== "")
+                    const titleChanged  = (newTitle  !== root.mediaTitle)
+                    const urlChanged    = (newUrl    !== root.mediaArtUrl)
+                    const trackChanged  = sourceChanged || titleChanged || urlChanged
+
+                    if (trackChanged) {
+                        root.mediaPosition = 0
+                        root.mediaDuration = 0
+                        root._posTimestamp = 0
+                        if (posProc.running) posProc.running = false
+                        if (newStatus === "Playing") posProc.running = true
                     }
-                    root.mediaTitle=p[2].trim()||"No media"
-                    root.mediaArtist=p[3].trim()
-                    root.mediaShuffleStatus = (p[4].trim()||"off").toLowerCase()
-                    root.mediaLoopStatus    = (p[5].trim()||"none").toLowerCase()
+
+                    root.mediaSource = newSource
+                    root.mediaStatus = newStatus
+                    if (urlChanged || sourceChanged || titleChanged) {
+                        root.mediaArtUrl = newUrl
+                        root._circularArtPath = ""
+                        if (newUrl) artConvProc.launch(newUrl)
+                    }
+                    root.mediaTitle = newTitle || "No media"
+                    root.mediaArtist = newArtist
+                    root.mediaShuffleStatus = newShuffle
+                    root.mediaLoopStatus    = newLoop
                 }
             }
         }
@@ -650,6 +672,7 @@ ShellRoot {
         function onMediaStatusChanged() {
             if(root.mediaStatus === "Playing") {
                 if(!lockCavaProc.running) lockCavaProc.running = true
+                if(!posProc.running)      posProc.running      = true
             } else {
                 lockCavaProc.running = false
                 root._cavaRaw = ""
@@ -675,6 +698,7 @@ ShellRoot {
                    "     -fill white -draw 'circle 96,96 96,0' \\) " +
                    "  -alpha off -compose CopyOpacity -composite " +
                    "  -strip \"$DST\""
+            if (running) running = false
             running = true
         }
         onExited: function(code){

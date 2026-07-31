@@ -14,6 +14,7 @@ import Quickshell.Io
 Item {
     id: scope
 
+    property string mediaSource:        ""
     property string mediaStatus:        "Stopped"
     property string mediaTitle:         ""
     property string mediaArtist:        ""
@@ -35,24 +36,45 @@ Item {
     Process {
         id: pctlProc
         command: ["playerctl", "-F", "metadata", "--format",
-            "{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{shuffle}}\t{{loop}}"]
+            "{{playerName}}\t{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{shuffle}}\t{{loop}}"]
         running: MediaPlayerPopupState.widgetVisible
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(line) {
                 const p = line.split("\t")
                 if (p.length < 1) return
-                scope.mediaStatus = p[0].trim() || "Stopped"
-                const url = p.length > 1 ? p[1].trim() : ""
-                if (url !== scope.mediaArtUrl) {
-                    scope.mediaArtUrl = url
-                    if (!url) scope._circularArtPath = ""
-                    else artProc.launch(url)
+                const newSource  = p[0].trim() || ""
+                const newStatus  = (p.length > 1 ? p[1].trim() : "") || "Stopped"
+                const newUrl     = p.length > 2 ? p[2].trim() : ""
+                const newTitle   = p.length > 3 ? p[3].trim() : ""
+                const newArtist  = p.length > 4 ? p[4].trim() : ""
+                const newShuffle = (p.length > 5 ? p[5].trim() : "off").toLowerCase()
+                const newLoop    = (p.length > 6 ? p[6].trim() : "none").toLowerCase()
+
+                const sourceChanged = (newSource !== scope.mediaSource) && (newSource !== "")
+                const titleChanged  = (newTitle  !== scope.mediaTitle)
+                const urlChanged    = (newUrl    !== scope.mediaArtUrl)
+                const trackChanged  = sourceChanged || titleChanged || urlChanged
+
+                if (trackChanged) {
+                    scope.mediaPosition = 0
+                    scope.mediaDuration = 0
+                    scope._posTimestamp = 0
+                    if (posProc.running) posProc.running = false
+                    if (newStatus === "Playing") posProc.running = true
                 }
-                scope.mediaTitle  = p.length > 2 ? (p[2].trim() || "") : ""
-                scope.mediaArtist = p.length > 3 ? (p[3].trim() || "") : ""
-                scope.mediaShuffleStatus = (p.length > 4 ? p[4].trim() : "off").toLowerCase()
-                scope.mediaLoopStatus    = (p.length > 5 ? p[5].trim() : "none").toLowerCase()
+
+                scope.mediaSource = newSource
+                scope.mediaStatus = newStatus
+                if (urlChanged || sourceChanged || titleChanged) {
+                    scope.mediaArtUrl = newUrl
+                    scope._circularArtPath = ""
+                    if (newUrl) artProc.launch(newUrl)
+                }
+                scope.mediaTitle  = newTitle
+                scope.mediaArtist = newArtist
+                scope.mediaShuffleStatus = newShuffle
+                scope.mediaLoopStatus    = newLoop
             }
         }
         onExited: pctlRestartTimer.restart()
@@ -83,7 +105,8 @@ Item {
                 "  \\( +clone -alpha extract -fill black -colorize 100 " +
                 "     -fill white -draw \"roundrectangle 0,0 $((S-1)),$((S-1)) $R,$R\" \\) " +
                 "-alpha off -compose CopyOpacity -composite -strip \"$DST\""
-            if (!running) running = true
+            if (running) running = false
+            running = true
         }
         onExited: function(code) {
             if (code === 0) {
@@ -247,6 +270,7 @@ Item {
         function on_PlayingChanged() {
             if (scope._playing) {
                 if (!cavaProc.running) cavaProc.running = true
+                if (!posProc.running)  posProc.running  = true
             } else {
                 cavaProc.running = false
                 scope._cavaRaw = ""
