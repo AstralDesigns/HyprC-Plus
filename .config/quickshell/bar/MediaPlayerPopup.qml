@@ -37,6 +37,7 @@ Item {
     property string _cavaRaw:           ""
 
     readonly property bool _playing: mediaStatus === "Playing"
+    readonly property bool _anyPlaying: _playing || mediaPlayers.some(p => p.status === "Playing")
 
     // ── MPRIS Metadata Watcher ────────────────────────────────────────────
     Process {
@@ -345,18 +346,20 @@ Item {
         onExited: cavaRestartTimer.restart()
     }
     Timer { id: cavaRestartTimer; interval: 2000; repeat: false
-        onTriggered: if (scope._playing && !cavaProc.running) cavaProc.running = true }
+        onTriggered: if (scope._anyPlaying && !cavaProc.running) cavaProc.running = true }
 
     Connections {
         target: scope
-        function on_PlayingChanged() {
-            if (scope._playing) {
+        function on_AnyPlayingChanged() {
+            if (scope._anyPlaying) {
                 if (!cavaProc.running) cavaProc.running = true
-                if (!posProc.running)  posProc.running  = true
             } else {
                 cavaProc.running = false
                 scope._cavaRaw = ""
             }
+        }
+        function on_PlayingChanged() {
+            if (scope._playing && !posProc.running) posProc.running = true
         }
     }
 
@@ -372,7 +375,7 @@ Item {
                 mediaWidget.posY = MediaPlayerPopupState.widgetY
                 if (!pctlProc.running)    pctlProc.running    = true
                 if (!volReadProc.running) volReadProc.running = true
-                if (scope._playing && !cavaProc.running) cavaProc.running = true
+                if (scope._anyPlaying && !cavaProc.running) cavaProc.running = true
             } else {
                 pctlProc.running    = false
                 cavaProc.running    = false
@@ -728,7 +731,7 @@ Item {
                     Canvas {
                         id: radialCava
                         anchors.fill: parent
-                        visible: scope.mediaStatus === "Playing"
+                        visible: scope._anyPlaying
                         property var _bars:     []
                         property int _barCount: 64
 

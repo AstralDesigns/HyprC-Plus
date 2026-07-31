@@ -105,6 +105,13 @@ Item {
                     	            MediaPlayerPopupState.toggleWidget()
                     	        }
                     	    }
+                    	    onWheel: function(e) {
+                    	        if (e.angleDelta.y < 0) {
+                    	            MediaPlayerState.nextSource()
+                    	        } else if (e.angleDelta.y > 0) {
+                    	            MediaPlayerState.prevSource()
+                    	        }
+                    	    }
                 	}
                     }
 

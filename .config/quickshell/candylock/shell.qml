@@ -543,6 +543,13 @@ ShellRoot {
     property real   mediaDuration:      activePlayer ? activePlayer.duration : 0
     property real   _posTimestamp:      activePlayer ? activePlayer._posTimestamp : 0
 
+    readonly property bool _playing: mediaStatus === "Playing"
+    readonly property bool _anyPlaying: _playing || mediaPlayers.some(p => p.status === "Playing")
+
+    onMediaSourceChanged: {
+        if (!posProc.running) posProc.running = true
+    }
+
     Process {
         id:mediaProc
         command: ["playerctl", "-F", "-a", "metadata", "--format", "{{playerName}}\t{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{shuffle}}\t{{loop}}"]
@@ -619,8 +626,11 @@ ShellRoot {
                 }
             }
         }
+        onExited: mediaProcRestartTimer.restart()
         Component.onCompleted: running=true
     }
+    Timer { id: mediaProcRestartTimer; interval: 3000; repeat: false
+        onTriggered: if (!mediaProc.running) mediaProc.running = true }
 
     // ── Position/duration ──────────────────────────────────────────────────
     Process {
@@ -656,17 +666,17 @@ ShellRoot {
             _line = ""
         }
     }
-    // Poll every second while Playing
+    // Poll every second while any source is Playing
     Timer {
         interval: 1000; repeat: true
-        running: root.mediaStatus === "Playing"
+        running: root._playing
         onTriggered: if (!posProc.running) posProc.running = true
         Component.onCompleted: posProc.running = true
     }
     // Smooth interpolation between polls — advance position by wall-clock elapsed time
     Timer {
-        interval: 250; repeat: true
-        running: root.mediaStatus === "Playing" && root.mediaDuration > 0 && root._posTimestamp > 0
+        interval: 200; repeat: true
+        running: root._playing && root.mediaDuration > 0 && root._posTimestamp > 0
         onTriggered: {
             const now = Date.now()
             const elapsed = (now - root._posTimestamp) / 1000.0
@@ -734,18 +744,20 @@ ShellRoot {
         onExited: cavRestartTimer.restart()
     }
     Timer { id:cavRestartTimer; interval:2000; repeat:false
-        onTriggered: if(!lockCavaProc.running) lockCavaProc.running = true }
+        onTriggered: if(root._anyPlaying && !lockCavaProc.running) lockCavaProc.running = true }
 
     Connections {
         target: root
-        function onMediaStatusChanged() {
-            if(root.mediaStatus === "Playing") {
-                if(!lockCavaProc.running) lockCavaProc.running = true
-                if(!posProc.running)      posProc.running      = true
+        function on_AnyPlayingChanged() {
+            if (root._anyPlaying) {
+                if (!lockCavaProc.running) lockCavaProc.running = true
             } else {
                 lockCavaProc.running = false
                 root._cavaRaw = ""
             }
+        }
+        function onMediaStatusChanged() {
+            if (root._playing && !posProc.running) posProc.running = true
         }
     }
 
@@ -1142,68 +1154,6 @@ ShellRoot {
                                     anchors { left:parent.left; right:parent.right; top:parent.top; margins:14 }
                                     spacing: 12
 
-                                    // ── Left Sidebar Pill (Minimized Indicators & Tab Switcher) ───
-                                    Rectangle {
-                                        id: sidebarPill
-                                        Layout.alignment: Qt.AlignVCenter
-                                        implicitWidth: 14
-                                        implicitHeight: Math.max(14, 14 + (root.mediaPlayers.length - 1) * 12)
-                                        radius: 7
-                                        color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.7)
-                                        border.width: 1
-                                        border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.25)
-                                        Behavior on implicitHeight { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
-
-                                        ColumnLayout {
-                                            anchors.centerIn: parent
-                                            spacing: 4
-
-                                            Repeater {
-                                                model: root.mediaPlayers.length > 0 ? root.mediaPlayers.length : 1
-                                                delegate: Item {
-                                                    required property int index
-                                                    width: 10; height: 8
-                                                    readonly property var pObj: index < root.mediaPlayers.length ? root.mediaPlayers[index] : null
-                                                    readonly property bool isActive: index === root.activePlayerIndex
-
-                                                    Rectangle {
-                                                        anchors.centerIn: parent
-                                                        width: parent.isActive ? 6 : 4
-                                                        height: parent.isActive ? 6 : 4
-                                                        radius: width / 2
-                                                        color: parent.isActive
-                                                            ? root.cPrimary
-                                                            : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.35)
-                                                        Behavior on width { NumberAnimation { duration: 150 } }
-                                                        Behavior on height { NumberAnimation { duration: 150 } }
-                                                        Behavior on color { ColorAnimation { duration: 150 } }
-                                                    }
-
-                                                    MouseArea {
-                                                        anchors.fill: parent
-                                                        anchors.margins: -3
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: root.activePlayerIndex = index
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            anchors.fill: parent
-                                            preventStealing: true
-                                            onWheel: function(e) {
-                                                const count = Math.max(1, root.mediaPlayers.length)
-                                                if (count <= 1) return
-                                                if (e.angleDelta.y < 0) {
-                                                    root.activePlayerIndex = (root.activePlayerIndex + 1) % count
-                                                } else if (e.angleDelta.y > 0) {
-                                                    root.activePlayerIndex = (root.activePlayerIndex - 1 + count) % count
-                                                }
-                                            }
-                                        }
-                                    }
-
                                     ColumnLayout {
                                         Layout.fillWidth: true
                                         spacing: 6
@@ -1461,7 +1411,7 @@ ShellRoot {
                                         Canvas {
                                             id: radialCava
                                             anchors.fill: parent
-                                            visible: root.mediaStatus === "Playing"
+                                            visible: root._anyPlaying
                                             property var _bars: []
                                             property int _barCount: 64
 
