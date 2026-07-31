@@ -63,7 +63,7 @@ Item {
                 let idx = list.findIndex(item => item.name === name)
 
                 if (status === "Stopped" && !title && !artist) {
-                    if (idx >= 0 && list.length > 1) {
+                    if (idx >= 0) {
                         list.splice(idx, 1)
                         scope.mediaPlayers = list
                         if (scope.activePlayerIndex >= scope.mediaPlayers.length) {

@@ -60,8 +60,8 @@ Item {
                 let list = root.mediaPlayers.slice()
                 let idx  = list.findIndex(item => item.name === name)
 
-                if (status === "Stopped" && !title && !artist) {
-                    if (idx >= 0 && list.length > 1) {
+                if (status === "Stopped") {
+                    if (idx >= 0) {
                         list.splice(idx, 1)
                         root.mediaPlayers = list
                         if (root.activePlayerIndex >= root.mediaPlayers.length) {
@@ -100,10 +100,55 @@ Item {
                 }
             }
         }
-        onExited: pctlRestart.restart()
+        onExited: {
+            root.mediaPlayers = []
+            root.activePlayerIndex = 0
+            pctlRestart.restart()
+        }
     }
     Timer { id: pctlRestart; interval: 3000; repeat: false
         onTriggered: if (root._watchMedia && !playerctlProc.running) playerctlProc.running = true }
+
+    // ── Liveness check for the source playerctl -F stops reporting on ────
+    //  Closing one of several sources reliably yields a "Stopped" line for
+    //  it. Closing the only (or last remaining) source does not — playerctl
+    //  -F has nothing left to fall back to watching and simply goes quiet
+    //  instead of emitting a final event, so that entry never hits the
+    //  Stopped branch above. Poll `playerctl -l` to catch that case and
+    //  drop anything it no longer lists.
+    property var _liveNames: []
+    Process {
+        id: playerListProc
+        command: ["playerctl", "-l"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) {
+                const n = l.trim()
+                if (n) root._liveNames.push(n)
+            }
+        }
+        onRunningChanged: if (running) root._liveNames = []
+        onExited: root._prunePlayers()
+    }
+    Timer {
+        id: playerPruneTimer
+        interval: 2000
+        repeat: true
+        running: root._watchMedia && root.mediaPlayers.length > 0
+        onTriggered: if (!playerListProc.running) playerListProc.running = true
+    }
+    function _prunePlayers() {
+        if (root.mediaPlayers.length === 0) return
+        const live = root._liveNames
+        const filtered = root.mediaPlayers.filter(p => live.indexOf(p.name) !== -1)
+        if (filtered.length !== root.mediaPlayers.length) {
+            root.mediaPlayers = filtered
+            if (root.activePlayerIndex >= root.mediaPlayers.length) {
+                root.activePlayerIndex = Math.max(0, root.mediaPlayers.length - 1)
+            }
+        }
+    }
 
     Connections {
         target: Config
