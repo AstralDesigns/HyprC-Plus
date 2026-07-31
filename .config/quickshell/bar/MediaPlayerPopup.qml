@@ -281,7 +281,7 @@ Item {
         // Widget Card Body
         Rectangle {
             id: mediaCard
-            implicitWidth:  mediaCardRow.implicitWidth  + 28
+            implicitWidth:  420
             implicitHeight: mediaCardRow.implicitHeight + 28
             radius: 20
             color: Theme.blurBackground
