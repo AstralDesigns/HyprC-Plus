@@ -14,17 +14,23 @@ import Quickshell.Io
 Item {
     id: scope
 
-    property string mediaSource:        ""
-    property string mediaStatus:        "Stopped"
-    property string mediaTitle:         ""
-    property string mediaArtist:        ""
-    property string mediaArtUrl:        ""
-    property string _circularArtPath:   ""
-    property string mediaShuffleStatus: "off"
-    property string mediaLoopStatus:    "none"
-    property real   mediaPosition:      0
-    property real   mediaDuration:      0
-    property real   _posTimestamp:      0
+    property var  mediaPlayers:       []
+    property int  activePlayerIndex:  0
+    readonly property var activePlayer: (mediaPlayers.length > 0 && activePlayerIndex < mediaPlayers.length)
+        ? mediaPlayers[activePlayerIndex]
+        : null
+
+    property string mediaSource:        activePlayer ? activePlayer.name   : ""
+    property string mediaStatus:        activePlayer ? activePlayer.status : "Stopped"
+    property string mediaTitle:         activePlayer ? (activePlayer.title || "No media") : "No media"
+    property string mediaArtist:        activePlayer ? activePlayer.artist : ""
+    property string mediaArtUrl:        activePlayer ? activePlayer.artUrl : ""
+    property string _circularArtPath:   activePlayer ? (activePlayer.circularArtPath || "") : ""
+    property string mediaShuffleStatus: activePlayer ? activePlayer.shuffle : "off"
+    property string mediaLoopStatus:    activePlayer ? activePlayer.loop : "none"
+    property real   mediaPosition:      activePlayer ? activePlayer.position : 0
+    property real   mediaDuration:      activePlayer ? activePlayer.duration : 0
+    property real   _posTimestamp:      activePlayer ? activePlayer._posTimestamp : 0
 
     property real   _volumePct:         50
     property bool   _volumeMuted:       false
@@ -35,7 +41,7 @@ Item {
     // ── MPRIS Metadata Watcher ────────────────────────────────────────────
     Process {
         id: pctlProc
-        command: ["playerctl", "-F", "metadata", "--format",
+        command: ["playerctl", "-F", "-a", "metadata", "--format",
             "{{playerName}}\t{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{shuffle}}\t{{loop}}"]
         running: MediaPlayerPopupState.widgetVisible
         stdout: SplitParser {
@@ -43,38 +49,71 @@ Item {
             onRead: function(line) {
                 const p = line.split("\t")
                 if (p.length < 1) return
-                const newSource  = p[0].trim() || ""
-                const newStatus  = (p.length > 1 ? p[1].trim() : "") || "Stopped"
-                const newUrl     = p.length > 2 ? p[2].trim() : ""
-                const newTitle   = p.length > 3 ? p[3].trim() : ""
-                const newArtist  = p.length > 4 ? p[4].trim() : ""
-                const newShuffle = (p.length > 5 ? p[5].trim() : "off").toLowerCase()
-                const newLoop    = (p.length > 6 ? p[6].trim() : "none").toLowerCase()
+                const name      = p[0].trim()
+                if (!name) return
+                const status    = (p.length > 1 ? p[1].trim() : "") || "Stopped"
+                const url       = p.length > 2 ? p[2].trim() : ""
+                const title     = p.length > 3 ? p[3].trim() : ""
+                const artist    = p.length > 4 ? p[4].trim() : ""
+                const shuffle   = (p.length > 5 ? p[5].trim() : "off").toLowerCase()
+                const loop      = (p.length > 6 ? p[6].trim() : "none").toLowerCase()
 
-                const sourceChanged = (newSource !== scope.mediaSource) && (newSource !== "")
-                const titleChanged  = (newTitle  !== scope.mediaTitle)
-                const urlChanged    = (newUrl    !== scope.mediaArtUrl)
-                const trackChanged  = sourceChanged || titleChanged || urlChanged
+                let list = scope.mediaPlayers.slice()
+                let idx = list.findIndex(item => item.name === name)
 
-                if (trackChanged) {
-                    scope.mediaPosition = 0
-                    scope.mediaDuration = 0
-                    scope._posTimestamp = 0
-                    if (posProc.running) posProc.running = false
-                    if (newStatus === "Playing") posProc.running = true
+                if (status === "Stopped" && !title && !artist) {
+                    if (idx >= 0 && list.length > 1) {
+                        list.splice(idx, 1)
+                        scope.mediaPlayers = list
+                        if (scope.activePlayerIndex >= scope.mediaPlayers.length) {
+                            scope.activePlayerIndex = Math.max(0, scope.mediaPlayers.length - 1)
+                        }
+                    }
+                    return
                 }
 
-                scope.mediaSource = newSource
-                scope.mediaStatus = newStatus
-                if (urlChanged || sourceChanged || titleChanged) {
-                    scope.mediaArtUrl = newUrl
-                    scope._circularArtPath = ""
-                    if (newUrl) artProc.launch(newUrl)
+                let item = idx >= 0 ? Object.assign({}, list[idx]) : {
+                    name: name,
+                    status: "Stopped",
+                    artUrl: "",
+                    title: "",
+                    artist: "",
+                    shuffle: "off",
+                    loop: "none",
+                    position: 0,
+                    duration: 0,
+                    _posTimestamp: 0,
+                    circularArtPath: ""
                 }
-                scope.mediaTitle  = newTitle
-                scope.mediaArtist = newArtist
-                scope.mediaShuffleStatus = newShuffle
-                scope.mediaLoopStatus    = newLoop
+
+                const titleChanged = item.title !== title
+                const urlChanged   = item.artUrl !== url
+
+                item.status  = status
+                item.artUrl  = url
+                item.title   = title
+                item.artist  = artist
+                item.shuffle = shuffle
+                item.loop    = loop
+
+                if (titleChanged || urlChanged) {
+                    item.position = 0
+                    item.duration = 0
+                    item._posTimestamp = 0
+                    item.circularArtPath = ""
+                    if (url) artProc.launchForPlayer(name, url)
+                }
+
+                if (idx >= 0) {
+                    list[idx] = item
+                } else {
+                    list.push(item)
+                }
+
+                scope.mediaPlayers = list
+                if (scope.activePlayerIndex >= scope.mediaPlayers.length) {
+                    scope.activePlayerIndex = Math.max(0, scope.mediaPlayers.length - 1)
+                }
             }
         }
         onExited: pctlRestartTimer.restart()
@@ -89,14 +128,16 @@ Item {
         id: artProc
         property string _dst: "/tmp/qs_mp_widget_art.png"
         property string _cmd: "true"
+        property string _targetPlayer: ""
         command: ["bash", "-c", artProc._cmd]
-        function launch(url) {
+        function launchForPlayer(playerName, url) {
             const s   = 92
             const r   = 46
             const src = url.startsWith("file://") ? url.substring(7) : url
             const esc = src.replace(/'/g, "'\\''")
-            const hash = Math.abs(url.split('').reduce(
+            const hash = Math.abs((playerName + url).split('').reduce(
                 (a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0)).toString(16)
+            _targetPlayer = playerName
             _dst = "/tmp/qs_mp_widget_art_" + hash + ".png"
             _cmd = "SRC='" + esc + "'; DST='" + _dst + "'; S=" + s + "; R=" + r + "; " +
                 "[ -f \"$SRC\" ] || { curl -sf --max-time 8 \"$SRC\" " +
@@ -109,9 +150,16 @@ Item {
             running = true
         }
         onExited: function(code) {
-            if (code === 0) {
+            if (code === 0 && artProc._targetPlayer !== "") {
                 const ver = _dst.includes("?") ? _dst : _dst + "?v=" + Date.now()
-                scope._circularArtPath = ver
+                let list = scope.mediaPlayers.slice()
+                let idx = list.findIndex(p => p.name === artProc._targetPlayer)
+                if (idx >= 0) {
+                    let item = Object.assign({}, list[idx])
+                    item.circularArtPath = ver
+                    list[idx] = item
+                    scope.mediaPlayers = list
+                }
             }
         }
     }
@@ -121,8 +169,12 @@ Item {
         id: posProc
         property string _raw: ""
         command: ["bash", "-c",
-            "printf '%s|%s\\n' \"$(playerctl position 2>/dev/null)\" " +
-            "\"$(playerctl metadata mpris:length 2>/dev/null)\""]
+            "P='" + (scope.mediaSource ? scope.mediaSource.replace(/'/g, "'\\''") : "") + "'; " +
+            "if [ -n \"$P\" ]; then " +
+            "  printf '%s|%s\\n' \"$(playerctl -p \"$P\" position 2>/dev/null)\" \"$(playerctl -p \"$P\" metadata mpris:length 2>/dev/null)\"; " +
+            "else " +
+            "  printf '%s|%s\\n' \"$(playerctl position 2>/dev/null)\" \"$(playerctl metadata mpris:length 2>/dev/null)\"; " +
+            "fi"]
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(l) { if (l.trim()) posProc._raw = l.trim() }
@@ -130,14 +182,21 @@ Item {
         onRunningChanged: if (running) _raw = ""
         onExited: function() {
             const parts = _raw.split("|")
-            if (parts.length >= 2) {
+            if (parts.length >= 2 && scope.activePlayer) {
                 const pos = parseFloat(parts[0])
                 const dur = parseFloat(parts[1]) / 1000000.0
-                if (!isNaN(pos) && pos >= 0) {
-                    scope.mediaPosition  = pos
-                    scope._posTimestamp = Date.now()
+                let list = scope.mediaPlayers.slice()
+                let idx = scope.activePlayerIndex
+                if (idx >= 0 && idx < list.length) {
+                    let item = Object.assign({}, list[idx])
+                    if (!isNaN(pos) && pos >= 0) {
+                        item.position = pos
+                        item._posTimestamp = Date.now()
+                    }
+                    if (!isNaN(dur) && dur > 0) item.duration = dur
+                    list[idx] = item
+                    scope.mediaPlayers = list
                 }
-                if (!isNaN(dur) && dur > 0) scope.mediaDuration = dur
             }
             _raw = ""
         }
@@ -154,8 +213,15 @@ Item {
         onTriggered: {
             const now     = Date.now()
             const elapsed = (now - scope._posTimestamp) / 1000.0
-            scope._posTimestamp = now
-            scope.mediaPosition = Math.min(scope.mediaPosition + elapsed, scope.mediaDuration)
+            let list = scope.mediaPlayers.slice()
+            let idx  = scope.activePlayerIndex
+            if (idx >= 0 && idx < list.length) {
+                let item = Object.assign({}, list[idx])
+                item._posTimestamp = now
+                item.position = Math.min(item.position + elapsed, item.duration)
+                list[idx] = item
+                scope.mediaPlayers = list
+            }
         }
     }
 
@@ -165,8 +231,10 @@ Item {
         property string _cmd: "true"
         command: ["bash", "-c", seekProc._cmd]
         function seek(secs) {
-            _cmd = "playerctl position " + secs.toFixed(1)
-            if (!running) running = true
+            const target = scope.mediaSource ? ("-p '" + scope.mediaSource.replace(/'/g, "'\\''") + "' ") : ""
+            _cmd = "playerctl " + target + "position " + secs.toFixed(1)
+            if (running) running = false
+            running = true
         }
     }
 
@@ -178,18 +246,32 @@ Item {
     }
     function playerAction(cmd) {
         let argv
+        const target = scope.mediaSource ? ("-p '" + scope.mediaSource.replace(/'/g, "'\\''") + "' ") : ""
         if (cmd === "shuffle") {
-            argv = "playerctl shuffle toggle"
+            argv = "playerctl " + target + "shuffle toggle"
         } else if (cmd === "loop") {
             const order = ["none", "track", "playlist"]
             const names = ["None", "Track", "Playlist"]
             const cur   = Math.max(0, order.indexOf(scope.mediaLoopStatus))
-            argv = "playerctl loop " + names[(cur + 1) % 3]
+            argv = "playerctl " + target + "loop " + names[(cur + 1) % 3]
         } else {
-            argv = "playerctl " + cmd
+            argv = "playerctl " + target + cmd
         }
+
+        if (cmd === "play-pause" && scope.activePlayer) {
+            let list = scope.mediaPlayers.slice()
+            let idx = scope.activePlayerIndex
+            if (idx >= 0 && idx < list.length) {
+                let item = Object.assign({}, list[idx])
+                item.status = item.status === "Playing" ? "Paused" : "Playing"
+                list[idx] = item
+                scope.mediaPlayers = list
+            }
+        }
+
         ctlProc._c = argv
-        if (!ctlProc.running) ctlProc.running = true
+        if (ctlProc.running) ctlProc.running = false
+        ctlProc.running = true
     }
 
     // ── Volume Control (pactl) ────────────────────────────────────────────
@@ -305,8 +387,8 @@ Item {
         // Widget Card Body
         Rectangle {
             id: mediaCard
-            implicitWidth:  420
-            implicitHeight: mediaCardRow.implicitHeight + 28
+            implicitWidth:  450
+            implicitHeight: Math.max(mediaCardRow.implicitHeight + 28, 198)
             radius: 20
             color: Theme.blurBackground
             border.width: Config.barBorderWidth
@@ -327,6 +409,68 @@ Item {
                 id: mediaCardRow
                 anchors { left: parent.left; right: parent.right; top: parent.top; margins: 14 }
                 spacing: 12
+
+                // ── Left Sidebar Pill (Minimized Indicators & Tab Switcher) ───
+                Rectangle {
+                    id: sidebarPill
+                    Layout.alignment: Qt.AlignVCenter
+                    implicitWidth: 14
+                    implicitHeight: Math.max(14, 14 + (scope.mediaPlayers.length - 1) * 12)
+                    radius: 7
+                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.7)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                    Behavior on implicitHeight { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 4
+
+                        Repeater {
+                            model: scope.mediaPlayers.length > 0 ? scope.mediaPlayers.length : 1
+                            delegate: Item {
+                                required property int index
+                                width: 10; height: 8
+                                readonly property var pObj: index < scope.mediaPlayers.length ? scope.mediaPlayers[index] : null
+                                readonly property bool isActive: index === scope.activePlayerIndex
+
+                                Rectangle {
+                                    anchors.centerIn: parent
+                                    width: parent.isActive ? 6 : 4
+                                    height: parent.isActive ? 6 : 4
+                                    radius: width / 2
+                                    color: parent.isActive
+                                        ? Theme.cPrimary
+                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
+                                    Behavior on width { NumberAnimation { duration: 150 } }
+                                    Behavior on height { NumberAnimation { duration: 150 } }
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -3
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: scope.activePlayerIndex = index
+                                }
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        preventStealing: true
+                        onWheel: function(e) {
+                            const count = Math.max(1, scope.mediaPlayers.length)
+                            if (count <= 1) return
+                            if (e.angleDelta.y < 0) {
+                                scope.activePlayerIndex = (scope.activePlayerIndex + 1) % count
+                            } else if (e.angleDelta.y > 0) {
+                                scope.activePlayerIndex = (scope.activePlayerIndex - 1 + count) % count
+                            }
+                        }
+                    }
+                }
 
                 // ── Left Column: Title, Artist, Seek Bar, Volume, Controls ──
                 ColumnLayout {

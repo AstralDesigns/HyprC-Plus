@@ -525,76 +525,133 @@ ShellRoot {
     }
 
     // ── Media ─────────────────────────────────────────────────────────────────
-    property string mediaSource: ""
-    property string mediaStatus:"Stopped"; property string mediaTitle:"No media"
-    property string mediaArtist:""; property string mediaArtUrl:""
-    property string _circularArtPath: ""
-    property string mediaShuffleStatus: "off"   // off | on  (lowercase)
-    property string mediaLoopStatus:    "none"  // none | track | playlist  (lowercase)
-    property real   mediaPosition: 0            // seconds
-    property real   mediaDuration: 0            // seconds
-    property real   _posTimestamp: 0             // Date.now() of last position update
+    property var  mediaPlayers:       []
+    property int  activePlayerIndex:  0
+    readonly property var activePlayer: (mediaPlayers.length > 0 && activePlayerIndex < mediaPlayers.length)
+        ? mediaPlayers[activePlayerIndex]
+        : null
+
+    property string mediaSource:        activePlayer ? activePlayer.name   : ""
+    property string mediaStatus:        activePlayer ? activePlayer.status : "Stopped"
+    property string mediaTitle:         activePlayer ? (activePlayer.title || "No media") : "No media"
+    property string mediaArtist:        activePlayer ? activePlayer.artist : ""
+    property string mediaArtUrl:        activePlayer ? activePlayer.artUrl : ""
+    property string _circularArtPath:   activePlayer ? (activePlayer.circularArtPath || "") : ""
+    property string mediaShuffleStatus: activePlayer ? activePlayer.shuffle : "off"
+    property string mediaLoopStatus:    activePlayer ? activePlayer.loop : "none"
+    property real   mediaPosition:      activePlayer ? activePlayer.position : 0
+    property real   mediaDuration:      activePlayer ? activePlayer.duration : 0
+    property real   _posTimestamp:      activePlayer ? activePlayer._posTimestamp : 0
 
     Process {
         id:mediaProc
-        command: ["playerctl", "-F", "metadata", "--format", "{{playerName}}\t{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{shuffle}}\t{{loop}}"]
+        command: ["playerctl", "-F", "-a", "metadata", "--format", "{{playerName}}\t{{status}}\t{{mpris:artUrl}}\t{{xesam:title}}\t{{xesam:artist}}\t{{shuffle}}\t{{loop}}"]
         stdout: SplitParser {
             splitMarker:"\n"
             onRead: function(l){
                 const p = l.split("\t")
                 if(p.length >= 1){
-                    const newSource = p[0].trim() || ""
-                    const newStatus = (p.length > 1 ? p[1].trim() : "") || "Stopped"
-                    const newUrl    = p.length > 2 ? p[2].trim() : ""
-                    const newTitle  = p.length > 3 ? p[3].trim() : ""
-                    const newArtist = p.length > 4 ? p[4].trim() : ""
-                    const newShuffle= (p.length > 5 ? p[5].trim() : "off").toLowerCase()
-                    const newLoop   = (p.length > 6 ? p[6].trim() : "none").toLowerCase()
+                    const name      = p[0].trim()
+                    if (!name) return
+                    const status    = (p.length > 1 ? p[1].trim() : "") || "Stopped"
+                    const url       = p.length > 2 ? p[2].trim() : ""
+                    const title     = p.length > 3 ? p[3].trim() : ""
+                    const artist    = p.length > 4 ? p[4].trim() : ""
+                    const shuffle   = (p.length > 5 ? p[5].trim() : "off").toLowerCase()
+                    const loop      = (p.length > 6 ? p[6].trim() : "none").toLowerCase()
 
-                    const sourceChanged = (newSource !== root.mediaSource) && (newSource !== "")
-                    const titleChanged  = (newTitle  !== root.mediaTitle)
-                    const urlChanged    = (newUrl    !== root.mediaArtUrl)
-                    const trackChanged  = sourceChanged || titleChanged || urlChanged
+                    let list = root.mediaPlayers.slice()
+                    let idx = list.findIndex(item => item.name === name)
 
-                    if (trackChanged) {
-                        root.mediaPosition = 0
-                        root.mediaDuration = 0
-                        root._posTimestamp = 0
-                        if (posProc.running) posProc.running = false
-                        if (newStatus === "Playing") posProc.running = true
+                    if (status === "Stopped" && !title && !artist) {
+                        if (idx >= 0 && list.length > 1) {
+                            list.splice(idx, 1)
+                            root.mediaPlayers = list
+                            if (root.activePlayerIndex >= root.mediaPlayers.length) {
+                                root.activePlayerIndex = Math.max(0, root.mediaPlayers.length - 1)
+                            }
+                        }
+                        return
                     }
 
-                    root.mediaSource = newSource
-                    root.mediaStatus = newStatus
-                    if (urlChanged || sourceChanged || titleChanged) {
-                        root.mediaArtUrl = newUrl
-                        root._circularArtPath = ""
-                        if (newUrl) artConvProc.launch(newUrl)
+                    let item = idx >= 0 ? Object.assign({}, list[idx]) : {
+                        name: name,
+                        status: "Stopped",
+                        artUrl: "",
+                        title: "",
+                        artist: "",
+                        shuffle: "off",
+                        loop: "none",
+                        position: 0,
+                        duration: 0,
+                        _posTimestamp: 0,
+                        circularArtPath: ""
                     }
-                    root.mediaTitle = newTitle || "No media"
-                    root.mediaArtist = newArtist
-                    root.mediaShuffleStatus = newShuffle
-                    root.mediaLoopStatus    = newLoop
+
+                    const titleChanged = item.title !== title
+                    const urlChanged   = item.artUrl !== url
+
+                    item.status  = status
+                    item.artUrl  = url
+                    item.title   = title
+                    item.artist  = artist
+                    item.shuffle = shuffle
+                    item.loop    = loop
+
+                    if (titleChanged || urlChanged) {
+                        item.position = 0
+                        item.duration = 0
+                        item._posTimestamp = 0
+                        item.circularArtPath = ""
+                        if (url) artConvProc.launchForPlayer(name, url)
+                    }
+
+                    if (idx >= 0) {
+                        list[idx] = item
+                    } else {
+                        list.push(item)
+                    }
+
+                    root.mediaPlayers = list
+                    if (root.activePlayerIndex >= root.mediaPlayers.length) {
+                        root.activePlayerIndex = Math.max(0, root.mediaPlayers.length - 1)
+                    }
                 }
             }
         }
         Component.onCompleted: running=true
     }
 
-    // ── Position/duration — pipe-delimited for reliable parsing ───────────
+    // ── Position/duration ──────────────────────────────────────────────────
     Process {
         id: posProc
         property string _line: ""
-        command: ["bash", "-c", "printf '%s|%s\\n' \"$(playerctl position 2>/dev/null)\" \"$(playerctl metadata mpris:length 2>/dev/null)\""]
+        command: ["bash", "-c",
+            "P='" + (root.mediaSource ? root.mediaSource.replace(/'/g, "'\\''") : "") + "'; " +
+            "if [ -n \"$P\" ]; then " +
+            "  printf '%s|%s\\n' \"$(playerctl -p \"$P\" position 2>/dev/null)\" \"$(playerctl -p \"$P\" metadata mpris:length 2>/dev/null)\"; " +
+            "else " +
+            "  printf '%s|%s\\n' \"$(playerctl position 2>/dev/null)\" \"$(playerctl metadata mpris:length 2>/dev/null)\"; " +
+            "fi"]
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l){ if(l.trim()) posProc._line = l.trim() } }
         onRunningChanged: if(running) _line = ""
         onExited: function() {
             const parts = _line.split("|")
-            if (parts.length >= 2) {
+            if (parts.length >= 2 && root.activePlayer) {
                 const pos = parseFloat(parts[0])
                 const dur = parseFloat(parts[1]) / 1000000.0
-                if (!isNaN(pos) && pos >= 0) { root.mediaPosition = pos; root._posTimestamp = Date.now() }
-                if (!isNaN(dur) && dur > 0)   root.mediaDuration = dur
+                let list = root.mediaPlayers.slice()
+                let idx = root.activePlayerIndex
+                if (idx >= 0 && idx < list.length) {
+                    let item = Object.assign({}, list[idx])
+                    if (!isNaN(pos) && pos >= 0) {
+                        item.position = pos
+                        item._posTimestamp = Date.now()
+                    }
+                    if (!isNaN(dur) && dur > 0) item.duration = dur
+                    list[idx] = item
+                    root.mediaPlayers = list
+                }
             }
             _line = ""
         }
@@ -613,8 +670,15 @@ ShellRoot {
         onTriggered: {
             const now = Date.now()
             const elapsed = (now - root._posTimestamp) / 1000.0
-            root._posTimestamp = now
-            root.mediaPosition = Math.min(root.mediaPosition + elapsed, root.mediaDuration)
+            let list = root.mediaPlayers.slice()
+            let idx  = root.activePlayerIndex
+            if (idx >= 0 && idx < list.length) {
+                let item = Object.assign({}, list[idx])
+                item._posTimestamp = now
+                item.position = Math.min(item.position + elapsed, item.duration)
+                list[idx] = item
+                root.mediaPlayers = list
+            }
         }
     }
 
@@ -623,7 +687,12 @@ ShellRoot {
         id: seekProc
         property string _cmd: "true"
         command: ["bash", "-c", seekProc._cmd]
-        function seek(secs) { _cmd = "playerctl position " + secs.toFixed(1); if(!running) running = true }
+        function seek(secs) {
+            const target = root.mediaSource ? ("-p '" + root.mediaSource.replace(/'/g, "'\\''") + "' ") : ""
+            _cmd = "playerctl " + target + "position " + secs.toFixed(1)
+            if (running) running = false
+            running = true
+        }
     }
 
     // ── Cava bridge: root-level string updated by lockCavaProc ───────────────
@@ -685,9 +754,14 @@ ShellRoot {
         id:artConvProc
         property string _dst: "/tmp/qs_art_circle.png"
         property string _cmd: "true"
+        property string _targetPlayer: ""
         command:["bash","-c", artConvProc._cmd]
-        function launch(url) {
+        function launchForPlayer(playerName, url) {
             const src = url.startsWith("file://") ? url.substring(7) : url
+            const hash = Math.abs((playerName + url).split('').reduce(
+                (a,b)=>{a=((a<<5)-a)+b.charCodeAt(0);return a&a},0)).toString(16)
+            _targetPlayer = playerName
+            _dst = "/tmp/qs_art_circle_" + hash + ".png"
             _cmd = "SRC='" + src.replace(/'/g,"'\\''") + "'; " +
                    "DST='" + _dst + "'; " +
                    "[ -f \"$SRC\" ] || { curl -sf --max-time 10 \"$SRC\" -o /tmp/qs_art_raw.png 2>/dev/null && SRC=/tmp/qs_art_raw.png; }; " +
@@ -702,7 +776,17 @@ ShellRoot {
             running = true
         }
         onExited: function(code){
-            if(code===0) root._circularArtPath = _dst + "?" + Date.now()
+            if(code === 0 && artConvProc._targetPlayer !== "") {
+                const ver = _dst + "?" + Date.now()
+                let list = root.mediaPlayers.slice()
+                let idx = list.findIndex(p => p.name === artConvProc._targetPlayer)
+                if (idx >= 0) {
+                    let item = Object.assign({}, list[idx])
+                    item.circularArtPath = ver
+                    list[idx] = item
+                    root.mediaPlayers = list
+                }
+            }
         }
     }
 
@@ -754,18 +838,32 @@ ShellRoot {
     }
     function playerAction(cmd) {
         let argv
+        const target = root.mediaSource ? ["-p", root.mediaSource] : []
         if(cmd === "shuffle") {
-            argv = ["playerctl","shuffle","toggle"]
+            argv = ["playerctl"].concat(target).concat(["shuffle", "toggle"])
         } else if(cmd === "loop") {
             const order = ["none","track","playlist"]
             const names = ["None","Track","Playlist"]
             const cur   = Math.max(0, order.indexOf(root.mediaLoopStatus))
-            argv = ["playerctl","loop", names[(cur + 1) % 3]]
+            argv = ["playerctl"].concat(target).concat(["loop", names[(cur + 1) % 3]])
         } else {
-            argv = ["playerctl", cmd]
+            argv = ["playerctl"].concat(target).concat([cmd])
         }
+
+        if (cmd === "play-pause" && root.activePlayer) {
+            let list = root.mediaPlayers.slice()
+            let idx = root.activePlayerIndex
+            if (idx >= 0 && idx < list.length) {
+                let item = Object.assign({}, list[idx])
+                item.status = item.status === "Playing" ? "Paused" : "Playing"
+                list[idx] = item
+                root.mediaPlayers = list
+            }
+        }
+
         ctlProc.command = argv
-        if(!ctlProc.running) ctlProc.running = true
+        if (ctlProc.running) ctlProc.running = false
+        ctlProc.running = true
     }
 
     // ── Session lock ──────────────────────────────────────────────────────────
@@ -1043,6 +1141,68 @@ ShellRoot {
                                     id: mediaCardRow
                                     anchors { left:parent.left; right:parent.right; top:parent.top; margins:14 }
                                     spacing: 12
+
+                                    // ── Left Sidebar Pill (Minimized Indicators & Tab Switcher) ───
+                                    Rectangle {
+                                        id: sidebarPill
+                                        Layout.alignment: Qt.AlignVCenter
+                                        implicitWidth: 14
+                                        implicitHeight: Math.max(14, 14 + (root.mediaPlayers.length - 1) * 12)
+                                        radius: 7
+                                        color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.7)
+                                        border.width: 1
+                                        border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.25)
+                                        Behavior on implicitHeight { NumberAnimation { duration: 200; easing.type: Easing.InOutQuad } }
+
+                                        ColumnLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            Repeater {
+                                                model: root.mediaPlayers.length > 0 ? root.mediaPlayers.length : 1
+                                                delegate: Item {
+                                                    required property int index
+                                                    width: 10; height: 8
+                                                    readonly property var pObj: index < root.mediaPlayers.length ? root.mediaPlayers[index] : null
+                                                    readonly property bool isActive: index === root.activePlayerIndex
+
+                                                    Rectangle {
+                                                        anchors.centerIn: parent
+                                                        width: parent.isActive ? 6 : 4
+                                                        height: parent.isActive ? 6 : 4
+                                                        radius: width / 2
+                                                        color: parent.isActive
+                                                            ? root.cPrimary
+                                                            : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.35)
+                                                        Behavior on width { NumberAnimation { duration: 150 } }
+                                                        Behavior on height { NumberAnimation { duration: 150 } }
+                                                        Behavior on color { ColorAnimation { duration: 150 } }
+                                                    }
+
+                                                    MouseArea {
+                                                        anchors.fill: parent
+                                                        anchors.margins: -3
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: root.activePlayerIndex = index
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            preventStealing: true
+                                            onWheel: function(e) {
+                                                const count = Math.max(1, root.mediaPlayers.length)
+                                                if (count <= 1) return
+                                                if (e.angleDelta.y < 0) {
+                                                    root.activePlayerIndex = (root.activePlayerIndex + 1) % count
+                                                } else if (e.angleDelta.y > 0) {
+                                                    root.activePlayerIndex = (root.activePlayerIndex - 1 + count) % count
+                                                }
+                                            }
+                                        }
+                                    }
 
                                     ColumnLayout {
                                         Layout.fillWidth: true
