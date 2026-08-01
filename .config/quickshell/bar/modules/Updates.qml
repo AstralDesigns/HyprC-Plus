@@ -9,7 +9,7 @@ import ".."
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
-    implicitWidth:  updIcon.implicitWidth + Config.moduleHPad * 2
+    implicitWidth:  updIcon.implicitWidth + Config.moduleHPad * 2 + (updBadge.visible ? 6 : 0)
     implicitHeight: Config.moduleHeight
 
     // ── System update state ───────────────────────────────────────────────────
@@ -36,12 +36,52 @@ Item {
         onTriggered: root._loaderIdx = (root._loaderIdx + 1) % root._loaderFrames.length
     }
 
-    // ── Trigger a fresh scan of both checks ──────────────────────────────────
+    // ── Gaming detection ────────────────────────────────────────────────────────
+    // Process/executable name fragments for common Linux gaming launchers,
+    // compatibility layers, and overlays. Matched with `pgrep -f` (regex, OR'd).
+    // Add more here as needed — kept as a single property for easy tuning.
+    readonly property var _gamingPatterns: [
+        "steam", "steamwebhelper", "lutris", "heroic", "Heroic",
+        "faugus", "legendary", "bottles", "minigalaxy", "playonlinux",
+        "gamescope", "gamemoderun", "gamemoded", "mangohud",
+        "wine64-preloader", "wineserver", "proton", "retroarch"
+    ]
+
+    // ── Trigger a fresh scan of both checks — skipped while gaming ────────────
     function rescan() {
+        if (_gamingCheckProc.running) return
+        // Flip the "checking" flags immediately so the spinner animation
+        // covers the gaming-detection step too, not just the real checks.
+        root._checking   = true
+        root._hcChecking = true
+        _gamingCheckProc.running = true
+    }
+
+    // Actually kicks off the two check processes (called once we know the
+    // user isn't gaming).
+    function _rescanNow() {
         root._hcBuffer  = ""
         root._sysBuffer = ""
         if (!checkProc.running)   checkProc.running   = true
         if (!hcCheckProc.running) hcCheckProc.running = true
+    }
+
+    // Exit code 0 → a gaming pattern matched, so skip the scan entirely.
+    // Non-zero → clear to proceed.
+    Process {
+        id: _gamingCheckProc
+        command: ["pgrep", "-x", root._gamingPatterns.join("|")]
+        running: false
+        onExited: (code) => {
+            running = false
+            if (code === 0) {
+                // Gaming detected — abort, drop the spinner we optimistically started.
+                root._checking   = false
+                root._hcChecking = false
+                return
+            }
+            root._rescanNow()
+        }
     }
 
     // ── System update check ───────────────────────────────────────────────────
@@ -136,6 +176,25 @@ Item {
         font.pixelSize: Config.fontSize
         font.weight:    Config.fontWeight
         Behavior on color { ColorAnimation { duration: 150 } }
+    }
+
+    Rectangle {
+        id: updBadge
+        visible: root._anyUpdates
+        anchors { top: parent.top; right: parent.right; topMargin: 3; rightMargin: 1 }
+        width: badgeLabel.implicitWidth + 4
+        height: 10; radius: 5
+        color: Theme.cPrimary
+
+        Text {
+            id: badgeLabel
+            anchors.centerIn: parent
+            text: "󰇚"
+            color: Theme.cOnPrimary
+            font.family:    Config.fontFamily
+            font.pixelSize: 7
+            font.weight: Font.Bold
+        }
     }
 
     opacity: ma.containsMouse ? 0.7 : 1.0
