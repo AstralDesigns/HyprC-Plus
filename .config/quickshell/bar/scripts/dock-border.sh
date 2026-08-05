@@ -30,12 +30,12 @@ if ! grep -q 'border-color:' "$STYLE"; then
 fi
 
 # Primary write target — GTK reads @name from style.css (line 10: dock window border)
-sed -i "10s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$STYLE"
+sed -i "16s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$STYLE"
 
 # Mirror into config.js for @HCD hot-reload metadata (optional, not the visual source)
 if [ -f "$CONFIG" ] && grep -q 'borderColorVar:' "$CONFIG"; then
     sed -i "s/^\([[:space:]]*borderColorVar:\)[[:space:]]*'[^']*'/\1 '${gtk}'/" "$CONFIG"
-    sed -i "537s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$LAUNCHER"
+    sed -i "541s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$LAUNCHER"
 fi
 
 pkill -f 'gjs.*app-launcher.js' 2>/dev/null || true
