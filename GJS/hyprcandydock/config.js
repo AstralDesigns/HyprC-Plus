@@ -76,10 +76,10 @@ var DockConfig = {
     borderWidth: 2,                // @HCD:borderWidth
     borderColorVar: 'inverse_primary', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
-    borderTopLeftRadius: 60,       // @HCD:borderTopLeftRadius
-    borderTopRightRadius: 60,      // @HCD:borderTopRightRadius
-    borderBottomLeftRadius: 60,    // @HCD:borderBottomLeftRadius
-    borderBottomRightRadius: 60,   // @HCD:borderBottomRightRadius
+    borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
+    borderTopRightRadius: 30,      // @HCD:borderTopRightRadius
+    borderBottomLeftRadius: 30,    // @HCD:borderBottomLeftRadius
+    borderBottomRightRadius: 30,   // @HCD:borderBottomRightRadius
 
     // ── External margins (dock edge ↔ screen / window edge) ──────────────
     // The exclusive zone is auto-calculated from the rendered content height:
