@@ -53,8 +53,18 @@ var DockConfig = {
     get iconSize() { return this.appIconSize; },
 
     // ── Internal padding ──────────────────────────────────────────────────
-    // Space between the icons and the dock outer edges (px).
-    innerPadding: 0,               // @HCD:innerPadding
+    // Space between the icons and the dock outer edges (px). Also drives
+    // the window.background CSS padding injected in dock-main.js's
+    // _injectGlyphSizeCSS (uniform on every side), so this is the one knob
+    // for both — and it's why it's read live rather than baked into a
+    // frozen const, so your control center's hot-reload picks it up.
+    // updateExclusiveZone() adds innerPadding*2 to its reservation to match,
+    // since this padding sits between mainBox and the actual edge of the
+    // rendered surface — if you ever add a second, separate CSS literal for
+    // that padding instead of reusing this value, the exclusive zone will
+    // under-reserve by the difference and windows will clip into the dock
+    // at low/zero outer margins.
+    innerPadding: 4,               // @HCD:innerPadding
 
     // ── Background fill style ─────────────────────────────────────────────
     // 'glass'    → solid @blur_background (default, matches style.css)
@@ -66,14 +76,14 @@ var DockConfig = {
     borderWidth: 2,                // @HCD:borderWidth
     borderColorVar: 'inverse_primary', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
-    borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
-    borderTopRightRadius: 30,      // @HCD:borderTopRightRadius
-    borderBottomLeftRadius: 30,    // @HCD:borderBottomLeftRadius
-    borderBottomRightRadius: 30,   // @HCD:borderBottomRightRadius
+    borderTopLeftRadius: 60,       // @HCD:borderTopLeftRadius
+    borderTopRightRadius: 60,      // @HCD:borderTopRightRadius
+    borderBottomLeftRadius: 60,    // @HCD:borderBottomLeftRadius
+    borderBottomRightRadius: 60,   // @HCD:borderBottomRightRadius
 
     // ── External margins (dock edge ↔ screen / window edge) ──────────────
     // The exclusive zone is auto-calculated from the rendered content height:
-    //   exclusiveZone = mainBox.naturalHeight + borderWidth*2
+    //   exclusiveZone = mainBox.naturalHeight + borderWidth*2 + innerPadding*2
     // The compositor adds the anchored-edge margin (e.g. marginBottom for a
     // bottom dock) on top of that automatically.  Hyprland's own gaps_out +
     // border_size provide the gap between windows and the reserved boundary.

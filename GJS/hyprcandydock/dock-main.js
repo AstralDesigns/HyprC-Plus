@@ -302,7 +302,16 @@ function _injectGlyphSizeCSS(display) {
     }
 
     const _dckpos = DockConfig.position || 'bottom';
-    const wRule = 'padding: 4px;';
+    // Reuses innerPadding (already hot-reloadable from the control center)
+    // instead of a dedicated windowPadding field, now that this padding is
+    // uniform on all sides. MUST stay in sync with updateExclusiveZone()'s
+    // reservation below — this padding sits between the border and mainBox
+    // on every side, so it adds innerPadding*2 to the dock's real rendered
+    // thickness on top of borderWidth*2. Reading the same config field in
+    // both places (padPx, declared above) is what keeps them in sync — a
+    // bare CSS literal not reflected in the exclusive zone is what
+    // previously caused windows to clip into the dock at low/zero margins.
+    const wRule = `padding: ${padPx}px;`;
 
     const _dockpos = DockConfig.position || 'bottom';
     let pRule;
@@ -868,7 +877,15 @@ const HyprCandyDock = GObject.registerClass({
     // GTK4 layer-shell: get_allocated_height() is unreliable (compositor
     // manages allocation externally).  Instead we query mainBox.measure()
     // for the NATURAL content height and add borderWidth*2 for the CSS
-    // border the compositor draws around the content.
+    // border, plus innerPadding*2 for the window.background CSS padding
+    // (see _injectGlyphSizeCSS's wRule, which uses the same innerPadding
+    // config value) — both sit between mainBox and the actual edge of the
+    // rendered surface, so both must be reserved or the real surface is
+    // taller/wider than the exclusive zone accounts for. Previously only
+    // borderWidth*2 was added here while the window padding lived as its
+    // own untracked value, so the compositor under-reserved and, at
+    // low/zero outer margins, windows would clip into the dock's
+    // window-facing edge instead of stopping flush against it.
     //
     // The compositor automatically adds the anchored-edge margin (e.g.
     // marginBottom for a bottom dock) on top of the exclusive zone value.
@@ -880,13 +897,15 @@ const HyprCandyDock = GObject.registerClass({
             Gtk4LayerShell.set_exclusive_zone(this, cfg.exclusiveZoneOverride);
             return;
         }
+        const winPad = cfg.innerPadding;
         const axis = IS_VERTICAL ? Gtk.Orientation.HORIZONTAL : Gtk.Orientation.VERTICAL;
         const contentSize = this.mainBox
             ? this.mainBox.measure(axis, -1)[1]   // [1] = natural size
             : (cfg.appIconSize + cfg.innerPadding * 2);  // fallback before mainBox exists
-        const zone = contentSize + cfg.borderWidth * 2;
+        const zone = contentSize + cfg.borderWidth * 2 + winPad * 2;
         Gtk4LayerShell.set_exclusive_zone(this, zone);
-        log('[dock] exclusiveZone = ' + zone + ' (content=' + contentSize + ' + border=' + (cfg.borderWidth * 2) + ')');
+        log('[dock] exclusiveZone = ' + zone + ' (content=' + contentSize +
+            ' + border=' + (cfg.borderWidth * 2) + ' + innerPadding=' + (winPad * 2) + ')');
     }
 
     // Called after layout changes. Short timeout ensures GTK has committed
