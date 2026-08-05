@@ -25,7 +25,7 @@ var DockConfig = {
     // ── Button spacing (gap between every button in the dock) ─────────────
     // Controls GtkBox spacing — applies uniformly between start↔first-app,
     // app↔app, and last-app↔trash so all gaps are edited in one place.
-    buttonSpacing: 0,              // @HCD:buttonSpacing
+    buttonSpacing: 2,              // @HCD:buttonSpacing
 
     // ── App icon size (Gtk.Image pixel_size) ─────────────────────────────
     // Controls Gtk.Image icons from the theme (e.g. Nautilus, Firefox).
