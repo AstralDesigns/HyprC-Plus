@@ -1861,7 +1861,27 @@ PanelWindow {
                                                             }
                                                             MouseArea {
                                                                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                                                onClicked: { Config.barBorderMode = modelData }
+                                                                onClicked: {
+                                                                    Config.barBorderMode = modelData
+                                                                    // Keep the GJS dock border in sync when switching
+                                                                    // modes without re-picking a swatch — otherwise the
+                                                                    // dock keeps whatever color was last written for
+                                                                    // whichever mode was active last time a swatch was
+                                                                    // clicked, instead of following the mode you just
+                                                                    // switched to.
+                                                                    const activeVar = modelData === "matugen"
+                                                                        ? Config.barBorderVar
+                                                                        : Config.barBorderWallustVar
+                                                                    if (activeVar) {
+                                                                        const gtk = activeVar.replace(/^\$/, "")
+                                                                        if (_barBorderDockWrite.running) {
+                                                                            _barBorderDockWrite._pending = [scriptDir + "/dock-border.sh", gtk]
+                                                                        } else {
+                                                                            _barBorderDockWrite.command = [scriptDir + "/dock-border.sh", gtk]
+                                                                            _barBorderDockWrite.running = true
+                                                                        }
+                                                                    }
+                                                                }
                                                             }
                                                             Behavior on color { ColorAnimation { duration: 120 } }
                                                         }
@@ -2006,7 +2026,27 @@ PanelWindow {
                                                             }
                                                             MouseArea {
                                                                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                                                onClicked: { Config.islandBorderMode = modelData }
+                                                                onClicked: {
+                                                                    Config.islandBorderMode = modelData
+                                                                    // Keep the GJS dock island border in sync when
+                                                                    // switching modes without re-picking a swatch —
+                                                                    // otherwise the dock keeps whatever color was last
+                                                                    // written for whichever mode was active last time
+                                                                    // a swatch was clicked, instead of following the
+                                                                    // mode you just switched to.
+                                                                    const activeVar = modelData === "matugen"
+                                                                        ? Config.islandBorderVar
+                                                                        : Config.islandBorderWallustVar
+                                                                    if (activeVar) {
+                                                                        const gtk = activeVar.replace(/^\$/, "")
+                                                                        if (_islBorderDockWrite.running) {
+                                                                            _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", gtk]
+                                                                        } else {
+                                                                            _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", gtk]
+                                                                            _islBorderDockWrite.running = true
+                                                                        }
+                                                                    }
+                                                                }
                                                             }
                                                             Behavior on color { ColorAnimation { duration: 120 } }
                                                         }

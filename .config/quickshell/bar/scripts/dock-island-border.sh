@@ -17,7 +17,7 @@ if [ ! -f "$STYLE" ]; then
 fi
 # Write to style.css line 49: start/trash icon border-color
 # Line 49 contains:  border-color: @<token>; /* CC border picker → dock-island-border.sh */
-sed -i "49s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$STYLE"
+sed -i "59s/\(border-color:[[:space:]]*\)@[a-zA-Z0-9_]*/\1@${gtk}/" "$STYLE"
 # Hot-reload the dock (SIGUSR2 / signal 12)
 pkill -SIGUSR2 -f 'gjs dock-main.js' 2>/dev/null || pkill -12 -f 'gjs dock-main.js' 2>/dev/null || true
 echo "$gtk"
