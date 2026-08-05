@@ -354,7 +354,7 @@ function _injectGlyphSizeCSS(display) {
             font-size: calc(${glyphPx}px + 4px);
         }
         #indicator-dots {
-            color: @color3;
+            color: @surface_tint;
         }
         /* Separator length = 60% of icon size so it looks short and decorative */
         separator.dock-sep-v {
