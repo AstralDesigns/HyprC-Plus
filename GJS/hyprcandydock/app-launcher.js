@@ -51,7 +51,7 @@ const LauncherConfig = imports.launcherConfig.LauncherConfig;
 const APP_ICON_SIZE   = LauncherConfig.iconSize       || 48;
 const TEXT_FONT_SIZE  = LauncherConfig.textFontSize   || 11;
 const TILE_WIDTH      = LauncherConfig.fixedTileWidth || 90;
-const TILE_HEIGHT     = LauncherConfig.fixedTileHeight|| 78;
+const TILE_HEIGHT     = LauncherConfig.fixedTileHeight|| 90;
 const GAP_FROM_DOCK   = 3;    // px gap between dock surface edge and launcher
 
 // ── CSS file paths (for hot-reload watcher) ────────────────────────────────
@@ -528,6 +528,10 @@ function buildLauncherCSS() {
 
     return `
 
+* {
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', monospace;
+}
+
 /* ── Window shell ─────────────────────────────────────────────────────── */
 window.hyprcandy-launcher {
     background-color: @blur_background;
@@ -667,7 +671,7 @@ button.app-tile {
     background-color: transparent;
     border-radius: 10px;
     border: 1px solid transparent;
-    padding: 10px 6px 8px 6px;
+    padding: 0px 6px 20px 6px;
     min-width: ${TILE_WIDTH}px;
     min-height: ${TILE_HEIGHT}px;
     outline: none;
@@ -819,10 +823,8 @@ window.hyprcandy-group-dialog {
 }
 
 /* ── Running-app dot indicators (overlaid on tile) ───────────────────── */
-.launcher-indicator {
-    font-size: ${Math.max(5, Math.round(APP_ICON_SIZE * 0.18))}px;
-    color: @primary;
-    margin-bottom: 2px;
+#launcher-indicator-dots {
+    color: @color3;
 }
 
 /* ── Tab sidebar pill ────────────────────────────────────────────────── */
@@ -869,9 +871,9 @@ window.hyprcandy-group-dialog {
 
 /* Glyph label — same fixed size as button so it never widens the circle. */
 .tab-glyph {
-    font-family: 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
     color: alpha(@color5, 0.8);
-    font-size: 17px;
+    font-size: 30px;
     min-width: 36px;
     min-height: 36px;
     max-width: 36px;
@@ -976,7 +978,7 @@ window.hyprcandy-group-dialog {
     min-height: 42px;
     outline: none;
     box-shadow: none;
-    font-family: 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
     font-size: 20px;
     color: @primary;
 }
@@ -999,7 +1001,7 @@ window.hyprcandy-group-dialog {
     min-height: 34px;
     outline: none;
     box-shadow: none;
-    font-family: 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', emoji, monospace;
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', emoji, monospace;
 }
 .emoji-cat-btn.active {
     background-color: @inverse_primary;
@@ -14140,46 +14142,57 @@ const EMOJI_ALL = [
         });
         btn.add_controller(dragSrc);
 
-        // ── Running-app dot indicators (same pattern as dock-main.js) ─
-        // Check _runningApps for this app's class — 0 dots if not running,
-        // 1 dot for a single instance, 2 dots for 2+ (capped like the dock).
-        // For Steam games (no StartupWMClass), also check by steamAppId since
-        // Hyprland reports them as "steam_app_<id>" and getRunningApps() indexes
-        // them under the bare app ID for exactly this purpose.
-        const _appKey       = app.className.toLowerCase();
-        const _instances    = this._runningApps.get(_appKey)
-                           ?? this._runningApps.get(app.className)
-                           ?? (app.steamAppId ? this._runningApps.get(app.steamAppId) : null)
-                           ?? [];
+        // ── Running-app dot indicators ────────────────────────────────────
+        // Cairo DrawingArea instead of font glyphs — exact pixel sizing
+        // ensures the Overlay's valign=END places dots flush at the tile bottom.
+        const _appKey      = app.className.toLowerCase();
+        const _instances   = this._runningApps.get(_appKey)
+                          ?? this._runningApps.get(app.className)
+                          ?? (app.steamAppId ? this._runningApps.get(app.steamAppId) : null)
+                          ?? [];
         const _instanceCount = _instances.length;
 
-        const dotsBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
-        dotsBox.set_halign(Gtk.Align.CENTER);
-        dotsBox.set_valign(Gtk.Align.END);   // bottom of the tile
-        dotsBox.set_name('launcher-indicator-dots');
+        const _dotR   = 5;   // px radius — 10px diameter dot, clearly visible
+        const _dotGap = 2;   // px gap between 2 dots
 
-        if (_instanceCount >= 1) {
-            const dot1 = Gtk.Label.new(GLYPH_INDICATOR);
-            dot1.add_css_class('launcher-indicator');
-            dotsBox.append(dot1);
-        }
-        if (_instanceCount >= 2) {
-            const dot2 = Gtk.Label.new(GLYPH_INDICATOR);
-            dot2.add_css_class('launcher-indicator');
-            dot2.set_margin_start(3);
-            dotsBox.append(dot2);
-        }
+        const indicatorArea = new Gtk.DrawingArea();
+        indicatorArea.set_name('launcher-indicator-dots');
+        indicatorArea.set_halign(Gtk.Align.CENTER);
+        indicatorArea.set_valign(Gtk.Align.END);   // flush at tile bottom
+        indicatorArea._instanceCount = _instanceCount;
 
-        // Wrap btn + dots in an overlay — no size penalty vs a plain button.
-        // set_measure_overlay(false) prevents dotsBox from expanding the tile;
-        // set_clip_overlay(true) passes pointer events through to the button.
+        const _setLauncherIndicatorSize = (area) => {
+            const n = Math.min(area._instanceCount, 2);
+            if (n === 0) {
+                area.set_size_request(0, 0);
+                area.set_visible(false);
+            } else {
+                area.set_visible(true);
+                const w = n === 1 ? _dotR * 2 : _dotR * 4 + _dotGap;
+                area.set_size_request(w, _dotR * 2);
+            }
+        };
+        _setLauncherIndicatorSize(indicatorArea);
+
+        indicatorArea.set_draw_func((area, cr, _w, _h) => {
+            const n = Math.min(area._instanceCount, 2);
+            if (n === 0) return;
+            const rgba = area.get_style_context().get_color();
+            cr.setSourceRGBA(rgba.red, rgba.green, rgba.blue, rgba.alpha);
+            for (let i = 0; i < n; i++) {
+                cr.arc(_dotR + i * (_dotR * 2 + _dotGap), _dotR, _dotR - 0.5, 0, 2 * Math.PI);
+                cr.fill();
+            }
+        });
+
+        // Wrap btn + indicator in an overlay — no layout cost to the tile.
         const tileOverlay = new Gtk.Overlay();
         tileOverlay.set_halign(Gtk.Align.CENTER);
         tileOverlay.set_valign(Gtk.Align.CENTER);
         tileOverlay.set_child(btn);
-        tileOverlay.add_overlay(dotsBox);
-        tileOverlay.set_measure_overlay(dotsBox, false);
-        tileOverlay.set_clip_overlay(dotsBox, true);
+        tileOverlay.add_overlay(indicatorArea);
+        tileOverlay.set_measure_overlay(indicatorArea, false);
+        tileOverlay.set_clip_overlay(indicatorArea, false);
 
         return tileOverlay;
     }

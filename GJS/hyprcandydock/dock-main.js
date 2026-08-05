@@ -16,17 +16,17 @@ const Gtk4LayerShell = imports.gi.Gtk4LayerShell;
 // when the dock is launched from outside its own folder (e.g. exec-once in hyprland.conf).
 const _dockDir = GLib.path_get_dirname(imports.system.programInvocationName);
 imports.searchPath.unshift(_dockDir);
-const Daemon     = imports.daemon.Daemon;
+const Daemon = imports.daemon.Daemon;
 const DockConfig = imports.config.DockConfig;
 
 // --- Parse position flag from ARGV ------------------------------------
 // Usage: gjs dock-main.js [-b|-t|-l|-r]
 (function parsePositionFlag() {
     const args = ARGV || [];
-    if      (args.includes('-t')) DockConfig.position = 'top';
+    if (args.includes('-t')) DockConfig.position = 'top';
     else if (args.includes('-l')) DockConfig.position = 'left';
     else if (args.includes('-r')) DockConfig.position = 'right';
-    else                          DockConfig.position = 'bottom'; // default
+    else DockConfig.position = 'bottom'; // default
 })();
 
 // Apply position-specific config overrides
@@ -54,54 +54,54 @@ function _spawnCleanCmd(cmdStr) {
 
 // --- Configuration (live from DockConfig) -----------------------------
 // Three independent size axes: app icons, glyph icons, indicators
-const APP_ICON_SIZE   = DockConfig.appIconSize;
+const APP_ICON_SIZE = DockConfig.appIconSize;
 const GLYPH_ICON_SIZE = DockConfig.glyphIconSize !== null
     ? DockConfig.glyphIconSize
     : Math.round(APP_ICON_SIZE * (DockConfig.glyphIconSizeFraction || 1.1));
-const INDICATOR_SIZE  = DockConfig.indicatorSize !== null
+const INDICATOR_SIZE = DockConfig.indicatorSize !== null
     ? DockConfig.indicatorSize
-    : Math.max(6, Math.round(APP_ICON_SIZE * DockConfig.indicatorSizeFraction));
+    : Math.max(6, Math.round(24 * DockConfig.indicatorSizeFraction));
 const INDICATOR_SPACING = DockConfig.indicatorSpacing;
 // Legacy alias used throughout
 const ICON_SIZE = APP_ICON_SIZE;
 
 // Glyph icons — Nerd Font Unicode codepoints (NF font required)
-const GLYPH_START      = '󱗼';   //  Linux / start
-const GLYPH_INDICATOR  = '\u{F09DF}';  //  active-window dot "\u{F09DF}"
+const GLYPH_START = '󱗼';   //  Linux / start
+const GLYPH_INDICATOR = '\u{F09DF}';  //  active-window dot "\u{F09DF}"
 const GLYPH_TRASH_EMPTY = '󰩺';   //  nf-md-trash_can_outline — no files in trash
-const GLYPH_TRASH_FULL  = '󰩹';   //  nf-md-trash_can         — files present (replaces delete_empty)
+const GLYPH_TRASH_FULL = '󰩹';   //  nf-md-trash_can         — files present (replaces delete_empty)
 const GLYPH_TRASH_HEAVY = '󰆴';   //  nf-md-delete            — heavily loaded (>20 items)
 // Hyprland logo glyph (nf-linux-hyprland, NerdFonts >= 3.2)
-const GLYPH_FALLBACK  = '\u200a\u200a\u200a\u200a󱙝\u200a\u200a\u200a\u200a';   //  shown when app has no icon
+const GLYPH_FALLBACK = '\u200a\u200a\u200a\u200a󱙝\u200a\u200a\u200a\u200a';   //  shown when app has no icon
 
 // --- CSS Management ---------------------------------------------------
 const HOME = GLib.get_home_dir();
-const GTK3_COLORS_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors.css']);
-const GTK4_COLORS_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
-const GTK3_WALLUST_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors-wallust.css']);
-const GTK4_WALLUST_PATH      = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors-wallust.css']);
-const DOCK_STYLE_PATH       = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'style.css']);
-const DOCK_CONFIG_PATH      = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'config.js']);
+const GTK3_COLORS_PATH = GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors.css']);
+const GTK4_COLORS_PATH = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
+const GTK3_WALLUST_PATH = GLib.build_filenamev([HOME, '.config', 'gtk-3.0', 'colors-wallust.css']);
+const GTK4_WALLUST_PATH = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors-wallust.css']);
+const DOCK_STYLE_PATH = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'style.css']);
+const DOCK_CONFIG_PATH = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'config.js']);
 // Absolute path so the toggle script is found regardless of working-directory
 // (exec-once in hyprland.conf sets cwd to '/', not the dock folder).
-const LAUNCHER_TOGGLE_PATH  = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'toggle-app-launcher.sh']);
-const LAUNCHER_STATE_PATH   = GLib.build_filenamev([HOME, '.cache', 'hyprcandy', 'launcher.state']);
-const HYPRCANDY_CONF_PATH   = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hyprcandy-bar.conf']);
+const LAUNCHER_TOGGLE_PATH = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'toggle-app-launcher.sh']);
+const LAUNCHER_STATE_PATH = GLib.build_filenamev([HOME, '.cache', 'hyprcandy', 'launcher.state']);
+const HYPRCANDY_CONF_PATH = GLib.build_filenamev([HOME, '.config', 'hyprcandy', 'hyprcandy-bar.conf']);
 
 let cssProviders = [];          // Static providers cleared/re-added on theme change
 let dynamicConfigProvider = null; // Persistent provider for config-driven values — never cleared
 let dockWindow = null;
 
-let _colorMonitor     = null;  // Gio.FileMonitor for gtk-4.0/colors.css
-let _styleMonitor     = null;  // Gio.FileMonitor for hyprcandydock/style.css
+let _colorMonitor = null;  // Gio.FileMonitor for gtk-4.0/colors.css
+let _styleMonitor = null;  // Gio.FileMonitor for hyprcandydock/style.css
 let _colorReloadTimer = 0;     // GLib timeout source ID (debounce)
 let _styleReloadTimer = 0;
-let _launcherMonitor  = null; // Gio.FileMonitor for launcher.state
-let _launcherOpen     = false; // true while launcher window is visible
+let _launcherMonitor = null; // Gio.FileMonitor for launcher.state
+let _launcherOpen = false; // true while launcher window is visible
 
 function loadCSS() {
     const display = Gdk.Display.get_default();
-    
+
     // Remove old providers
     for (const provider of cssProviders) {
         try {
@@ -206,14 +206,14 @@ function _readBorderColorFromStyle() {
 
 function _mapCornersForPosition(edge, storedTL, storedTR, storedBL, storedBR) {
     switch (edge) {
-    case 'top':
-        return { tl: storedBL, tr: storedBR, bl: storedTL, br: storedTR };
-    case 'left':
-        return { tl: storedBL, tr: storedTL, bl: storedBR, br: storedTR };
-    case 'right':
-        return { tl: storedTR, tr: storedBR, bl: storedTL, br: storedBL };
-    default: // bottom
-        return { tl: storedTL, tr: storedTR, bl: storedBL, br: storedBR };
+        case 'top':
+            return { tl: storedBL, tr: storedBR, bl: storedTL, br: storedTR };
+        case 'left':
+            return { tl: storedBL, tr: storedTL, bl: storedBR, br: storedTR };
+        case 'right':
+            return { tl: storedTR, tr: storedBR, bl: storedTL, br: storedBL };
+        default: // bottom
+            return { tl: storedTL, tr: storedTR, bl: storedBL, br: storedBR };
     }
 }
 
@@ -221,19 +221,19 @@ function _injectGlyphSizeCSS(display) {
     // Read live from DockConfig so hot-reload (SIGUSR2) picks up new values.
     // Do NOT use the baked consts (APP_ICON_SIZE etc.) here — they are frozen
     // at process start and won't reflect config edits.
-    const appPx       = DockConfig.appIconSize;
-    const glyphPx     = DockConfig.glyphIconSize !== null
+    const appPx = DockConfig.appIconSize;
+    const glyphPx = DockConfig.glyphIconSize !== null
         ? DockConfig.glyphIconSize
         : Math.round(appPx * (DockConfig.glyphIconSizeFraction || 1.1));
     const indicatorPx = DockConfig.indicatorSize !== null
         ? DockConfig.indicatorSize
-        : Math.max(Math.round(24 * DockConfig.indicatorSizeFraction));
-    const btnSize  = appPx ;
-    const borderW  = DockConfig.borderWidth;
+        : Math.max(5, Math.round(24 * DockConfig.indicatorSizeFraction));
+    const btnSize = appPx;
+    const borderW = DockConfig.borderWidth;
     const fallbackR = DockConfig.borderRadius;
-    const storedTL = DockConfig.borderTopLeftRadius     ?? fallbackR;
-    const storedTR = DockConfig.borderTopRightRadius    ?? fallbackR;
-    const storedBL = DockConfig.borderBottomLeftRadius  ?? fallbackR;
+    const storedTL = DockConfig.borderTopLeftRadius ?? fallbackR;
+    const storedTR = DockConfig.borderTopRightRadius ?? fallbackR;
+    const storedBL = DockConfig.borderBottomLeftRadius ?? fallbackR;
     const storedBR = DockConfig.borderBottomRightRadius ?? fallbackR;
     const mapped = _mapCornersForPosition(
         DockConfig.position || 'bottom', storedTL, storedTR, storedBL, storedBR);
@@ -241,7 +241,7 @@ function _injectGlyphSizeCSS(display) {
     const borderTR = mapped.tr;
     const borderBL = mapped.bl;
     const borderBR = mapped.br;
-    const padPx    = DockConfig.innerPadding;
+    const padPx = DockConfig.innerPadding;
 
     // Gradient style mirrors the Bar / Tri rect gradient: inversePrimary → scrim.
     // GTK4 CSS @-variable references work in background-image just like in color.
@@ -300,73 +300,29 @@ function _injectGlyphSizeCSS(display) {
         // flat
         glyphBadgeGradient = 'linear-gradient(to bottom, @on_secondary, @on_secondary)';
     }
-    
-    const _dockPos = DockConfig.position || 'bottom';
-    let padRule;
-    if (_dockPos === 'top') {
-        padRule = `padding-left: 1px; padding-right: 1px; padding-top: 0px; padding-bottom: 0px;`;
-    } else if (_dockPos === 'left') {
-        padRule = `padding-left: 0px; padding-right: 0px; padding-top: 1px; padding-bottom: 1px;`;
-    } else if (_dockPos === 'right') {
-        padRule = `padding-left: 0px; padding-right: 0px; padding-top: 1px; padding-bottom: 1px;`;
-    } else {
-        padRule = `padding-left: 1px; padding-right: 1px; padding-top: 0px; padding-bottom: 0px;`;
-    }
-    
+
+    const _dckpos = DockConfig.position || 'bottom';
+    const wRule = 'padding: 4px;';
+
     const _dockpos = DockConfig.position || 'bottom';
     let pRule;
-    if (_dockPos === 'top') {
-        pRule = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
-    } else if (_dockpos === 'left') {
-        pRule = `padding-left: 0px; padding-right: 0px; padding-top: 2px; padding-bottom: 2px;`;
-    } else if (_dockpos === 'right') {
-        pRule = `padding-left: 0px; padding-right: 0px; padding-top: 2px; padding-bottom: 2px;`;
+    if (_dockpos === 'top' || _dockpos === 'bottom') {
+        pRule = 'padding-left: 2px; padding-right: 2px; margin-left: 2px; margin-right: 2px; padding-top: 0px; padding-bottom: 0px; margin-top: 0px; margin-bottom: 0px;';
     } else {
-        pRule = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
+        pRule = 'padding-top: 2px; padding-bottom: 2px; margin-top: 2px; margin-bottom: 2px; padding-left: 0px; padding-right: 0px; margin-left: 0px; margin-right: 0px;';
     }
-    
-    const _dpos = DockConfig.position || 'bottom';
-    let btRule;
-    if (_dpos === 'top') {
-        btRule = `padding-left: 2px; padding-right: 2px; padding-top: 4px; padding-bottom: 4px;`;
-    } else if (_dpos === 'left') {
-        btRule = `padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px;`;
-    } else if (_dpos === 'right') {
-        btRule = `padding-left: 4px; padding-right: 4px; padding-top: 2px; padding-bottom: 2px;`;
-    } else {
-        btRule = `padding-left: 2px; padding-right: 2px; padding-top: 4px; padding-bottom: 4px;`;
-    }
-    
-    const _pos = DockConfig.position || 'bottom';
-    let pd;
-    if (_pos === 'top') {
-        pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
-    } else if (_pos === 'left') {
-        pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
-    } else if (_pos === 'right') {
-        pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
-    } else {
-        pd = `padding-left: 2px; padding-right: 2px; padding-top: 0px; padding-bottom: 0px;`;
-    }
-    
-    const _mgpos = DockConfig.position || 'bottom';
-    let mg;
-    if (_mgpos === 'top') {
-        mg = `margin-bottom: 6px;`;
-    } else if (_mgpos === 'left') {
-        mg = `margin-right: 6px;`;
-    } else if (_mgpos === 'right') {
-        mg = `margin-left: 6px;`;
-    } else {
-        mg = `margin-top: 6px;`;
-    }
+
+
 
     const css = `
         /* Config-driven values — updated in-place on SIGUSR2 hot-reload */
+        * {
+            font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', monospace;
+        }
         window.background {
             border-width: ${borderW}px;
             border-style: solid;
-            padding: ${padPx}px;
+            ${wRule}
             border-radius: ${borderTL}px ${borderTR}px ${borderBR}px ${borderBL}px;
             ${bgStyle}
         }
@@ -382,26 +338,24 @@ function _injectGlyphSizeCSS(display) {
             font-size: calc(${appPx}px + 2px);
             border-radius: 999px;
             background-image: ${glyphBadgeGradient};
-            padding-left: calc(${appPx}px * 0.35)
-            ;
-            padding-right: calc(${appPx}px * 0.3)
+            padding-left: calc(${appPx}px * 0.35);
+            padding-right: calc(${appPx}px * 0.3);
         }
         .fallback-icon {
             font-size: calc(${glyphPx}px + 4px);
         }
-        #active-indicator {
-            font-size: ${indicatorPx}px;
-            padding-left: 2px;
+        #indicator-dots {
+            color: @color3;
         }
-        /* Separator length matches icon size (not button container) */
+        /* Separator length = 60% of icon size so it looks short and decorative */
         separator.dock-sep-v {
-            min-height: ${appPx}px;
-            max-height: ${appPx}px;
+            min-height: ${Math.round(appPx * 0.6)}px;
+            max-height: ${Math.round(appPx * 0.6)}px;
             ${pRule}
         }
         separator.dock-sep-h {
-            min-width: ${appPx}px;
-            max-width: ${appPx}px;
+            min-width: ${Math.round(appPx * 0.6)}px;
+            max-width: ${Math.round(appPx * 0.6)}px;
             ${pRule}
         }
         button.app-button, button.dock-button {
@@ -409,13 +363,9 @@ function _injectGlyphSizeCSS(display) {
             max-width: ${appPx}px;
             min-height: ${appPx}px;
             max-height: ${appPx}px;
-            padding: calc((${appPx}px * 0.25) + 2px);/*${btRule}*/
         }
         button.app-button image, button.dock-button image {
-            min-width: ${appPx}px;
-            max-width: ${appPx}px;
-            min-height: ${appPx}px;
-            max-height: ${appPx}px;
+            padding: 4px;
         }
     `;
 
@@ -496,9 +446,9 @@ function applyMarginsToLayerShell(win) {
     if (!win) return;
     const cfg = DockConfig;
     Gtk4LayerShell.set_margin(win, Gtk4LayerShell.Edge.BOTTOM, cfg.marginBottom);
-    Gtk4LayerShell.set_margin(win, Gtk4LayerShell.Edge.TOP,    cfg.marginTop);
-    Gtk4LayerShell.set_margin(win, Gtk4LayerShell.Edge.LEFT,   cfg.marginLeft);
-    Gtk4LayerShell.set_margin(win, Gtk4LayerShell.Edge.RIGHT,  cfg.marginRight);
+    Gtk4LayerShell.set_margin(win, Gtk4LayerShell.Edge.TOP, cfg.marginTop);
+    Gtk4LayerShell.set_margin(win, Gtk4LayerShell.Edge.LEFT, cfg.marginLeft);
+    Gtk4LayerShell.set_margin(win, Gtk4LayerShell.Edge.RIGHT, cfg.marginRight);
 }
 
 
@@ -523,15 +473,15 @@ function readHyprCandyConf() {
         const dockMatch = txt.match(/\[dock\]([\s\S]*?)(?=\n\[|$)/i);
         if (!dockMatch) return { ...defaults, licenseActive };
         const section = dockMatch[1];
-        const ahMatch     = section.match(/^\s*autohide\s*=\s*(true|false)/im);
-        const delayMatch  = section.match(/^\s*autohide_delay\s*=\s*(\d+)/im);
-        const layerMatch  = section.match(/^\s*layer\s*=\s*(top|overlay)/im);
+        const ahMatch = section.match(/^\s*autohide\s*=\s*(true|false)/im);
+        const delayMatch = section.match(/^\s*autohide_delay\s*=\s*(\d+)/im);
+        const layerMatch = section.match(/^\s*layer\s*=\s*(top|overlay)/im);
         const marginMatch = section.match(/^\s*margin_from_edge\s*=\s*(\d+)/im);
         return {
-            autoHide:       ahMatch     ? ahMatch[1].toLowerCase() === 'true' : false,
-            autoHideDelay:  delayMatch  ? parseInt(delayMatch[1]) * 1000       : 5000,
-            layer:          layerMatch  ? layerMatch[1].toLowerCase()          : 'top',
-            marginFromEdge: marginMatch ? parseInt(marginMatch[1])             : null,
+            autoHide: ahMatch ? ahMatch[1].toLowerCase() === 'true' : false,
+            autoHideDelay: delayMatch ? parseInt(delayMatch[1]) * 1000 : 5000,
+            layer: layerMatch ? layerMatch[1].toLowerCase() : 'top',
+            marginFromEdge: marginMatch ? parseInt(marginMatch[1]) : null,
             licenseActive,
         };
     } catch (e) {
@@ -576,16 +526,16 @@ function hotReload() {
         // This overrides the positionOverride value that reloadConfigFromFile() applied.
         if (conf.marginFromEdge !== null) {
             const pos = DockConfig.position;
-            if      (pos === 'bottom') DockConfig.marginBottom = conf.marginFromEdge;
-            else if (pos === 'top')    DockConfig.marginTop    = conf.marginFromEdge;
-            else if (pos === 'left')   DockConfig.marginLeft   = conf.marginFromEdge;
-            else if (pos === 'right')  DockConfig.marginRight  = conf.marginFromEdge;
+            if (pos === 'bottom') DockConfig.marginBottom = conf.marginFromEdge;
+            else if (pos === 'top') DockConfig.marginTop = conf.marginFromEdge;
+            else if (pos === 'left') DockConfig.marginLeft = conf.marginFromEdge;
+            else if (pos === 'right') DockConfig.marginRight = conf.marginFromEdge;
             log('[dock] hot-reload: margin_from_edge = ' + conf.marginFromEdge + ' (position: ' + pos + ')');
         }
 
         // Update auto-hide settings; the EventControllerMotion on dockWindow
         // reads these module-level vars each time leave fires.
-        _ahEnabled  = conf.autoHide;
+        _ahEnabled = conf.autoHide;
         _ahDelaySec = conf.autoHideDelay;
         if (!_ahEnabled) {
             _ahCancelTimer();
@@ -751,8 +701,8 @@ var DragDropManager = class {
     //  - No container-level drop target needed.
     //  - isDragging blocks _updateFromDaemon from reverting order mid-drag.
     constructor(dock) {
-        this.dock         = dock;
-        this.isDragging   = false;
+        this.dock = dock;
+        this.isDragging = false;
         this.draggedClass = null;
     }
 
@@ -762,10 +712,10 @@ var DragDropManager = class {
 
     _applyReorder(draggedClass, afterClass) {
         const entries = this._appEntries();
-        const from    = entries.findIndex(([c]) => c === draggedClass);
+        const from = entries.findIndex(([c]) => c === draggedClass);
         if (from === -1) return;
         const [entry] = entries.splice(from, 1);
-        const toIdx   = afterClass ? entries.findIndex(([c]) => c === afterClass) : -1;
+        const toIdx = afterClass ? entries.findIndex(([c]) => c === afterClass) : -1;
         entries.splice(toIdx === -1 ? 0 : toIdx + 1, 0, entry);
 
         // Rebuild Map + reorder visual children.
@@ -789,16 +739,16 @@ var DragDropManager = class {
         });
 
         dragSource.connect('drag-begin', (source) => {
-            this.isDragging   = true;
+            this.isDragging = true;
             this.draggedClass = className;
             overlay.set_opacity(0.4);
-            try { source.set_icon(Gtk.WidgetPaintable.new(btn), 0, 0); } catch (_) {}
+            try { source.set_icon(Gtk.WidgetPaintable.new(btn), 0, 0); } catch (_) { }
         });
 
         dragSource.connect('drag-end', () => {
             overlay.set_opacity(1.0);
             // Always clear — successful drop (deleteData=true) must also unlock updates
-            this.isDragging   = false;
+            this.isDragging = false;
             this.draggedClass = null;
         });
 
@@ -826,9 +776,9 @@ var DragDropManager = class {
 
             // Decide insert position from pointer location within this slot
             const isVert = IS_VERTICAL;
-            const alloc  = overlay.get_allocation();
-            const half   = isVert ? alloc.height / 2 : alloc.width / 2;
-            const pos    = isVert ? y : x;
+            const alloc = overlay.get_allocation();
+            const half = isVert ? alloc.height / 2 : alloc.width / 2;
+            const pos = isVert ? y : x;
 
             let afterClass;
             if (pos >= half) {
@@ -837,13 +787,13 @@ var DragDropManager = class {
             } else {
                 // Drop in first half → insert before this slot
                 const myIdx = entries.findIndex(([c]) => c === className);
-                afterClass  = myIdx > 0 ? entries[myIdx - 1][0] : null;
+                afterClass = myIdx > 0 ? entries[myIdx - 1][0] : null;
             }
 
             this._applyReorder(draggedClass, afterClass);
             this.dock.daemon.reorderPinned(draggedClass, afterClass);
 
-            this.isDragging   = false;
+            this.isDragging = false;
             this.draggedClass = null;
             return true;
         });
@@ -866,7 +816,7 @@ const HyprCandyDock = GObject.registerClass({
 
         this.daemon = new Daemon(this);
         this.clientWidgets = new Map();
-        
+
         // Track separators
         this._startSeparator = null;
         this._endSeparator = null;
@@ -876,10 +826,10 @@ const HyprCandyDock = GObject.registerClass({
 
         this._setupLayerShell();
         this._createDock();
-        
+
         // Initialize drag-drop manager after mainBox is created
         this.dragDropManager = new DragDropManager(this);
-        
+
         this._initializeDock();
     }
 
@@ -895,15 +845,15 @@ const HyprCandyDock = GObject.registerClass({
 
         // Anchor the correct edge; clear the opposing three
         Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.BOTTOM, pos === 'bottom');
-        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.TOP,    pos === 'top');
-        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.LEFT,   pos === 'left');
-        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.RIGHT,  pos === 'right');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.TOP, pos === 'top');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.LEFT, pos === 'left');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.RIGHT, pos === 'right');
 
         // Margins from config
         Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.BOTTOM, cfg.marginBottom);
-        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP,    cfg.marginTop);
-        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT,   cfg.marginLeft);
-        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT,  cfg.marginRight);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP, cfg.marginTop);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT, cfg.marginLeft);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT, cfg.marginRight);
 
         // Exclusive zone is set after the first layout pass via
         // _scheduleExclusiveZoneUpdate() — at this point the surface hasn't
@@ -1112,7 +1062,7 @@ const HyprCandyDock = GObject.registerClass({
                     null,
                     (_, res) => {
                         try {
-                            const info  = trashUri.query_info_finish(res);
+                            const info = trashUri.query_info_finish(res);
                             const count = info.get_attribute_uint32('trash::item-count');
                             _trashCount = count;
                             if (count === 0) {
@@ -1125,10 +1075,10 @@ const HyprCandyDock = GObject.registerClass({
                                 label.set_text(GLYPH_TRASH_HEAVY);
                                 btn.set_tooltip_text(`Trash (${count} items)`);
                             }
-                        } catch (_) {}
+                        } catch (_) { }
                     }
                 );
-            } catch (_) {}
+            } catch (_) { }
         };
 
         _updateTrashIcon();
@@ -1139,7 +1089,7 @@ const HyprCandyDock = GObject.registerClass({
         const TRASH_FILES_DIR = GLib.build_filenamev(
             [GLib.get_home_dir(), '.local', 'share', 'Trash', 'files']
         );
-        try { GLib.mkdir_with_parents(TRASH_FILES_DIR, 0o755); } catch (_) {}
+        try { GLib.mkdir_with_parents(TRASH_FILES_DIR, 0o755); } catch (_) { }
         try {
             const trashDir = Gio.File.new_for_path(TRASH_FILES_DIR);
             this._trashMonitor = trashDir.monitor_directory(
@@ -1290,7 +1240,7 @@ const HyprCandyDock = GObject.registerClass({
 
         this.mainBox.append(btn);
         this._trashButton = btn;
-        this._trashLabel  = label;
+        this._trashLabel = label;
     }
 
     _updateFromDaemon(clientData) {
@@ -1405,9 +1355,9 @@ const HyprCandyDock = GObject.registerClass({
         if (pos === 'top') {
             dotsHalign = Gtk.Align.CENTER; dotsValign = Gtk.Align.START;
         } else if (pos === 'left') {
-            dotsHalign = Gtk.Align.START;  dotsValign = Gtk.Align.CENTER;
+            dotsHalign = Gtk.Align.START; dotsValign = Gtk.Align.CENTER;
         } else if (pos === 'right') {
-            dotsHalign = Gtk.Align.END;    dotsValign = Gtk.Align.CENTER;
+            dotsHalign = Gtk.Align.END; dotsValign = Gtk.Align.CENTER;
         } else {
             // bottom (default)
             dotsHalign = Gtk.Align.CENTER; dotsValign = Gtk.Align.END;
@@ -1482,26 +1432,64 @@ const HyprCandyDock = GObject.registerClass({
         });
         btn.add_controller(gesture);
 
-        // Dots overlay — lives on top of the button, zero layout cost.
-        // Orientation: horizontal for bottom/top, vertical for left/right.
-        const dotsBox = Gtk.Box.new(
-            IS_VERTICAL ? Gtk.Orientation.VERTICAL : Gtk.Orientation.HORIZONTAL, 0);
-        dotsBox.set_halign(dotsHalign);
-        dotsBox.set_valign(dotsValign);
-        dotsBox.set_name('indicator-dots');
-        dotsBox._dotCount = data.instances ? data.instances.length : 0;
-        this._populateDots(dotsBox, data);
+        // ── Indicator DrawingArea ─────────────────────────────────────────
+        // A Gtk.DrawingArea with Cairo-drawn circles is used instead of
+        // Gtk.Label glyphs because font metrics make labels taller than their
+        // visual dot, causing misalignment with the Overlay's halign/valign.
+        // The DrawingArea reports its EXACT pixel size as its natural size, so
+        // GTK places it flush at the dock-facing edge via halign/valign below.
+        const _dotR = Math.max(4, Math.round(INDICATOR_SIZE / 12));
+        const _dotD = 2 * _dotR;
+        const _dotGap = INDICATOR_SPACING;  // from config (px between 2 dots)
 
-        // Wrap button + dots in an overlay — no size penalty vs a plain button
+        const indicatorArea = new Gtk.DrawingArea();
+        indicatorArea.set_name('indicator-dots');
+        indicatorArea.set_halign(dotsHalign);
+        indicatorArea.set_valign(dotsValign);
+        // Store params used by _syncIndicatorSize and the draw func.
+        indicatorArea._instanceCount = data.instances ? data.instances.length : 0;
+        indicatorArea._dotR = _dotR;
+        indicatorArea._dotGap = _dotGap;
+        indicatorArea._isVertical = IS_VERTICAL;
+
+        this._syncIndicatorSize(indicatorArea);
+
+        indicatorArea.set_draw_func((area, cr, _w, _h) => {
+            const n = Math.min(area._instanceCount, 2);
+            if (n === 0) return;
+            const r = area._dotR;
+            const gap = area._dotGap;
+            const d = 2 * r;
+            // Color from CSS 'color: @primary' on #indicator-dots
+            const rgba = area.get_style_context().get_color();
+            cr.setSourceRGBA(rgba.red, rgba.green, rgba.blue, rgba.alpha);
+            if (area._isVertical) {
+                // Left/right dock: dots stacked vertically, side by side
+                for (let i = 0; i < n; i++) {
+                    cr.arc(r, r + i * (d + gap), r - 0.5, 0, 2 * Math.PI);
+                    cr.fill();
+                }
+            } else {
+                // Top/bottom dock: dots side by side horizontally
+                for (let i = 0; i < n; i++) {
+                    cr.arc(r + i * (d + gap), r, r - 0.5, 0, 2 * Math.PI);
+                    cr.fill();
+                }
+            }
+        });
+
+        // Wrap button + indicator in an overlay — zero layout cost:
+        // the DrawingArea's natural size is its content size, so the Overlay
+        // places it exactly at the dock-facing edge without adding height/width.
         const overlay = new Gtk.Overlay();
         overlay.set_halign(Gtk.Align.CENTER);
         overlay.set_valign(Gtk.Align.CENTER);
         overlay.set_child(btn);
-        overlay.add_overlay(dotsBox);
-        // Prevent the dots from influencing the overlay's own size request
-        overlay.set_measure_overlay(dotsBox, false);
-        // Allow input events to pass through the transparent dots area to the button
-        overlay.set_clip_overlay(dotsBox, true);
+        overlay.add_overlay(indicatorArea);
+        overlay.set_measure_overlay(indicatorArea, false);
+        // Don't clip — the DrawingArea is always smaller than the button,
+        // but false allows edge-flush rendering without being cut off.
+        overlay.set_clip_overlay(indicatorArea, false);
 
         this.dragDropManager.setupDragSource(btn, overlay, data.className);
 
@@ -1526,8 +1514,8 @@ const HyprCandyDock = GObject.registerClass({
     }
 
     _updateClientButton(data) {
-        // clientWidgets now stores the Gtk.Overlay directly.
-        // Structure: overlay { child=btn, overlay=dotsBox }
+        // clientWidgets stores the Gtk.Overlay.
+        // Structure: overlay { child=btn, overlay=indicatorArea (DrawingArea) }
         const overlay = this.clientWidgets.get(data.className);
         if (!overlay) return;
 
@@ -1539,24 +1527,19 @@ const HyprCandyDock = GObject.registerClass({
             btn.set_tooltip_text(tooltipText);
         }
 
-        // Only rebuild dots when the instance count actually changed —
-        // avoids allocating/destroying Gtk.Label widgets on every poll tick.
-        const dotsBox = this._findDotsBox(overlay);
-        if (dotsBox) {
+        // Only update the indicator when the instance count actually changed.
+        const indicatorArea = this._findDotsBox(overlay);
+        if (indicatorArea) {
             const newCount = data.instances ? data.instances.length : 0;
-            if (dotsBox._dotCount !== newCount) {
-                dotsBox._dotCount = newCount;
-                while (dotsBox.get_first_child()) {
-                    dotsBox.remove(dotsBox.get_first_child());
-                }
-                this._populateDots(dotsBox, data);
+            if (indicatorArea._instanceCount !== newCount) {
+                indicatorArea._instanceCount = newCount;
+                this._syncIndicatorSize(indicatorArea);
+                indicatorArea.queue_draw();
             }
         }
     }
 
-    // Walk the overlay's children to find the named dotsBox widget.
-    // Gtk.Overlay keeps its overlay children as siblings AFTER the main child
-    // in the internal child list, so we skip the first child (the button).
+    // Walk the overlay's children to find the indicator DrawingArea by name.
     _findDotsBox(overlay) {
         let child = overlay.get_first_child();
         while (child) {
@@ -1566,23 +1549,24 @@ const HyprCandyDock = GObject.registerClass({
         return null;
     }
 
-    // Shared helper — fills a dotsBox with indicator glyphs
-    _populateDots(dotsBox, data) {
-        const instanceCount = data.instances ? data.instances.length : 0;
-        if (instanceCount > 0) {
-            if (instanceCount > 1) {
-                const first = Gtk.Label.new(GLYPH_INDICATOR);
-                first.set_name('active-indicator');
-                dotsBox.append(first);
-                const second = Gtk.Label.new(GLYPH_INDICATOR);
-                second.set_name('active-indicator');
-                if (IS_VERTICAL) second.set_margin_top(INDICATOR_SPACING);
-                else              second.set_margin_start(INDICATOR_SPACING);
-                dotsBox.append(second);
+    // Resize the indicator DrawingArea to match the current instance count.
+    // Called once on creation and again whenever the count changes.
+    _syncIndicatorSize(area) {
+        const n = Math.min(area._instanceCount, 2);
+        const r = area._dotR;
+        const gap = area._dotGap;
+        const d = 2 * r;
+        if (n === 0) {
+            area.set_size_request(0, 0);
+            area.set_visible(false);
+        } else {
+            area.set_visible(true);
+            if (area._isVertical) {
+                // Left/right dock: dots stacked vertically
+                area.set_size_request(d, n === 1 ? d : 2 * d + gap);
             } else {
-                const dot = Gtk.Label.new(GLYPH_INDICATOR);
-                dot.set_name('active-indicator');
-                dotsBox.append(dot);
+                // Top/bottom dock: dots side by side horizontally
+                area.set_size_request(n === 1 ? d : 2 * d + gap, d);
             }
         }
     }
@@ -1597,13 +1581,13 @@ const HyprCandyDock = GObject.registerClass({
         const _gap = DockConfig.popoverGapDock || 12;
         let popPos, offX, offY;
         if (_pos === 'top') {
-            popPos = Gtk.PositionType.BOTTOM; offX = 0;    offY = _gap;
+            popPos = Gtk.PositionType.BOTTOM; offX = 0; offY = _gap;
         } else if (_pos === 'left') {
-            popPos = Gtk.PositionType.RIGHT;  offX = _gap; offY = 0;
+            popPos = Gtk.PositionType.RIGHT; offX = _gap; offY = 0;
         } else if (_pos === 'right') {
-            popPos = Gtk.PositionType.LEFT;   offX = -_gap; offY = 0;
+            popPos = Gtk.PositionType.LEFT; offX = -_gap; offY = 0;
         } else {
-            popPos = Gtk.PositionType.TOP;    offX = 0;    offY = -_gap;
+            popPos = Gtk.PositionType.TOP; offX = 0; offY = -_gap;
         }
 
         const picker = new Gtk.Popover();
@@ -1616,7 +1600,7 @@ const HyprCandyDock = GObject.registerClass({
             _ahPopoverClosed();
             this._resetDockButtonHover(parentButton);
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
-                try { picker.unparent(); } catch (_) {}
+                try { picker.unparent(); } catch (_) { }
                 return GLib.SOURCE_REMOVE;
             });
         });
@@ -1701,17 +1685,17 @@ const HyprCandyDock = GObject.registerClass({
         const _gapS = DockConfig.popoverGapSide || 12;
         let mainPopPos, mainOffX, mainOffY, sidePopPos, sideOffX, sideOffY;
         if (_pos === 'top') {
-            mainPopPos = Gtk.PositionType.BOTTOM; mainOffX = 0;      mainOffY = _gapD;
-            sidePopPos = Gtk.PositionType.BOTTOM; sideOffX = 0;      sideOffY = _gapS;
+            mainPopPos = Gtk.PositionType.BOTTOM; mainOffX = 0; mainOffY = _gapD;
+            sidePopPos = Gtk.PositionType.BOTTOM; sideOffX = 0; sideOffY = _gapS;
         } else if (_pos === 'left') {
-            mainPopPos = Gtk.PositionType.RIGHT;  mainOffX = _gapD;  mainOffY = 0;
-            sidePopPos = Gtk.PositionType.RIGHT;  sideOffX = _gapS;  sideOffY = 0;
+            mainPopPos = Gtk.PositionType.RIGHT; mainOffX = _gapD; mainOffY = 0;
+            sidePopPos = Gtk.PositionType.RIGHT; sideOffX = _gapS; sideOffY = 0;
         } else if (_pos === 'right') {
-            mainPopPos = Gtk.PositionType.LEFT;   mainOffX = -_gapD; mainOffY = 0;
-            sidePopPos = Gtk.PositionType.LEFT;   sideOffX = -_gapS; sideOffY = 0;
+            mainPopPos = Gtk.PositionType.LEFT; mainOffX = -_gapD; mainOffY = 0;
+            sidePopPos = Gtk.PositionType.LEFT; sideOffX = -_gapS; sideOffY = 0;
         } else {
-            mainPopPos = Gtk.PositionType.TOP;    mainOffX = 0;      mainOffY = -_gapD;
-            sidePopPos = Gtk.PositionType.RIGHT;  sideOffX = _gapS;  sideOffY = 0;
+            mainPopPos = Gtk.PositionType.TOP; mainOffX = 0; mainOffY = -_gapD;
+            sidePopPos = Gtk.PositionType.RIGHT; sideOffX = _gapS; sideOffY = 0;
         }
 
         // Main popover
@@ -1729,11 +1713,11 @@ const HyprCandyDock = GObject.registerClass({
             _ahPopoverClosed();
             this._resetDockButtonHover(parentButton);
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
-                try { mainPopover.unparent(); } catch(_) {}
+                try { mainPopover.unparent(); } catch (_) { }
                 return GLib.SOURCE_REMOVE;
             });
         });
-        
+
         // Apply inline styling for transparency fix
         const mainStyleContext = mainPopover.get_style_context();
         mainStyleContext.add_provider(this._getPopoverCSSProvider(), Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -1816,7 +1800,7 @@ const HyprCandyDock = GObject.registerClass({
                 // mainPopover.unparent() (deferred via idle_add on its own
                 // 'closed' signal) cleans up the entire tree including all
                 // side popovers when the main menu is dismissed.
-                
+
                 // Apply inline styling for transparency fix
                 const sideStyleContext = sidePopover.get_style_context();
                 sideStyleContext.add_provider(this._getPopoverCSSProvider(), Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -1871,11 +1855,11 @@ const HyprCandyDock = GObject.registerClass({
                     wsBtn.add_css_class('popover-item');
                     wsBtn.add_css_class('popover-action');
                     wsBtn.set_halign(Gtk.Align.FILL);
-wsBtn.connect('clicked', () => {
-	                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.window.move({ window = 'address:${instance.address}', workspace = ${i} })"`);
-	                        sidePopover.popdown();
-	                        mainPopover.popdown();
-	                    });
+                    wsBtn.connect('clicked', () => {
+                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.window.move({ window = 'address:${instance.address}', workspace = ${i} })"`);
+                        sidePopover.popdown();
+                        mainPopover.popdown();
+                    });
                     actionsBox.append(wsBtn);
                 }
 
@@ -1962,24 +1946,24 @@ wsBtn.connect('clicked', () => {
                 wsBtn.add_css_class('popover-item');
                 wsBtn.add_css_class('popover-action');
                 wsBtn.set_halign(Gtk.Align.FILL);
-wsBtn.connect('clicked', () => {
-	                    // Combine workspace focus with exec_cmd rule to fix race conditions for apps like Nautilus
-	                    const raw = this.daemon._resolveExec(data.iconClass || data.className);
-	                    if (raw) {
-	                        // Focus workspace first, then launch with rule
-	                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ workspace = ${i} })"`);
-	                        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
-	                            GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.exec_cmd('${raw}', { workspace = ${i} })"`);
-	                            return GLib.SOURCE_REMOVE;
-	                        });
-	                    } else {
-	                        // Fallback: focus workspace then launch
-	                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ workspace = ${i} })"`);
-	                        launchFn();
-	                    }
-	                    wsSubPop.popdown();
-	                    mainPopover.popdown();
-	                });
+                wsBtn.connect('clicked', () => {
+                    // Combine workspace focus with exec_cmd rule to fix race conditions for apps like Nautilus
+                    const raw = this.daemon._resolveExec(data.iconClass || data.className);
+                    if (raw) {
+                        // Focus workspace first, then launch with rule
+                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ workspace = ${i} })"`);
+                        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 50, () => {
+                            GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.exec_cmd('${raw}', { workspace = ${i} })"`);
+                            return GLib.SOURCE_REMOVE;
+                        });
+                    } else {
+                        // Fallback: focus workspace then launch
+                        GLib.spawn_command_line_async(`hyprctl dispatch "hl.dsp.focus({ workspace = ${i} })"`);
+                        launchFn();
+                    }
+                    wsSubPop.popdown();
+                    mainPopover.popdown();
+                });
                 wsBox.append(wsBtn);
             }
             wsSubPop.set_child(wsBox);
@@ -2147,7 +2131,7 @@ wsBtn.connect('clicked', () => {
         // Calculate popover position based on dock position
         let mainPopPos, mainOffX, mainOffY;
         const _gap = 8;
-        
+
         if (IS_VERTICAL) {
             mainPopPos = (DockConfig.position === 'left') ? Gtk.PositionType.RIGHT : Gtk.PositionType.LEFT;
             mainOffX = _gap;
@@ -2169,11 +2153,11 @@ wsBtn.connect('clicked', () => {
             _ahPopoverClosed();
             this._resetDockButtonHover(parentButton);
             GLib.idle_add(GLib.PRIORITY_LOW, () => {
-                try { popover.unparent(); } catch(_) {}
+                try { popover.unparent(); } catch (_) { }
                 return GLib.SOURCE_REMOVE;
             });
         });
-        
+
         // Apply styling
         const styleContext = popover.get_style_context();
         styleContext.add_provider(this._getPopoverCSSProvider(), Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
@@ -2295,12 +2279,12 @@ wsBtn.connect('clicked', () => {
 
 // --- Auto-hide state -------------------------------------------------
 // Set by readHyprCandyConf() on startup and on every SIGUSR2 hot-reload.
-let _ahEnabled      = false;
-let _ahDelaySec     = 5000;     // ms
-let _ahTimerId      = 0;        // GLib timeout source id, 0 = not running
+let _ahEnabled = false;
+let _ahDelaySec = 5000;     // ms
+let _ahTimerId = 0;        // GLib timeout source id, 0 = not running
 let _ahPopoverCount = 0;        // number of popovers currently open; dock stays
-                                // visible while this is > 0 (pointer-leave from
-                                // dock into a popover must not trigger hide)
+// visible while this is > 0 (pointer-leave from
+// dock into a popover must not trigger hide)
 
 function _ahCancelTimer() {
     if (_ahTimerId) {
@@ -2340,7 +2324,7 @@ function _ahStartTimer() {
             const [, out] = GLib.spawn_command_line_sync('hyprctl -j activewindow');
             const json = new TextDecoder().decode(out);
             if (/"fullscreen"\s*:\s*true/.test(json)) return GLib.SOURCE_REMOVE;
-        } catch (_) {}
+        } catch (_) { }
         dockWindow.set_visible(false);
         if (_ahHotspot) {
             _ahHotspot._applySize();
@@ -2377,7 +2361,7 @@ function setupLauncherMonitor() {
                     _launcherOpen = false;
                     _ahPopoverClosed();
                 }
-            } catch (_) {}
+            } catch (_) { }
         });
     } catch (e) {
         log('[dock] launcher monitor setup failed: ' + e.message);
@@ -2407,9 +2391,9 @@ const HotspotWindow = GObject.registerClass({
     _init(application) {
         super._init({
             application: application,
-            title:       'HyprCandy Dock Hotspot',
-            decorated:   false,
-            resizable:   false,
+            title: 'HyprCandy Dock Hotspot',
+            decorated: false,
+            resizable: false,
         });
 
         Gtk4LayerShell.init_for_window(this);
@@ -2465,15 +2449,15 @@ const HotspotWindow = GObject.registerClass({
     _refreshAnchors() {
         const pos = DockConfig.position;
         Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.BOTTOM, pos === 'bottom');
-        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.TOP,    pos === 'top');
-        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.LEFT,   pos === 'left'  || pos === 'bottom' || pos === 'top');
-        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.RIGHT,  pos === 'right' || pos === 'bottom' || pos === 'top');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.TOP, pos === 'top');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.LEFT, pos === 'left' || pos === 'bottom' || pos === 'top');
+        Gtk4LayerShell.set_anchor(this, Gtk4LayerShell.Edge.RIGHT, pos === 'right' || pos === 'bottom' || pos === 'top');
 
         // Always zero all four margins so a previous position's values don't bleed in.
         Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.BOTTOM, 0);
-        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP,    0);
-        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT,   0);
-        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT,  0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.TOP, 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.LEFT, 0);
+        Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT, 0);
 
         // Use an explicit size_request derived from the monitor geometry so
         // pointer events cover the entire edge.  GTK4 anchor-stretching inside
@@ -2492,7 +2476,7 @@ const HotspotWindow = GObject.registerClass({
         // without having to travel to the raw pixel edge.
         const thickness = isHoriz
             ? Math.max(4, pos === 'bottom' ? DockConfig.marginBottom : DockConfig.marginTop)
-            : Math.max(4, pos === 'left'   ? DockConfig.marginLeft   : DockConfig.marginRight);
+            : Math.max(4, pos === 'left' ? DockConfig.marginLeft : DockConfig.marginRight);
 
         // Along-edge dimension: query the monitor so we set an exact pixel size.
         // Fall back to a large sentinel (4096) if the display isn't ready yet;
@@ -2546,7 +2530,7 @@ const DockApplication = GObject.registerClass({
         // Initialise auto-hide conf values (hotReload() will update them later)
         {
             const conf = readHyprCandyConf();
-            _ahEnabled  = conf.autoHide;
+            _ahEnabled = conf.autoHide;
             _ahDelaySec = conf.autoHideDelay;
             // Apply initial layer from conf
             Gtk4LayerShell.set_layer(dockWindow, conf.layer === 'overlay'
@@ -2557,10 +2541,10 @@ const DockApplication = GObject.registerClass({
             // CC slider value takes effect immediately on launch.
             if (conf.marginFromEdge !== null) {
                 const pos = DockConfig.position;
-                if      (pos === 'bottom') DockConfig.marginBottom = conf.marginFromEdge;
-                else if (pos === 'top')    DockConfig.marginTop    = conf.marginFromEdge;
-                else if (pos === 'left')   DockConfig.marginLeft   = conf.marginFromEdge;
-                else if (pos === 'right')  DockConfig.marginRight  = conf.marginFromEdge;
+                if (pos === 'bottom') DockConfig.marginBottom = conf.marginFromEdge;
+                else if (pos === 'top') DockConfig.marginTop = conf.marginFromEdge;
+                else if (pos === 'left') DockConfig.marginLeft = conf.marginFromEdge;
+                else if (pos === 'right') DockConfig.marginRight = conf.marginFromEdge;
                 applyMarginsToLayerShell(dockWindow);
                 log('[dock] startup: margin_from_edge = ' + conf.marginFromEdge + ' (position: ' + pos + ')');
             }

@@ -3964,7 +3964,7 @@ PanelWindow {
                             CCSection { text: "Corner Radius" }
                             CCSlider {
                                 label: "Top-Left"
-                                from: 0; to: 90; stepSize: 1
+                                from: 0; to: 60; stepSize: 1
                                 value: parseInt(_dockBorderTLVal) || 0
                                 onMoved: function(v) {
                                     _dockBorderTLVal = v.toString()
@@ -3974,7 +3974,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Top-Right"
-                                from: 0; to: 90; stepSize: 1
+                                from: 0; to: 60; stepSize: 1
                                 value: parseInt(_dockBorderTRVal) || 0
                                 onMoved: function(v) {
                                     _dockBorderTRVal = v.toString()
@@ -3984,7 +3984,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Bottom-Left"
-                                from: 0; to: 90; stepSize: 1
+                                from: 0; to: 60; stepSize: 1
                                 value: parseInt(_dockBorderBLVal) || 0
                                 onMoved: function(v) {
                                     _dockBorderBLVal = v.toString()
@@ -3994,7 +3994,7 @@ PanelWindow {
                             }
                             CCSlider {
                                 label: "Bottom-Right"
-                                from: 0; to: 90; stepSize: 1
+                                from: 0; to: 60; stepSize: 1
                                 value: parseInt(_dockBorderBRVal) || 0
                                 onMoved: function(v) {
                                     _dockBorderBRVal = v.toString()
@@ -4161,7 +4161,7 @@ PanelWindow {
 
                             CCSlider {
                                 label: "Icon Size"
-                                from: 18; to: 64; stepSize: 1
+                                from: 18; to: 60; stepSize: 1
                                 value: parseInt(_dockIconSizeVal) || 24
                                 onMoved: function(v) {
                                     _dockIconSizeVal = v.toString()
