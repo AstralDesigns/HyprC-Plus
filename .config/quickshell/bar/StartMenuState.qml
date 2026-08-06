@@ -19,6 +19,8 @@ Item {
     function open()   {
         sm.menuVisible = true
         if (!volReadProc.running) volReadProc.running = true
+        if (!micReadProc.running) micReadProc.running = true
+        if (!micActiveProc.running) micActiveProc.running = true
     }
     function close()  { sm.menuVisible = false }
 
@@ -27,6 +29,8 @@ Item {
     onMenuVisibleChanged: {
         if (!menuVisible) return
         if (!volReadProc.running) volReadProc.running = true
+        if (!micReadProc.running) micReadProc.running = true
+        if (!micActiveProc.running) micActiveProc.running = true
         if (!blReadProc.running) blReadProc.running = true
         if (!netStatusProc.running) netStatusProc.running = true
         if (!btStatusProc.running) btStatusProc.running = true
@@ -96,26 +100,43 @@ Item {
     Timer { interval:200; repeat:true; running: sm._pollActive
         onTriggered: { if(!volReadProc.running) volReadProc.running=true } }
 
-    // ── Microphone ────────────────────────────────────────────────────────────
+    // ── Microphone ───────────────────────────────────────────────────────────
+    // micActive tracks whether any app currently holds an open recording
+    // stream against a genuine input device (not a sink .monitor) — the
+    // slider only shows up then. See micActiveProc below for the filter.
     property real micValue: 0.5; property bool micMuted: false; property bool micActive: false
-    Process { id: micReadProc; property var _b:[]
-        command:["bash","-c","pactl get-source-volume @DEFAULT_SOURCE@ && pactl get-source-mute @DEFAULT_SOURCE@ && pactl list source-outputs short"]
-        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
-            const vm=l.match(/(\d+)%/); if(vm) sm.micValue=parseInt(vm[1])/100;
-            if(l.includes("Mute:")) sm.micMuted=l.includes("yes");
-            if(l.trim().length > 0 && !l.includes("Volume:") && !l.includes("Mute:")) { sm.micActive = true; }
-        } }
-        onRunningChanged: if(running) { sm.micActive = false; _b=[] }
+    Process { id: micReadProc
+        command:["bash","-c","pactl get-source-volume @DEFAULT_SOURCE@ && pactl get-source-mute @DEFAULT_SOURCE@"]
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){ const vm=l.match(/(\d+)%/); if(vm) sm.micValue=parseInt(vm[1])/100; if(l.includes("Mute:")) sm.micMuted=l.includes("yes") } }
     }
     Process { id: micSetProc; property string _cmd:""; property string _queued:""
         command:["bash","-c",micSetProc._cmd]
         onExited: { if(_queued!==""){ _cmd=_queued; _queued=""; running=true } else micMuteRefreshTimer.restart() }
     }
-    function setMicVolume(v){ const c="pactl set-source-volume @DEFAULT_SOURCE@ "+Math.round(v*100)+"%"; if(micSetProc.running){ micSetProc._queued=c } else { micSetProc._cmd=c; micSetProc.running=true } }
+    function setMic(v){ const c="pactl set-source-volume @DEFAULT_SOURCE@ "+Math.round(v*100)+"%"; if(micSetProc.running){ micSetProc._queued=c } else { micSetProc._cmd=c; micSetProc.running=true } }
     function toggleMicMute(){ const c="pactl set-source-mute @DEFAULT_SOURCE@ toggle"; if(micSetProc.running){ micSetProc._queued=c } else { micSetProc._cmd=c; micSetProc.running=true; micMuteRefreshTimer.restart() } }
     Timer { id:micMuteRefreshTimer; interval:350; repeat:false; onTriggered: if(!micReadProc.running) micReadProc.running=true }
     Timer { interval:200; repeat:true; running: sm._pollActive
         onTriggered: { if(!micReadProc.running) micReadProc.running=true } }
+
+    // Only source-outputs attached to a genuine (non-monitor) input device
+    // count as "mic active" — a plain `source-outputs` list also includes
+    // streams capturing a sink's .monitor (e.g. Cava, screen/system-audio
+    // recorders), which run continuously and would otherwise make this
+    // look permanently active regardless of whether the mic itself is used.
+    Process { id: micActiveProc
+        command:["bash","-c",
+            "MONS=$(pactl list short sources 2>/dev/null | awk -F'\\t' '$2 ~ /\\.monitor$/ {print $1}'); " +
+            "pactl list source-outputs 2>/dev/null | awk -v mons=\"$MONS\" '" +
+            "BEGIN { n = split(mons, arr, \"\\n\"); for (i = 1; i <= n; i++) monset[arr[i]] = 1 } " +
+            "/^Source Output #/ { active = 1 } " +
+            "active && /^[[:space:]]*Source:/ { split($0, a, \": \"); if (!(a[2] in monset)) print \"REAL\"; active = 0 }" +
+            "'"
+        ]
+        stdout: StdioCollector { onStreamFinished: { sm.micActive = this.text.includes("REAL") } }
+    }
+    Timer { interval:1000; repeat:true; running: sm._pollActive; triggeredOnStart: true
+        onTriggered: { if(!micActiveProc.running) micActiveProc.running=true } }
 
     // ── Clock tick ────────────────────────────────────────────────────────
     property date _now: new Date()

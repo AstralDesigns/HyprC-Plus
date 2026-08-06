@@ -184,6 +184,29 @@ PanelWindow {
               	  }
             }
 
+            // ── Microphone (only while something is actually recording) ─
+            Rectangle {
+                    Layout.fillWidth: true; height: 25; radius: 99; clip: true
+                    visible: StartMenuState.micActive
+                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
+                    border.width: 1
+        	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+                    RowLayout { Layout.fillWidth: true; spacing: 10
+                	Text {
+                        	text: StartMenuState.micMuted ? " 󰍭" : " 󰍬"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc5
+                        	MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMicMute() }
+                	}
+                	SliderBg {
+                    		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
+                    		value: StartMenuState.micValue
+                    		onMoved: function(v) { StartMenuState.micValue = v; StartMenuState.setMic(v) }
+                    		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
+                	}
+                	Text { text: Math.round(StartMenuState.micValue * 100) + "%"; color: Theme.cWc5
+                    	font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
+              	  }
+            }
+
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             // ── Network + Bluetooth ────────────────────────────────────
