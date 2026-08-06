@@ -857,11 +857,13 @@ Item {
         }
     }
 
-    // ── Bottom-Layer Draggable Widget Surface ─────────────────────────────
+    // ── Overlay-Layer Draggable Widget Surface ─────────────────────────────
     PinnedWidgetWindow {
         id: mediaWidget
         active: MediaPlayerPopupState.widgetVisible
         widgetNamespace: "quickshell"
+        
+        WlrLayershell.layer: WlrLayer.Overlay
 
         onActiveChanged: {
             if (active) {
