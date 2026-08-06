@@ -8,7 +8,7 @@ PanelWindow {
     id: popup
 
     WlrLayershell.namespace:     "quickshell"
-    WlrLayershell.layer:         WlrLayer.Top
+    WlrLayershell.layer:         WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     anchors.left:   false
