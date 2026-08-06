@@ -71,7 +71,7 @@ PanelWindow {
                 text: "󰝾"
                 color: Theme.cOnSurfVar
                 font.family: Config.fontFamily
-                font.pixelSize: 16
+                font.pixelSize: 18
             }
 
             Repeater {
