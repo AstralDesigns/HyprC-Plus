@@ -1,10 +1,15 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 import "."
 
 PanelWindow {
     id: popup
+
+    WlrLayershell.namespace:     "quickshell"
+    WlrLayershell.layer:         WlrLayer.Top
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
     anchors.left:   false
     anchors.right:  false
@@ -28,6 +33,90 @@ PanelWindow {
     Rectangle {
         id: card
         anchors.centerIn: parent
+        focus: true
+
+        // Index of the currently keyboard-highlighted button within whatever
+        // step is active. Reset to 0 on every step change and on (re)open.
+        property int _focusedIndex: 0
+
+        Connections {
+            target: ScreenshotPopupState
+            function onStepChanged()   { card._focusedIndex = 0 }
+            function onVisibleChanged() {
+                if (ScreenshotPopupState.visible) {
+                    card._focusedIndex = 0
+                    card.forceActiveFocus()
+                }
+            }
+        }
+
+        // Arrow keys and vim h/j/k/l move the highlighted button; Return/Enter
+        // activates it; Escape goes back a step (or closes on the first step).
+        // Mirrors the overview module's directional-index + Return-to-select
+        // pattern, adapted to this project's single-PanelWindow focus idiom.
+        Keys.onPressed: function(event) {
+            const step = ScreenshotPopupState.step
+            let count = 0
+            let activate = null
+            let goBack = null
+
+            if (step === "timing") {
+                count = 2
+                activate = function(idx) {
+                    if (idx === 0) ScreenshotPopupState.pickTiming(0)
+                    else ScreenshotPopupState.step = "delay"
+                }
+            } else if (step === "delay") {
+                count = 6
+                const delays = [5, 10, 20, 30, 60]
+                activate = function(idx) {
+                    if (idx < 5) ScreenshotPopupState.pickTiming(delays[idx])
+                    else ScreenshotPopupState.step = "timing"
+                }
+                goBack = function() { ScreenshotPopupState.step = "timing" }
+            } else if (step === "region") {
+                count = 4
+                const regions = ["output", "active", "region"]
+                activate = function(idx) {
+                    if (idx < 3) ScreenshotPopupState.pickRegion(regions[idx])
+                    else ScreenshotPopupState.step = "timing"
+                }
+                goBack = function() { ScreenshotPopupState.step = "timing" }
+            } else if (step === "action") {
+                count = 5
+                const actions = ["copy", "save", "copysave", "edit"]
+                activate = function(idx) {
+                    if (idx < 4) ScreenshotPopupState.pickAction(actions[idx])
+                    else ScreenshotPopupState.step = "region"
+                }
+                goBack = function() { ScreenshotPopupState.step = "region" }
+            } else if (step === "countdown" || step === "running") {
+                count = 1
+                activate = function(idx) {
+                    ScreenshotPopupState.reset()
+                    ScreenshotPopupState.hide()
+                }
+            }
+
+            if (count === 0) return
+
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                if (activate) activate(card._focusedIndex)
+                event.accepted = true
+            } else if (event.key === Qt.Key_Escape) {
+                if (goBack) goBack()
+                else ScreenshotPopupState.hide()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Up   || event.key === Qt.Key_K
+                    || event.key === Qt.Key_Left || event.key === Qt.Key_H) {
+                card._focusedIndex = (card._focusedIndex - 1 + count) % count
+                event.accepted = true
+            } else if (event.key === Qt.Key_Down  || event.key === Qt.Key_J
+                    || event.key === Qt.Key_Right || event.key === Qt.Key_L) {
+                card._focusedIndex = (card._focusedIndex + 1) % count
+                event.accepted = true
+            }
+        }
 
         // Width fixed; height driven only by the visible step column
         width:  220
@@ -89,8 +178,8 @@ PanelWindow {
                 visible: ScreenshotPopupState.step === "timing"
                 Layout.fillWidth: true
                 spacing: 6
-                SsBtn { Layout.fillWidth: true; label: "  Immediate"; onActivated: ScreenshotPopupState.pickTiming(0) }
-                SsBtn { Layout.fillWidth: true; label: "  Delayed";   onActivated: ScreenshotPopupState.step = "delay" }
+                SsBtn { Layout.fillWidth: true; label: "  Immediate"; highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickTiming(0) }
+                SsBtn { Layout.fillWidth: true; label: "  Delayed";   highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.step = "delay" }
             }
 
             // ── Step: delay ───────────────────────────────────────────
@@ -98,12 +187,12 @@ PanelWindow {
                 visible: ScreenshotPopupState.step === "delay"
                 Layout.fillWidth: true
                 spacing: 6
-                SsBtn { Layout.fillWidth: true; label: "󱦟  5 seconds";  onActivated: ScreenshotPopupState.pickTiming(5)  }
-                SsBtn { Layout.fillWidth: true; label: "󱦟  10 seconds"; onActivated: ScreenshotPopupState.pickTiming(10) }
-                SsBtn { Layout.fillWidth: true; label: "󱦟  20 seconds"; onActivated: ScreenshotPopupState.pickTiming(20) }
-                SsBtn { Layout.fillWidth: true; label: "󱦟  30 seconds"; onActivated: ScreenshotPopupState.pickTiming(30) }
-                SsBtn { Layout.fillWidth: true; label: "󱦟  60 seconds"; onActivated: ScreenshotPopupState.pickTiming(60) }
-                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; onActivated: ScreenshotPopupState.step = "timing" }
+                SsBtn { Layout.fillWidth: true; label: "󱦟  5 seconds";  highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickTiming(5)  }
+                SsBtn { Layout.fillWidth: true; label: "󱦟  10 seconds"; highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.pickTiming(10) }
+                SsBtn { Layout.fillWidth: true; label: "󱦟  20 seconds"; highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.pickTiming(20) }
+                SsBtn { Layout.fillWidth: true; label: "󱦟  30 seconds"; highlighted: card._focusedIndex === 3; onActivated: ScreenshotPopupState.pickTiming(30) }
+                SsBtn { Layout.fillWidth: true; label: "󱦟  60 seconds"; highlighted: card._focusedIndex === 4; onActivated: ScreenshotPopupState.pickTiming(60) }
+                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; highlighted: card._focusedIndex === 5; onActivated: ScreenshotPopupState.step = "timing" }
             }
 
             // ── Step: region ──────────────────────────────────────────
@@ -111,10 +200,10 @@ PanelWindow {
                 visible: ScreenshotPopupState.step === "region"
                 Layout.fillWidth: true
                 spacing: 6
-                SsBtn { Layout.fillWidth: true; label: "󰍹  Entire Display"; onActivated: ScreenshotPopupState.pickRegion("output") }
-                SsBtn { Layout.fillWidth: true; label: "  Active Window";   onActivated: ScreenshotPopupState.pickRegion("active") }
-                SsBtn { Layout.fillWidth: true; label: "  Selection";       onActivated: ScreenshotPopupState.pickRegion("region") }
-                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; onActivated: ScreenshotPopupState.step = "timing" }
+                SsBtn { Layout.fillWidth: true; label: "󰍹  Entire Display"; highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickRegion("output") }
+                SsBtn { Layout.fillWidth: true; label: "  Active Window";   highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.pickRegion("active") }
+                SsBtn { Layout.fillWidth: true; label: "  Selection";       highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.pickRegion("region") }
+                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; highlighted: card._focusedIndex === 3; onActivated: ScreenshotPopupState.step = "timing" }
             }
 
             // ── Step: action ──────────────────────────────────────────
@@ -122,11 +211,11 @@ PanelWindow {
                 visible: ScreenshotPopupState.step === "action"
                 Layout.fillWidth: true
                 spacing: 6
-                SsBtn { Layout.fillWidth: true; label: "  Copy";         onActivated: ScreenshotPopupState.pickAction("copy")     }
-                SsBtn { Layout.fillWidth: true; label: "  Save";         onActivated: ScreenshotPopupState.pickAction("save")     }
-                SsBtn { Layout.fillWidth: true; label: "  Copy & Save";  onActivated: ScreenshotPopupState.pickAction("copysave") }
-                SsBtn { Layout.fillWidth: true; label: "  Edit (satty)"; onActivated: ScreenshotPopupState.pickAction("edit")     }
-                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; onActivated: ScreenshotPopupState.step = "region" }
+                SsBtn { Layout.fillWidth: true; label: "  Copy";         highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickAction("copy")     }
+                SsBtn { Layout.fillWidth: true; label: "  Save";         highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.pickAction("save")     }
+                SsBtn { Layout.fillWidth: true; label: "  Copy & Save";  highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.pickAction("copysave") }
+                SsBtn { Layout.fillWidth: true; label: "  Edit (satty)"; highlighted: card._focusedIndex === 3; onActivated: ScreenshotPopupState.pickAction("edit")     }
+                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; highlighted: card._focusedIndex === 4; onActivated: ScreenshotPopupState.step = "region" }
             }
 
             // ── Step: countdown ───────────────────────────────────────
@@ -173,6 +262,7 @@ PanelWindow {
                     Layout.bottomMargin: 4
                     label:  "Cancel"
                     accent: false
+                    highlighted: card._focusedIndex === 0
                     onActivated: {
                         ScreenshotPopupState.reset()
                         ScreenshotPopupState.hide()
@@ -200,6 +290,7 @@ PanelWindow {
                 SsBtn {
                     Layout.fillWidth: true
                     label: "Cancel"; accent: false
+                    highlighted: card._focusedIndex === 0
                     onActivated: { ScreenshotPopupState.reset(); ScreenshotPopupState.hide() }
                 }
             }

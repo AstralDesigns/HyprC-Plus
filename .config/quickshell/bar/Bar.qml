@@ -399,10 +399,12 @@ PanelWindow {
                                        || SystemMonitorPopupState.visible
                                        || CalendarPopupState.visible
                                        || WorkspacesPopupState.visible
+                                       || MediaPlayerPopupState.visible
 
     // Tri AH: only pin the segment that owns the open popup. CC pins all three.
     readonly property bool _triLeftPinned: NotificationsState.historyVisible
                                          || WorkspacesPopupState.visible
+                                         || MediaPlayerPopupState.visible
     readonly property bool _triRightPinned: StartMenuState.menuVisible
                                           || TrayMenuState.visible
                                           || SysTrayPopupState.visible

@@ -226,11 +226,22 @@ Singleton {
         }
     }
 
-    // wl-copy
+    // wl-copy / mv — reused for copy, save, and copysave; the completion
+    // message must branch on which action actually ran, since it previously
+    // always assumed a clipboard copy regardless of the real command.
     Process {
         id: copyProc
         onExited: function(code) {
-            root.statusMsg = code === 0 ? "Copied to clipboard" : "Copy failed"
+            const name = root._outputFile.split("/").pop()
+            if (code !== 0) {
+                root.statusMsg = "Copy failed"
+            } else if (root.actionMode === "save") {
+                root.statusMsg = "Saved " + name + " to " + root.screenshotDir
+            } else if (root.actionMode === "copysave") {
+                root.statusMsg = "Copied " + name + " to clipboard & Saved to " + root.screenshotDir
+            } else {
+                root.statusMsg = "Copied to clipboard"
+            }
             _notifyAndDone()
         }
     }
@@ -285,20 +296,18 @@ Singleton {
         } else if (act === "save") {
             copyProc.command = ["mv", tmp, out]
             copyProc.running = true
-            root.statusMsg   = "Saved: " + out
         } else if (act === "copysave") {
             // copy then move
             const cmd = "wl-copy < " + JSON.stringify(tmp) + " && mv " + JSON.stringify(tmp) + " " + JSON.stringify(out)
             copyProc.command = ["bash", "-c", cmd]
             copyProc.running = true
-            root.statusMsg   = "Copied & saved"
         } else if (act === "edit") {
             // move to output then open satty
             const cmd = "mv " + JSON.stringify(tmp) + " " + JSON.stringify(out)
             editorProc.command = ["bash", "-c", cmd +
                 " && satty --filename " + JSON.stringify(out)]
             if (!editorProc.running) editorProc.running = true
-            root.statusMsg = "Opened in satty"
+            root.statusMsg = "Opening in Satty"
             _notifyAndDone()
         }
     }

@@ -73,7 +73,18 @@ Singleton {
 
     function windowsForWorkspace(wsId) {
         if (!root.windowList) return []
-        return root.windowList.filter(w => w.workspace && w.workspace.id === wsId && w.mapped !== false)
+        return root.windowList
+            .filter(w => w.workspace && w.workspace.id === wsId && w.mapped !== false)
+            // Reading order (top-to-bottom, then left-to-right) based on each
+            // window's actual on-screen position — matches the real tiling
+            // arrangement rather than hyprctl's internal client-list order
+            // (roughly creation order).
+            .sort((a, b) => {
+                const ay = (a.at && a.at[1]) || 0, by = (b.at && b.at[1]) || 0
+                if (ay !== by) return ay - by
+                const ax = (a.at && a.at[0]) || 0, bx = (b.at && b.at[0]) || 0
+                return ax - bx
+            })
     }
 
     // ── Tile tooltip (per-window icon inside the popup) ────────────────────

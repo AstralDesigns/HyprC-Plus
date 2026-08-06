@@ -4,10 +4,12 @@ import Quickshell.Io
 import ".."
 
 // ── Media island ─────────────────────────────────────────────────────────────
-//  Shows: GJS toggle glyph | (when active) thumb/disc + prev/⏯/next controls
+//  Shows: thumb/disc glyph + prev/⏯/next controls
 //  Thumb area is always thumbSize wide when active — placeholder spinning disc
 //  shown when no art, image when art is available. No collapse on art changes.
 //  All playerctl state lives in MediaPlayerState singleton.
+//  Left-click thumb  → toggle MediaPlayerPopup (top-layer popup)
+//  Right-click thumb → toggle detached draggable widget
 
 Item {
     id: root
@@ -16,9 +18,6 @@ Item {
     implicitHeight: Config.moduleHeight
 
     property real mediaMaxW: -1
-
-    // ── GJS media-player toggle ───────────────────────────────────────────────
-    Process { id: gjsMediaProc; command: [Config.candyDir + "/GJS/toggle-media-player.sh"]; running: false }
 
     // ── Padding container ─────────────────────────────────────────────────────
     Item {
@@ -100,9 +99,9 @@ Item {
                     	    cursorShape: Qt.PointingHandCursor
                     	    onClicked: function(ev) {
                     	        if (ev.button === Qt.RightButton) {
-                    	            if (!gjsMediaProc.running) gjsMediaProc.running = true
-                    	        } else {
                     	            MediaPlayerPopupState.toggleWidget()
+                    	        } else {
+                    	            MediaPlayerPopupState.toggle()
                     	        }
                     	    }
                     	    onWheel: function(e) {
