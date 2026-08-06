@@ -374,7 +374,7 @@ function _injectGlyphSizeCSS(display) {
             max-height: ${appPx}px;
         }
         button.app-button image, button.dock-button image {
-            padding: 4px;
+            padding: 0px;
         }
     `;
 
@@ -1457,7 +1457,7 @@ const HyprCandyDock = GObject.registerClass({
         // visual dot, causing misalignment with the Overlay's halign/valign.
         // The DrawingArea reports its EXACT pixel size as its natural size, so
         // GTK places it flush at the dock-facing edge via halign/valign below.
-        const _dotR = Math.max(4, Math.round(INDICATOR_SIZE / 12));
+        const _dotR = Math.max(4, Math.round(INDICATOR_SIZE / (INDICATOR_SIZE / 2)));
         const _dotD = 2 * _dotR;
         const _dotGap = INDICATOR_SPACING;  // from config (px between 2 dots)
 
@@ -1479,7 +1479,7 @@ const HyprCandyDock = GObject.registerClass({
             const r = area._dotR;
             const gap = area._dotGap;
             const d = 2 * r;
-            // Color from CSS 'color: @primary' on #indicator-dots
+            // Color from CSS 'color: @surface_tint' on #indicator-dots
             const rgba = area.get_style_context().get_color();
             cr.setSourceRGBA(rgba.red, rgba.green, rgba.blue, rgba.alpha);
             if (area._isVertical) {
