@@ -117,7 +117,10 @@ Item {
 
                 MouseArea {
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
+                    onEntered: WorkspacesPopupState.hoverWorkspace(parent._slot)
+                    onExited: WorkspacesPopupState.leaveWorkspace(parent._slot)
                     onClicked: Hyprland.dispatch("workspace " + parent._slot)
                     onWheel: function(ev) {
                         if (!Config.wsScrollSwitch) return
@@ -156,7 +159,10 @@ Item {
 
                 MouseArea {
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
+                    onEntered: WorkspacesPopupState.hoverWorkspace(parent.modelData.id)
+                    onExited: WorkspacesPopupState.leaveWorkspace(parent.modelData.id)
                     onClicked: Hyprland.dispatch("workspace " + parent.modelData.id)
                 }
             }

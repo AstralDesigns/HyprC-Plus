@@ -60,7 +60,7 @@ Item {
                             id: discGlyph
                             visible: MediaPlayerState.artPath === "" || artImage.status !== Image.Ready
                             anchors.centerIn: parent
-                            text: "" //󰎆 󰎍 󰺕 󱥸 󱨧
+                            text: "󰀥" // 󰀥 󰎆 󰎍 󰺕 󱥸 󱨧
                             color: Theme.cWc10
                             font.family: Config.fontFamily
                             font.pixelSize: MediaPlayerState.thumbSize - 2

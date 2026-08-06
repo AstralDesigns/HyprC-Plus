@@ -96,6 +96,27 @@ Item {
     Timer { interval:200; repeat:true; running: sm._pollActive
         onTriggered: { if(!volReadProc.running) volReadProc.running=true } }
 
+    // ── Microphone ────────────────────────────────────────────────────────────
+    property real micValue: 0.5; property bool micMuted: false; property bool micActive: false
+    Process { id: micReadProc; property var _b:[]
+        command:["bash","-c","pactl get-source-volume @DEFAULT_SOURCE@ && pactl get-source-mute @DEFAULT_SOURCE@ && pactl list source-outputs short"]
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
+            const vm=l.match(/(\d+)%/); if(vm) sm.micValue=parseInt(vm[1])/100;
+            if(l.includes("Mute:")) sm.micMuted=l.includes("yes");
+            if(l.trim().length > 0 && !l.includes("Volume:") && !l.includes("Mute:")) { sm.micActive = true; }
+        } }
+        onRunningChanged: if(running) { sm.micActive = false; _b=[] }
+    }
+    Process { id: micSetProc; property string _cmd:""; property string _queued:""
+        command:["bash","-c",micSetProc._cmd]
+        onExited: { if(_queued!==""){ _cmd=_queued; _queued=""; running=true } else micMuteRefreshTimer.restart() }
+    }
+    function setMicVolume(v){ const c="pactl set-source-volume @DEFAULT_SOURCE@ "+Math.round(v*100)+"%"; if(micSetProc.running){ micSetProc._queued=c } else { micSetProc._cmd=c; micSetProc.running=true } }
+    function toggleMicMute(){ const c="pactl set-source-mute @DEFAULT_SOURCE@ toggle"; if(micSetProc.running){ micSetProc._queued=c } else { micSetProc._cmd=c; micSetProc.running=true; micMuteRefreshTimer.restart() } }
+    Timer { id:micMuteRefreshTimer; interval:350; repeat:false; onTriggered: if(!micReadProc.running) micReadProc.running=true }
+    Timer { interval:200; repeat:true; running: sm._pollActive
+        onTriggered: { if(!micReadProc.running) micReadProc.running=true } }
+
     // ── Clock tick ────────────────────────────────────────────────────────
     property date _now: new Date()
     Timer { interval:10000; repeat:true; running: sm._pollActive

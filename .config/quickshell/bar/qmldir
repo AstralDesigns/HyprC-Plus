@@ -58,3 +58,6 @@ singleton ScreenshotPopupState 1.0 ScreenshotPopupState.qml
 ScreenshotPopup 1.0 ScreenshotPopup.qml
 SsBtn 1.0 SsBtn.qml
 ShellLayer 1.0 ShellLayer.qml
+
+singleton WorkspacesPopupState 1.0 WorkspacesPopupState.qml
+WorkspacesPopup 1.0 WorkspacesPopup.qml

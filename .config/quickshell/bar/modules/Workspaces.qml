@@ -178,7 +178,13 @@ Item {
 
                     MouseArea {
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
+                        onEntered: {
+                            var pt = mapToItem(null, 0, 0)
+                            WorkspacesPopupState.hoverWorkspace(wsBtn.parent._slot, pt.x, width)
+                        }
+                        onExited: WorkspacesPopupState.leaveWorkspace(wsBtn.parent._slot)
                         onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + wsBtn.parent._slot + " })")
                         onWheel: ev => root._scrollWorkspace(ev.angleDelta.y)
                     }
@@ -217,7 +223,13 @@ Item {
 
                 MouseArea {
                     anchors.fill: parent
+                    hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
+                    onEntered: {
+                        var pt = mapToItem(null, 0, 0)
+                        WorkspacesPopupState.hoverWorkspace(parent.modelData.id, pt.x, width)
+                    }
+                    onExited: WorkspacesPopupState.leaveWorkspace(parent.modelData.id)
                     onClicked: Hyprland.dispatch("hl.dsp.focus({ workspace = " + parent.modelData.id + " })")
                 }
             }

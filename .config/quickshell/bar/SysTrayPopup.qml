@@ -19,7 +19,7 @@ PanelWindow {
     margins {
         top:    _barAtBottom ? 0 : _barGap
         bottom: _barAtBottom ? _barGapBot : 0
-        right:  _panelMargin + 142
+        right:  _panelMargin + 135
     }
     // _pad drives symmetric padding on all sides, sourced from bar's outerMarginTop
     readonly property real _pad: Config.outerMarginTop

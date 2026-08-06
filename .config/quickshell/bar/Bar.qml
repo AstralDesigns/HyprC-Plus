@@ -8,6 +8,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Io
+import "."
 import "modules" as Modules
 
 PanelWindow {
@@ -397,9 +398,11 @@ PanelWindow {
                                        || WeatherPopupState.visible
                                        || SystemMonitorPopupState.visible
                                        || CalendarPopupState.visible
+                                       || WorkspacesPopupState.visible
 
     // Tri AH: only pin the segment that owns the open popup. CC pins all three.
     readonly property bool _triLeftPinned: NotificationsState.historyVisible
+                                         || WorkspacesPopupState.visible
     readonly property bool _triRightPinned: StartMenuState.menuVisible
                                           || TrayMenuState.visible
                                           || SysTrayPopupState.visible

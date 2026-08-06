@@ -979,7 +979,7 @@ window.hyprcandy-group-dialog {
     outline: none;
     box-shadow: none;
     font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
-    font-size: 20px;
+    font-size: 30px;
     color: @primary;
 }
 .nerd-btn:hover {
