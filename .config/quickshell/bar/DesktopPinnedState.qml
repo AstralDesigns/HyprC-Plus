@@ -51,6 +51,22 @@ QtObject {
     // we must try several derived ID forms before falling back to a full scan.
 
     function _findEntry(cls) {
+        // Tier 1 — Quickshell's own native heuristic .desktop matcher (the
+        // same one the overview module and WorkspacesPopup.qml use). It's
+        // C++-backed (fast, no risk of blocking the UI thread on repeated
+        // calls) and has proven reliable for reverse-DNS classes, web-app/
+        // Electron hashed classes, and custom-built binaries.
+        const native = DesktopEntries.heuristicLookup(cls)
+        if (native) return native
+
+        // Tier 2 — the hand-rolled matcher below (originally ported from a
+        // GNOME Shell dock/app-launcher's class-matching heuristics), kept
+        // as a fallback for anything the native lookup doesn't catch, e.g.
+        // wrapper-launcher Exec-binary matching or fuzzy Name matching.
+        return _findEntryLegacy(cls)
+    }
+
+    function _findEntryLegacy(cls) {
         const parts = cls.split('.')
         const last  = parts[parts.length - 1]
         const last2 = parts.length >= 2

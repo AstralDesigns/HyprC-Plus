@@ -71,7 +71,7 @@ PanelWindow {
                 text: "󰝾"
                 color: Theme.cOnSurfVar
                 font.family: Config.fontFamily
-                font.pixelSize: 18
+                font.pixelSize: 16
             }
 
             Repeater {
@@ -85,7 +85,14 @@ PanelWindow {
                     height: 20
 
                     readonly property string _cls:  modelData["initialClass"] || modelData["class"] || ""
-                    readonly property string _icon: _cls.toLowerCase()
+
+                    // Same lookup the overview module uses (OverviewWindow.qml):
+                    // Quickshell's own native heuristic .desktop matcher, rather
+                    // than a hand-rolled JS scan — faster, and avoids the
+                    // synchronous-scan cost that caused issues when reused
+                    // across DesktopPinnedState/DesktopLayer.
+                    readonly property var    _entry: DesktopEntries.heuristicLookup(_cls)
+                    readonly property string _icon:  (_entry && _entry.icon) || _cls
 
                     property string _resolvedIcon: ""
 
@@ -104,19 +111,29 @@ PanelWindow {
                         }
                     }
 
+                    // Re-resolve if the underlying window class changes for this
+                    // delegate (e.g. Repeater reusing an item across model updates).
+                    onModelDataChanged: {
+                        _resolvedIcon = ""
+                        iconResolver._buf = ""
+                        iconResolver.running = false
+                        iconResolver.running = tile._icon !== ""
+                    }
+
                     readonly property string _iconSrc: {
                         const r = _resolvedIcon
                         if (r !== "") {
                             if (r.startsWith("file://") || r.startsWith("image://")) return r
                             if (r.startsWith("/")) return "file://" + r
-                            return Quickshell.iconPath(r, "application-x-executable")
+                            return Quickshell.iconPath(r, "image-missing")
                         }
                         if (_icon.startsWith("file://") || _icon.startsWith("image://")) return _icon
                         if (_icon.startsWith("/")) return "file://" + _icon
-                        return Quickshell.iconPath(_icon, "application-x-executable")
+                        return Quickshell.iconPath(_icon, "image-missing")
                     }
 
                     Image {
+                        id: tileIcon
                         anchors.centerIn: parent
                         source: tile._iconSrc
                         width: 20
@@ -126,6 +143,17 @@ PanelWindow {
                         fillMode: Image.PreserveAspectFit
                         opacity: status === Image.Ready ? 1.0 : 0.0
                         Behavior on opacity { NumberAnimation { duration: 150 } }
+                    }
+
+                    // No icon found on any resolution path — nf-md-ghost_outline
+                    // fallback glyph, matching the DesktopLayer convention.
+                    Text {
+                        anchors.centerIn: parent
+                        visible: tileIcon.status !== Image.Ready
+                        text: "\u{F165D}"
+                        font.family: Config.fontFamily
+                        font.pixelSize: 14
+                        color: Theme.cOnSurfVar
                     }
 
                     MouseArea {
