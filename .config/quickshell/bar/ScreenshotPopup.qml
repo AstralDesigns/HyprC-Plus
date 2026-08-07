@@ -75,10 +75,10 @@ PanelWindow {
                 }
                 goBack = function() { ScreenshotPopupState.step = "timing" }
             } else if (step === "region") {
-                count = 4
-                const regions = ["output", "active", "region"]
+                count = 3
+                const regions = ["output", "active"]
                 activate = function(idx) {
-                    if (idx < 3) ScreenshotPopupState.pickRegion(regions[idx])
+                    if (idx < 2) ScreenshotPopupState.pickRegion(regions[idx])
                     else ScreenshotPopupState.step = "timing"
                 }
                 goBack = function() { ScreenshotPopupState.step = "timing" }
@@ -202,8 +202,7 @@ PanelWindow {
                 spacing: 6
                 SsBtn { Layout.fillWidth: true; label: "󰍹  Entire Display"; highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickRegion("output") }
                 SsBtn { Layout.fillWidth: true; label: "  Active Window";   highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.pickRegion("active") }
-                SsBtn { Layout.fillWidth: true; label: "  Selection";       highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.pickRegion("region") }
-                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; highlighted: card._focusedIndex === 3; onActivated: ScreenshotPopupState.step = "timing" }
+                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.step = "timing" }
             }
 
             // ── Step: action ──────────────────────────────────────────

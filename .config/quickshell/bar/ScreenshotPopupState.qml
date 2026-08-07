@@ -11,11 +11,11 @@ import Quickshell.Io
 //
 //  The popup flow mirrors the rofi script:
 //    1. Choose timing  : Immediate | Delayed (+ delay duration)
-//    2. Choose region  : Everything | Active Display | Selection
+//    2. Choose region  : Everything | Active Display
 //    3. Choose action  : Copy | Save | Copy & Save | Edit
 //
 //  After the user picks all three, the singleton runs grim internally
-//  (with slurp for region selection) and handles copy/save/satty.
+//  and handles copy/save/satty.
 // ─────────────────────────────────────────────────────────────────────────────
 Singleton {
     id: root
@@ -33,7 +33,7 @@ Singleton {
 
     // ── Selections ────────────────────────────────────────────────────────────
     property int    delaySeconds: 0   // 0 = immediate
-    property string regionMode:  ""   // "output" | "active" | "region"
+    property string regionMode:  ""   // "output" | "active"
     property string actionMode:  ""   // "copy"   | "save"  | "copysave" | "edit"
 
     // ── Status message shown during/after capture ─────────────────────────────
@@ -129,30 +129,6 @@ Singleton {
     }
 
     // ── Processes ─────────────────────────────────────────────────────────────
-
-    // slurp — interactive region selector
-    property string _slurpGeometry: ""
-    Process {
-        id: slurpProc
-        command: ["slurp"]
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: function(line) {
-                root._slurpGeometry = line.trim()
-            }
-        }
-        onExited: function(code) {
-            if (code !== 0 || root._slurpGeometry === "") {
-                // User cancelled
-                root.statusMsg = "Selection cancelled"
-                root.busy      = false
-                root.step      = "timing"
-                root.visible   = true
-                return
-            }
-            _fireGrim(root._slurpGeometry)
-        }
-    }
 
     // hyprctl activewindow — geometry for active window
     property string _windowGeometry: ""
@@ -257,7 +233,6 @@ Singleton {
 
     // ── Capture orchestration ─────────────────────────────────────────────────
     function _runCapture() {
-        root._slurpGeometry   = ""
         root._windowGeometry  = ""
         root._monitorGeometry = ""
         // ensure screenshot dir exists, then dispatch
@@ -265,9 +240,7 @@ Singleton {
     }
 
     function _dispatchGeometry() {
-        if (root.regionMode === "region") {
-            if (!slurpProc.running) slurpProc.running = true
-        } else if (root.regionMode === "active") {
+        if (root.regionMode === "active") {
             if (!activeWinProc.running) activeWinProc.running = true
         } else {
             // output (full monitor)
