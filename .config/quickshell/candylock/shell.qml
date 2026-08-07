@@ -221,7 +221,13 @@ ShellRoot {
     property string weatherUnit: "metric"
     property string weatherIcon: "󰖐"
     property string weatherTemp: "--°"
-    property real   _wxTempC: 0; property real _wxHumidity: 0
+    property string weatherCondStr: "Loading…"
+    property string weatherFeels: "--"
+    property string weatherWind: "--"
+    property string weatherHum: "--"
+    property string weatherPrec: "--"
+    property real   _wxTempC: 0; property real _wxFeelsC: 0; property real _wxWindKmh: 0
+    property real   _wxHumidity: 0; property real _wxPrec: 0
     property int    _wxCode: 0;  property int  _wxIsDay: 1
     readonly property string _pinnedLocFile: Quickshell.env("HOME") + "/.config/hyprcandy/weather-location.conf"
     readonly property string _weatherCache:  Quickshell.env("HOME") + "/.config/hyprcandy/astal-weather-cache.json"
@@ -262,16 +268,48 @@ ShellRoot {
         return "󰖐"
     }
 
+    function _wxCondStr(code, isDay, h) {
+        if (code===0)             return "Clear Sky"
+        if (code===1)             return "Mainly Clear"
+        if (code===2)             return "Partly Cloudy"
+        if (code===3)             return h >= 85 ? "Mostly Cloudy" : "Cloudy"
+        if (code===45||code===48) return "Fog"
+        if (code>=51&&code<=55)   return code===51 ? "Light Drizzle" : code===53 ? "Moderate Drizzle" : "Dense Drizzle"
+        if (code===56||code===57) return code===56 ? "Light Freezing Rain" : "Dense Freezing Drizzle"
+        if (code===61)            return "Slight Rain"
+        if (code===63)            return "Moderate Rain"
+        if (code===65)            return "Heavy Rain"
+        if (code===66||code===67) return "Freezing Rain"
+        if (code>=71&&code<=75)   return code===71 ? "Light Snow" : code===73 ? "Moderate Snow" : "Heavy Snow"
+        if (code===77)            return "Snow Grains"
+        if (code>=80&&code<=82)   return "Rain Showers"
+        if (code===85||code===86) return "Snow Showers"
+        if (code===95)            return "Thunderstorm"
+        if (code===96||code===99) return "Thunderstorm + Hail"
+        return "Unknown"
+    }
+
     function _updateWeatherDisplay() {
         root.weatherIcon = root._wxCond(root._wxCode, root._wxIsDay, root._wxHumidity)
+        root.weatherCondStr = root._wxCondStr(root._wxCode, root._wxIsDay, root._wxHumidity)
         if (root._wxTempC === 0 && root._wxCode === 0 && root._wxHumidity === 0) {
-            root.weatherTemp = "--°"; return
+            root.weatherTemp = "--°"
+            root.weatherFeels = "--"
+            root.weatherWind = "--"
+            root.weatherHum = "--"
+            root.weatherPrec = "--"
+            return
         }
-        if (root.weatherUnit === "imperial") {
-            root.weatherTemp = Math.round(root._wxTempC * 9/5 + 32) + "°F"
-        } else {
-            root.weatherTemp = Math.round(root._wxTempC) + "°C"
-        }
+        const suffix = root.weatherUnit === "imperial" ? "°F" : "°C"
+        const cvt = (c) => root.weatherUnit === "imperial"
+            ? Math.round(c * 9/5 + 32) : Math.round(c)
+        root.weatherTemp  = cvt(root._wxTempC)  + suffix
+        root.weatherFeels = cvt(root._wxFeelsC) + suffix
+        root.weatherWind  = root.weatherUnit === "imperial"
+            ? Math.round(root._wxWindKmh * 0.621371) + " mph"
+            : Math.round(root._wxWindKmh) + " km/h"
+        root.weatherHum   = Math.round(root._wxHumidity) + "%"
+        root.weatherPrec  = (root._wxPrec || 0) + " mm"
     }
 
     // Step 1 — read unit preference
@@ -397,9 +435,12 @@ ShellRoot {
             }
         }
         root._wxTempC    = c.temperature_2m       || 0
+        root._wxFeelsC   = c.apparent_temperature || 0
+        root._wxWindKmh  = c.wind_speed_10m       || 0
         root._wxCode     = c.weather_code          || 0
         root._wxIsDay    = (c.is_day !== undefined ? c.is_day : 1)
         root._wxHumidity = c.relative_humidity_2m || 0
+        root._wxPrec     = c.precipitation        || 0
         root._updateWeatherDisplay()
     }
 
@@ -973,15 +1014,21 @@ ShellRoot {
                         anchors { left:parent.left; right:parent.right; top:parent.top; margins:24 }
                         spacing:10
 
-                        // ══════ ROW 1: clock card  |  info + pin card ══════════
+                        // ══════ MAIN GRID: (clock + dials) | (info + weather/media) ══
                         RowLayout {
-                            Layout.fillWidth:true; spacing:14
+                            Layout.fillWidth:true; spacing:14; Layout.bottomMargin:4
+
+                            // ── LEFT COLUMN: clock + dials ──────────────────────
+                            ColumnLayout {
+                                Layout.preferredWidth: 148
+                                Layout.maximumWidth: 148
+                                spacing: 10
 
                             // ── CLOCK CARD ──────────────────────────────────────
                             Rectangle {
                                 id:clockCard
-                                Layout.preferredWidth:148
-                                Layout.preferredHeight:rightCol.implicitHeight
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: infoCard.height
                                 radius:20; color:root.cCardDark
                                 border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.22)
 
@@ -1008,7 +1055,83 @@ ShellRoot {
                                 }
                             }
 
-                            // ── RIGHT COLUMN ─────────────────────────────────────
+                            // ── DIALS CARD ──────────────────────────────────────
+                            Rectangle {
+                                id:dialsCard
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: dialsCol.implicitHeight + 32
+                                radius:20; color:root.cCardDark
+                                border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.22)
+
+                                ColumnLayout {
+                                    id:dialsCol
+                                    anchors { left:parent.left; right:parent.right; top:parent.top; bottom:parent.bottom; margins:14 }
+                                    spacing:8
+
+                                    Repeater {
+                                        model:3
+                                        delegate: Item {
+                                            required property int index
+                                            readonly property real arcVal: index===0 ? root.cpuUsage
+                                                : (index===1 ? root.memUsage
+                                                : (root.tempOk ? Math.min(root.tempC/100,1) : 0))
+                                            readonly property string arcText: index===0 ? Math.round(root.cpuUsage*100)+"%"
+                                                : (index===1 ? Math.round(root.memUsage*100)+"%"
+                                                : (root.tempOk ? Math.round(root.tempC)+"°" : "N/A"))
+                                            readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
+                                            readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
+                                            readonly property color arcColor: index===0 ? root.cWc4
+                                                : (index===1 ? root.cWc3 : root.cWc5)
+
+                                            Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
+
+                                            Canvas {
+                                                id:arcC
+                                                anchors.horizontalCenter:parent.horizontalCenter
+                                                anchors.top:parent.top
+                                                anchors.topMargin: Math.max(0,(parent.height-72-14)/2)
+                                                width:72; height:72
+                                                property color dialCol: parent.arcColor
+                                                property color onS:     root.cOnSurf
+                                                property real  cv:      parent.arcVal
+                                                property string gt:     parent.arcText
+                                                property string gl:     parent.arcGlyph
+                                                onDialColChanged: requestPaint(); onOnSChanged: requestPaint()
+                                                onCvChanged: requestPaint(); onGtChanged: requestPaint()
+                                                Component.onCompleted: requestPaint()
+                                                onPaint: {
+                                                    const ctx=getContext("2d"); ctx.clearRect(0,0,width,height)
+                                                    const cx=width/2,cy=height/2,r=27,lw=5
+                                                    const s=0.75*Math.PI,e=2.25*Math.PI
+                                                    ctx.lineWidth=lw; ctx.lineCap="round"
+                                                    ctx.beginPath(); ctx.arc(cx,cy,r,s,e)
+                                                    ctx.strokeStyle=Qt.rgba(onS.r,onS.g,onS.b,0.12).toString(); ctx.stroke()
+                                                    if(cv>0.005){
+                                                        ctx.beginPath(); ctx.arc(cx,cy,r,s,s+cv*(e-s))
+                                                        ctx.strokeStyle=dialCol.toString(); ctx.stroke()
+                                                    }
+                                                    ctx.fillStyle=Qt.rgba(dialCol.r,dialCol.g,dialCol.b,0.92).toString()
+                                                    ctx.font="15px 'Symbols Nerd Font Mono'"
+                                                    ctx.textAlign="center"; ctx.textBaseline="alphabetic"
+                                                    ctx.fillText(gl,cx,cy+2)
+                                                    ctx.fillStyle=Qt.rgba(onS.r,onS.g,onS.b,0.88).toString()
+                                                    ctx.font="bold 9px monospace"
+                                                    ctx.textBaseline="top"; ctx.fillText(gt,cx,cy+5)
+                                                }
+                                            }
+                                            Text {
+                                                anchors.horizontalCenter:parent.horizontalCenter
+                                                anchors.bottom:parent.bottom
+                                                text:parent.arcLabel; color:root.cOnSurfVar; font.pixelSize:9
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            } // left column
+
+                            // ── RIGHT COLUMN: info + weather/media ──────────────
                             ColumnLayout {
                                 id:rightCol
                                 Layout.fillWidth:true; spacing:10
@@ -1018,7 +1141,7 @@ ShellRoot {
                                     Layout.fillWidth:true
                                     height:infoCardCol.implicitHeight+36
                                     radius:20; color:root.cCardWarm
-                                    border.width:1; border.color:Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
+                                    border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.1)
 
                                     ColumnLayout {
                                         id:infoCardCol
@@ -1027,8 +1150,8 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:root.cWc2
-                                            font.family:"C059"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
+                                            text:root.clockDate; color:root.cWc4
+                                            font.family:"FantasqueM Nerd Font Mono"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
 
@@ -1036,7 +1159,8 @@ ShellRoot {
                                             Layout.fillWidth:true; spacing:15; Layout.alignment:Qt.AlignHCenter
 
                                             Item {
-                                                width:95; height:95
+                                                Layout.alignment: Qt.AlignHCenter
+                                                width:100; height:100
                                                 Image {
                                                     id:userImg; anchors.fill:parent
                                                     source: root._userIconPath!=="" ? ("file://"+root._userIconPath.split("?")[0]+"?v="+root._userIconPath.split("?")[1]) : ""
@@ -1048,20 +1172,6 @@ ShellRoot {
                                                     visible:userImg.status!==Image.Ready
                                                     Text { anchors.centerIn:parent; text:"󰀄"; font.pixelSize:40; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
                                                     border.width:2; border.color:Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,1.0)
-                                                }
-                                            }
-
-                                            ColumnLayout {
-                                                Layout.fillWidth:true; spacing:4; Layout.alignment:Qt.AlignVCenter
-                                                Text {
-                                                    Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherTemp; color:root.cWc3; opacity: 1.0
-                                                    font.family:"C059"; font.pixelSize:28; font.italic:true; font.weight:Font.DemiBold
-                                                }
-                                                Text {
-                                                    Layout.alignment:Qt.AlignHCenter
-                                                    text:root.weatherIcon; color:root.cWc3; opacity: 1.0
-                                                    font.pixelSize:28; font.family:"Symbols Nerd Font Mono"
                                                 }
                                             }
                                         }
@@ -1081,7 +1191,7 @@ ShellRoot {
                                                 border.color: root.authFailed ? root.cErr
                                                     : (root.authChecking
                                                         ? root.cWc3
-                                                        : root.cWc4)
+                                                        : root.cWc2)
                                                 Behavior on border.color { ColorAnimation{duration:250} }
                                             }
                                             RowLayout {
@@ -1134,12 +1244,126 @@ ShellRoot {
                                         }
                                     }
                                 }
-                            }
-                        }
 
-                        // ══════ ROW 2: compact media card | dials card ══════════
-                        RowLayout {
-                            Layout.fillWidth:true; spacing:14; Layout.bottomMargin:4
+                            ColumnLayout {
+                                id: rightBottomCol
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: dialsCard.height
+                                spacing: 10
+
+                                // ── WEATHER CARD — horizontal current conditions ──
+                                Rectangle {
+                                    id: weatherCard
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+                                    Layout.minimumHeight: 72
+                                    radius: 20
+                                    color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g,
+                                                  root.cOnSecondary.b, 0.65)
+                                    border.width: 1
+                                    border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.1)
+
+                                    RowLayout {
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.margins: 12
+                                        spacing: 10
+
+                                        ColumnLayout {
+                                            Layout.preferredWidth: 76
+                                            Layout.maximumWidth: 76
+                                            Layout.alignment: Qt.AlignVCenter
+                                            spacing: 2
+
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: root.weatherIcon
+                                                color: root.cWc6
+                                                font.pixelSize: 34
+                                                font.family: "Symbols Nerd Font Mono"
+                                                horizontalAlignment: Text.AlignHCenter
+                                            }
+                                            Text {
+                                                Layout.alignment: Qt.AlignHCenter
+                                                text: root.weatherTemp
+                                                color: root.cWc3
+                                                font.pixelSize: 18
+                                                font.weight: Font.Bold
+                                                font.family: "C059"
+                                                font.italic: true
+                                                horizontalAlignment: Text.AlignHCenter
+                                            }
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: root.weatherCondStr
+                                                color: root.cOnSurfVar
+                                                font.pixelSize: 9
+                                                font.family: "monospace"
+                                                horizontalAlignment: Text.AlignHCenter
+                                                wrapMode: Text.WordWrap
+                                                maximumLineCount: 2
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            Layout.preferredWidth: 1
+                                            Layout.fillHeight: true
+                                            Layout.topMargin: 6
+                                            Layout.bottomMargin: 6
+                                            color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
+                                        }
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            Layout.alignment: Qt.AlignVCenter
+                                            spacing: 6
+
+                                            Repeater {
+                                                model: [
+                                                    { glyph: "󰔐", label: "Feels",    val: root.weatherFeels },
+                                                    { glyph: "󰖌", label: "Humidity", val: root.weatherHum   },
+                                                    { glyph: "󰖝", label: "Wind",     val: root.weatherWind  },
+                                                    { glyph: "󰖗", label: "Precip",   val: root.weatherPrec  }
+                                                ]
+                                                delegate: RowLayout {
+                                                    required property var modelData
+                                                    spacing: 3
+                                                    Layout.fillWidth: true
+
+                                                    Text {
+                                                        text: modelData.glyph
+                                                        color: root.cWc6
+                                                        font.pixelSize: 12
+                                                        font.family: "Symbols Nerd Font Mono"
+                                                    }
+                                                    ColumnLayout {
+                                                        spacing: 0
+                                                        Layout.fillWidth: true
+                                                        Text {
+                                                            text: modelData.label
+                                                            color: root.cOnSurfVar
+                                                            font.pixelSize: 9
+                                                            font.family: "monospace"
+                                                            elide: Text.ElideRight
+                                                            Layout.fillWidth: true
+                                                        }
+                                                        Text {
+                                                            text: modelData.val
+                                                            color: root.cOnSurf
+                                                            font.pixelSize: 10
+                                                            font.weight: Font.Medium
+                                                            font.family: "monospace"
+                                                            elide: Text.ElideRight
+                                                            Layout.fillWidth: true
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
 
                             // ── MEDIA CARD — compact horizontal layout ────────────
                             Rectangle {
@@ -1487,82 +1711,9 @@ ShellRoot {
                                     }
                                 }
                             }
-
-                            // ── DIALS CARD ──────────────────────────────────────
-                            Rectangle {
-                                id:dialsCard
-                                Layout.preferredWidth:116
-                                Layout.topMargin: 12
-                                height:dialsCol.implicitHeight + 32
-                                radius:20; color:root.cCardDark
-                                border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.22)
-
-                                ColumnLayout {
-                                    id:dialsCol
-                                    anchors { left:parent.left; right:parent.right; top:parent.top; bottom:parent.bottom; margins:14 }
-                                    spacing:8
-
-                                    Repeater {
-                                        model:3
-                                        delegate: Item {
-                                            required property int index
-                                            readonly property real arcVal: index===0 ? root.cpuUsage
-                                                : (index===1 ? root.memUsage
-                                                : (root.tempOk ? Math.min(root.tempC/100,1) : 0))
-                                            readonly property string arcText: index===0 ? Math.round(root.cpuUsage*100)+"%"
-                                                : (index===1 ? Math.round(root.memUsage*100)+"%"
-                                                : (root.tempOk ? Math.round(root.tempC)+"°" : "N/A"))
-                                            readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
-                                            readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
-                                            readonly property color arcColor: index===0 ? root.cWc4
-                                                : (index===1 ? root.cWc3 : root.cWc5)
-
-                                            Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
-
-                                            Canvas {
-                                                id:arcC
-                                                anchors.horizontalCenter:parent.horizontalCenter
-                                                anchors.top:parent.top
-                                                anchors.topMargin: Math.max(0,(parent.height-72-14)/2)
-                                                width:72; height:72
-                                                property color dialCol: parent.arcColor
-                                                property color onS:     root.cOnSurf
-                                                property real  cv:      parent.arcVal
-                                                property string gt:     parent.arcText
-                                                property string gl:     parent.arcGlyph
-                                                onDialColChanged: requestPaint(); onOnSChanged: requestPaint()
-                                                onCvChanged: requestPaint(); onGtChanged: requestPaint()
-                                                Component.onCompleted: requestPaint()
-                                                onPaint: {
-                                                    const ctx=getContext("2d"); ctx.clearRect(0,0,width,height)
-                                                    const cx=width/2,cy=height/2,r=27,lw=5
-                                                    const s=0.75*Math.PI,e=2.25*Math.PI
-                                                    ctx.lineWidth=lw; ctx.lineCap="round"
-                                                    ctx.beginPath(); ctx.arc(cx,cy,r,s,e)
-                                                    ctx.strokeStyle=Qt.rgba(onS.r,onS.g,onS.b,0.12).toString(); ctx.stroke()
-                                                    if(cv>0.005){
-                                                        ctx.beginPath(); ctx.arc(cx,cy,r,s,s+cv*(e-s))
-                                                        ctx.strokeStyle=dialCol.toString(); ctx.stroke()
-                                                    }
-                                                    ctx.fillStyle=Qt.rgba(dialCol.r,dialCol.g,dialCol.b,0.92).toString()
-                                                    ctx.font="15px 'Symbols Nerd Font Mono'"
-                                                    ctx.textAlign="center"; ctx.textBaseline="alphabetic"
-                                                    ctx.fillText(gl,cx,cy+2)
-                                                    ctx.fillStyle=Qt.rgba(onS.r,onS.g,onS.b,0.88).toString()
-                                                    ctx.font="bold 9px monospace"
-                                                    ctx.textBaseline="top"; ctx.fillText(gt,cx,cy+5)
-                                                }
-                                            }
-                                            Text {
-                                                anchors.horizontalCenter:parent.horizontalCenter
-                                                anchors.bottom:parent.bottom
-                                                text:parent.arcLabel; color:root.cOnSurfVar; font.pixelSize:9
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                            } // rightBottomCol
+                            } // rightCol
+                        } // main grid RowLayout
                     }
                 }
 
