@@ -1043,7 +1043,7 @@ ShellRoot {
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
                                         text:"󰫢  󰫢"; color: root.cWc3
-                                        font.family:"codicon"; font.pixelSize:14
+                                        font.family:"Symbols Nerd Font Mono"; font.pixelSize:14
                                         topPadding:8; bottomPadding:8
                                     }
                                     Text {
