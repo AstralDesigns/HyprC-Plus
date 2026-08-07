@@ -1151,7 +1151,7 @@ ShellRoot {
                                         Text {
                                             Layout.fillWidth:true
                                             text:root.clockDate; color:root.cWc4
-                                            font.family:"FantasqueM Nerd Font Mono"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
+                                            font.family:"Symbols Nerd Font Mono"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
 
@@ -1191,14 +1191,14 @@ ShellRoot {
                                                 border.color: root.authFailed ? root.cErr
                                                     : (root.authChecking
                                                         ? root.cWc3
-                                                        : root.cWc2)
+                                                        : root.cWc5)
                                                 Behavior on border.color { ColorAnimation{duration:250} }
                                             }
                                             RowLayout {
                                                 anchors.centerIn:parent; spacing:7
                                                 visible:root.pinEntry.length===0 && !root.authChecking
                                                 Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:root.cWc1}
-                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cWc5; opacity:1.00 }
+                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cWc2; opacity:1.00 }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; visible:root.authChecking
@@ -1208,7 +1208,7 @@ ShellRoot {
                                             Row {
                                                 anchors.centerIn:parent; spacing:6
                                                 visible:root.pinEntry.length>0 && !root.authChecking && !root.pinVisible
-                                                Repeater { model:root.pinEntry.length; delegate:Rectangle{width:9;height:9;radius:5;color:root.cSecondary;opacity:0.90} }
+                                                Repeater { model:root.pinEntry.length; delegate:Rectangle{width:9;height:9;radius:99;color:root.cSecondary;opacity:0.90} }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; width:parent.width-24
