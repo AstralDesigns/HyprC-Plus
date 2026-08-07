@@ -88,7 +88,7 @@ var DockConfig = {
     // bottom dock) on top of that automatically.  Hyprland's own gaps_out +
     // border_size provide the gap between windows and the reserved boundary.
     // Set exclusiveZoneOverride (number) to force a specific value.
-    exclusiveZoneOverride: null,
+    exclusiveZoneOverride: 0,
 
     marginBottom: 6,               // @HCD:marginBottom
     marginLeft:   10,              // @HCD:marginLeft
