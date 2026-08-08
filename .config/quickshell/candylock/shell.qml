@@ -1502,7 +1502,7 @@ ShellRoot {
                                                 text: root._volumeMuted ? "󰝟" : "󰕾"
                                                 font.family: "Symbols Nerd Font Mono"
                                                 font.pixelSize: 14
-                                                color: root.cWc5
+                                                color: root.cWc9
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     cursorShape: Qt.PointingHandCursor
