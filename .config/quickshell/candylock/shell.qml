@@ -1972,14 +1972,14 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maRebt.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.85) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
                                 border.width: 1
-                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cWc5.r, root.cWc5.g, root.cWc5.b,0.65) : "transparent"
+                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cWc2.r, root.cWc2.g, root.cWc2.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰑙"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cWc5; opacity: _maRebt.containsMouse ? 1.0 : 1.0
+                                color: root.cWc2; opacity: _maRebt.containsMouse ? 1.0 : 1.0
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
