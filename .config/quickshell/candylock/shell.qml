@@ -1197,12 +1197,12 @@ ShellRoot {
                                             RowLayout {
                                                 anchors.centerIn:parent; spacing:7
                                                 visible:root.pinEntry.length===0 && !root.authChecking
-                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:root.cWc1}
+                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:root.cWc9}
                                                 Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cWc2; opacity:1.00 }
                                             }
                                             Text {
                                                 anchors.centerIn:parent; visible:root.authChecking
-                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:root.cWc1
+                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:root.cWc9
                                                 RotationAnimator on rotation { from:0; to:360; duration:900; loops:Animation.Infinite; running:root.authChecking }
                                             }
                                             Row {
@@ -1226,7 +1226,7 @@ ShellRoot {
                                                 visible:root.pinEntry.length>0 && !root.authChecking
                                                 text: root.pinVisible ? "󰛐" : "󰛑"
                                                 font.family:"Symbols Nerd Font Mono"; font.pixelSize:14
-                                                color:root.cWc1; opacity:0.85
+                                                color:root.cWc9; opacity:0.85
                                                 MouseArea {
                                                     anchors.fill:parent; anchors.margins:-8
                                                     cursorShape:Qt.PointingHandCursor
@@ -1287,7 +1287,7 @@ ShellRoot {
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: root.weatherTemp
-                                                color: root.cWc3
+                                                color: root.cWc2
                                                 font.pixelSize: 18
                                                 font.weight: Font.Bold
                                                 font.family: "C059"
