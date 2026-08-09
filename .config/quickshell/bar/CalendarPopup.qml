@@ -306,7 +306,7 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 text: modelData
                                 color: (index === 5 || index === 6)
-                                    ? Theme.cWc6
+                                    ? Theme.cWc4
                                     : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.80)
                                 font.family: Config.labelFont
                                 font.pixelSize: 10
@@ -399,7 +399,7 @@ PanelWindow {
                                         color: _isToday
                                             ? Theme.cPrimary
                                             : _isWeekend
-                                                ? Theme.cWc6
+                                                ? Theme.cWc4
                                                 : Theme.cPrimary
                                         font.family: Config.labelFont
                                         font.pixelSize: 12
