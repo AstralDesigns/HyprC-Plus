@@ -1818,9 +1818,10 @@ PanelWindow {
                                         CCSection { text: "Screen Margins" }
                                         CCSlider { label:"Top Margin";    from:0;to:30; value:Config.outerMarginTop;    onMoved:function(v){Config.outerMarginTop=v} }
                                         CCSlider { label:"Bottom Margin"; from:0;to:30; value:Config.outerMarginBottom; onMoved:function(v){Config.outerMarginBottom=v} }
-                                        // In shell mode a separate side margin controls only the module strip
-                                        CCSlider { visible: Config.barMode !== "shell"; label:"Side Margin";        from:0;to:200; value:Config.outerMarginSide;        onMoved:function(v){Config.outerMarginSide=v} }
-                                        CCSlider { visible: Config.barMode === "shell"; label:"Side Margin (Shell)"; from:0;to:200; value:Config.shellModuleSideMargin; onMoved:function(v){Config.shellModuleSideMargin=v} }
+                                        // "tri" and "shell" islands have their own side-margin, split from bar/island's outerMarginSide
+                                        CCSlider { visible: Config.barMode !== "tri" && Config.barMode !== "shell"; label:"Side Margin";       from:0;to:200; value:Config.outerMarginSide;      onMoved:function(v){Config.outerMarginSide=v} }
+                                        CCSlider { visible: Config.barMode === "tri";                              label:"Side Margin (Tri)";   from:0;to:200; value:Config.triModuleSideMargin;  onMoved:function(v){Config.triModuleSideMargin=v} }
+                                        CCSlider { visible: Config.barMode === "shell";                            label:"Side Margin (Shell)"; from:0;to:200; value:Config.shellModuleSideMargin;onMoved:function(v){Config.shellModuleSideMargin=v} }
                                         CCSlider { label:"Edge Pad Left"; from:0;to:30; value:Config.barEdgePaddingLeft; onMoved:function(v){Config.barEdgePaddingLeft=v} }
                                         CCSlider { label:"Edge Pad Right";from:0;to:30; value:Config.barEdgePaddingRight;onMoved:function(v){Config.barEdgePaddingRight=v} }
 

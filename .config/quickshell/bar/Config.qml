@@ -59,6 +59,7 @@ QtObject {
         v = _settings.value("outerMarginTop"); if (v !== undefined && v !== null) outerMarginTop = v
         v = _settings.value("outerMarginBottom"); if (v !== undefined && v !== null) outerMarginBottom = v
         v = _settings.value("outerMarginSide"); if (v !== undefined && v !== null) outerMarginSide = v
+        v = _settings.value("triModuleSideMargin"); if (v !== undefined && v !== null) triModuleSideMargin = parseInt(v)
         v = _settings.value("barEdgePaddingLeft");  if (v !== undefined && v !== null) barEdgePaddingLeft  = v
         v = _settings.value("barEdgePaddingRight"); if (v !== undefined && v !== null) barEdgePaddingRight = v
         var oldRadius = 20
@@ -249,6 +250,7 @@ QtObject {
         _settings.setValue("outerMarginTop", outerMarginTop)
         _settings.setValue("outerMarginBottom", outerMarginBottom)
         _settings.setValue("outerMarginSide", outerMarginSide)
+        _settings.setValue("triModuleSideMargin", triModuleSideMargin)
         _settings.setValue("barEdgePaddingLeft",  barEdgePaddingLeft)
         _settings.setValue("barEdgePaddingRight", barEdgePaddingRight)
         _settings.setValue("barTopLeftRadius",     barTopLeftRadius)
@@ -453,7 +455,16 @@ QtObject {
     // Widget-local — Top/Bottom sliders always match visual edge; values swap on top↔bottom flip.
     property int outerMarginTop:    2   // px — gap from screen top (when bar at top)
     property int outerMarginBottom: 0   // px — gap from screen bottom (when bar at bottom)
-    property int outerMarginSide:   6   // px — gap from left & right screen edges
+    property int outerMarginSide:   6   // px — gap from left & right screen edges — used by "bar" & "island" modes
+    property int triModuleSideMargin: 6   // px — side margin for the left/right tri islands (split from outerMarginSide)
+
+    //  Resolved side margin for the active bar mode — popups (and the tri/shell
+    //  islands themselves) should read this instead of outerMarginSide directly,
+    //  so both track whichever mode is active off the SAME module-margin value
+    //  (no separate popup-only slider).
+    readonly property real popupSideMargin: barMode === "tri"   ? triModuleSideMargin
+        : barMode === "shell" ? shellModuleSideMargin
+        : outerMarginSide
 
     //  Far-edge padding: extra inset from the barBg L/R edges to the first/last
     //  module group. Adds inner breathing room in "bar" mode.

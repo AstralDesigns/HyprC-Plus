@@ -1272,12 +1272,8 @@ PanelWindow {
                      && (!bar._triLeftAhHidden || bar._triLeftPinned)
             anchors {
                 left:           parent.left
-                leftMargin:     Config.barMode === "shell" ? Config.shellModuleSideMargin : Config.outerMarginSide
-                top:            Config.barMode === "shell" ? (bar._isTop ? parent.top : undefined) : undefined
-                bottom:         Config.barMode === "shell" ? (bar._isBottom ? parent.bottom : undefined) : undefined
-                topMargin:      Config.barMode === "shell" ? (bar._isTop ? (Config.shellArmThickness + Config.outerMarginTop) : 0) : 0
-                bottomMargin:   Config.barMode === "shell" ? (bar._isBottom ? (Config.shellArmThickness + Config.outerMarginBottom) : 0) : 0
-                verticalCenter: Config.barMode === "shell" ? undefined : parent.verticalCenter
+                leftMargin:     Config.triModuleSideMargin
+                verticalCenter: parent.verticalCenter
             }
             height:       Config.barHeight
             implicitWidth: triLeftRow.implicitWidth
@@ -1495,12 +1491,8 @@ PanelWindow {
                      && (!bar._triRightAhHidden || bar._triRightPinned)
             anchors {
                 right:          parent.right
-                rightMargin:    Config.barMode === "shell" ? Config.shellModuleSideMargin : Config.outerMarginSide
-                top:            Config.barMode === "shell" ? (bar._isTop ? parent.top : undefined) : undefined
-                bottom:         Config.barMode === "shell" ? (bar._isBottom ? parent.bottom : undefined) : undefined
-                topMargin:      Config.barMode === "shell" ? (bar._isTop ? (Config.shellArmThickness + Config.outerMarginTop) : 0) : 0
-                bottomMargin:   Config.barMode === "shell" ? (bar._isBottom ? (Config.shellArmThickness + Config.outerMarginBottom) : 0) : 0
-                verticalCenter: Config.barMode === "shell" ? undefined : parent.verticalCenter
+                rightMargin:    Config.triModuleSideMargin
+                verticalCenter: parent.verticalCenter
             }
             height:       Config.barHeight
             implicitWidth: triRightRow.implicitWidth

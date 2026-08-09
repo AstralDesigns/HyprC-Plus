@@ -411,7 +411,7 @@ Item {
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
         readonly property bool  _barAtBottom: Config.barPosition === "bottom"
-        readonly property real  _panelMargin: Config.outerMarginSide * 2
+        readonly property real  _panelMargin: Config.barMode === "shell" ? Config.popupSideMargin : Config.popupSideMargin * 2
         readonly property real  _panelRadius: Config.barMode === "island" ? Config.islandRadius : Config.barRadius
         readonly property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop) : Config.outerMarginTop) + Config.barHeight + 4
         readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 4
