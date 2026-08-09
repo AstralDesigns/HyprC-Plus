@@ -478,6 +478,22 @@ PanelWindow {
             } else {
                 if (!bar._shellModHidden && !bar.anyPanelOpen) _shellModHideTimer.restart()
             }
+            // Force-refresh the shell-mode vertical-position bindings on every
+            // re-entry into shell mode. These two are plain arithmetic bindings
+            // ("y: cond ? 0 : (parent.height - height)"), not anchors — after a
+            // shell → bar/island/tri → shell round-trip they can be left stuck
+            // on a stale evaluation (the actual bug this call works around).
+            // Re-installing the binding via Qt.binding() guarantees a clean
+            // re-evaluation against the current bar._isTop/_isBottom instead of
+            // whatever the binding happened to freeze on.
+            if (Config.barMode === "shell") {
+                barBg.y = Qt.binding(function() {
+                    return barBg._shellHorizontal ? (bar._isBottom ? (barBg.parent.height - barBg.height) : 0) : 0
+                })
+                shellCenter.y = Qt.binding(function() {
+                    return bar._isTop ? 0 : (shellCenter.parent.height - shellCenter.height)
+                })
+            }
             updateBarVisibility()
         }
         function onBarAutoHideChanged() {
@@ -1366,9 +1382,8 @@ PanelWindow {
                      && (!bar._triCenterAhHidden || bar._triCenterPinned)
             anchors {
                 horizontalCenter: parent.horizontalCenter
-                top:    bar._isTop ? parent.top : undefined
-                bottom: bar._isBottom ? parent.bottom : undefined
             }
+            y: bar._isTop ? 0 : (parent.height - height)
             height: Math.max(Config.barHeight, Config.moduleHeight)
             implicitWidth: shellCenterRow.implicitWidth
                            + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
