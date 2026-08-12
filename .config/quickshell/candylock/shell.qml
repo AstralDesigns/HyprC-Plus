@@ -1178,7 +1178,7 @@ ShellRoot {
 
                                         Rectangle {
                                             Layout.fillWidth:true; height:1
-                                            color:Qt.rgba(root.cSecondary.r, root.cSecondary.g, root.cSecondary.b, 0.30)
+                                            color:Qt.rgba(root.cSecondary.r, root.cSecondary.g, root.cSecondary.b, 0.16)
                                         }
 
                                         // PIN ENTRY
