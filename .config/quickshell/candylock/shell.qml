@@ -1036,19 +1036,19 @@ ShellRoot {
                                     anchors.centerIn:parent; spacing:0
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockHour; color:root.cWc4
+                                        text:root.clockHour; color:root.cWc5
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:"󰫢  󰫢"; color: root.cWc3
+                                        text:"󰫢  󰫢"; color: root.cWc4
                                         font.family:"Symbols Nerd Font Mono"; font.pixelSize:14
                                         topPadding:8; bottomPadding:8
                                     }
                                     Text {
                                         Layout.alignment:Qt.AlignHCenter
-                                        text:root.clockMin; color:root.cWc5
+                                        text:root.clockMin; color:root.cWc3
                                         font.family:"C059"; font.pixelSize:86; font.italic:true; font.weight:Font.Bold
                                         lineHeight:0.88
                                     }
@@ -1080,8 +1080,8 @@ ShellRoot {
                                                 : (root.tempOk ? Math.round(root.tempC)+"°" : "N/A"))
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
-                                            readonly property color arcColor: index===0 ? root.cWc4
-                                                : (index===1 ? root.cWc3 : root.cWc5)
+                                            readonly property color arcColor: index===0 ? root.cWc5
+                                                : (index===1 ? root.cWc4 : root.cWc3)
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
 
@@ -1150,7 +1150,7 @@ ShellRoot {
 
                                         Text {
                                             Layout.fillWidth:true
-                                            text:root.clockDate; color:root.cWc4
+                                            text:root.clockDate; color:root.cWc5
                                             font.family:"Symbols Nerd Font Mono"; font.pixelSize:30; font.italic:true; font.weight:Font.DemiBold
                                             horizontalAlignment:Text.AlignHCenter
                                         }
@@ -1190,8 +1190,8 @@ ShellRoot {
                                                 border.width:2
                                                 border.color: root.authFailed ? root.cErr
                                                     : (root.authChecking
-                                                        ? root.cWc3
-                                                        : root.cWc5)
+                                                        ? root.cWc5
+                                                        : root.cWc3)
                                                 Behavior on border.color { ColorAnimation{duration:250} }
                                             }
                                             RowLayout {
