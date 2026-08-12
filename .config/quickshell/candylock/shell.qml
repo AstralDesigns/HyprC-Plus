@@ -1080,8 +1080,8 @@ ShellRoot {
                                                 : (root.tempOk ? Math.round(root.tempC)+"°" : "N/A"))
                                             readonly property string arcGlyph: index===0?"󰻠":(index===1?"󰍛":"󰔏")
                                             readonly property string arcLabel: index===0?"CPU":(index===1?"RAM":"Temp")
-                                            readonly property color arcColor: index===0 ? root.cWc3
-                                                : (index===1 ? root.cWc9 : root.cWc10)
+                                            readonly property color arcColor: index===0 ? root.cWc5
+                                                : (index===1 ? root.cWc10 : root.cWc3)
 
                                             Layout.fillWidth:true; Layout.fillHeight:true; Layout.minimumHeight:88
 
