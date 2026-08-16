@@ -352,6 +352,8 @@ function _injectGlyphSizeCSS(display) {
         }
         .fallback-icon {
             font-size: calc(${glyphPx}px + 4px);
+            min-width: ${appPx}px;
+            min-height: calc(${appPx}px + (${padPx}px * 2));
         }
         #indicator-dots {
             color: @surface_tint;
@@ -374,6 +376,8 @@ function _injectGlyphSizeCSS(display) {
             max-height: ${appPx}px;
         }
         button.app-button image, button.dock-button image {
+            min-width: ${appPx}px;
+            min-height: calc(${appPx}px + (${padPx}px * 2));
             padding: 0px;
         }
     `;
@@ -1457,7 +1461,7 @@ const HyprCandyDock = GObject.registerClass({
         // visual dot, causing misalignment with the Overlay's halign/valign.
         // The DrawingArea reports its EXACT pixel size as its natural size, so
         // GTK places it flush at the dock-facing edge via halign/valign below.
-        const _dotR = Math.max(4, Math.round(INDICATOR_SIZE / (INDICATOR_SIZE / 2)));
+        const _dotR = Math.max(2.5, Math.round(INDICATOR_SIZE / (INDICATOR_SIZE / 2)));
         const _dotD = 2 * _dotR;
         const _dotGap = INDICATOR_SPACING;  // from config (px between 2 dots)
 
