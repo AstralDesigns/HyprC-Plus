@@ -538,7 +538,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @color2;
+    border-color: @inverse_primary;
     margin: 8px;
 }
 
