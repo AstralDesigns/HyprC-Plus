@@ -307,7 +307,7 @@ PanelWindow {
                                 text: modelData
                                 color: (index === 5 || index === 6)
                                     ? Theme.cWc4
-                                    : Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.80)
+                                    : Theme.cPrimary
                                 font.family: Config.labelFont
                                 font.pixelSize: 10
                                 font.weight: Font.Medium
