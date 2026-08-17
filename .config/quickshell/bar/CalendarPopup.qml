@@ -418,56 +418,6 @@ PanelWindow {
                     }
                 }
             }
-
-            //RowLayout {
-                //Layout.fillWidth: true
-                //Layout.bottomMargin: 2
-                //spacing: 4
-
-                //Repeater {
-                    //model: calWin._upcomingDays
-                    //delegate: Rectangle {
-                        //required property var modelData
-                        //Layout.fillWidth: true
-                        //height: upcomingCol.implicitHeight + 10
-                        //radius: 6
-                        //color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               //Theme.cInversePrimary.b, 0.45)
-                        //border.width: 1
-                        //border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
-
-                        //ColumnLayout {
-                            //id: upcomingCol
-                            //anchors.centerIn: parent
-                            //spacing: 1
-
-                            //Text {
-                                //Layout.alignment: Qt.AlignHCenter
-                                //text: modelData.label
-                                //color: Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, 1.0)
-                                //font.family: Config.labelFont
-                                //font.pixelSize: 9
-                                //font.weight: Font.Medium
-                            //}
-                            //Text {
-                                //Layout.alignment: Qt.AlignHCenter
-                                //text: modelData.day
-                                //color: Theme.cOnSurf
-                                //font.family: Config.labelFont
-                                //font.pixelSize: 13
-                                //font.weight: Font.Medium
-                            //}
-                            //Text {
-                                //Layout.alignment: Qt.AlignHCenter
-                                //text: modelData.month
-                                //color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.55)
-                                //font.family: Config.labelFont
-                                //font.pixelSize: 9
-                            //}
-                        //}
-                    //}
-                //}
-            //}
         }
     }
 }
