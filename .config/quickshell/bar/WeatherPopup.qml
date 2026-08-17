@@ -166,8 +166,8 @@ Item {
                     implicitHeight: 172
                     radius: 20
                     clip: true
-                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                                               Theme.cOnSecondary.b, 0.45)
+                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                               Theme.cInversePrimary.b, 0.25)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 

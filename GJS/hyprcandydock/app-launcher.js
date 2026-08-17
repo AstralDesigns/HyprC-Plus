@@ -538,7 +538,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @inverse_primary;
+    border-color: @color2;
     margin: 8px;
 }
 
@@ -550,7 +550,7 @@ window.hyprcandy-launcher {
    No padding here — the border sits flush against the SearchEntry.       */
 
 .search-frame {
-    background-color: @blur_background8;
+    background-color: alpha(@inverse_primary, 0.35);
     border-radius: ${sr}px;
     border-style: solid;
     border-width: 0px;
@@ -833,7 +833,7 @@ window.hyprcandy-group-dialog {
    pillWrap margin-start: 2px  → 2px from the list-frame left inner edge.
    pillWrap margin-end:   2px  → 2px gap between pill and stack content.  */
 .tab-pill {
-    background-color: alpha(@inverse_primary, 0.35);
+    background-color: alpha(@inverse_primary, 0.45);
     border-radius: 30px;
     border: 1px solid alpha(@scrim, 1.00);
     padding: 1px 0;
@@ -858,7 +858,7 @@ window.hyprcandy-group-dialog {
 }
 
 .tab-btn:hover {
-    background-color: alpha(@on_secondary, 0.4);
+    background-color: alpha(@on_secondary, 0.65);
 }
 
 .tab-btn.active {
@@ -940,7 +940,7 @@ window.hyprcandy-group-dialog {
     box-shadow: none;
 }
 .emoji-mode-btn.active {
-    background-color: @inverse_primary;
+    background-color: alpha(@inverse_primary, 0.45);
     border-color: transparent;
     color: @primary;
 }
@@ -979,7 +979,7 @@ window.hyprcandy-group-dialog {
     outline: none;
     box-shadow: none;
     font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
-    font-size: 30px;
+    font-size: 35px;
     color: @primary;
 }
 .nerd-btn:hover {
@@ -987,7 +987,7 @@ window.hyprcandy-group-dialog {
     border-color: alpha(@primary, 0.16);
 }
 .nerd-btn:active {
-    background-color: alpha(@inverse_primary, 0.5);
+    background-color: alpha(@inverse_primary, 0.45);
 }
 /* Category bar buttons — NF font so glyph previews render in nerd mode */
 .emoji-cat-btn {
@@ -997,14 +997,14 @@ window.hyprcandy-group-dialog {
     border-radius: 6px;
     padding: 2px 8px;
     color: alpha(@primary, 0.60);
-    font-size: 20px;
+    font-size: 25px;
     min-height: 34px;
     outline: none;
     box-shadow: none;
     font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', emoji, monospace;
 }
 .emoji-cat-btn.active {
-    background-color: @inverse_primary;
+    background-color: alpha(@inverse_primary, 0.45);
     color: @primary;
 }
 .emoji-cat-btn:hover {
