@@ -320,9 +320,9 @@ PanelWindow {
             // ── Calendar grid ─────────────────────────────────────────────
             Rectangle {
                 Layout.fillWidth: true
-                Layout.bottomMargin: 10
+                Layout.bottomMargin: 2
                 implicitHeight: gridCol.implicitHeight + 16
-                radius: 20
+                radius: 12
                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                Theme.cInversePrimary.b, 0.25)
                 border.width: 1
