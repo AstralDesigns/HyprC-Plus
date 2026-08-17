@@ -276,7 +276,7 @@ PanelWindow {
                 implicitHeight: headersRow.implicitHeight + 12
                 radius: 20
                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.25)
+                                               Theme.cInversePrimary.b, 0.35)
                 border.width: 1
                 border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
@@ -324,7 +324,7 @@ PanelWindow {
                 implicitHeight: gridCol.implicitHeight + 16
                 radius: 12
                 color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.25)
+                                               Theme.cInversePrimary.b, 0.35)
                 border.width: 1
                 border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
