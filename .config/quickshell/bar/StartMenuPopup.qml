@@ -379,7 +379,7 @@ PanelWindow {
                     id: netListWrap
                     visible: StartMenuState.networkExpanded
                     Layout.fillWidth: true
-                    // 34px row + 2px spacing per entry; cap at 6 rows.
+                    // - 34px row + 2px spacing per entry; cap at 6 rows.
                     readonly property real _rowH: 36
                     readonly property real _maxHeight: _rowH * 6
                     implicitHeight: netListFlick.height
@@ -397,7 +397,7 @@ PanelWindow {
                             visible: (StartMenuState.networkList && StartMenuState.networkList.length > 6) && size < 1.0
                             contentItem: Rectangle {
                                 implicitWidth: 4
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
                                 radius: 2
                             }
                             background: Rectangle { color: "transparent" }

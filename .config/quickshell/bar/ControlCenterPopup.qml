@@ -5108,7 +5108,7 @@ PanelWindow {
                                             policy: ScrollBar.AsNeeded
                                             contentItem: Rectangle {
                                                 implicitWidth: 4
-                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
                                                 radius: 2
                                             }
                                             background: Rectangle { color: "transparent" }
@@ -5346,7 +5346,7 @@ PanelWindow {
                                                     policy: ScrollBar.AsNeeded
                                                     contentItem: Rectangle {
                                                         implicitWidth: 3
-                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
                                                         radius: 2
                                                     }
                                                     background: Rectangle { color: "transparent" }
@@ -5848,7 +5848,7 @@ PanelWindow {
                                         policy: ScrollBar.AsNeeded
                                         contentItem: Rectangle {
                                             implicitWidth: 4
-                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
                                             radius: 2
                                         }
                                         background: Rectangle { color: "transparent" }
