@@ -338,7 +338,7 @@ Item {
                 const onS = Theme.cOnSurf
                 ctx.lineWidth = lw; ctx.lineCap = "round"
                 ctx.beginPath(); ctx.arc(cx, cy, r, S, E)
-                ctx.strokeStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.12).toString()
+                ctx.strokeStyle = Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15).toString()
                 ctx.stroke()
                 if (_v > 0.005) {
                     ctx.beginPath(); ctx.arc(cx, cy, r, S, S + _v*(E-S))

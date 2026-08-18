@@ -58,7 +58,7 @@ ShellRoot {
     // Sub-card backgrounds
     readonly property color cCardDark: Qt.rgba(
         Qt.color(_m3background).r, Qt.color(_m3background).g,
-        Qt.color(_m3background).b, 0.80)
+        Qt.color(_m3background).b, 0.6)
     readonly property color cCardWarm: Qt.rgba(
         Qt.color(_m3background).r, Qt.color(_m3background).g,
         Qt.color(_m3background).b, 0.6)
@@ -1105,7 +1105,7 @@ ShellRoot {
                                                     const s=0.75*Math.PI,e=2.25*Math.PI
                                                     ctx.lineWidth=lw; ctx.lineCap="round"
                                                     ctx.beginPath(); ctx.arc(cx,cy,r,s,e)
-                                                    ctx.strokeStyle=Qt.rgba(onS.r,onS.g,onS.b,0.12).toString(); ctx.stroke()
+                                                    ctx.strokeStyle=Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.15).toString(); ctx.stroke()
                                                     if(cv>0.005){
                                                         ctx.beginPath(); ctx.arc(cx,cy,r,s,s+cv*(e-s))
                                                         ctx.strokeStyle=dialCol.toString(); ctx.stroke()
@@ -1438,7 +1438,7 @@ ShellRoot {
 
                                                 Rectangle {
                                                     anchors.fill: parent; radius: 7
-                                                    color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.28)
+                                                    color: Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.15)
                                                     border.width: 1
                                                     border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45)
                                                 }
@@ -1517,7 +1517,7 @@ ShellRoot {
 
                                                 Rectangle {
                                                     anchors.fill: parent; radius: 7
-                                                    color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.28)
+                                                    color: Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.15)
                                                     border.width: 1
                                                     border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45)
                                                 }
