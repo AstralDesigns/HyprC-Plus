@@ -152,6 +152,7 @@ Item {
     Process { id: nightLightStatusProc
         command:[sm._scriptDir + "/hyprland-hyprsunset.sh", "status"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){ sm.nightLightOn = l.trim() === "on" } }
+        Component.onCompleted: running = true
     }
     Process { id: nightLightToggleProc
         command:[sm._scriptDir + "/hyprland-hyprsunset.sh", "toggle"]

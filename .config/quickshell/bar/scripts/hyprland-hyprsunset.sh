@@ -1,14 +1,21 @@
 #!/bin/bash
-# Hyprsunset toggle/status - matches candy-utils.js exactly
+# Hyprsunset toggle/status/apply - matches candy-utils.js exactly
 STATE_FILE="$HOME/.config/hyprcandy/hyprsunset.state"
 
 case "$1" in
-    status)
-        [ -f "$STATE_FILE" ] && echo "on" || echo "off"
+    status|apply|restore)
+        if [ -f "$STATE_FILE" ]; then
+            if ! pgrep -x hyprsunset >/dev/null 2>&1; then
+                ( hyprsunset >/dev/null 2>&1 & ) &
+            fi
+            echo "on"
+        else
+            echo "off"
+        fi
         ;;
     toggle|*)
         if [ -f "$STATE_FILE" ]; then
-            pkill hyprsunset
+            pkill -x hyprsunset 2>/dev/null
             rm -f "$STATE_FILE"
         else
             # Double-fork to fully detach (survives parent death)

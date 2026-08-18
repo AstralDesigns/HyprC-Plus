@@ -362,16 +362,6 @@ PanelWindow {
                     }
                 }
 
-                // Scanning status text above network list
-                //Text {
-                    //visible: StartMenuState.networkExpanded && StartMenuState.netScanProcRunning
-                    //text: "Scanning…"
-                    //color: Theme.cPrimary
-                    //font.pixelSize: 11
-                    //font.italic: true
-                    //leftPadding: 4
-                //}
-
                 // Wifi network list — caps at 6 rows visible, then becomes
                 // scrollable with a minimal scrollbar (matches CC's
                 // Keybinds / Animations tabs).
