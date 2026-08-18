@@ -3085,55 +3085,33 @@ PanelWindow {
                                 }
                             }
 
-                            // ── Hyprsunset toggle ─────────────────────────────────
-                            CCToggle {
-                                id: sunsetToggle
-                                label: "Hyprsunset"
-                                value: false
-                                Component.onCompleted: _sunsetStatus.running = true
-                                onToggled: function(v) {
-                                    _sunsetToggleProc.command = [scriptDir + "/hyprland-hyprsunset.sh", "toggle"]
-                                    _sunsetToggleProc.running = true
-                                }
-                            }
-                            Process {
-                                id: _sunsetStatus
-                                command: [scriptDir + "/hyprland-hyprsunset.sh", "status"]
-                                running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) { sunsetToggle.value = l.trim() === "on" }
-                                }
-                            }
-                            Process { id: _sunsetToggleProc; running: false }
-
                             // ── Gamma +/- buttons ─────────────────────────────────
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 8
-                                Text {
-                                    text: "Gamma"
-                                    color: Theme.cPrimary
-                                    font.family: Config.labelFont
-                                    font.pixelSize: 13
-                                    Layout.preferredWidth: 100
-                                }
-                                CCPillBtn {
-                                    text: "−10"
-                                    onClicked: {
-                                        _gammaDec.command = [scriptDir + "/hyprland-gamma.sh", "-10"]
-                                        _gammaDec.running = true
-                                    }
-                                }
-                                CCPillBtn {
-                                    text: "+10"
-                                    onClicked: {
-                                        _gammaInc.command = [scriptDir + "/hyprland-gamma.sh", "10"]
-                                        _gammaInc.running = true
-                                    }
-                                }
-                            }
-                            Process { id: _gammaDec; running: false; onExited: running = false }
-                            Process { id: _gammaInc; running: false; onExited: running = false }
+                            //RowLayout {
+                                //Layout.fillWidth: true; spacing: 8
+                                //Text {
+                                    //text: "Gamma"
+                                    //color: Theme.cPrimary
+                                    //font.family: Config.labelFont
+                                    //font.pixelSize: 13
+                                    //Layout.preferredWidth: 100
+                                //}
+                                //CCPillBtn {
+                                    //text: "−10"
+                                    //onClicked: {
+                                        //_gammaDec.command = [scriptDir + "/hyprland-gamma.sh", "-10"]
+                                        //_gammaDec.running = true
+                                    //}
+                                //}
+                                //CCPillBtn {
+                                    //text: "+10"
+                                    //onClicked: {
+                                        //_gammaInc.command = [scriptDir + "/hyprland-gamma.sh", "10"]
+                                        //_gammaInc.running = true
+                                    //}
+                                //}
+                            //}
+                            //Process { id: _gammaDec; running: false; onExited: running = false }
+                            //Process { id: _gammaInc; running: false; onExited: running = false }
 
                             CCPillBtn { text: "󰈊  Hyprpicker"; onClicked: _picker.running = true }
                             Process { id: _picker; command: ["hyprpicker"]; running: false }

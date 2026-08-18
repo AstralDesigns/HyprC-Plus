@@ -21,6 +21,7 @@ Item {
         if (!volReadProc.running) volReadProc.running = true
         if (!micReadProc.running) micReadProc.running = true
         if (!micActiveProc.running) micActiveProc.running = true
+        if (!nightLightStatusProc.running) nightLightStatusProc.running = true
     }
     function close()  { sm.menuVisible = false }
 
@@ -34,12 +35,14 @@ Item {
         if (!blReadProc.running) blReadProc.running = true
         if (!netStatusProc.running) netStatusProc.running = true
         if (!btStatusProc.running) btStatusProc.running = true
+        if (!nightLightStatusProc.running) nightLightStatusProc.running = true
     }
 
     // ── Network scan state ──────────────────────────────────────────────
     property bool netScanProcRunning: false
     property bool netSavedProcRunning: false
     function startNetScan() {
+        if (sm.netPasswordSSID !== "") return
         // Open the gate immediately so the follow-up auto-scan after this
         // manual refresh isn't blocked by the 30-second cooldown.
         _autoScanGate.open()
@@ -143,6 +146,21 @@ Item {
     Timer { interval:10000; repeat:true; running: sm._pollActive
         onTriggered: sm._now = new Date() }
 
+    // ── Night light (hyprsunset) ────────────────────────────────────────
+    readonly property string _scriptDir: Quickshell.env("HOME") + "/.config/quickshell/bar/scripts"
+    property bool nightLightOn: false
+    Process { id: nightLightStatusProc
+        command:[sm._scriptDir + "/hyprland-hyprsunset.sh", "status"]
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){ sm.nightLightOn = l.trim() === "on" } }
+    }
+    Process { id: nightLightToggleProc
+        command:[sm._scriptDir + "/hyprland-hyprsunset.sh", "toggle"]
+        onExited: { if(!nightLightStatusProc.running) nightLightStatusProc.running = true }
+    }
+    function toggleNightLight() {
+        if (!nightLightToggleProc.running) nightLightToggleProc.running = true
+    }
+
     // ── Network ────────────────────────────────────────────────────────────────
     property bool networkExpanded: false
     onNetworkExpandedChanged: {
@@ -186,7 +204,7 @@ Item {
         }}
         onExited: {
             if (!netRadioProc.running) netRadioProc.running = true
-            if (sm.networkExpanded && !sm._forgetInFlight && !netScanProc.running
+            if (sm.networkExpanded && sm.netPasswordSSID === "" && !sm._forgetInFlight && !netScanProc.running
                     && _autoScanGate.elapsed)
                 netScanProc.running = true
         }
@@ -255,10 +273,10 @@ Item {
                 if (sm._forgetPending) {
                     sm._forgetPending  = false
                     sm._forgetInFlight = false
-                    if (!netScanProc.running) netScanProc.running = true
+                    if (sm.netPasswordSSID === "" && !netScanProc.running) netScanProc.running = true
                 } else if (sm._connSavedPending) {
                     sm._connSavedPending = false
-                    if (sm.networkExpanded && !netScanProc.running)
+                    if (sm.networkExpanded && sm.netPasswordSSID === "" && !netScanProc.running)
                         netScanProc.running = true
                 }
             }
@@ -270,7 +288,7 @@ Item {
         command: ["bash", "-c", "nmcli dev wifi rescan 2>/dev/null; true"]
         onRunningChanged: {
             if (running) { sm.netScanProcRunning = true; sm._netBuf = [] }
-            else if (!sm._forgetInFlight && !netScanProc.running) netScanProc.running = true
+            else if (!sm._forgetInFlight && sm.netPasswordSSID === "" && !netScanProc.running) netScanProc.running = true
         }
     }
     Process { id: netScanProc
@@ -288,7 +306,9 @@ Item {
         onRunningChanged: {
             sm.netScanProcRunning = running
             if(running) { sm._netBuf=[] } else {
-                sm.networkList=sm._netBuf.slice()
+                if (sm.netPasswordSSID === "") {
+                    sm.networkList=sm._netBuf.slice()
+                }
                 // Start the 30-second cooldown so the next STATUS→scan cycle
                 // won't re-run nmcli wifi list until the gate reopens.
                 _autoScanGate.reset()
@@ -343,7 +363,7 @@ Item {
         onExited: {
             if(!netStatusProc.running) netStatusProc.running=true
             // Guard: don't race a scan against an in-flight forget/saved-rebuild cycle.
-            if(!sm._forgetInFlight && !netScanProc.running) netScanProc.running=true
+            if(!sm._forgetInFlight && sm.netPasswordSSID === "" && !netScanProc.running) netScanProc.running=true
         }
     }
     function disconnectNetwork() {

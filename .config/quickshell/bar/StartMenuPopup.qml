@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
@@ -207,6 +208,45 @@ PanelWindow {
               	  }
             }
 
+            // ── Night light ──────────────────────────────────────────────
+            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
+
+            RowLayout {
+                Layout.fillWidth: true; height: 25; spacing: 10
+                Text {
+                	text: " 󰖔"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc5
+                }
+                Text {
+                	text: "Night light"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
+                	Layout.fillWidth: true
+                }
+                // iOS-style pill toggle
+                Rectangle {
+                    	id: _nlPill
+                    	width: 40; height: 22; radius: 11
+                    	color: StartMenuState.nightLightOn
+                        	? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.82)
+                        	: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+                    	border.width: 1
+                    	border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                    	Behavior on color { ColorAnimation { duration: 150 } }
+
+                    	Rectangle {
+                        	width: 16; height: 16; radius: 8
+                        	color: StartMenuState.nightLightOn ? Theme.cWc6 : Theme.cWc5
+                        	anchors.verticalCenter: parent.verticalCenter
+                        	x: StartMenuState.nightLightOn ? parent.width - width - 3 : 3
+                        	Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                        	Behavior on color { ColorAnimation { duration: 150 } }
+                    	}
+
+                    	MouseArea {
+                        	anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                        	onClicked: StartMenuState.toggleNightLight()
+                    	}
+                }
+            }
+
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             // ── Network + Bluetooth ────────────────────────────────────
@@ -237,21 +277,8 @@ PanelWindow {
                         color: Theme.cOnSurf; font.pixelSize: 11; opacity: 0.75
                         elide: Text.ElideRight
                     }
-                    Rectangle {
-                        width: 24; height: 24; radius: 6
-                        color: nxh.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65) : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
-                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        Text { anchors.centerIn: parent; text: StartMenuState.networkExpanded ? "󰁆" : "󰁄"
-                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cWc5 }
-                        MouseArea { id: nxh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                StartMenuState.networkExpanded = !StartMenuState.networkExpanded
-                                if (StartMenuState.networkExpanded) StartMenuState.startNetScan()
-                            }
-                        }
-                    }
-                    // Rescan button — triggers nmcli dev wifi rescan then refreshes list
+                    // Rescan button — triggers nmcli dev wifi rescan then refreshes list.
+                    // Only visible while the Wi-Fi section is expanded.
                     Rectangle {
                         width: 24; height: 24; radius: 6
                         visible: StartMenuState.networkExpanded
@@ -277,8 +304,36 @@ PanelWindow {
                             cursorShape: StartMenuState.netScanProcRunning ? Qt.ArrowCursor : Qt.PointingHandCursor
                             enabled: !StartMenuState.netScanProcRunning
                             onClicked: {
-                                StartMenuState.networkList = []
                                 StartMenuState.startNetScan()
+                            }
+                        }
+                    }
+                    // Advanced network settings — launches nm-connection-editor.
+                    // Always visible, like the expand/minimize toggle.
+                    Rectangle {
+                        width: 24; height: 24; radius: 6
+                        color: netSettingsH.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65) : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Text { anchors.centerIn: parent; text: "󰒓"
+                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cWc5 }
+                        MouseArea { id: netSettingsH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: Quickshell.execDetached(["nm-connection-editor"])
+                        }
+                    }
+                    // Expand/minimize the Wi-Fi network list — always visible,
+                    // always the last control before the BT separator.
+                    Rectangle {
+                        width: 24; height: 24; radius: 6
+                        color: nxh.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65) : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Text { anchors.centerIn: parent; text: StartMenuState.networkExpanded ? "󰁆" : "󰁄"
+                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cWc5 }
+                        MouseArea { id: nxh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                StartMenuState.networkExpanded = !StartMenuState.networkExpanded
+                                if (StartMenuState.networkExpanded) StartMenuState.startNetScan()
                             }
                         }
                     }
@@ -307,10 +362,50 @@ PanelWindow {
                     }
                 }
 
-                // Wifi network list
-                Column {
+                // Scanning status text above network list
+                //Text {
+                    //visible: StartMenuState.networkExpanded && StartMenuState.netScanProcRunning
+                    //text: "Scanning…"
+                    //color: Theme.cPrimary
+                    //font.pixelSize: 11
+                    //font.italic: true
+                    //leftPadding: 4
+                //}
+
+                // Wifi network list — caps at 6 rows visible, then becomes
+                // scrollable with a minimal scrollbar (matches CC's
+                // Keybinds / Animations tabs).
+                Item {
+                    id: netListWrap
                     visible: StartMenuState.networkExpanded
-                    Layout.fillWidth: true; width: parent.width; spacing: 2
+                    Layout.fillWidth: true
+                    // 34px row + 2px spacing per entry; cap at 6 rows.
+                    readonly property real _rowH: 36
+                    readonly property real _maxHeight: _rowH * 6
+                    implicitHeight: netListFlick.height
+
+                    Flickable {
+                        id: netListFlick
+                        width: parent.width
+                        height: Math.min(netListCol.implicitHeight, netListWrap._maxHeight)
+                        contentWidth: width
+                        contentHeight: netListCol.implicitHeight
+                        clip: true
+                        boundsBehavior: Flickable.StopAtBounds
+                        ScrollBar.vertical: ScrollBar {
+                            policy: (StartMenuState.networkList && StartMenuState.networkList.length > 6) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                            visible: (StartMenuState.networkList && StartMenuState.networkList.length > 6) && size < 1.0
+                            contentItem: Rectangle {
+                                implicitWidth: 4
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                radius: 2
+                            }
+                            background: Rectangle { color: "transparent" }
+                        }
+
+                    Column {
+                        id: netListCol
+                        width: netListFlick.width; spacing: 2
 
                     Repeater {
                         model: StartMenuState.networkList
@@ -510,9 +605,11 @@ PanelWindow {
                     }
 
                     Text {
-                        visible: StartMenuState.netScanProcRunning && StartMenuState.networkList.length === 0
-                        text: "Scanning..."; color: Theme.cOnSurfVar; font.pixelSize: 11; font.italic: true; leftPadding: 12
+                        visible: StartMenuState.networkList.length === 0 && !StartMenuState.netScanProcRunning
+                        text: "No networks found"; color: Theme.cOnSurfVar; font.pixelSize: 11; font.italic: true; leftPadding: 12
                     }
+                    } // netListCol
+                    } // netListFlick
                 }
 
                 // Bluetooth panel (expanded)
@@ -579,193 +676,228 @@ PanelWindow {
                         text: "Bluetooth is off"; color: Theme.cOnSurfVar; font.pixelSize: 11; font.italic: true; leftPadding: 4; topPadding: 4
                     }
 
-                    // Device list
-                    Repeater {
-                        model: StartMenuState.btDevices
-                        delegate: Column {
-                            id: btDelegate
-                            required property var modelData
-                            required property int index
-                            width: parent.width; spacing: 2
+                    // Device list — caps at 6 rows visible, then becomes scrollable
+                    Item {
+                        id: btListWrap
+                        visible: StartMenuState.btPowered && StartMenuState.btDevices.length > 0
+                        width: parent.width
+                        // 34px row + 2px spacing per entry; cap at 6 rows.
+                        readonly property real _rowH: 36
+                        readonly property real _maxHeight: _rowH * 6
+                        implicitHeight: btListFlick.height
 
-                            Rectangle {
-                                id: btDevRow
-                                width: parent.width; height: 34; radius: 8
-                                color: bth.containsMouse
-                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
-                                    : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.5)
-                                Behavior on color { ColorAnimation { duration: 100 } }
-                                border.width: btDelegate.modelData.connected ? 1 : 0
-                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.5)
-
-                                RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 6
-                                    Text {
-                                        font.pixelSize: 13; font.family: Config.fontFamily
-                                        color: btDelegate.modelData.connected ? Theme.cWc4 : Theme.cOnSurfVar
-                                        text: {
-                                            const ic = (btDelegate.modelData.icon || "").toLowerCase()
-                                            if (ic === "audio-headset" || ic === "audio-headphones" || ic === "audio-headset-gateway") return "󰋎"
-                                            if (ic === "audio-card" || ic.includes("speaker")) return "󰓃"
-                                            if (ic === "input-keyboard") return "󰌌"
-                                            if (ic === "input-mouse") return "󰍽"
-                                            if (ic === "input-gaming") return "󰊗"
-                                            if (ic === "phone") return "󰏲"
-                                            if (ic === "computer") return "󰇄"
-                                            if (ic.includes("watch") || ic.includes("wearable")) return "󰓹"
-                                            if (ic === "printer") return "󰐪"
-                                            if (ic === "camera-photo") return "󰄀"
-                                            if (ic === "camera-video") return "󰕧"
-                                            if (ic === "modem" || ic === "network-wireless") return "󰤨"
-                                            return "󰂯"
-                                        }
-                                    }
-                                    Text { Layout.fillWidth: true; text: btDelegate.modelData.name
-                                        color: Theme.cOnSurf; font.pixelSize: 11; elide: Text.ElideRight }
-                                    Text { text: "󰒖"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cPrimary
-                                        visible: StartMenuState.btConnecting === btDelegate.modelData.mac
-                                        RotationAnimator on rotation { from: 0; to: 360; duration: 800; loops: Animation.Infinite
-                                            running: StartMenuState.btConnecting === btDelegate.modelData.mac } }
-                                    Text { text: "󰄬"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cPrimary
-                                        visible: StartMenuState.btConnectedMac === btDelegate.modelData.mac
-                                        opacity: StartMenuState.btConnectedMac === btDelegate.modelData.mac ? 1.0 : 0.0
-                                        Behavior on opacity { NumberAnimation { duration: 400 } } }
-                                    Text {
-                                        text: StartMenuState.btExpandedMac === btDelegate.modelData.mac ? "󰅀" : "󰅂"
-                                        font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cOnSurfVar
-                                        MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor
-                                            onClicked: function(e) {
-                                                e.accepted = true
-                                                const m = btDelegate.modelData.mac
-                                                if (StartMenuState.btExpandedMac === m) StartMenuState.btExpandedMac = ""
-                                                else { StartMenuState.btExpandedMac = m; StartMenuState.btQueryProfile(m) }
-                                            }
-                                        }
-                                    }
+                        Flickable {
+                            id: btListFlick
+                            width: parent.width
+                            height: Math.min(btListCol.implicitHeight, btListWrap._maxHeight)
+                            contentWidth: width
+                            contentHeight: btListCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            ScrollBar.vertical: ScrollBar {
+                                policy: (StartMenuState.btDevices && StartMenuState.btDevices.length > 6) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                                visible: (StartMenuState.btDevices && StartMenuState.btDevices.length > 6) && size < 1.0
+                                contentItem: Rectangle {
+                                    implicitWidth: 4
+                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                    radius: 2
                                 }
-                                MouseArea { id: bth; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; z: -1
-                                    onClicked: {
-                                        if (StartMenuState.btConnecting !== "") return
-                                        if (btDelegate.modelData.connected) StartMenuState.btDisconnect(btDelegate.modelData.mac)
-                                        else StartMenuState.btConnect(btDelegate.modelData.mac)
-                                    }
-                                }
+                                background: Rectangle { color: "transparent" }
                             }
 
-                            // Options panel
-                            Rectangle {
-                                visible: StartMenuState.btExpandedMac === btDelegate.modelData.mac
-                                width: parent.width
-                                height: visible ? optCol.implicitHeight + 12 : 0
-                                radius: 8
-                                color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.35)
-                                border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
-                                clip: true
+                            Column {
+                                id: btListCol
+                                width: btListFlick.width; spacing: 2
 
-                                Column {
-                                    id: optCol
-                                    anchors { left: parent.left; right: parent.right; top: parent.top; margins: 6 }
-                                    spacing: 6
+                                Repeater {
+                                    model: StartMenuState.btDevices
+                                    delegate: Column {
+                                        id: btDelegate
+                                        required property var modelData
+                                        required property int index
+                                        width: parent.width; spacing: 2
 
-                                    RowLayout {
-                                        width: parent.width; spacing: 4
-                                        visible: StartMenuState.btHasAudioCard[btDelegate.modelData.mac] === true
-                                        Text { text: "Profile:"; font.pixelSize: 10; color: Theme.cOnSurfVar; Layout.preferredWidth: 40 }
-                                        ProfilePill { pLabel: "A2DP";    pProfile: "a2dp-sink";        pMac: btDelegate.modelData.mac }
-                                        ProfilePill { pLabel: "HSP/HFP"; pProfile: "headset-head-unit"; pMac: btDelegate.modelData.mac }
-                                        ProfilePill { pLabel: "Off";     pProfile: "off";               pMac: btDelegate.modelData.mac }
-                                        Item { Layout.fillWidth: true }
-                                    }
-
-                                    RowLayout {
-                                        width: parent.width; spacing: 4
                                         Rectangle {
-                                            height: 22; radius: 6; implicitWidth: sdLbl.implicitWidth + 20
-                                            visible: btDelegate.modelData.connected &&
-                                                     StartMenuState.btHasAudioCard[btDelegate.modelData.mac] === true
-                                            color: sdh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
-                                                : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
-                                            border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.50)
+                                            id: btDevRow
+                                            width: parent.width; height: 34; radius: 8
+                                            color: bth.containsMouse
+                                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.5)
                                             Behavior on color { ColorAnimation { duration: 100 } }
-                                            RowLayout { id: sdLbl; anchors.centerIn: parent; spacing: 4
-                                                Text { text: "󰓃"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cPrimary }
-                                                Text { text: "Default Output"; font.pixelSize: 10; color: Theme.cOnSurf }
-                                            }
-                                            MouseArea { id: sdh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                                onClicked: StartMenuState.btSetDefaultSink(btDelegate.modelData.mac) }
-                                        }
-                                        Rectangle {
-                                            id: trustRect; height: 22; radius: 6; implicitWidth: trLbl.implicitWidth + 20
-                                            property bool _isTrusted: StartMenuState.btIsTrusted(btDelegate.modelData.mac)
-                                            visible: {
-                                                const ic = (btDelegate.modelData.icon || "").toLowerCase()
-                                                return ic === "phone" || ic === "computer" || ic === "printer" ||
-                                                       ic.includes("watch") || ic.includes("wearable")
-                                            }
-                                            color: trh.containsMouse
-                                                ? (trustRect._isTrusted ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
-                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20))
-                                                : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
-                                            border.width: 1
-                                            border.color: trustRect._isTrusted
-                                                ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.5)
-                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
-                                            Behavior on color { ColorAnimation { duration: 100 } }
-                                            RowLayout { id: trLbl; anchors.centerIn: parent; spacing: 4
+                                            border.width: btDelegate.modelData.connected ? 1 : 0
+                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.5)
+
+                                            RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 6
                                                 Text {
-                                                    text: trustRect._isTrusted ? "󱈘" : "󱖡" //󰒃 󰒄
-                                                    font.pixelSize: 11; font.family: Config.fontFamily
-                                                    color: trustRect._isTrusted ? Theme.cErr : Theme.cPrimary
+                                                    font.pixelSize: 13; font.family: Config.fontFamily
+                                                    color: btDelegate.modelData.connected ? Theme.cWc4 : Theme.cOnSurfVar
+                                                    text: {
+                                                        const ic = (btDelegate.modelData.icon || "").toLowerCase()
+                                                        if (ic === "audio-headset" || ic === "audio-headphones" || ic === "audio-headset-gateway") return "󰋎"
+                                                        if (ic === "audio-card" || ic.includes("speaker")) return "󰓃"
+                                                        if (ic === "input-keyboard") return "󰌌"
+                                                        if (ic === "input-mouse") return "󰍽"
+                                                        if (ic === "input-gaming") return "󰊗"
+                                                        if (ic === "phone") return "󰏲"
+                                                        if (ic === "computer") return "󰇄"
+                                                        if (ic.includes("watch") || ic.includes("wearable")) return "󰓹"
+                                                        if (ic === "printer") return "󰐪"
+                                                        if (ic === "camera-photo") return "󰄀"
+                                                        if (ic === "camera-video") return "󰕧"
+                                                        if (ic === "modem" || ic === "network-wireless") return "󰤨"
+                                                        return "󰂯"
+                                                    }
                                                 }
-                                                //Text { text: trustRect._isTrusted ? "Untrust" : "Trust"
-                                                    //font.pixelSize: 10; color: trustRect._isTrusted ? Theme.cErr : Theme.cOnSurf }
+                                                Text { Layout.fillWidth: true; text: btDelegate.modelData.name
+                                                    color: Theme.cOnSurf; font.pixelSize: 11; elide: Text.ElideRight }
+                                                Text { text: "󰒖"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cPrimary
+                                                    visible: StartMenuState.btConnecting === btDelegate.modelData.mac
+                                                    RotationAnimator on rotation { from: 0; to: 360; duration: 800; loops: Animation.Infinite
+                                                        running: StartMenuState.btConnecting === btDelegate.modelData.mac } }
+                                                Text { text: "󰄬"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cPrimary
+                                                    visible: StartMenuState.btConnectedMac === btDelegate.modelData.mac
+                                                    opacity: StartMenuState.btConnectedMac === btDelegate.modelData.mac ? 1.0 : 0.0
+                                                    Behavior on opacity { NumberAnimation { duration: 400 } } }
+                                                Text {
+                                                    text: StartMenuState.btExpandedMac === btDelegate.modelData.mac ? "󰅀" : "󰅂"
+                                                    font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cOnSurfVar
+                                                    MouseArea { anchors.fill: parent; anchors.margins: -6; cursorShape: Qt.PointingHandCursor
+                                                        onClicked: function(e) {
+                                                            e.accepted = true
+                                                            const m = btDelegate.modelData.mac
+                                                            if (StartMenuState.btExpandedMac === m) StartMenuState.btExpandedMac = ""
+                                                            else { StartMenuState.btExpandedMac = m; StartMenuState.btQueryProfile(m) }
+                                                        }
+                                                    }
+                                                }
                                             }
-                                            MouseArea { id: trh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                                onClicked: StartMenuState.btSetTrust(btDelegate.modelData.mac, !trustRect._isTrusted) }
+                                            MouseArea { id: bth; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; z: -1
+                                                onClicked: {
+                                                    if (StartMenuState.btConnecting !== "") return
+                                                    if (btDelegate.modelData.connected) StartMenuState.btDisconnect(btDelegate.modelData.mac)
+                                                    else StartMenuState.btConnect(btDelegate.modelData.mac)
+                                                }
+                                            }
                                         }
+
+                                        // Options panel
                                         Rectangle {
-                                            height: 22; radius: 6; implicitWidth: sfLbl.implicitWidth + 20
-                                            visible: {
-                                                const ic = (btDelegate.modelData.icon || "").toLowerCase()
-                                                return ic === "phone" || ic === "computer" || ic === "printer" ||
-                                                       ic.includes("watch") || ic.includes("wearable")
+                                            visible: StartMenuState.btExpandedMac === btDelegate.modelData.mac
+                                            width: parent.width
+                                            height: visible ? optCol.implicitHeight + 12 : 0
+                                            radius: 8
+                                            color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.35)
+                                            border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+                                            clip: true
+
+                                            Column {
+                                                id: optCol
+                                                anchors { left: parent.left; right: parent.right; top: parent.top; margins: 6 }
+                                                spacing: 6
+
+                                                RowLayout {
+                                                    width: parent.width; spacing: 4
+                                                    visible: StartMenuState.btHasAudioCard[btDelegate.modelData.mac] === true
+                                                    Text { text: "Profile:"; font.pixelSize: 10; color: Theme.cOnSurfVar; Layout.preferredWidth: 40 }
+                                                    ProfilePill { pLabel: "A2DP";    pProfile: "a2dp-sink";        pMac: btDelegate.modelData.mac }
+                                                    ProfilePill { pLabel: "HSP/HFP"; pProfile: "headset-head-unit"; pMac: btDelegate.modelData.mac }
+                                                    ProfilePill { pLabel: "Off";     pProfile: "off";               pMac: btDelegate.modelData.mac }
+                                                    Item { Layout.fillWidth: true }
+                                                }
+
+                                                RowLayout {
+                                                    width: parent.width; spacing: 4
+                                                    Rectangle {
+                                                        height: 22; radius: 6; implicitWidth: sdLbl.implicitWidth + 20
+                                                        visible: btDelegate.modelData.connected &&
+                                                                 StartMenuState.btHasAudioCard[btDelegate.modelData.mac] === true
+                                                        color: sdh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                                                            : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.50)
+                                                        Behavior on color { ColorAnimation { duration: 100 } }
+                                                        RowLayout { id: sdLbl; anchors.centerIn: parent; spacing: 4
+                                                            Text { text: "󰓃"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cPrimary }
+                                                            Text { text: "Default Output"; font.pixelSize: 10; color: Theme.cOnSurf }
+                                                        }
+                                                        MouseArea { id: sdh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                            onClicked: StartMenuState.btSetDefaultSink(btDelegate.modelData.mac) }
+                                                    }
+                                                    Rectangle {
+                                                        id: trustRect; height: 22; radius: 6; implicitWidth: trLbl.implicitWidth + 20
+                                                        property bool _isTrusted: StartMenuState.btIsTrusted(btDelegate.modelData.mac)
+                                                        visible: {
+                                                            const ic = (btDelegate.modelData.icon || "").toLowerCase()
+                                                            return ic === "phone" || ic === "computer" || ic === "printer" ||
+                                                                   ic.includes("watch") || ic.includes("wearable")
+                                                        }
+                                                        color: trh.containsMouse
+                                                            ? (trustRect._isTrusted ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
+                                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20))
+                                                            : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                                        border.width: 1
+                                                        border.color: trustRect._isTrusted
+                                                            ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.5)
+                                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                        Behavior on color { ColorAnimation { duration: 100 } }
+                                                        RowLayout { id: trLbl; anchors.centerIn: parent; spacing: 4
+                                                            Text {
+                                                                text: trustRect._isTrusted ? "󱈘" : "󱖡" //󰒃 󰒄
+                                                                font.pixelSize: 11; font.family: Config.fontFamily
+                                                                color: trustRect._isTrusted ? Theme.cErr : Theme.cPrimary
+                                                            }
+                                                            //Text { text: trustRect._isTrusted ? "Untrust" : "Trust"
+                                                                //font.pixelSize: 10; color: trustRect._isTrusted ? Theme.cErr : Theme.cOnSurf }
+                                                        }
+                                                        MouseArea { id: trh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                            onClicked: StartMenuState.btSetTrust(btDelegate.modelData.mac, !trustRect._isTrusted) }
+                                                    }
+                                                    Rectangle {
+                                                        height: 22; radius: 6; implicitWidth: sfLbl.implicitWidth + 20
+                                                        visible: {
+                                                            const ic = (btDelegate.modelData.icon || "").toLowerCase()
+                                                            return ic === "phone" || ic === "computer" || ic === "printer" ||
+                                                                   ic.includes("watch") || ic.includes("wearable")
+                                                        }
+                                                        color: sfh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
+                                                            : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                        Behavior on color { ColorAnimation { duration: 100 } }
+                                                        RowLayout { id: sfLbl; anchors.centerIn: parent; spacing: 4
+                                                            Text { text: "󰏢"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
+                                                            //Text { text: "Send File"; font.pixelSize: 10; color: Theme.cOnSurfVar }
+                                                        }
+                                                        MouseArea { id: sfh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                            onClicked: StartMenuState.btSendFile(btDelegate.modelData.mac) }
+                                                    }
+                                                    Item { Layout.fillWidth: true }
+                                                    Rectangle {
+                                                        height: 22; radius: 6; implicitWidth: rpLbl.implicitWidth + 20
+                                                        color: rph.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                                                            : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                                        border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                        Behavior on color { ColorAnimation { duration: 100 } }
+                                                        RowLayout { id: rpLbl; anchors.centerIn: parent; spacing: 4
+                                                            Text { text: "󰑓"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
+                                                            Text { text: "Fix"; font.pixelSize: 10; color: Theme.cOnSurfVar }
+                                                        }
+                                                        MouseArea { id: rph; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                            onClicked: StartMenuState.btRepair(btDelegate.modelData.mac) }
+                                                    }
+                                                    Rectangle {
+                                                        height: 22; radius: 6; implicitWidth: fgLbl.implicitWidth + 20
+                                                        color: fgh.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
+                                                            : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
+                                                        border.width: 1; border.color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.45)
+                                                        Behavior on color { ColorAnimation { duration: 100 } }
+                                                        RowLayout { id: fgLbl; anchors.centerIn: parent; spacing: 4
+                                                            Text { text: "󰆴"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cErr; opacity: 0.8 }
+                                                            //Text { text: "Forget"; font.pixelSize: 10; color: Theme.cErr; opacity: 0.8 }
+                                                        }
+                                                        MouseArea { id: fgh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                                            onClicked: StartMenuState.btForget(btDelegate.modelData.mac) }
+                                                    }
+                                                }
                                             }
-                                            color: sfh.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
-                                                : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
-                                            border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
-                                            Behavior on color { ColorAnimation { duration: 100 } }
-                                            RowLayout { id: sfLbl; anchors.centerIn: parent; spacing: 4
-                                                Text { text: "󰏢"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
-                                                //Text { text: "Send File"; font.pixelSize: 10; color: Theme.cOnSurfVar }
-                                            }
-                                            MouseArea { id: sfh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                                onClicked: StartMenuState.btSendFile(btDelegate.modelData.mac) }
-                                        }
-                                        Item { Layout.fillWidth: true }
-                                        Rectangle {
-                                            height: 22; radius: 6; implicitWidth: rpLbl.implicitWidth + 20
-                                            color: rph.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
-                                                : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
-                                            border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
-                                            Behavior on color { ColorAnimation { duration: 100 } }
-                                            RowLayout { id: rpLbl; anchors.centerIn: parent; spacing: 4
-                                                Text { text: "󰑓"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
-                                                Text { text: "Fix"; font.pixelSize: 10; color: Theme.cOnSurfVar }
-                                            }
-                                            MouseArea { id: rph; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                                onClicked: StartMenuState.btRepair(btDelegate.modelData.mac) }
-                                        }
-                                        Rectangle {
-                                            height: 22; radius: 6; implicitWidth: fgLbl.implicitWidth + 20
-                                            color: fgh.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
-                                                : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.8)
-                                            border.width: 1; border.color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.45)
-                                            Behavior on color { ColorAnimation { duration: 100 } }
-                                            RowLayout { id: fgLbl; anchors.centerIn: parent; spacing: 4
-                                                Text { text: "󰆴"; font.pixelSize: 11; font.family: Config.fontFamily; color: Theme.cErr; opacity: 0.8 }
-                                                //Text { text: "Forget"; font.pixelSize: 10; color: Theme.cErr; opacity: 0.8 }
-                                            }
-                                            MouseArea { id: fgh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                                onClicked: StartMenuState.btForget(btDelegate.modelData.mac) }
                                         }
                                     }
                                 }
