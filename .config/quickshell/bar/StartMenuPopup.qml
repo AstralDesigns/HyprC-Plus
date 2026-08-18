@@ -95,7 +95,7 @@ PanelWindow {
                    }
                     ColumnLayout { Layout.fillWidth: true; spacing: 1
                     	Text { text: Quickshell.env("USER"); color: Theme.cWc6; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
-                    	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Theme.cWc5; font.pixelSize: 13 }
+                    	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Theme.cPrimary; font.pixelSize: 13 }
                     }
                     // Recorder
                     Rectangle {
@@ -154,9 +154,9 @@ PanelWindow {
                     		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
                     		value: StartMenuState.backlightValue
                     		onMoved: function(v) { StartMenuState.backlightValue = v; StartMenuState.setBacklight(v) }
-                    		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
+                    		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cScrim
                 	}
-                	Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cWc5
+                	Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cPrimary
                     		font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
                 }
             }
@@ -178,9 +178,9 @@ PanelWindow {
                     		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
                     		value: StartMenuState.volumeValue
                     		onMoved: function(v) { StartMenuState.volumeValue = v; StartMenuState.setVolume(v) }
-                    		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
+                    		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cScrim
                 	}
-                	Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cWc5
+                	Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cPrimary
                     	font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
               	  }
             }
@@ -201,9 +201,9 @@ PanelWindow {
                     		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
                     		value: StartMenuState.micValue
                     		onMoved: function(v) { StartMenuState.micValue = v; StartMenuState.setMic(v) }
-                    		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cOutVar
+                    		gradA: Theme.cInversePrimary; gradB: Theme.cOnPrimary; track: Theme.cScrim
                 	}
-                	Text { text: Math.round(StartMenuState.micValue * 100) + "%"; color: Theme.cWc5
+                	Text { text: Math.round(StartMenuState.micValue * 100) + "%"; color: Theme.cPrimary
                     	font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
               	  }
             }
@@ -214,7 +214,7 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true; height: 25; spacing: 10
                 Text {
-                	text: " 󰖔"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc5
+                	text: " 󰖔"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc6
                 }
                 Text {
                 	text: "Night light"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
