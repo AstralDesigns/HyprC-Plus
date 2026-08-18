@@ -1519,8 +1519,8 @@ PanelWindow {
                                         color: _subIdx === index
                                             ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                       Theme.cInversePrimary.b, 1.00)
-                                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                                                      Theme.cOnSecondary.b, 0.16)
+                                            : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, 
+                                            	      Theme.cScrim.b, 0.15)
                                         border.width: _subIdx === index ? 1 : 0
                                         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                               Theme.cPrimary.b, 0.42)
@@ -3085,34 +3085,8 @@ PanelWindow {
                                 }
                             }
 
-                            // ── Gamma +/- buttons ─────────────────────────────────
-                            //RowLayout {
-                                //Layout.fillWidth: true; spacing: 8
-                                //Text {
-                                    //text: "Gamma"
-                                    //color: Theme.cPrimary
-                                    //font.family: Config.labelFont
-                                    //font.pixelSize: 13
-                                    //Layout.preferredWidth: 100
-                                //}
-                                //CCPillBtn {
-                                    //text: "−10"
-                                    //onClicked: {
-                                        //_gammaDec.command = [scriptDir + "/hyprland-gamma.sh", "-10"]
-                                        //_gammaDec.running = true
-                                    //}
-                                //}
-                                //CCPillBtn {
-                                    //text: "+10"
-                                    //onClicked: {
-                                        //_gammaInc.command = [scriptDir + "/hyprland-gamma.sh", "10"]
-                                        //_gammaInc.running = true
-                                    //}
-                                //}
-                            //}
-                            //Process { id: _gammaDec; running: false; onExited: running = false }
-                            //Process { id: _gammaInc; running: false; onExited: running = false }
-
+                            CCSection { text: "Color picker & X-Ray" }
+                            
                             CCPillBtn { text: "󰈊  Hyprpicker"; onClicked: _picker.running = true }
                             Process { id: _picker; command: ["hyprpicker"]; running: false }
 
@@ -3135,6 +3109,8 @@ PanelWindow {
                                 }
                             }
                             Process { id: _xrayToggleProc; running: false }
+                            
+                            CCSection { text: "Opacity & Blur" }
 
                             // ── Opacity slider ───────────────────────────────────
                             CCSlider {
@@ -5015,9 +4991,9 @@ PanelWindow {
                                         radius: 9
                                         color: _subIdx === index
                                             ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                      Theme.cInversePrimary.b, 0.72)
-                                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                      Theme.cInversePrimary.b, 0.16)
+                                                      Theme.cInversePrimary.b, 0.82)
+                                            : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, 
+                                            	      Theme.cScrim.b, 0.15)
                                         border.width: _subIdx === index ? 1 : 0
                                         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                               Theme.cPrimary.b, 0.42)
@@ -5047,7 +5023,7 @@ PanelWindow {
                                     width: 180
                                     radius: 9
                                     color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                   Theme.cInversePrimary.b, 0.16)
+                                                   Theme.cInversePrimary.b, 0.3)
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                           Theme.cPrimary.b, 0.18)
@@ -5073,7 +5049,7 @@ PanelWindow {
                                             Text {
                                                 anchors.fill: parent
                                                 text: "Search binds..."
-                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.38)
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.8)
                                                 font.family: Config.labelFont; font.pixelSize: 12
                                                 verticalAlignment: Text.AlignVCenter
                                                 visible: kbSearchInput.text.length === 0
@@ -5506,7 +5482,8 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
+                                                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, 
+                                            	      Theme.cScrim.b, 0.15)
                                                 border.width: kbKeysInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5525,7 +5502,7 @@ PanelWindow {
                                                     Text {
                                                         anchors.fill: parent
                                                         text: "e.g. SUPER + T"
-                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.36)
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.8)
                                                         font.family: Config.labelFont; font.pixelSize: 12
                                                         verticalAlignment: Text.AlignVCenter
                                                         visible: kbKeysInput.text.length === 0
@@ -5545,7 +5522,8 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
+                                                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, 
+                                            	      Theme.cScrim.b, 0.15)
                                                 border.width: kbCmdInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5564,7 +5542,7 @@ PanelWindow {
                                                     Text {
                                                         anchors.fill: parent
                                                         text: "e.g. kitty"
-                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.36)
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.8)
                                                         font.family: Config.labelFont; font.pixelSize: 12
                                                         verticalAlignment: Text.AlignVCenter
                                                         visible: kbCmdInput.text.length === 0
@@ -5584,7 +5562,8 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.4)
+                                                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, 
+                                            	      Theme.cScrim.b, 0.15)
                                                 border.width: kbDescInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5603,7 +5582,7 @@ PanelWindow {
                                                     Text {
                                                         anchors.fill: parent
                                                         text: "What does this do?"
-                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.36)
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.8)
                                                         font.family: Config.labelFont; font.pixelSize: 12
                                                         verticalAlignment: Text.AlignVCenter
                                                         visible: kbDescInput.text.length === 0
@@ -7576,7 +7555,7 @@ PanelWindow {
                 // Trough background
                 Rectangle {
                     anchors.fill: parent; radius: _trough.tH / 2
-                    color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.28)
+                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                 }
@@ -7675,7 +7654,7 @@ PanelWindow {
             color: value
                 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                       Theme.cInversePrimary.b, 0.82)
-                : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+                : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                   Theme.cPrimary.b, value ? 0.6 : 0.6)
@@ -7718,8 +7697,7 @@ PanelWindow {
         Rectangle {
             Layout.preferredWidth: Math.min(360, options.length * 88)
             height: 28; radius: 9
-            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                           Theme.cInversePrimary.b, 0.12)
+            color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                   Theme.cPrimary.b, 0.18)
@@ -7773,8 +7751,8 @@ PanelWindow {
             : (pbma.containsMouse
                 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                           Theme.cInversePrimary.b, 1.0)
-                : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                          Theme.cInversePrimary.b, 0.16))
+                : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, 
+                	  Theme.cScrim.b, 0.15))
         border.width: 1
 	border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
 	    Theme.cPrimary.b, pbma.containsMouse ? 0.55 : 0.2)

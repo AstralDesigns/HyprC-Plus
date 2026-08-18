@@ -226,7 +226,7 @@ PanelWindow {
                     	width: 40; height: 22; radius: 11
                     	color: StartMenuState.nightLightOn
                         	? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.82)
-                        	: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.35)
+                        	: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                     	border.width: 1
                     	border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
                     	Behavior on color { ColorAnimation { duration: 150 } }
