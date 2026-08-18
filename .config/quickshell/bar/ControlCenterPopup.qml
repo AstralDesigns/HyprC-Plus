@@ -1618,8 +1618,8 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 6
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 28; radius: 7
-                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                               Theme.cPrimary.b, 0.06)
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                               Theme.cInversePrimary.b, 0.15)
                                                 border.width: 1
                                                 border.color: _wLocInput.activeFocus
                                                     ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
@@ -1650,7 +1650,7 @@ PanelWindow {
                                                     visible: _wLocInput.text === "" && !_wLocInput.activeFocus
                                                     text: "Search city or district…"
                                                     color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                                   Theme.cPrimary.b, 0.35)
+                                                                   Theme.cPrimary.b, 0.8)
                                                     font.family: Config.labelFont; font.pixelSize: 12
                                                 }
                                             }
@@ -2365,7 +2365,7 @@ PanelWindow {
                                         CCSection { text: "Dimensions & Behavior" }
                                         CCSlider { label:"Bar Count";   from:5;to:200;stepSize:1;   value:Config.cavaWidth;      onMoved:function(v){Config.cavaWidth=v} }
                                         CCSlider { label:"Bar Spacing"; from:0;to:6;stepSize:0.5;decimals:1; value:Config.cavaBarSpacing; onMoved:function(v){Config.cavaBarSpacing=v} }
-                                        CCToggle { label:"Transparent Inactive"; value:Config.cavaTransparentWhenInactive; onToggled:function(v){Config.cavaTransparentWhenInactive=v} }
+                                        //CCToggle { label:"Transparent Inactive"; value:Config.cavaTransparentWhenInactive; onToggled:function(v){Config.cavaTransparentWhenInactive=v} }
                                         CCSlider { label:"Active Opacity";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.cavaActiveOpacity;  onMoved:function(v){Config.cavaActiveOpacity=v} }
                                         CCSlider { label:"Inactive Opacity";from:0;to:1;stepSize:0.05;decimals:2; value:Config.cavaInactiveOpacity;onMoved:function(v){Config.cavaInactiveOpacity=v} }
 
