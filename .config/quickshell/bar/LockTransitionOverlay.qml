@@ -57,7 +57,7 @@ Variants {
                     RotationAnimator on rotation {
                         from: 0
                         to: 360
-                        duration: 1200
+                        duration: 1000
                         loops: Animation.Infinite
                         running: LockTransitionState.active
                     }
