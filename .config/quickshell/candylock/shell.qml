@@ -1133,6 +1133,11 @@ ShellRoot {
                                                     border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.25)
                                                 }
                                             }
+                                            
+                                            Rectangle {
+                                    		    width: 190; height: 1
+                                    		    color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
+                                	    }
 
                                             // PIN ENTRY
                                             Item {
