@@ -39,6 +39,30 @@ Variants {
             Behavior on opacity {
                 NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
             }
+
+            Item {
+                anchors.centerIn: parent
+                width: 72; height: 72
+
+                Text {
+                    id: lockGlyph
+                    anchors.centerIn: parent
+                    text: "󰳌"
+                    font.family: "Symbols Nerd Font Mono"
+                    font.pixelSize: 200
+                    color: Theme.cWc6
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+
+                    RotationAnimator on rotation {
+                        from: 0
+                        to: 360
+                        duration: 1200
+                        loops: Animation.Infinite
+                        running: LockTransitionState.active
+                    }
+                }
+            }
         }
     }
 }

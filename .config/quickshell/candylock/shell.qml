@@ -161,7 +161,7 @@ ShellRoot {
     }
 
     // ── Wallpaper ────────────────────────────────────────────────────────────
-    property string wallpaperPath: ""
+    property string wallpaperPath: Quickshell.env("CANDYLOCK_WALLPAPER") || ""
     FileView {
         path: (Quickshell.env("XDG_CONFIG_HOME")||(Quickshell.env("HOME")+"/.config"))+"/wallpaper/wallpaper.ini"
         watchChanges:true; onFileChanged:reload()
@@ -940,7 +940,7 @@ ShellRoot {
                     id:wallImg
                     anchors.fill:parent
                     source: root.wallpaperPath?"file://"+root.wallpaperPath:""
-                    fillMode:Image.PreserveAspectCrop; smooth:true; cache:true; playing:true; asynchronous:true
+                    fillMode:Image.PreserveAspectCrop; smooth:true; cache:true; playing:true; asynchronous:false
                     visible: root.wallpaperPath!==""
                 }
 

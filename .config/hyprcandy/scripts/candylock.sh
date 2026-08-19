@@ -5,8 +5,11 @@
 set -euo pipefail
 
 CONFDIR="$HOME/.config/quickshell"
-source "$HOME/.config/hyprcandy/scripts/qs-theme-env.sh"
-qs_export_theme_env
+# Pre-seed active wallpaper path so candylock renders wallpaper synchronously on frame 0
+if [ -f "$HOME/.config/wallpaper/wallpaper.ini" ]; then
+    WP=$(sed -n 's/^wallpaper[[:space:]]*=[[:space:]]*//p' "$HOME/.config/wallpaper/wallpaper.ini" | head -n1 | sed "s|^~|$HOME|")
+    [ -n "$WP" ] && export CANDYLOCK_WALLPAPER="$WP"
+fi
 
 # Signal bar to immediately fade in the smooth blur overlay
 touch /tmp/qs-candylock-trans.lock 2>/dev/null || true
