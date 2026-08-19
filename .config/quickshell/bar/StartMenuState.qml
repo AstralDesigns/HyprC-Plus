@@ -34,6 +34,7 @@ Item {
         if (!micActiveProc.running) micActiveProc.running = true
         if (!blReadProc.running) blReadProc.running = true
         if (!netStatusProc.running) netStatusProc.running = true
+        if (!netSavedProc.running) netSavedProc.running = true
         if (!btStatusProc.running) btStatusProc.running = true
         if (!nightLightStatusProc.running) nightLightStatusProc.running = true
     }
@@ -262,8 +263,6 @@ Item {
 
     Process { id: netSavedProc
         command: ["bash", "-c", "nmcli --escape no -t -f NAME con show 2>/dev/null"]
-        // Only run when the menu is visible
-        running: sm.menuVisible
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
             const n = l.trim(); if (n) sm._savedNets.push(n)
         }}
@@ -878,6 +877,14 @@ Item {
             if (sm._userIconPath === "" && !smIconProc.running)
                 smIconProc.running = true
         }
+    }
+
+    Timer {
+        id: smNetPreloadTimer
+        interval: 1500   // after bar settles; prepopulates saved networks and available wifi list on session startup
+        repeat: false
+        running: true
+        onTriggered: sm.startNetScan()
     }
 
     Timer {

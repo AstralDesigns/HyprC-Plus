@@ -1837,8 +1837,7 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             Rectangle {
                                                 Layout.preferredWidth: 174; height: 28; radius: 9
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                               Theme.cInversePrimary.b, 0.12)
+                                                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                                                 border.width: 1
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                                 Row {
@@ -2002,8 +2001,7 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             Rectangle {
                                                 Layout.preferredWidth: 174; height: 28; radius: 9
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                               Theme.cInversePrimary.b, 0.12)
+                                                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                                                 border.width: 1
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                                 Row {
@@ -2384,8 +2382,7 @@ PanelWindow {
                                             // Three-button mode selector
                                             Rectangle {
                                                 Layout.preferredWidth: 216; height: 28; radius: 9
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                               Theme.cInversePrimary.b, 0.12)
+                                                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                                                 border.width: 1
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                                 Row {
@@ -2552,8 +2549,7 @@ PanelWindow {
                                             // Three-button mode selector
                                             Rectangle {
                                                 Layout.preferredWidth: 216; height: 28; radius: 9
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                               Theme.cInversePrimary.b, 0.12)
+                                                color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                                                 border.width: 1
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                                 Row {
@@ -3252,8 +3248,7 @@ PanelWindow {
                                 // Three-button mode selector: Custom | Matugen | Pywal
                                 Rectangle {
                                     Layout.preferredWidth: 144; height: 28; radius: 9
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                   Theme.cInversePrimary.b, 0.12)
+                                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                     Row {
@@ -3417,8 +3412,7 @@ PanelWindow {
                                 // Three-button mode selector: Custom | Matugen | Pywal
                                 Rectangle {
                                     Layout.preferredWidth: 144; height: 28; radius: 9
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                   Theme.cInversePrimary.b, 0.12)
+                                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                     Row {

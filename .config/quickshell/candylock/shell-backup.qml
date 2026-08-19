@@ -861,10 +861,10 @@ ShellRoot {
             "DST='" + iconConvProc._dst + "'; " +
             "[ -f \"$SRC\" ] || exit 1; " +
             "magick \"$SRC\" " +
-            "  -resize 384x384^ -gravity center -extent 384x384 " +
+            "  -resize 192x192^ -gravity center -extent 192x192 " +
             "  \\( +clone -alpha extract " +
             "     -fill black -colorize 100 " +
-            "     -fill white -draw 'circle 192,192 192,0' \\) " +
+            "     -fill white -draw 'circle 96,96 96,0' \\) " +
             "  -alpha off -compose CopyOpacity -composite " +
             "  -strip \"$DST\""]
         onExited: function(code){
@@ -981,7 +981,7 @@ ShellRoot {
                     anchors.verticalCenter:   parent.verticalCenter
                     anchors.verticalCenterOffset: -36
                     width:520
-                    height:panelCol.implicitHeight+50
+                    height:panelCol.implicitHeight+40
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
@@ -1032,200 +1032,166 @@ ShellRoot {
                                 id:rightCol
                                 Layout.fillWidth:true; spacing:10
 
-                                // ── TOP ROW: Unified Card (Clock | User & PIN | Date) ──
                                 Rectangle {
-                                    id: userTopCard
-                                    Layout.fillWidth: true
-                                    height: userTopRow.implicitHeight
-                                    radius: 20
-                                    color: root.cCardWarm
-                                    border.width: 1
-                                    border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.1)
+                                    id:infoCard
+                                    Layout.fillWidth:true
+                                    height:infoCardCol.implicitHeight+36
+                                    radius:20; color:root.cCardWarm
+                                    border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.1)
 
-                                    RowLayout {
-                                        id: userTopRow
-                                        anchors.fill: parent
-                                        anchors.leftMargin: 14
-                                        anchors.rightMargin: 14
-                                        anchors.topMargin: 0
-                                        anchors.bottomMargin: 10
-                                        spacing: 12
+                                    ColumnLayout {
+                                        id:infoCardCol
+                                        anchors { left:parent.left; right:parent.right; top:parent.top; margins:20 }
+                                        spacing:14
 
-                                        // ── LEFT: Clock ──────────────────────────────────
-                                        ColumnLayout {
+                                        // ── Clock | User icon | Date ─────────────────────
+                                        RowLayout {
                                             Layout.fillWidth: true
-                                            Layout.preferredWidth: 1
-                                            Layout.alignment: Qt.AlignVCenter
                                             spacing: 0
-                                            Text {
-                                                Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockHour; color: root.cWc3
-                                                font.family: "C059"; font.pixelSize: 86
-                                                font.italic: true; font.weight: Font.Bold
-                                                lineHeight: 0.88
-                                            }
-                                            Text {
-                                                Layout.alignment: Qt.AlignHCenter
-                                                text: "󰫢  󰫢"; color: root.cWc9
-                                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
-                                                topPadding: 6; bottomPadding: 6
-                                            }
-                                            Text {
-                                                Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockMin; color: root.cWc10
-                                                font.family: "C059"; font.pixelSize: 86
-                                                font.italic: true; font.weight: Font.Bold
-                                                lineHeight: 0.88
-                                            }
-                                        }
 
-                                        // ── SEPARATOR 1 ───────────────────────────────────
-                                        Rectangle {
-                                            Layout.preferredWidth: 1
-                                            Layout.fillHeight: true
-                                            Layout.topMargin: 35
-                                            Layout.bottomMargin: 35
-                                            color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.0)
-                                        }
+                                            // ── LEFT: Clock (vertical) ───────────────────
+                                            ColumnLayout {
+                                                spacing: 0
+                                                Layout.alignment: Qt.AlignVCenter
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: root.clockHour; color: root.cWc3
+                                                    font.family: "C059"; font.pixelSize: 52
+                                                    font.italic: true; font.weight: Font.Bold
+                                                    lineHeight: 0.88
+                                                }
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: "󰫢  󰫢"; color: root.cWc9
+                                                    font.family: "Symbols Nerd Font Mono"; font.pixelSize: 11
+                                                    topPadding: 5; bottomPadding: 5
+                                                }
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: root.clockMin; color: root.cWc10
+                                                    font.family: "C059"; font.pixelSize: 52
+                                                    font.italic: true; font.weight: Font.Bold
+                                                    lineHeight: 0.88
+                                                }
+                                            }
 
-                                        // ── CENTER: User icon + PIN Entry ─────────────────
-                                        ColumnLayout {
-                                            id: userPinCol
-                                            Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                                            spacing: 12
+                                            Item { Layout.fillWidth: true }
 
+                                            // ── CENTER: User icon ─────────────────────────
                                             Item {
-                                                width: 130; height: 130
-                                                Layout.preferredWidth: 130
-                                                Layout.preferredHeight: 130
-                                                Layout.alignment: Qt.AlignHCenter
-
+                                                width: 100; height: 100
+                                                Layout.preferredWidth:  100
+                                                Layout.preferredHeight: 100
+                                                Layout.alignment: Qt.AlignVCenter
                                                 Image {
-                                                    id: userImg
-                                                    anchors.fill: parent
-                                                    source: root._userIconPath !== "" ? ("file://" + root._userIconPath.split("?")[0] + "?v=" + root._userIconPath.split("?")[1]) : ""
-                                                    fillMode: Image.PreserveAspectFit
-                                                    smooth: true; cache: false; mipmap: true
-                                                    visible: status === Image.Ready
+                                                    id:userImg; anchors.fill:parent
+                                                    source: root._userIconPath!=="" ? ("file://"+root._userIconPath.split("?")[0]+"?v="+root._userIconPath.split("?")[1]) : ""
+                                                    fillMode:Image.PreserveAspectFit; smooth:true; cache:false
+                                                    visible:status===Image.Ready
                                                 }
-
                                                 Rectangle {
-                                                    anchors.fill: parent
-                                                    radius: width / 2
-                                                    color: root.cSurfHi
-                                                    visible: userImg.status !== Image.Ready
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: "󰀄"
-                                                        font.pixelSize: 52
-                                                        font.family: "Symbols Nerd Font Mono"
-                                                        color: root.cOnSurfVar
-                                                    }
-                                                    border.width: 2
-                                                    border.color: Qt.rgba(root.cScrim.r, root.cScrim.g, root.cScrim.b, 1.0)
-                                                }
-
-                                                // Clean subtle border ring around avatar
-                                                Rectangle {
-                                                    anchors.fill: parent
-                                                    radius: width / 2
-                                                    color: "transparent"
-                                                    border.width: 2
-                                                    border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.25)
+                                                    anchors.fill:parent; radius:99; color:root.cSurfHi
+                                                    visible:userImg.status!==Image.Ready
+                                                    Text { anchors.centerIn:parent; text:"󰀄"; font.pixelSize:40; font.family:"Symbols Nerd Font Mono"; color:root.cOnSurfVar }
+                                                    border.width:2; border.color:Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,1.0)
                                                 }
                                             }
 
-                                            // PIN ENTRY
-                                            Item {
-                                                Layout.alignment: Qt.AlignHCenter; width: 190; height: 42
-                                                Rectangle {
-                                                    anchors.fill: parent; radius: 21
-                                                    color: Qt.rgba(root.cBg.r, root.cBg.g, root.cBg.b, 0.75)
-                                                    border.width: 2
-                                                    border.color: root.authFailed ? root.cErr
-                                                        : (root.authChecking
-                                                            ? root.cWc5
-                                                            : root.cWc10)
-                                                    Behavior on border.color { ColorAnimation { duration: 250 } }
-                                                }
-                                                RowLayout {
-                                                    anchors.centerIn: parent; spacing: 6
-                                                    visible: root.pinEntry.length === 0 && !root.authChecking
-                                                    Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc9 }
-                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc2; opacity: 1.00 }
-                                                }
-                                                Text {
-                                                    anchors.centerIn: parent; visible: root.authChecking
-                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc9
-                                                    RotationAnimator on rotation { from: 0; to: 360; duration: 900; loops: Animation.Infinite; running: root.authChecking }
-                                                }
-                                                Row {
-                                                    anchors.centerIn: parent; spacing: 5
-                                                    visible: root.pinEntry.length > 0 && !root.authChecking && !root.pinVisible
-                                                    Repeater { model: root.pinEntry.length; delegate: Rectangle { width: 8; height: 8; radius: 99; color: root.cSecondary; opacity: 0.90 } }
-                                                }
-                                                Text {
-                                                    anchors.centerIn: parent; width: parent.width - 24
-                                                    visible: root.pinEntry.length > 0 && !root.authChecking && root.pinVisible
-                                                    text: root.pinEntry; color: root.cSecondary
-                                                    font.family: "C059"; font.pixelSize: 15
-                                                    horizontalAlignment: Text.AlignHCenter
-                                                    elide: Text.ElideMiddle
-                                                }
+                                            Item { Layout.fillWidth: true }
 
-                                                // PIN VISIBILITY TOGGLE — only shown once typing begins
+                                            // ── RIGHT: Date (vertical, 3 independent colours) ─
+                                            ColumnLayout {
+                                                spacing: 0
+                                                Layout.alignment: Qt.AlignVCenter
                                                 Text {
-                                                    anchors.right: parent.right; anchors.rightMargin: 12
-                                                    anchors.verticalCenter: parent.verticalCenter
-                                                    visible: root.pinEntry.length > 0 && !root.authChecking
-                                                    text: root.pinVisible ? "󰛐" : "󰛑"
-                                                    font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13
-                                                    color: root.cWc9; opacity: 0.85
-                                                    MouseArea {
-                                                        anchors.fill: parent; anchors.margins: -8
-                                                        cursorShape: Qt.PointingHandCursor
-                                                        onClicked: root.pinVisible = !root.pinVisible
-                                                    }
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: root.clockDayName; color: root.cWc3
+                                                    font.family: "Symbols Nerd Font Mono"; font.pixelSize: 20
+                                                    font.italic: true; font.weight: Font.DemiBold
+                                                    lineHeight: 0.88
                                                 }
-                                            }
-
-                                            Text {
-                                                Layout.alignment: Qt.AlignHCenter
-                                                text: root.authFailed ? "Wrong password" : ""
-                                                color: root.cErr; font.pixelSize: 11; font.italic: true
-                                                opacity: root.authFailed ? 1 : 0
-                                                Behavior on opacity { NumberAnimation { duration: 200 } }
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: root.clockDateNum; color: root.cWc10
+                                                    font.family: "Symbols Nerd Font Mono"; font.pixelSize: 20
+                                                    font.italic: true; font.weight: Font.DemiBold
+                                                    lineHeight: 0.88
+                                                }
+                                                Text {
+                                                    Layout.alignment: Qt.AlignHCenter
+                                                    text: root.clockMonthName; color: root.cWc9
+                                                    font.family: "Symbols Nerd Font Mono"; font.pixelSize: 20
+                                                    font.italic: true; font.weight: Font.DemiBold
+                                                    lineHeight: 0.88
+                                                }
                                             }
                                         }
 
-                                        // ── RIGHT: Date ───────────────────────────────────
-                                        ColumnLayout {
-                                            Layout.fillWidth: true
-                                            Layout.preferredWidth: 1
-                                            Layout.alignment: Qt.AlignVCenter
-                                            spacing: 14
-                                            Text {
-                                                Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDayName; color: root.cWc3
-                                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 22
-                                                font.italic: true; font.weight: Font.Bold
-                                                lineHeight: 0.88
+                                        Rectangle {
+                                            Layout.fillWidth:true; height:1
+                                            color:Qt.rgba(root.cSecondary.r, root.cSecondary.g, root.cSecondary.b, 0.16)
+                                        }
+
+                                        // PIN ENTRY
+                                        Item {
+                                            Layout.alignment:Qt.AlignHCenter; width:220; height:44
+                                            Rectangle {
+                                                anchors.fill:parent; radius:22
+                                                color:Qt.rgba(root.cBg.r,root.cBg.g,root.cBg.b,0.75)
+                                                border.width:2
+                                                border.color: root.authFailed ? root.cErr
+                                                    : (root.authChecking
+                                                        ? root.cWc5
+                                                        : root.cWc10)
+                                                Behavior on border.color { ColorAnimation{duration:250} }
+                                            }
+                                            RowLayout {
+                                                anchors.centerIn:parent; spacing:7
+                                                visible:root.pinEntry.length===0 && !root.authChecking
+                                                Text { text:"󰀄"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:14; color:root.cWc9}
+                                                Text { text:Quickshell.env("USER"); font.family:"C059"; font.pixelSize:14; font.italic:true; color:root.cWc2; opacity:1.00 }
                                             }
                                             Text {
-                                                Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDateNum; color: root.cWc9
-                                                font.family: "C059"; font.pixelSize: 86
-                                                font.italic: true; font.weight: Font.DemiBold
-                                                lineHeight: 0.88
-                                                topPadding: 8; bottomPadding: 8
+                                                anchors.centerIn:parent; visible:root.authChecking
+                                                text:"󰶘"; font.family:"Symbols Nerd Font Mono"; font.pixelSize:18; color:root.cWc9
+                                                RotationAnimator on rotation { from:0; to:360; duration:900; loops:Animation.Infinite; running:root.authChecking }
+                                            }
+                                            Row {
+                                                anchors.centerIn:parent; spacing:6
+                                                visible:root.pinEntry.length>0 && !root.authChecking && !root.pinVisible
+                                                Repeater { model:root.pinEntry.length; delegate:Rectangle{width:9;height:9;radius:99;color:root.cSecondary;opacity:0.90} }
                                             }
                                             Text {
-                                                Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockMonthName; color: root.cWc10
-                                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 22
-                                                font.italic: true; font.weight: Font.Bold
-                                                lineHeight: 0.88
+                                                anchors.centerIn:parent; width:parent.width-24
+                                                visible:root.pinEntry.length>0 && !root.authChecking && root.pinVisible
+                                                text:root.pinEntry; color:root.cSecondary
+                                                font.family:"C059"; font.pixelSize:16
+                                                horizontalAlignment:Text.AlignHCenter
+                                                elide:Text.ElideMiddle
                                             }
+
+                                            // PIN VISIBILITY TOGGLE — only shown once typing begins
+                                            Text {
+                                                anchors.right:parent.right; anchors.rightMargin:14
+                                                anchors.verticalCenter:parent.verticalCenter
+                                                visible:root.pinEntry.length>0 && !root.authChecking
+                                                text: root.pinVisible ? "󰛐" : "󰛑"
+                                                font.family:"Symbols Nerd Font Mono"; font.pixelSize:14
+                                                color:root.cWc9; opacity:0.85
+                                                MouseArea {
+                                                    anchors.fill:parent; anchors.margins:-8
+                                                    cursorShape:Qt.PointingHandCursor
+                                                    onClicked: root.pinVisible = !root.pinVisible
+                                                }
+                                            }
+                                        }
+
+                                        Text {
+                                            Layout.alignment:Qt.AlignHCenter
+                                            text:root.authFailed?"Wrong password":""
+                                            color:root.cErr; font.pixelSize:11; font.italic:true
+                                            opacity:root.authFailed?1:0
+                                            Behavior on opacity { NumberAnimation{duration:200} }
                                         }
                                     }
                                 }
@@ -1240,7 +1206,7 @@ ShellRoot {
                                     id: weatherCard
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
-                                    Layout.minimumHeight: 100
+                                    Layout.minimumHeight: 72
                                     radius: 20
                                     color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g,
                                                   root.cOnSecondary.b, 0.65)
@@ -1809,7 +1775,10 @@ ShellRoot {
                         radius: width / 2
                         color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
                         border.width: 3
-                        border.color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
+                        border.color: root.dialsVisible
+                            ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.85)
+                            : Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.65)
+                        Behavior on border.color { ColorAnimation { duration: 180 } }
                     }
 
                     layer.enabled: true
@@ -1823,11 +1792,11 @@ ShellRoot {
                     Text {
                         anchors.centerIn: parent
                         text: root._hasBattery
-                            ? (root._batCharging ? "󱐋" : "󰻠")
+                            ? (root._batCharging ? "󱐋" : "󰁹")
                             : "󰕯"
                         font.family: "Symbols Nerd Font Mono"
                         font.pixelSize: 20
-                        color: root.dialsVisible ? root.cSecondary : root.cPrimary
+                        color: root.dialsVisible ? root.cPrimary : root.cInvPrimary
                         Behavior on color { ColorAnimation { duration: 180 } }
                     }
 
@@ -1971,8 +1940,8 @@ ShellRoot {
                                 anchors.top: parent.top
                                 anchors.topMargin: Math.max(0,(parent.height-72-14)/2)
                                 width: 72; height: 72
-                                property color dialCol: root._batCapacity <= 10 ? Qt.rgba(1.0, 0.3, 0.3, 1)
-                                    : (root._batCharging ? Qt.rgba(0.3, 0.9, 0.5, 1) : root.cWc6)
+                                property color dialCol: root._batCapacity <= 10 ? root.cErr
+                                    : (root._batCharging ? root.cSecondary : root.cWc3)
                                 property real  cv:  Math.max(0, Math.min(100, root._batCapacity)) / 100
                                 property string gt: root._batCapacity + "%"
                                 property string gl: root._batCharging ? "󱐋" : "󰁹"
