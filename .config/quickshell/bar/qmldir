@@ -61,3 +61,6 @@ ShellLayer 1.0 ShellLayer.qml
 
 singleton WorkspacesPopupState 1.0 WorkspacesPopupState.qml
 WorkspacesPopup 1.0 WorkspacesPopup.qml
+
+singleton LockTransitionState 1.0 LockTransitionState.qml
+LockTransitionOverlay 1.0 LockTransitionOverlay.qml

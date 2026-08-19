@@ -928,8 +928,7 @@ ShellRoot {
 
     // ── Session lock ──────────────────────────────────────────────────────────
     WlSessionLock { id:sessionLock
-        locked: false
-        Component.onCompleted: locked = true
+        locked: true
         onLockedChanged: if (locked) suspendIfFlagged.running = true
         WlSessionLockSurface {
             Rectangle {

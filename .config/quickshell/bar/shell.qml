@@ -173,6 +173,9 @@ ShellRoot {
     //    survives bar autohide (bar.visible = false unmaps the bar surface).
     InhibitorAnchor {}
 
+    // ── Smooth pre-lock blur transition overlay ─────────────────────────────
+    LockTransitionOverlay {}
+
 
     // ── One bar instance per monitor ────────────────────────────────────────
     Variants {
