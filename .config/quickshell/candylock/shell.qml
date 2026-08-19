@@ -281,7 +281,7 @@ ShellRoot {
         if (code===2)             return "Partly Cloudy"
         if (code===3)             return h >= 85 ? "Mostly Cloudy" : "Cloudy"
         if (code===45||code===48) return "Fog"
-        if (code>=51&&code<=55)   return code===51 ? "Light Drizzle" : code===53 ? "Moderate Drizzle" : "Dense Drizzle"
+        if (code>=51&&code<=55)   return code===51 ? "Light Drizzle" : code===53 ? "Moderate Rain" : "Rainy"
         if (code===56||code===57) return code===56 ? "Light Freezing Rain" : "Dense Freezing Drizzle"
         if (code===61)            return "Slight Rain"
         if (code===63)            return "Moderate Rain"

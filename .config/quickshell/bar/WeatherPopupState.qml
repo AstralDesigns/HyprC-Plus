@@ -78,9 +78,9 @@ QtObject {
         if (code===2)             return {t:'Partly Cloudy',         i:isDay?'⛅':'☁️'};
         if (code===3)             return h>=85?{t:'Mostly Cloudy',i:isDay?'⛅':'☁️'}:{t:'Cloudy',i:isDay?'⛅':'☁️'};
         if (code===45||code===48) return {t:'Fog',              i:isDay?'🌫':'🌫'};
-        if (code>=51)             return {t:'Rainy',            i:isDay?'🌦️':'🌧️'};
-        if (code>=53)             return {t:'Moderate Drizzle', i:isDay?'🌦️':'🌧️'};
-        if (code>=55)             return {t:'Dense Drizzle',    i:isDay?'🌦️':'🌧️'};
+        if (code>=51)             return {t:'Light Drizzle',            i:isDay?'🌦️':'🌧️'};
+        if (code>=53)             return {t:'Moderate Rain', i:isDay?'🌦️':'🌧️'};
+        if (code>=55)             return {t:'Rainy',    i:isDay?'🌦️':'🌧️'};
         if (code===56)            return {t:'Light Freezing Rain',   i:isDay?'🌦️':'🌧️'};
         if (code===57)            return {t:'Dense Freezing Drizzle',i:isDay?'🌦️':'🌧️'};
         if (code===61)            return {t:'Slight Rain',           i:isDay?'🌦️':'🌧️'};
