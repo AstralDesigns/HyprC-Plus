@@ -245,7 +245,7 @@ Item {
         default property alias content: contentLay.data
 
         readonly property int _leftPad: hPad + (showUrgencyBar ? 4 : 0)
-        implicitHeight: contentLay.implicitHeight + vPad * 5
+        implicitHeight: contentLay.implicitHeight + vPad * 2
         height: implicitHeight
 
         Rectangle {
