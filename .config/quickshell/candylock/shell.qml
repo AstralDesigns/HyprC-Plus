@@ -60,8 +60,8 @@ ShellRoot {
         Qt.color(_m3background).r, Qt.color(_m3background).g,
         Qt.color(_m3background).b, 0.6)
     readonly property color cCardWarm: Qt.rgba(
-        Qt.color(_m3background).r, Qt.color(_m3background).g,
-        Qt.color(_m3background).b, 0.6)
+        Qt.color(_m3onSecondary).r, Qt.color(_m3onSecondary).g,
+        Qt.color(_m3onSecondary).b, 0.65)
 
     function parseColors(t) {
         const re=/property color (\w+): "(#[0-9a-fA-F]+)"/g; let m
@@ -980,7 +980,7 @@ ShellRoot {
                     anchors.verticalCenter:   parent.verticalCenter
                     anchors.verticalCenterOffset: -36
                     width:520
-                    height:panelCol.implicitHeight+50
+                    height:panelCol.implicitHeight+45
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
@@ -1139,7 +1139,7 @@ ShellRoot {
                                                 Layout.alignment: Qt.AlignHCenter; width: 190; height: 42
                                                 Rectangle {
                                                     anchors.fill: parent; radius: 21
-                                                    color: Qt.rgba(root.cBg.r, root.cBg.g, root.cBg.b, 0.75)
+                                                    color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.2)
                                                     border.width: 2
                                                     border.color: root.authFailed ? root.cErr
                                                         : (root.authChecking
@@ -1150,12 +1150,12 @@ ShellRoot {
                                                 RowLayout {
                                                     anchors.centerIn: parent; spacing: 6
                                                     visible: root.pinEntry.length === 0 && !root.authChecking
-                                                    Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc9 }
+                                                    Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc12 }
                                                     Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc2; opacity: 1.00 }
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; visible: root.authChecking
-                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc9
+                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc12
                                                     RotationAnimator on rotation { from: 0; to: 360; duration: 900; loops: Animation.Infinite; running: root.authChecking }
                                                 }
                                                 Row {
@@ -1179,7 +1179,7 @@ ShellRoot {
                                                     visible: root.pinEntry.length > 0 && !root.authChecking
                                                     text: root.pinVisible ? "󰛐" : "󰛑"
                                                     font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13
-                                                    color: root.cWc9; opacity: 0.85
+                                                    color: root.cWc12; opacity: 0.85
                                                     MouseArea {
                                                         anchors.fill: parent; anchors.margins: -8
                                                         cursorShape: Qt.PointingHandCursor
@@ -1241,8 +1241,7 @@ ShellRoot {
                                     Layout.fillHeight: true
                                     Layout.minimumHeight: 100
                                     radius: 20
-                                    color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g,
-                                                  root.cOnSecondary.b, 0.65)
+                                    color: root.cCardWarm
                                     border.width: 1
                                     border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.1)
 
