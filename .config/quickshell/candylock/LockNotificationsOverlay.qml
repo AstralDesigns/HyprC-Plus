@@ -245,7 +245,7 @@ Item {
         default property alias content: contentLay.data
 
         readonly property int _leftPad: hPad + (showUrgencyBar ? 4 : 0)
-        implicitHeight: contentLay.implicitHeight + vPad * 2
+        implicitHeight: contentLay.implicitHeight + vPad * 5
         height: implicitHeight
 
         Rectangle {
@@ -356,7 +356,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: 84
-        anchors.leftMargin: 6
+        anchors.leftMargin: 24
         width: 364
         implicitHeight: toastCol.implicitHeight
 
@@ -533,7 +533,7 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.topMargin: 84
-        anchors.leftMargin: 6
+        anchors.leftMargin: 24
         width: 380
         clip: true
         implicitHeight: Math.min(histPanel.implicitHeight, 560)

@@ -427,7 +427,7 @@ Item {
             bottom: _barAtBottom ? _barGapBot : 0
             left:  _panelMargin
     	}
-        implicitHeight: Math.min(histScrollContent.height + histHeader.implicitHeight + histDivider.height + 42, 720)
+        implicitHeight: Math.min(histScrollContent.height + histHeader.implicitHeight + histDivider.height + 40, 720)
         color: "transparent"
 
         // Click-outside dismiss
