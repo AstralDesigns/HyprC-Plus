@@ -1317,7 +1317,7 @@ ShellRoot {
                                                     Text {
                                                         text: modelData.glyph
                                                         color: root.cWc6
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: 14
                                                         font.family: "Symbols Nerd Font Mono"
                                                     }
                                                     ColumnLayout {
@@ -1333,8 +1333,8 @@ ShellRoot {
                                                         }
                                                         Text {
                                                             text: modelData.val
-                                                            color: root.cOnSurf
-                                                            font.pixelSize: 10
+                                                            color: root.cPrimary
+                                                            font.pixelSize: 12
                                                             font.weight: Font.Medium
                                                             font.family: "monospace"
                                                             elide: Text.ElideRight
