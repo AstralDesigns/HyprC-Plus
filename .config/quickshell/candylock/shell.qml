@@ -1139,7 +1139,7 @@ ShellRoot {
                                                 Layout.alignment: Qt.AlignHCenter; width: 190; height: 42
                                                 Rectangle {
                                                     anchors.fill: parent; radius: 21
-                                                    color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.2)
+                                                    color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.25)
                                                     border.width: 2
                                                     border.color: root.authFailed ? root.cErr
                                                         : (root.authChecking
