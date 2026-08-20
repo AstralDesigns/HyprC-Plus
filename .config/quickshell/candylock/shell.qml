@@ -1267,7 +1267,7 @@ ShellRoot {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: root.weatherIcon
                                                 color: root.cWc6
-                                                font.pixelSize: 34
+                                                font.pixelSize: 22
                                                 font.family: "Symbols Nerd Font Mono"
                                                 horizontalAlignment: Text.AlignHCenter
                                             }
