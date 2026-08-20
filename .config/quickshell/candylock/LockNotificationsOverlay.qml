@@ -592,7 +592,7 @@ Item {
 
                 Rectangle {
                     Layout.fillWidth: true; height: 1
-                    color: Qt.rgba(overlay.cOutVar.r, overlay.cOutVar.g, overlay.cOutVar.b, 0.3)
+                    color: Qt.rgba(overlay.cPrimary.r, overlay.cPrimary.g, overlay.cPrimary.b, 0.16)
                 }
 
                 Flickable {
