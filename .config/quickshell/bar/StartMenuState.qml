@@ -840,6 +840,17 @@ Item {
     // ── Power/logout ──────────────────────────────────────────────────────
     Process { id: logoutProc; command:["bash","-c",Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh exit"] }
     Process { id: powerProc; property string _cmd:""; command:["bash","-c",powerProc._cmd] }
+    property bool hibernateAvailable: false
+    Process {
+        id: _hibCheckProc
+        command: ["bash","-c","grep -qw hibernate /sys/power/state 2>/dev/null && echo yes || echo no"]
+        running: true
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) { sm.hibernateAvailable = line.trim() === "yes" }
+        }
+        onExited: running = false
+    }
 
     function runPowerCmd(cmd) {
         powerProc._cmd = cmd

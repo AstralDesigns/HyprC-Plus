@@ -1093,44 +1093,39 @@ ShellRoot {
                                             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
                                             spacing: 12
 
-                                            Item {
+                                            Rectangle {
                                                 width: 130; height: 130
                                                 Layout.preferredWidth: 130
                                                 Layout.preferredHeight: 130
                                                 Layout.alignment: Qt.AlignHCenter
+                                                radius: width / 2
+                                                color: root.cSurfHi
+                                                clip: true
 
                                                 Image {
                                                     id: userImg
                                                     anchors.fill: parent
                                                     source: root._userIconPath !== "" ? ("file://" + root._userIconPath.split("?")[0] + "?v=" + root._userIconPath.split("?")[1]) : ""
-                                                    fillMode: Image.PreserveAspectFit
+                                                    fillMode: Image.PreserveAspectCrop
                                                     smooth: true; cache: false; mipmap: true
                                                     visible: status === Image.Ready
                                                 }
 
-                                                Rectangle {
-                                                    anchors.fill: parent
-                                                    radius: width / 2
-                                                    color: root.cSurfHi
+                                                Text {
+                                                    anchors.centerIn: parent
                                                     visible: userImg.status !== Image.Ready
-                                                    Text {
-                                                        anchors.centerIn: parent
-                                                        text: "󰀄"
-                                                        font.pixelSize: 52
-                                                        font.family: "Symbols Nerd Font Mono"
-                                                        color: root.cOnSurfVar
-                                                    }
-                                                    border.width: 2
-                                                    border.color: Qt.rgba(root.cScrim.r, root.cScrim.g, root.cScrim.b, 1.0)
+                                                    text: "󰀄"
+                                                    font.pixelSize: 52
+                                                    font.family: "Symbols Nerd Font Mono"
+                                                    color: root.cOnSurfVar
                                                 }
 
-                                                // Clean subtle border ring around avatar
                                                 Rectangle {
                                                     anchors.fill: parent
                                                     radius: width / 2
                                                     color: "transparent"
-                                                    border.width: 2
-                                                    border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.25)
+                                                    border.width: 4
+                                                    border.color: root.cWc9
                                                 }
                                             }
                                             

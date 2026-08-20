@@ -38,7 +38,7 @@ PanelWindow {
         bottom: _barAtBottom ? _barGapBot : 0
         right:  _panelMargin
     }
-    implicitHeight: mainCol.implicitHeight + 32
+    implicitHeight: mainCol.implicitHeight + 10
     color: "transparent"
 
     // Click-outside dismiss
@@ -92,6 +92,13 @@ PanelWindow {
                             smooth: true; mipmap: true; visible: StartMenuState._userIconPath !== "" }
                     	Text { anchors.centerIn: parent; visible: !smAvatar.visible; text: "󰀄"
                         	font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
+                        Rectangle {
+                                    anchors.fill: parent
+                                    radius: width / 2
+                                    color: "transparent"
+                                    border.width: 2
+                                    border.color: Theme.cWc9
+                        }
                    }
                     ColumnLayout { Layout.fillWidth: true; spacing: 1
                     	Text { text: Quickshell.env("USER"); color: Theme.cWc6; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
@@ -905,72 +912,69 @@ PanelWindow {
 
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
-            // ── Power / actions grid ──────────────────────────────────
-            GridLayout { Layout.fillWidth: true; columns: 4; rowSpacing: 6; columnSpacing: 6
-                Repeater {
-                    model: [
-                        { i: "", l: "Lock",    cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh lock" },
-                        { i: "󰑙", l: "Reboot",  cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh reboot" },
-                        { i: "󰒲", l: "Sleep",   cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh suspend" },
-                        { i: "", l: "Shutdown", cmd: Quickshell.env("HOME")+"/.config/hypr/scripts/power.sh shutdown" },
-                    ]
-                    delegate: Rectangle {
-                        required property var modelData
-                        Layout.fillWidth: true; height: 52; radius: 12
-                        color: ph.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.8)
-                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
-                        gradient: ph.containsMouse ? onmouseGradient : powerGradient
-                        border.width: 2; border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
-                        Behavior on color { ColorAnimation { duration: 120 } }
-                        ColumnLayout { anchors.centerIn: parent; spacing: 2
-                            Text { Layout.alignment: Qt.AlignHCenter; text: modelData.i
-                                font.pixelSize: 18; font.family: Config.fontFamily
-                                color: ph.containsMouse ? Theme.cWc6 : Theme.cWc5
-                                Behavior on color { ColorAnimation { duration: 120 } } }
-                            Text { Layout.alignment: Qt.AlignHCenter; text: modelData.l
-                                color: Theme.cPrimary; font.pixelSize: 10 }
-                        }
-                        MouseArea { id: ph; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                StartMenuState.menuVisible = false
-                                StartMenuState.runPowerCmd(modelData.cmd)
+            // ── Power / actions pill ──────────────────────────────────
+            Rectangle {
+                Layout.alignment: Qt.AlignHCenter
+                implicitWidth: pwrRow.implicitWidth + 12
+                implicitHeight: 52
+                radius: 99
+                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
+                border.width: 1
+                border.color: Theme.cScrim
+                Row {
+                    id: pwrRow
+                    anchors.centerIn: parent
+                    spacing: 4
+                    Repeater {
+                        model: [
+                            { i: "󰳌", c: Theme.cWc13, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh lock",    show: true,     isLogout: false },
+                            { i: "󰒲", c: Theme.cWc6, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh suspend", show: true,     isLogout: false },
+                            { i: "󰈉", c: Theme.cWc10, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh hibernate", show: StartMenuState.hibernateAvailable, isLogout: false },
+                            { i: "󰑙", c: Theme.cWc11, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh reboot",  show: true,     isLogout: false },
+                            { i: "󰐥", c: Theme.cWc12, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh shutdown",show: true,     isLogout: false },
+                            { i: "󰗼", c: Theme.cWc9, cmd: "",                                                                 show: true,     isLogout: true }
+                        ].filter(item => item.show)
+                        delegate: Item {
+                            required property var modelData
+                            width: 44; height: 44
+                            Rectangle {
+                                anchors.fill: parent; anchors.topMargin: 2; anchors.bottomMargin: 2
+                                radius: 99
+                                color: ph.containsMouse
+                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                                border.width: 1
+                                border.color: ph.containsMouse
+                                    ? Qt.rgba(modelData.c.r, modelData.c.g, modelData.c.b, 0.65)
+                                    : "transparent"
+                                Behavior on color { ColorAnimation { duration: 130 } }
+                                Behavior on border.color { ColorAnimation { duration: 130 } }
+                            }
+                            Text {
+                                anchors.centerIn: parent
+                                text: modelData.i
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 18
+                                color: modelData.c
+                            }
+                            MouseArea {
+                                id: ph
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: {
+                                    StartMenuState.menuVisible = false
+                                    if (modelData.isLogout) {
+                                        StartMenuState.logout()
+                                    } else {
+                                        StartMenuState.runPowerCmd(modelData.cmd)
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
-
-            // Logout button (full width)
-            Rectangle {
-                Layout.fillWidth: true; height: 36; radius: 12
-                color: logh.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.8)
-                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
-                gradient: logh.containsMouse ? onmouseGradient : powerGradient
-                border.width: 2; border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
-                Behavior on color { ColorAnimation { duration: 120 } }
-                RowLayout { anchors.centerIn: parent; spacing: 8
-                    Text { text: "󰗼"; font.pixelSize: 16; font.family: "Symbols Nerd Font Mono"
-                        color: logh.containsMouse ? Theme.cWc6 : Theme.cWc5
-                        Behavior on color { ColorAnimation { duration: 120 } } }
-                    Text { text: "Logout"; color: logh.containsMouse ? Theme.cPrimary : Theme.cPrimary
-                        font.pixelSize: 10; font.weight: Font.Medium
-                        Behavior on color { ColorAnimation { duration: 120 } } }
-                }
-                MouseArea { id: logh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: { StartMenuState.menuVisible = false; StartMenuState.logout() } }
-            }
-            
-            Gradient {
-		id: powerGradient
-		GradientStop { position: 0.0; color: Theme.cInversePrimary }
-		GradientStop { position: 1.0; color: Theme.cOnSecondary }
-	    }
-	    
-	    Gradient {
-		id: onmouseGradient
-		GradientStop { position: 0.0; color: Theme.cOnSecondary }
-		GradientStop { position: 1.0; color: Theme.cInversePrimary }
-	    }
 
             Item { height: 4 }
         }

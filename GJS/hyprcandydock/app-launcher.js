@@ -538,7 +538,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @inverse_primary;
+    border-color: @color3;
     margin: 8px;
 }
 
@@ -550,7 +550,7 @@ window.hyprcandy-launcher {
    No padding here — the border sits flush against the SearchEntry.       */
 
 .search-frame {
-    background-color: alpha(@inverse_primary, 0.35);
+    background-color: alpha(@color9, 0.65);
     border-radius: ${sr}px;
     border-style: solid;
     border-width: 0px;
