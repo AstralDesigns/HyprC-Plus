@@ -1078,15 +1078,6 @@ ShellRoot {
                                             }
                                         }
 
-                                        // ── SEPARATOR 1 ───────────────────────────────────
-                                        Rectangle {
-                                            Layout.preferredWidth: 1
-                                            Layout.fillHeight: true
-                                            Layout.topMargin: 35
-                                            Layout.bottomMargin: 35
-                                            color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.0)
-                                        }
-
                                         // ── CENTER: User icon + PIN Entry ─────────────────
                                         ColumnLayout {
                                             id: userPinCol

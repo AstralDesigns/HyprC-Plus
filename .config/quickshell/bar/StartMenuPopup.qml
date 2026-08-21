@@ -92,13 +92,6 @@ PanelWindow {
                             smooth: true; mipmap: true; visible: StartMenuState._userIconPath !== "" }
                     	Text { anchors.centerIn: parent; visible: !smAvatar.visible; text: "󰀄"
                         	font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
-                        Rectangle {
-                                    anchors.fill: parent
-                                    radius: width / 2
-                                    color: "transparent"
-                                    border.width: 2
-                                    border.color: Theme.cWc9
-                        }
                    }
                     ColumnLayout { Layout.fillWidth: true; spacing: 1
                     	Text { text: Quickshell.env("USER"); color: Theme.cWc6; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
@@ -929,11 +922,11 @@ PanelWindow {
                     Repeater {
                         model: [
                             { i: "󰳌", c: Theme.cWc13, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh lock",    show: true,     isLogout: false },
-                            { i: "󰒲", c: Theme.cWc6, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh suspend", show: true,     isLogout: false },
-                            { i: "󰈉", c: Theme.cWc10, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh hibernate", show: StartMenuState.hibernateAvailable, isLogout: false },
+                            { i: "󰒲", c: Theme.cWc14, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh suspend", show: true,     isLogout: false },
+                            { i: "󰈉", c: Theme.cWc11, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh hibernate", show: StartMenuState.hibernateAvailable, isLogout: false },
                             { i: "󰑙", c: Theme.cWc11, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh reboot",  show: true,     isLogout: false },
-                            { i: "󰐥", c: Theme.cWc12, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh shutdown",show: true,     isLogout: false },
-                            { i: "󰗼", c: Theme.cWc9, cmd: "",                                                                 show: true,     isLogout: true }
+                            { i: "󰐥", c: Theme.cWc14, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh shutdown",show: true,     isLogout: false },
+                            { i: "󰗼", c: Theme.cWc13, cmd: "",                                                                 show: true,     isLogout: true }
                         ].filter(item => item.show)
                         delegate: Item {
                             required property var modelData

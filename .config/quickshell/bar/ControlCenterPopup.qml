@@ -1317,14 +1317,6 @@ PanelWindow {
                                     color: Theme.cPrimary
                                 }
 
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: width / 2
-                                    color: "transparent"
-                                    border.width: 2
-                                    border.color: Theme.cWc9
-                                }
-
                                 // Hover edit overlay
                                 Rectangle {
                                     anchors.fill: parent; radius: parent.radius
