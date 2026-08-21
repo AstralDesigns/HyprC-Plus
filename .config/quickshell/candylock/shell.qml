@@ -1664,7 +1664,7 @@ ShellRoot {
                                             id: artDisc
                                             anchors.centerIn: parent
                                             width: 92; height: 92
-                                            radius: 46; color: root.cSurfHi
+                                            radius: 99; color: root.cSurfHi
                                             antialiasing: true
                                             layer.enabled: true
                                             layer.smooth: true
@@ -1683,6 +1683,13 @@ ShellRoot {
                                                 anchors.centerIn: parent; visible: !artImg.visible
                                                 text: "󰽲"; font.pixelSize:32; font.family:"Symbols Nerd Font Mono"
                                                 color: root.cOnSurfVar; opacity: 0.35
+                                            }
+                                            Rectangle {
+                                                anchors.fill: parent
+                                                radius: width / 2
+                                                color: "transparent"
+                                                border.width: 1
+                                                border.color: root.cWc10
                                             }
                                             RotationAnimator on rotation {
                                                 from:0; to:360; duration:16000

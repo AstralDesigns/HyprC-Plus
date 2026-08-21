@@ -801,6 +801,13 @@ Item {
                         text: "󰽲"; font.pixelSize: 32; font.family: "Symbols Nerd Font Mono"
                         color: Theme.cOnSurfVar; opacity: 0.35
                     }
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: width / 2
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Theme.cWc10
+                    }
                     RotationAnimator on rotation {
                         from: 0; to: 360; duration: 16000
                         loops: Animation.Infinite

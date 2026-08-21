@@ -91,6 +91,13 @@ Item {
                             opacity: status === Image.Ready ? 1.0 : 0.0
                             Behavior on opacity { NumberAnimation { duration: 120 } }
                         }
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: width / 2
+                            color: "transparent"
+                            border.width: 1
+                            border.color: Theme.cWc10
+                        }
                 	opacity: discMa.containsMouse ? 0.7 : 1.0
                 	Behavior on opacity { NumberAnimation { duration: 80 } }
                 	MouseArea {
