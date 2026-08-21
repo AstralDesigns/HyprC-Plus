@@ -143,11 +143,12 @@ Item {
             " sta=$(cat \"$b/status\" 2>/dev/null);" +
             " [ -n \"$cap\" ] && printf 'BAT:%s:%s\\n' \"$cap\" \"$sta\" && break;" +
             " done;" +
-            // ── Network ──
-            "awk 'NR>2{gsub(\":\",\" \",$1);if($1!=\"lo\"){rx+=$2;tx+=$10}}END{printf \"NET:%d:%d\\n\",rx,tx}' /proc/net/dev;" +
-            // ── Uptime / Load (use printf to avoid awk quoting issues) ──
-            "read ut _ < /proc/uptime && printf 'UPTIME:%s\\n' \"$ut\";" +
-            "read la _ < /proc/loadavg && printf 'LOAD:%s\\n' \"$la\""
+            // ── Network / Uptime / Load (popup mode only) ──
+            (SystemMonitorPopupState.visible ? (
+                "awk 'NR>2{gsub(\":\",\" \",$1);if($1!=\"lo\"){rx+=$2;tx+=$10}}END{printf \"NET:%d:%d\\n\",rx,tx}' /proc/net/dev;" +
+                "read ut _ < /proc/uptime && printf 'UPTIME:%s\\n' \"$ut\";" +
+                "read la _ < /proc/loadavg && printf 'LOAD:%s\\n' \"$la\""
+            ) : "")
         ]
         running: false
 
@@ -371,6 +372,81 @@ Item {
         }
     }
 
+    // ── Dials Card (used in popup panel and widget) ───────────────────────
+    component GaugesCard: Rectangle {
+        id: cardRoot
+        required property var root
+
+        readonly property int _gaugeCount: 3 + (cardRoot.root._swapOk ? 1 : 0) + cardRoot.root._gpus.length + (cardRoot.root._hasBat ? 1 : 0)
+        implicitWidth: _gaugeCount * 88 + Math.max(0, _gaugeCount - 1) * 8 + 24
+        implicitHeight: 112 + 16
+        radius: 20
+        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                       Theme.cInversePrimary.b, 0.35)
+        border.width: 1
+        border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+
+        Row {
+            id: gaugesRow
+            anchors.centerIn: parent
+            spacing: 8
+
+            ArcGauge {
+                value:    cardRoot.root._cpu;  glyph: "󰻠"; label: "CPU"
+                valStr:   Math.round(cardRoot.root._cpu * 100) + "%"
+                arcColor: Theme.cWc5
+            }
+            ArcGauge {
+                value:    cardRoot.root._ram;  glyph: "󰍛"; label: "RAM"
+                valStr:   Math.round(cardRoot.root._ram * 100) + "%"
+                sub:      cardRoot.root._fmtBytes(cardRoot.root._ramUsed)
+                arcColor: Theme.cWc5
+            }
+            ArcGauge {
+                value:    cardRoot.root._tempOk ? Math.min(cardRoot.root._temp / 100, 1) : 0
+                glyph:    "󰔏"; label: "Temp"
+                valStr:   cardRoot.root._tempOk ? Math.round(cardRoot.root._temp) + "°" : "N/A"
+                arcColor: cardRoot.root._tempOk && cardRoot.root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cWc4
+            }
+            ArcGauge {
+                visible:  cardRoot.root._swapOk
+                value:    cardRoot.root._swap; glyph: "󰾴"; label: "Swap"
+                valStr:   Math.round(cardRoot.root._swap * 100) + "%"
+                sub:      cardRoot.root._swapOk ? cardRoot.root._fmtBytes(cardRoot.root._swapUsed) : ""
+                arcColor: Theme.cWc4
+            }
+
+            // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
+            Repeater {
+                model: cardRoot.root._gpus
+                delegate: ArcGauge {
+                    required property var modelData
+                    value:    modelData.pct / 100
+                    glyph:    modelData.isIgpu ? "󱤓" : "󰢮"
+                    label:    modelData.isIgpu ? "iGPU" : "dGPU"
+                    valStr:   modelData.pct + "%"
+                    sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
+                    arcColor: Theme.cWc3
+                }
+            }
+
+            // Battery — laptops only; hidden on desktops
+            ArcGauge {
+                visible:  cardRoot.root._hasBat
+                value:    cardRoot.root._batPct / 100
+                glyph:    cardRoot.root._batPct > 80 ? "󰁹" : cardRoot.root._batPct > 60 ? "󰂀"
+                          : cardRoot.root._batPct > 40 ? "󰁾" : cardRoot.root._batPct > 20 ? "󰁼" : "󰁺"
+                label:    cardRoot.root._batStatus === "Full"      ? "Battery "
+                          : cardRoot.root._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
+                valStr:   cardRoot.root._batPct + "%"
+                sub:      cardRoot.root._batStatus
+                arcColor: cardRoot.root._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
+                          : cardRoot.root._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
+                          : Theme.cWc6
+            }
+        }
+    }
+
     component SysMonPanel: Rectangle {
         id: smPanel
         required property var root
@@ -428,75 +504,10 @@ Item {
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             // Unified card background for gauges in a single horizontal line
-            Rectangle {
+            GaugesCard {
                 id: gaugesCard
+                root: smPanel.root
                 Layout.fillWidth: true
-                implicitHeight: 112 + 16
-                radius: 20
-                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.35)
-                border.width: 1
-                border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
-
-                Row {
-                    id: gaugesRow
-                    anchors.centerIn: parent
-                    spacing: 8
-
-                    ArcGauge {
-                        value:    root._cpu;  glyph: "󰻠"; label: "CPU"
-                        valStr:   Math.round(root._cpu * 100) + "%"
-                        arcColor: Theme.cWc5
-                    }
-                    ArcGauge {
-                        value:    root._ram;  glyph: "󰍛"; label: "RAM"
-                        valStr:   Math.round(root._ram * 100) + "%"
-                        sub:      root._fmtBytes(root._ramUsed)
-                        arcColor: Theme.cWc5
-                    }
-                    ArcGauge {
-                        value:    root._tempOk ? Math.min(root._temp / 100, 1) : 0
-                        glyph:    "󰔏"; label: "Temp"
-                        valStr:   root._tempOk ? Math.round(root._temp) + "°" : "N/A"
-                        arcColor: root._tempOk && root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cWc4
-                    }
-                    ArcGauge {
-                        visible:  root._swapOk
-                        value:    root._swap; glyph: "󰾴"; label: "Swap"
-                        valStr:   Math.round(root._swap * 100) + "%"
-                        sub:      root._swapOk ? root._fmtBytes(root._swapUsed) : ""
-                        arcColor: Theme.cWc4
-                    }
-
-                    // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
-                    Repeater {
-                        model: root._gpus
-                        delegate: ArcGauge {
-                            required property var modelData
-                            value:    modelData.pct / 100
-                            glyph:    modelData.isIgpu ? "󱤓" : "󰢮"
-                            label:    modelData.isIgpu ? "iGPU" : "dGPU"
-                            valStr:   modelData.pct + "%"
-                            sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
-                            arcColor: modelData.isIgpu ? Theme.cWc3 : Theme.cWc3
-                        }
-                    }
-
-                    // Battery — laptops only; hidden on desktops
-                    ArcGauge {
-                        visible:  root._hasBat
-                        value:    root._batPct / 100
-                        glyph:    root._batPct > 80 ? "󰁹" : root._batPct > 60 ? "󰂀"
-                                  : root._batPct > 40 ? "󰁾" : root._batPct > 20 ? "󰁼" : "󰁺"
-                        label:    root._batStatus === "Full"      ? "Battery "
-                                  : root._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
-                        valStr:   root._batPct + "%"
-                        sub:      root._batStatus
-                        arcColor: root._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
-                                  : root._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
-                                  : Theme.cWc6
-                    }
-                }
             }
 
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
@@ -594,10 +605,20 @@ Item {
             SystemMonitorPopupState.widgetY = Math.round(y)
         }
 
-        SysMonPanel {
-            root: scope
-            showClose: false
-            popupMode: false
+        Rectangle {
+            implicitWidth: widgetDials.implicitWidth + 20
+            implicitHeight: widgetDials.implicitHeight + 20
+            radius: 24
+            color: Theme.blurBackground
+            border.width: Config.barBorderWidth
+            border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                                  Config.barBorderColor.b, Config.barBorderAlpha)
+
+            GaugesCard {
+                id: widgetDials
+                root: scope
+                anchors.centerIn: parent
+            }
         }
     }
 }

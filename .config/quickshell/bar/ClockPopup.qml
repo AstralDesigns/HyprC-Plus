@@ -232,6 +232,146 @@ Item {
         }
     }
 
+    component ClockWidgetPanel: Rectangle {
+        id: cwp
+        required property var root
+        implicitWidth: 156
+        implicitHeight: 156
+        radius: 99
+        color: Theme.blurBackground
+        border.width: Config.barBorderWidth
+        border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                              Config.barBorderColor.b, Config.barBorderAlpha)
+
+        // Inner analogue clock background card
+        Rectangle {
+            anchors.centerIn: parent
+            width: 110
+            height: 110
+            radius: 55
+            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                           Theme.cInversePrimary.b, 0.45)
+            border.width: 1
+            border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.45)
+        }
+
+        Canvas {
+            anchors.fill: parent
+            antialiasing: true
+            property var time: cwp.root._now
+            onTimeChanged: requestPaint()
+
+            onPaint: {
+                const ctx = getContext("2d")
+                ctx.reset()
+                ctx.clearRect(0, 0, width, height)
+                const cx = width / 2
+                const cy = height / 2
+                const r = 51
+
+                // Inner clock dial outline
+                ctx.lineWidth = 1.5
+                ctx.strokeStyle = Qt.rgba(Theme.cWc3.r, Theme.cWc3.g, Theme.cWc3.b, 0.80).toString()
+                ctx.beginPath()
+                ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                ctx.stroke()
+
+                // Hour markers (12 dots)
+                ctx.fillStyle = Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80).toString()
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i * 30) * Math.PI / 180
+                    const mx = cx + (r - 6) * Math.sin(angle)
+                    const my = cy - (r - 6) * Math.cos(angle)
+                    ctx.beginPath()
+                    const mRadius = (i % 3 === 0) ? 2.5 : 1.2
+                    ctx.arc(mx, my, mRadius, 0, 2 * Math.PI)
+                    ctx.fill()
+                }
+
+                // Time angles (without second hand)
+                const ms = time.getMilliseconds()
+                const sec = time.getSeconds() + ms / 1000.0
+                const min = time.getMinutes() + sec / 60.0
+                const hr = (time.getHours() % 12) + min / 60.0
+                const minAngle = (min * 6) * Math.PI / 180
+                const hrAngle = (hr * 30) * Math.PI / 180
+
+                // Hour hand
+                ctx.save()
+                ctx.translate(cx, cy)
+                ctx.rotate(hrAngle)
+                ctx.lineWidth = 4.0
+                ctx.lineCap = "round"
+                ctx.strokeStyle = Theme.cWc6.toString()
+                ctx.beginPath()
+                ctx.moveTo(0, 8)
+                ctx.lineTo(0, -(r - 18))
+                ctx.stroke()
+                ctx.restore()
+
+                // Minute hand
+                ctx.save()
+                ctx.translate(cx, cy)
+                ctx.rotate(minAngle)
+                ctx.lineWidth = 2.5
+                ctx.lineCap = "round"
+                ctx.strokeStyle = Theme.cWc5.toString()
+                ctx.beginPath()
+                ctx.moveTo(0, 10)
+                ctx.lineTo(0, -(r - 10))
+                ctx.stroke()
+                ctx.restore()
+
+                // Circulating inner seconds dot
+                const secAngle = (sec * 6) * Math.PI / 180
+                ctx.save()
+                ctx.translate(cx, cy)
+                ctx.rotate(secAngle)
+                ctx.fillStyle = Theme.cWc3.toString()
+                ctx.beginPath()
+                ctx.arc(0, -(r - 16), 3, 0, 2 * Math.PI)
+                ctx.fill()
+                ctx.restore()
+
+                // Center pivot cap
+                ctx.fillStyle = Theme.cWc9.toString()
+                ctx.beginPath()
+                ctx.arc(cx, cy, 4, 0, 2 * Math.PI)
+                ctx.fill()
+                ctx.fillStyle = Theme.cWc6.toString()
+                ctx.beginPath()
+                ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI)
+                ctx.fill()
+
+                // Padded region: pointing Hour and Minute text
+                const hrText = Qt.formatDateTime(time, "hh")
+                const minText = Qt.formatDateTime(time, "mm")
+
+                let diff = Math.abs(hrAngle - minAngle) % (2 * Math.PI)
+                if (diff > Math.PI) diff = 2 * Math.PI - diff
+                const rHr = (diff < 0.28) ? 62 : 66
+                const rMin = (diff < 0.28) ? 70 : 66
+
+                const hrX = cx + rHr * Math.sin(hrAngle)
+                const hrY = cy - rHr * Math.cos(hrAngle)
+                const minX = cx + rMin * Math.sin(minAngle)
+                const minY = cy - rMin * Math.cos(minAngle)
+
+                ctx.font = "bold 11px monospace"
+                ctx.textAlign = "center"
+                ctx.textBaseline = "middle"
+
+                // Hour text where hour hand points
+                ctx.fillStyle = Theme.cWc6.toString()
+                ctx.fillText(hrText, hrX, hrY)
+
+                // Minute text where minute hand points
+                ctx.fillStyle = Theme.cWc5.toString()
+                ctx.fillText(minText, minX, minY)
+            }
+        }
+    }
+
     PanelWindow {
         id: clkPopup
         readonly property bool _barAtBottom: Config.barPosition === "bottom"
@@ -286,6 +426,6 @@ Item {
             ClockPopupState.widgetY = Math.round(y)
         }
 
-        ClockPanel { root: scope }
+        ClockWidgetPanel { root: scope }
     }
 }
