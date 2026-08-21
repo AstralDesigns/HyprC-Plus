@@ -369,16 +369,16 @@ PanelWindow {
                     }
                 }
 
-                // Wifi network list — caps at 6 rows visible, then becomes
-                // scrollable with a minimal scrollbar (matches CC's
-                // Keybinds / Animations tabs).
+                // Wifi network list — caps at 3 rows when both net & BT are expanded, 6 rows when alone,
+                // then becomes scrollable with a minimal scrollbar.
                 Item {
                     id: netListWrap
                     visible: StartMenuState.networkExpanded
                     Layout.fillWidth: true
-                    // - 34px row + 2px spacing per entry; cap at 6 rows.
+                    // - 34px row + 2px spacing per entry; cap at 3 rows when both expanded, else 6.
                     readonly property real _rowH: 36
-                    readonly property real _maxHeight: _rowH * 6
+                    readonly property int  _maxRows: (StartMenuState.networkExpanded && StartMenuState.btExpanded) ? 3 : 6
+                    readonly property real _maxHeight: _rowH * _maxRows
                     implicitHeight: netListFlick.height
 
                     Flickable {
@@ -390,11 +390,11 @@ PanelWindow {
                         clip: true
                         boundsBehavior: Flickable.StopAtBounds
                         ScrollBar.vertical: ScrollBar {
-                            policy: (StartMenuState.networkList && StartMenuState.networkList.length > 6) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-                            visible: (StartMenuState.networkList && StartMenuState.networkList.length > 6) && size < 1.0
+                            policy: (StartMenuState.networkList && StartMenuState.networkList.length > netListWrap._maxRows) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                            visible: (StartMenuState.networkList && StartMenuState.networkList.length > netListWrap._maxRows) && size < 1.0
                             contentItem: Rectangle {
                                 implicitWidth: 4
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
                                 radius: 2
                             }
                             background: Rectangle { color: "transparent" }
@@ -673,14 +673,15 @@ PanelWindow {
                         text: "Bluetooth is off"; color: Theme.cOnSurfVar; font.pixelSize: 11; font.italic: true; leftPadding: 4; topPadding: 4
                     }
 
-                    // Device list — caps at 6 rows visible, then becomes scrollable
+                    // Device list — caps at 3 rows when both net & BT are expanded, 6 rows when alone
                     Item {
                         id: btListWrap
                         visible: StartMenuState.btPowered && StartMenuState.btDevices.length > 0
                         width: parent.width
-                        // 34px row + 2px spacing per entry; cap at 6 rows.
+                        // 34px row + 2px spacing per entry; cap at 3 rows when both expanded, else 6.
                         readonly property real _rowH: 36
-                        readonly property real _maxHeight: _rowH * 6
+                        readonly property int  _maxRows: (StartMenuState.networkExpanded && StartMenuState.btExpanded) ? 3 : 6
+                        readonly property real _maxHeight: _rowH * _maxRows
                         implicitHeight: btListFlick.height
 
                         Flickable {
@@ -692,8 +693,8 @@ PanelWindow {
                             clip: true
                             boundsBehavior: Flickable.StopAtBounds
                             ScrollBar.vertical: ScrollBar {
-                                policy: (StartMenuState.btDevices && StartMenuState.btDevices.length > 6) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-                                visible: (StartMenuState.btDevices && StartMenuState.btDevices.length > 6) && size < 1.0
+                                policy: (StartMenuState.btDevices && StartMenuState.btDevices.length > btListWrap._maxRows) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                                visible: (StartMenuState.btDevices && StartMenuState.btDevices.length > btListWrap._maxRows) && size < 1.0
                                 contentItem: Rectangle {
                                     implicitWidth: 4
                                     color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
