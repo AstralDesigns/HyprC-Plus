@@ -276,18 +276,11 @@ PanelWindow {
     }
 
     // ── HC update launcher ────────────────────────────────────────────────────
-    // Phase 1 (this process): git clone into ~/.hyprcandy, then launch
-    // Candy_Update.sh via setsid so it runs in its own process group —
-    // completely detached from QuickShell.  When QS reloads (e.g. because
-    // the bar itself was just updated) this process is gone but the script
-    // keeps running; _hcPgrepProc picks it back up on Component.onCompleted.
-    //
-    // pexec inside Candy_Update.sh handles privilege elevation via hyprpolkit
-    // so the password prompt appears in the foreground independently of QS.
     Process {
         id: _hcUpdateProc
         command: [
             "bash", "-ic",
+            "touch " + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel && " +
             "rm -rf ~/.hyprcandy/candyinstall && " + 
             "cd ~/.HCUpdates && " +
             "git pull && " +
@@ -298,20 +291,18 @@ PanelWindow {
             "pkexec bash ~/.hyprcandy/candyinstall/Candy_Update.sh > /tmp/candy-update.log 2>&1"
         ]
         running: false
-        onExited: (code) => {
-            running = false
-            if (code === 0) {
-                // Git clone succeeded and the script has been launched.
-                // Write a sentinel file before marking running — this survives
-                // the QS reload that the update itself triggers, so the
-                // post-reload pgrep check can detect a completed update even
-                // though _hcScriptRunning resets to false on every reload.
-                _hcSentinelProc.running = true
+        onRunningChanged: {
+            if (running) {
                 _hcScriptRunning = true
                 _hcPollTimer.start()
             }
-            // Non-zero: git clone or chmod failed — nothing to poll.
-            // _hcScriptRunning stays false; user can retry.
+        }
+        onExited: (code) => {
+            running = false
+            _hcScriptRunning = false
+            if (code === 0) {
+                _hcStateClearProc.running = true
+            }
         }
     }
 
@@ -329,12 +320,11 @@ PanelWindow {
                 // Still running — keep the "Running …" state alive.
                 _hcScriptRunning = true
             } else {
-                // Script finished (or was never running on this boot).
-                // Check sentinel file rather than _hcScriptRunning — the flag
-                // resets on every QS reload but the file survives, so this
-                // correctly fires even when the reload happened mid-update.
-                _hcScriptRunning = false
-                _hcStateClearProc.running = true
+                // Only clear state if script was previously running
+                if (_hcScriptRunning) {
+                    _hcScriptRunning = false
+                    _hcStateClearProc.running = true
+                }
             }
         }
     }
