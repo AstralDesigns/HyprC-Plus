@@ -1435,7 +1435,7 @@ PanelWindow {
                     RowLayout {
                         Layout.fillWidth: true
                         Text {
-                            text: "hyprcandy ♥️"
+                            text: "♥️ Support HyprCandy"
                             color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                            Theme.cPrimary.b,
                                            hcTextHov.containsMouse ? 0.85 : 0.65)
@@ -4533,7 +4533,7 @@ PanelWindow {
                                         }
                                         Text {
                                             text: ccWin._licStatus === "active"
-                                                ? (ccWin._licEmail !== "" ? "Licensed to " + ccWin._licEmail : "Subscription active")
+                                                ? (ccWin._licEmail !== "" ? "Licensed by " + ccWin._licEmail : "Subscription active")
                                                 : ccWin._licStatus === "invalid"
                                                     ? (ccWin._licError !== "" ? ccWin._licError : "Key not recognised")
                                                     : "Enter your licence key to activate"
@@ -4541,121 +4541,6 @@ PanelWindow {
                                                            Theme.cPrimary.b, 0.6)
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             Layout.fillWidth: true; wrapMode: Text.Wrap
-                                        }
-                                    }
-                                }
-                            }
-
-                            CCSection { text: "Licence Key" }
-
-                            // ── Key entry + Activate ──────────────────────────
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 8
-                                Rectangle {
-                                    Layout.fillWidth: true; height: 34; radius: 9
-                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                   Theme.cPrimary.b, 0.06)
-                                    border.width: 1
-                                    border.color: _licKeyTI.activeFocus
-                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                  Theme.cPrimary.b, 0.55)
-                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                  Theme.cPrimary.b, 0.2)
-                                    Behavior on border.color { ColorAnimation { duration: 120 } }
-                                    TextInput {
-                                        id: _licKeyTI
-                                        anchors { fill: parent; margins: 8 }
-                                        // Keep always present in the layout so it can
-                                        // receive focus; opacity:0 hides it visually when
-                                        // unfocused while the overlay Texts show instead
-                                        opacity: activeFocus ? 1 : 0
-                                        color: Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                        verticalAlignment: TextInput.AlignVCenter; clip: true
-                                        Component.onCompleted: {
-                                            text = ccLicenseSettings.licenseKey
-                                        }
-                                        onActiveFocusChanged: {
-                                            if (activeFocus) text = ccLicenseSettings.licenseKey
-                                        }
-                                        onTextChanged: {
-                                            if (activeFocus) ccWin._licKeyInput = text
-                                        }
-                                        Keys.onReturnPressed: {
-                                            ccWin._verifyLicense(ccWin._licKeyInput, true)
-                                            focus = false
-                                        }
-                                    }
-                                    // Masked display — shown when a key is saved and field not focused
-                                    Text {
-                                        anchors { fill: parent; leftMargin: 9 }
-                                        verticalAlignment: Text.AlignVCenter
-                                        visible: ccLicenseSettings.licenseKey !== "" && !_licKeyTI.activeFocus
-                                        text: "●●●●-●●●●-●●●●-●●●●"
-                                        color: Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                    }
-                                    // Placeholder — shown when no key saved and field not focused
-                                    Text {
-                                        anchors { fill: parent; leftMargin: 9 }
-                                        verticalAlignment: Text.AlignVCenter
-                                        visible: ccLicenseSettings.licenseKey === "" && !_licKeyTI.activeFocus
-                                        text: "XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
-                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                       Theme.cPrimary.b, 0.28)
-                                        font.family: Config.labelFont; font.pixelSize: 11
-                                    }
-                                    // Full-area click target — requests focus on the
-                                    // TextInput when the overlays are showing
-                                    MouseArea {
-                                        anchors.fill: parent
-                                        visible: !_licKeyTI.activeFocus
-                                        cursorShape: Qt.IBeamCursor
-                                        onClicked: _licKeyTI.forceActiveFocus()
-                                    }
-                                }
-                                    Rectangle {
-                                    height: 34
-                                    implicitWidth: _actLbl.implicitWidth + 20
-                                    radius: 9
-                                    color: _actHov.containsMouse
-                                        ? (ccWin._licStatus === "active" 
-                                            ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.22)
-                                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                      Theme.cInversePrimary.b, 0.55))
-                                        : (ccWin._licStatus === "active"
-                                            ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.10)
-                                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                      Theme.cInversePrimary.b, 0.32))
-                                    border.width: 1
-                                    border.color: ccWin._licStatus === "active"
-                                        ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.42)
-                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                  Theme.cPrimary.b, 0.38)
-                                    Behavior on color { ColorAnimation { duration: 120 } }
-                                    Text {
-                                        id: _actLbl; anchors.centerIn: parent
-                                        text: (ccWin._licVerifying || ccWin._licDeactivating) ? "󰑪" 
-                                            : (ccWin._licStatus === "active" ? "Deactivate" : "Activate")
-                                        color: ccWin._licStatus === "active" ? Theme.cErr : Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                        font.weight: Font.Medium
-                                        RotationAnimator on rotation {
-                                            from: 0; to: 360; duration: 900
-                                            loops: Animation.Infinite
-                                            running: ccWin._licVerifying || ccWin._licDeactivating
-                                        }
-                                    }
-                                    MouseArea {
-                                        id: _actHov; anchors.fill: parent
-                                        hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                        enabled: !ccWin._licVerifying && !ccWin._licDeactivating
-                                        onClicked: {
-                                            if (ccWin._licStatus === "active") {
-                                                ccWin._deactivateLicense()
-                                            } else {
-                                                ccWin._verifyLicense(ccWin._licKeyInput, true)
-                                            }
                                         }
                                     }
                                 }
@@ -4702,52 +4587,6 @@ PanelWindow {
                                         _licKeyTI.text = ""
                                     }
                                 }
-                            }
-
-                            CCSection { text: "Get HyprCandy+" }
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: "Subscribe to unlock the full HyprCandy+ experience — " +
-                                      "custom lockscreen, live backgrounds, in-depth control center, " +
-                                      "GPU-aware launcher and dock, and more."
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                               Theme.cPrimary.b, 0.55)
-                                font.family: Config.labelFont; font.pixelSize: 11
-                                wrapMode: Text.Wrap
-                            }
-
-                            Rectangle {
-                                height: 36
-                                implicitWidth: _gmLbl.implicitWidth + 24
-                                radius: 10
-                                color: _gmHov.containsMouse
-                                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                              Theme.cInversePrimary.b, 0.55)
-                                    : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                              Theme.cInversePrimary.b, 0.28)
-                                border.width: 1
-                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                      Theme.cPrimary.b, 0.38)
-                                Behavior on color { ColorAnimation { duration: 120 } }
-                                Text {
-                                    id: _gmLbl; anchors.centerIn: parent
-                                    text: "󰀄  Get your HyprCandy+ key"
-                                    color: Theme.cPrimary
-                                    font.family: Config.labelFont; font.pixelSize: 13
-                                    font.weight: Font.Medium
-                                }
-                                MouseArea {
-                                    id: _gmHov; anchors.fill: parent
-                                    hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                                    onClicked: _openGumroad.running = true
-                                }
-                            }
-                            Process {
-                                id: _openGumroad
-                                command: ["xdg-open", "https://mirukai.gumroad.com/l/cxsyj"]
-                                running: false
-                                onExited: running = false
                             }
 
                             CCSection { text: "Support hyprcandy" }
