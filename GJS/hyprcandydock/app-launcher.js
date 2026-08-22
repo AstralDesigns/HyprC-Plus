@@ -538,7 +538,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @color3;
+    border-color: @color2;
     margin: 8px;
 }
 
@@ -550,7 +550,7 @@ window.hyprcandy-launcher {
    No padding here — the border sits flush against the SearchEntry.       */
 
 .search-frame {
-    background-color: alpha(@color9, 0.65);
+    background-color: alpha(@color2, 0.65);
     border-radius: ${sr}px;
     border-style: solid;
     border-width: 0px;
@@ -599,7 +599,7 @@ window.hyprcandy-launcher {
 }
 
 .launcher-search image {
-    color: alpha(@primary, 0.65);
+    color: alpha(@primary, 0.85);
 }
 
 /* ── Arrow-key navigation — FlowBoxChild focus/selected state ─────────── */
@@ -786,7 +786,7 @@ popover.launcher-popover button {
 }
 
 .fav-glyph {
-    color: @color9;
+    color: @color2;
     font-size: ${Math.round(TEXT_FONT_SIZE * 1.27)}px;
     margin-right: 4px;
 }
