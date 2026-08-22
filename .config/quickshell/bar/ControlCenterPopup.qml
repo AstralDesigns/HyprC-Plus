@@ -94,6 +94,9 @@ PanelWindow {
     property string _sddmHeaderVal:  "󰫣󰫣󰫣"
     property string _sddmFormVal:    "center"
     property string _sddmBlurVal:    "55"
+    property string _sddmWidthVal:   ""
+    property string _sddmHeightVal:  ""
+    property string _sddmFontVal:    ""
 
     // ── Hyprland entry values ─────────────────────────────────────────────
     property string _opacEntryVal:       ""
@@ -759,7 +762,7 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_header.state\" ] && cat \"$sd/sddm_header.state\" || " +
-            "  grep -oP '^HeaderText=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1"]
+            "  grep -oP '^HeaderText=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -771,7 +774,7 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_form.state\" ] && cat \"$sd/sddm_form.state\" || " +
-            "  grep -oP '^FormPosition=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1"]
+            "  grep -oP '^FormPosition=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -783,11 +786,47 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_blur.state\" ] && cat \"$sd/sddm_blur.state\" || " +
-            "  grep -oP '^BlurRadius=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | head -1"]
+            "  grep -oP '^BlurRadius=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(l) { const v = l.trim(); if (v && !isNaN(parseInt(v))) _sddmBlurVal = v }
+        }
+    }
+    Process {
+        id: _sddmReadWidth
+        command: ["bash", "-c",
+            "sd=\"$HOME/.config/hyprcandy\"; " +
+            "[ -f \"$sd/sddm_width.state\" ] && cat \"$sd/sddm_width.state\" || " +
+            "  grep -oP '^ScreenWidth=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { const v = l.trim(); if (v) _sddmWidthVal = v }
+        }
+    }
+    Process {
+        id: _sddmReadHeight
+        command: ["bash", "-c",
+            "sd=\"$HOME/.config/hyprcandy\"; " +
+            "[ -f \"$sd/sddm_height.state\" ] && cat \"$sd/sddm_height.state\" || " +
+            "  grep -oP '^ScreenHeight=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { const v = l.trim(); if (v) _sddmHeightVal = v }
+        }
+    }
+    Process {
+        id: _sddmReadFont
+        command: ["bash", "-c",
+            "sd=\"$HOME/.config/hyprcandy\"; " +
+            "[ -f \"$sd/sddm_font.state\" ] && cat \"$sd/sddm_font.state\" || " +
+            "  grep -oP '^Font=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { const v = l.trim(); if (v) _sddmFontVal = v }
         }
     }
 
@@ -4432,6 +4471,39 @@ PanelWindow {
                             }
                             Process { id: _sddmHdr; running: false }
 
+                            CCEntryRow {
+                                label: "Width"
+                                value: _sddmWidthVal
+                                onApplied: function(v) {
+                                    _sddmWidthVal = v
+                                    _sddmWidth.command = [scriptDir + "/sddm-set.sh", "ScreenWidth", v, "sddm_width.state"]
+                                    _sddmWidth.running = true
+                                }
+                            }
+                            Process { id: _sddmWidth; running: false }
+
+                            CCEntryRow {
+                                label: "Height"
+                                value: _sddmHeightVal
+                                onApplied: function(v) {
+                                    _sddmHeightVal = v
+                                    _sddmHeight.command = [scriptDir + "/sddm-set.sh", "ScreenHeight", v, "sddm_height.state"]
+                                    _sddmHeight.running = true
+                                }
+                            }
+                            Process { id: _sddmHeight; running: false }
+
+                            CCEntryRow {
+                                label: "Font"
+                                value: _sddmFontVal
+                                onApplied: function(v) {
+                                    _sddmFontVal = v
+                                    _sddmFont.command = [scriptDir + "/sddm-set.sh", "Font", v, "sddm_font.state"]
+                                    _sddmFont.running = true
+                                }
+                            }
+                            Process { id: _sddmFont; running: false }
+
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 8
                                 Text {
@@ -4479,6 +4551,9 @@ PanelWindow {
                                     _sddmReadHeader.running = true
                                     _sddmReadForm.running   = true
                                     _sddmReadBlur.running   = true
+                                    _sddmReadWidth.running  = true
+                                    _sddmReadHeight.running = true
+                                    _sddmReadFont.running   = true
                                 }
                             }
 
