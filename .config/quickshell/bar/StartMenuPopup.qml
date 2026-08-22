@@ -445,7 +445,8 @@ PanelWindow {
                                     spacing: 6
 
                                     Text {
-                                        text: netDelegate.modelData.signal > 70 ? "󰤨"
+                                        text: netDelegate.modelData.isEthernet ? "󰈀"
+                                            : netDelegate.modelData.signal > 70 ? "󰤨"
                                             : netDelegate.modelData.signal > 40 ? "󰤥"
                                             : netDelegate.modelData.signal > 20 ? "󰤢" : "󰤟"
                                         font.pixelSize: 12; font.family: Config.fontFamily

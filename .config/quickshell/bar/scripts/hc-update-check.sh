@@ -1,55 +1,57 @@
 #!/usr/bin/env bash
 # hc-update-check.sh
-# Checks for HyprCandy Plus dotfile updates.
-# Outputs a single JSON line:
-#   {"hasUpdates": true/false, "tooltip": "...", "noStore": true/false}
+# Checks for HyprCandy Plus dotfile updates and maintains a persistent state
+# file so update availability survives bar restarts and session restarts.
 #
-# Logic:
-#   - If ~/HCUpdates does NOT exist → report updates available (no store),
-#     so the apply button forces the main update script to set it up.
-#   - If ~/HCUpdates exists → run git pull; if changes were pulled → updates
-#     available; if already up-to-date → no updates.
+# State file: ~/.config/hyprcandy/hc-update-state
+#   - Written (with tooltip text) only when new updates are detected
+#   - Deleted when git pull says "Already up to date" or after update is applied
+#
+# Outputs one JSON line:
+#   {"hasUpdates": true|false, "tooltip": "...", "noStore": true|false}
 
-HC_STORE="$HOME/HCUpdates"
-HC_REPO="https://github.com/AstralDesigns/HyprC-Plus.git"
+HC_STORE="$HOME/.HCUpdates"
+STATE_FILE="$HOME/.config/hyprcandy/hc-update-state"
 
 emit() {
     local has="$1" tip="$2" nostore="${3:-false}"
-    # Escape any double-quotes in tooltip
     tip="${tip//\"/\\\"}"
     echo "{\"hasUpdates\":${has},\"tooltip\":\"${tip}\",\"noStore\":${nostore}}"
 }
 
-# ── Store folder absent ────────────────────────────────────────────────────────
-if [ ! -d "$HC_STORE" ]; then
-    emit "true" "HCPlus store not found — run Apply to set up and sync dotfiles." "true"
+# ── Store folder absent or not a git repo → needs setup ───────────────────────
+if [ ! -d "$HC_STORE" ] || [ ! -d "$HC_STORE/.git" ]; then
+    tip="HC+ store not found — 󰇚 to set up and sync dotfiles."
+    echo "$tip" > "$STATE_FILE"
+    emit "true" "$tip" "true"
     exit 0
 fi
 
-# ── Store folder present: attempt git pull ────────────────────────────────────
-if [ ! -d "$HC_STORE/.git" ]; then
-    # Folder exists but isn't a git repo — treat same as absent
-    emit "true" "HCPlus store is not a git repo — run Apply to re-initialise." "true"
-    exit 0
-fi
-
-# Fetch quietly; capture pull output to detect changes
-pull_out=$(git -C "$HC_STORE" pull --ff-only 2>&1)
+# ── Store present and is a git repo — pull and check for changes ──────────────
+pull_out=$(git -C "$HC_STORE" pull 2>&1)
 pull_exit=$?
 
 if [ $pull_exit -ne 0 ]; then
-    # Network error or conflict — report unknown state, don't claim updates
-    emit "false" "HCPlus check failed: ${pull_out}" "false"
+    # Network/git failure — if state file already exists, keep previous state
+    if [ -f "$STATE_FILE" ]; then
+        saved_tip=$(cat "$STATE_FILE")
+        emit "true" "${saved_tip}" "false"
+    else
+        emit "false" "HC+ check failed: ${pull_out}" "false"
+    fi
     exit 0
 fi
 
 if echo "$pull_out" | grep -q "Already up to date"; then
+    # Genuinely up to date — clean up any stale state or sentinel files
+    rm -f "$STATE_FILE" "$HOME/.config/hyprcandy/.hc-update-sentinel"
     emit "false" "HyprCandy Plus is up to date" "false"
 else
-    # git pull pulled something — count changed files
-    changed=$(echo "$pull_out" | grep -E '^\s+[0-9]+ file' | grep -oE '[0-9]+ file' | head -1)
-    if [ -z "$changed" ]; then
-        changed="changes available"
+    # New changes were pulled — write state and notify only on newly detected update
+    tip="HC+ files changed — 󰇚 to sync."
+    if [ ! -f "$STATE_FILE" ]; then
+        notify-send " HC+ Update" "New updates available"
     fi
-    emit "true" "HC+ dotfile updates pulled (${changed}) — apply to sync." "false"
+    echo "$tip" > "$STATE_FILE"
+    emit "true" "$tip" "false"
 fi

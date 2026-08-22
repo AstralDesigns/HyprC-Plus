@@ -356,16 +356,14 @@ PanelWindow {
     // ── HC state file cleanup process (runs after script finishes) ────────────
     // Removes ~/.config/hyprcandy/hc-update-state so the next check
     // evaluates fresh rather than reading the now-stale persisted state.
-    // Gates on the sentinel file so cold QS starts (where no update ran)
-    // don't spuriously fire notify.sh.
     Process {
         id: _hcStateClearProc
         command: [
             "bash", "-c",
             "s=" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel; " +
-            "[ -f \"$s\" ] || exit 0; " +
-            Quickshell.env("HOME") + "/.config/hypr/scripts/notify.sh > /dev/null; " +
-            "rm -f \"$s\" " + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state"
+            "st=" + Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state; " +
+            "if [ -f \"$s\" ]; then " + Quickshell.env("HOME") + "/.config/hypr/scripts/notify.sh > /dev/null 2>&1 || true; fi; " +
+            "rm -f \"$s\" \"$st\""
         ]
         running: false
         onExited: {

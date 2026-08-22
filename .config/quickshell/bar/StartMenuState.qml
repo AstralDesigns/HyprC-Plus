@@ -307,7 +307,17 @@ Item {
             sm.netScanProcRunning = running
             if(running) { sm._netBuf=[] } else {
                 if (sm.netPasswordSSID === "") {
-                    sm.networkList=sm._netBuf.slice()
+                    let list = sm._netBuf.slice()
+                    // If Ethernet is active, ensure it is represented at the top of the list
+                    if (sm.netIsEthernet && sm.networkStatus === "connected") {
+                        const ethName = sm.networkSSID || "Ethernet"
+                        list.unshift({ active: true, secure: false, signal: 100, ssid: ethName, saved: true, isEthernet: true })
+                    }
+                    // Sort so the active/connected network is always placed first at the top
+                    list.sort(function(a, b) {
+                        return (b.active ? 1 : 0) - (a.active ? 1 : 0)
+                    })
+                    sm.networkList = list
                 }
                 // Start the 30-second cooldown so the next STATUS→scan cycle
                 // won't re-run nmcli wifi list until the gate reopens.
