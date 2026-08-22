@@ -861,7 +861,7 @@ ShellRoot {
             "DST='" + iconConvProc._dst + "'; " +
             "[ -f \"$SRC\" ] || exit 1; " +
             "magick \"$SRC\" " +
-            "  -resize 384x384^ -gravity center -extent 384x384 " +
+            "  -resize 432x432^ -gravity center -extent 384x384 " +
             "  \\( +clone -alpha extract " +
             "     -fill black -colorize 100 " +
             "     -fill white -draw 'circle 192,192 192,0' \\) " +
@@ -1065,7 +1065,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "󰫢  󰫢"; color: root.cWc9
+                                                text: "󰫢  󰫢"; color: root.cWc12
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
                                                 topPadding: 6; bottomPadding: 6
                                             }
@@ -1112,11 +1112,12 @@ ShellRoot {
                                                 }
 
                                                 Rectangle {
+                                                    Layout.alignment: Qt.AlignHCenter
                                                     anchors.fill: parent
                                                     radius: width / 2
                                                     color: "transparent"
                                                     border.width: 4
-                                                    border.color: root.cWc9
+                                                    border.color: root.cWc11
                                                 }
                                             }
                                             
@@ -1142,7 +1143,7 @@ ShellRoot {
                                                     anchors.centerIn: parent; spacing: 6
                                                     visible: root.pinEntry.length === 0 && !root.authChecking
                                                     Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc12 }
-                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc2; opacity: 1.00 }
+                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc10; opacity: 1.00 }
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; visible: root.authChecking
@@ -1152,7 +1153,7 @@ ShellRoot {
                                                 Row {
                                                     anchors.centerIn: parent; spacing: 5
                                                     visible: root.pinEntry.length > 0 && !root.authChecking && !root.pinVisible
-                                                    Repeater { model: root.pinEntry.length; delegate: Rectangle { width: 8; height: 8; radius: 99; color: root.cSecondary; opacity: 0.90 } }
+                                                    Repeater { model: root.pinEntry.length; delegate: Rectangle { width: 8; height: 8; radius: 99; color: root.cWc5; opacity: 1.0 } }
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; width: parent.width - 24
@@ -1203,7 +1204,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDateNum; color: root.cWc9
+                                                text: root.clockDateNum; color: root.cWc12
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.DemiBold
                                                 lineHeight: 0.88
