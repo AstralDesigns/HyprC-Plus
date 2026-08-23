@@ -4664,7 +4664,7 @@ PanelWindow {
                                 }
                             }
 
-                            CCSection { text: "Support hyprcandy" }
+                            CCSection { text: "♥️ Support HyprCandy" }
 
                             Text {
                                 Layout.fillWidth: true
