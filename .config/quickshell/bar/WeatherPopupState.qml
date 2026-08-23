@@ -20,8 +20,8 @@ QtObject {
     // ── Visibility ────────────────────────────────────────────────────────
     property bool visible: false
     property bool widgetVisible: false
-    property int widgetX: 480
-    property int widgetY: 100
+    property int widgetX: Quickshell.screens.length > 0 ? (Quickshell.screens[0].width - 560  - 25) : 1860
+    property int widgetY: 60
 
     function toggle() { root.visible = !root.visible }
     function open()   { root.visible = true  }
