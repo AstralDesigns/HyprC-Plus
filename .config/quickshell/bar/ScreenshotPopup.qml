@@ -16,7 +16,11 @@ PanelWindow {
     anchors.top:    false
     anchors.bottom: false
 
-    visible: ScreenshotPopupState.visible
+    // ── Deferred-destroy animation pattern ──────────────────────────────
+    property bool _stateVisible: ScreenshotPopupState.visible
+    Timer { id: _scrExitDelay; interval: 220; repeat: false }
+    visible: _stateVisible || _scrExitDelay.running
+    on_StateVisibleChanged: { if (!_stateVisible) _scrExitDelay.restart() }
     color:   "transparent"
 
     implicitWidth:  card.width
@@ -128,6 +132,12 @@ PanelWindow {
                       Config.barBorderColor.b, Config.barBorderAlpha)
         radius:       20
 
+        // Animate in/out with opacity + scale
+        opacity: popup._stateVisible ? 1.0 : 0.0
+        scale:   popup._stateVisible ? 1.0 : 0.92
+        transformOrigin: Item.Center
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         ColumnLayout {
             id: col
             anchors {

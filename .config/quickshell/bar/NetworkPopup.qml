@@ -108,6 +108,13 @@ Item {
                     height: contentCol.height + 24
                     clip: true
 
+                    // Animate in/out with opacity + scale
+                    readonly property bool _barAtBottom: Config.barPosition === "bottom"
+                    opacity: NetworkPopupState.visible ? 1.0 : 0.0
+                    scale:   NetworkPopupState.visible ? 1.0 : 0.92
+                    transformOrigin: _barAtBottom ? Item.BottomRight : Item.TopRight
+                    Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                    Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
                     Rectangle {
                         id: popup
                         anchors.fill: parent

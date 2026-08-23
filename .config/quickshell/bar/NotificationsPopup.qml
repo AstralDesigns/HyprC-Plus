@@ -69,7 +69,11 @@ Item {
                     width: toastCol.width
                     x: _swipeX
                     opacity: _p * (1.0 - Math.min(Math.abs(_swipeX) / 160, 0.55))
+                    // Slide in from left: _slideIn animates from -40 to 0 when card first appears
+                    property real _slideIn: -40
+                    transform: Translate { x: toastDelegate._slideIn }
                     NumberAnimation on _p { from:0; to:1; duration:200; easing.type:Easing.OutCubic; running:true }
+                    NumberAnimation on _slideIn { from:-40; to:0; duration:240; easing.type:Easing.OutCubic; running:true }
                     Behavior on _swipeX {
                         enabled: !_swipeLock
                         NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
@@ -404,7 +408,11 @@ Item {
     // ═══════════════════════════════════════════════════════════════════
     PanelWindow {
         id: historyWindow
-        visible: NotificationsState.historyVisible
+        // ── Deferred-destroy animation pattern ──────────────────────────────
+        property bool _stateVisible: NotificationsState.historyVisible
+        Timer { id: _histExitDelay; interval: 220; repeat: false }
+        visible: _stateVisible || _histExitDelay.running
+        on_StateVisibleChanged: { if (!_stateVisible) _histExitDelay.restart() }
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "quickshell:notifications:history"
         WlrLayershell.layer: WlrLayer.Top
@@ -427,7 +435,8 @@ Item {
             bottom: _barAtBottom ? _barGapBot : 0
             left:  _panelMargin
     	}
-        implicitHeight: Math.min(histScrollContent.height + histHeader.implicitHeight + histDivider.height + 40, 720)
+        implicitHeight: 560
+        implicitWidth: 388
         color: "transparent"
 
         // Click-outside dismiss
@@ -445,8 +454,14 @@ Item {
 
         Rectangle {
             id: histPanel
-            anchors { top: parent.top; left: parent.left; bottom: parent.bottom }
+            anchors {
+                top: !_barAtBottom ? parent.top : undefined
+                bottom: _barAtBottom ? parent.bottom : undefined
+                left: parent.left
+            }
             width: 380
+            height: Math.min(histScrollContent.implicitHeight + 76, 540)
+            Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
             color: Theme.blurBackground
             //radius: historyWindow._panelRadius
             topLeftRadius: 20
@@ -456,9 +471,12 @@ Item {
             border.width: Config.barBorderWidth
             border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                           Config.barBorderColor.b, Config.barBorderAlpha)
-            scale: NotificationsState.historyVisible ? 1.0 : 0.92
-            transformOrigin: Item.TopLeft
-            Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+            // Animate in/out with opacity + scale
+            opacity: historyWindow._stateVisible ? 1.0 : 0.0
+            scale: historyWindow._stateVisible ? 1.0 : 0.92
+            transformOrigin: _barAtBottom ? Item.BottomLeft : Item.TopLeft
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
             Keys.onEscapePressed: NotificationsState.historyVisible = false
             focus: true
             Connections {
@@ -510,17 +528,30 @@ Item {
 
             Flickable {
                 id: histFlickable
-                anchors{top:histDivider.bottom;topMargin:8;left:parent.left;right:parent.right;bottom:parent.bottom;leftMargin:10;rightMargin:10;bottomMargin:10}
-                clip:true; contentHeight:histScrollContent.height
-                flickableDirection:Flickable.VerticalFlick; boundsBehavior:Flickable.StopAtBounds
+                anchors {
+                    top: histDivider.bottom
+                    topMargin: 8
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
+                    leftMargin: 10
+                    rightMargin: 10
+                    bottomMargin: 10
+                }
+                clip: true
+                contentHeight: histScrollContent.implicitHeight
+                flickableDirection: Flickable.VerticalFlick
+                boundsBehavior: Flickable.StopAtBounds
                 ColumnLayout {
                     id: histScrollContent
-                    width:parent.width; height:implicitHeight; spacing:5
-                    Item { visible:NotificationsState.history.length===0; Layout.fillWidth:true; height:44
+                    width: parent.width
+                    spacing: 5
+                    Item { visible:NotificationsState.history.length===0; Layout.fillWidth:true; height:32
                         Text { anchors.centerIn:parent; text:"No notifications"; color:Theme.cOnSurfVar; font.pixelSize:12; font.italic:true } }
                     Repeater {
                         model: NotificationsState.history
                         delegate: Rectangle {
+                            id: histCard
                             required property var modelData
                             readonly property var notif: modelData
                             property bool _exp: false
@@ -529,73 +560,94 @@ Item {
                             property bool _swipeLock: false
                             property var _flickable: histFlickable
 
-                            radius:12; Layout.fillWidth:true
-                            height:hcBody.implicitHeight+16
-                            Layout.preferredHeight:height
-                            color:hcMA.containsMouse ? Qt.rgba(Theme.cSurfMid.r,Theme.cSurfMid.g,Theme.cSurfMid.b,0.8)
+                            radius: 12
+                            Layout.fillWidth: true
+                            clip: true
+                            height: _dismissing ? 0 : (hcBody.implicitHeight + 20)
+                            Layout.preferredHeight: height
+                            color: hcMA.containsMouse ? Qt.rgba(Theme.cSurfMid.r,Theme.cSurfMid.g,Theme.cSurfMid.b,0.8)
                                 : Qt.rgba(Theme.cSurfMid.r,Theme.cSurfMid.g,Theme.cSurfMid.b,0.5)
-                            border.width:1
-                            border.color:notif.urgency>=2 ? Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.35)
+                            border.width: 1
+                            border.color: notif.urgency>=2 ? Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.35)
                                 : Qt.rgba(Theme.cOutVar.r,Theme.cOutVar.g,Theme.cOutVar.b,0.25)
-                            Behavior on color{ColorAnimation{duration:100}}
-                            Behavior on height{NumberAnimation{duration:140;easing.type:Easing.OutCubic}}
-                            x:_swipeX; opacity:1.0-Math.min(Math.abs(_swipeX)/160,0.55)
-                            Behavior on _swipeX{enabled:!_swipeLock;NumberAnimation{duration:220;easing.type:Easing.OutCubic}}
+                            Behavior on color { ColorAnimation { duration: 100 } }
+                            Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+                            // Fade + slide in when newly added to history
+                            property real _entryP: 0
+                            opacity: (_dismissing ? 0 : _entryP) * (1.0 - Math.min(Math.abs(_swipeX)/160, 0.55))
+                            Behavior on opacity { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                            NumberAnimation on _entryP { from: 0; to: 1; duration: 200; easing.type: Easing.OutCubic; running: true }
+                            x: _swipeX
+                            Behavior on _swipeX { enabled: !_swipeLock; NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+                            Timer {
+                                id: histDismissTimer
+                                interval: 200
+                                repeat: false
+                                onTriggered: {
+                                    NotificationsState.history = NotificationsState.history.filter(function(n){ return n.id !== notif.id })
+                                }
+                            }
 
                             function _commitDismiss() {
-                                if(_dismissing)return; _dismissing=true
-                                const dir=_swipeX>=0?1:-1; _swipeX=dir*(width+40)
-                                Qt.callLater(function(){NotificationsState.history=NotificationsState.history.filter(function(n){return n.id!==notif.id})})
+                                if (_dismissing) return
+                                _dismissing = true
+                                const dir = _swipeX >= 0 ? 1 : -1
+                                _swipeX = dir * (width + 40)
+                                histDismissTimer.restart()
                             }
                             function _endGesture() {
-                                _swipeLock=false; _flickable.interactive=true
-                                if(_dismissing)return
-                                if(Math.abs(_swipeX)>=width*0.35)_commitDismiss(); else _swipeX=0
+                                _swipeLock = false
+                                _flickable.interactive = true
+                                if (_dismissing) return
+                                if (Math.abs(_swipeX) >= width * 0.35) _commitDismiss()
+                                else _swipeX = 0
                             }
-                            Timer{id:swipeIdleTimer;interval:200;repeat:false;onTriggered:_endGesture()}
-                            WheelHandler{onWheel:function(ev){
-                                const px=ev.pixelDelta.x!==0?ev.pixelDelta.x:-(ev.angleDelta.x/8.0)
-                                const py=ev.pixelDelta.y!==0?ev.pixelDelta.y:-(ev.angleDelta.y/8.0)
-                                const hm=Math.abs(px),vm=Math.abs(py)
-                                if(hm<2||vm>hm*0.8){ev.accepted=false;return}
-                                ev.accepted=true;_flickable.interactive=false;_swipeLock=true
-                                _swipeX=Math.max(-width*1.3,Math.min(width*1.3,_swipeX+px))
+                            Timer { id: swipeIdleTimer; interval: 200; repeat: false; onTriggered: _endGesture() }
+                            WheelHandler { onWheel: function(ev){
+                                const px = ev.pixelDelta.x !== 0 ? ev.pixelDelta.x : -(ev.angleDelta.x / 8.0)
+                                const py = ev.pixelDelta.y !== 0 ? ev.pixelDelta.y : -(ev.angleDelta.y / 8.0)
+                                const hm = Math.abs(px), vm = Math.abs(py)
+                                if (hm < 2 || vm > hm * 0.8) { ev.accepted = false; return }
+                                ev.accepted = true; _flickable.interactive = false; _swipeLock = true
+                                _swipeX = Math.max(-width * 1.3, Math.min(width * 1.3, _swipeX + px))
                                 swipeIdleTimer.restart()
-                                if(Math.abs(_swipeX)>=width*0.70)_commitDismiss()
+                                if (Math.abs(_swipeX) >= width * 0.70) _commitDismiss()
                             }}
 
-                            ColumnLayout { id:hcBody
-                                anchors{left:parent.left;right:parent.right;top:parent.top;margins:10}
-                                spacing:4
-                                RowLayout{Layout.fillWidth:true;spacing:8
-                                    Rectangle{width:6;height:6;radius:3;Layout.alignment:Qt.AlignVCenter
-                                        color:notif.urgency>=2?Theme.cErr:notif.category==="bt"?Theme.cPrimary:Qt.rgba(Theme.cOnSurfVar.r,Theme.cOnSurfVar.g,Theme.cOnSurfVar.b,0.5)}
-                                    Item{width:20;height:20
-                                        Image{id:hcIcImg
-                                            anchors{fill:parent;margins:notif.category==="media.playing"?0:1}
-                                            source:{const ic=notif.icon||"";if(ic.startsWith("/")||ic.startsWith("file://"))return"";return notif.iconPath?"file://"+notif.iconPath:""}
-                                            fillMode:notif.category==="media.playing"?Image.PreserveAspectCrop:Image.PreserveAspectFit;smooth:true;mipmap:true;visible:status===Image.Ready;cache:false
-                                            layer.enabled:notif.category==="media.playing"
-                                            layer.effect:MultiEffect{maskEnabled:true;maskSource:hcArtMask;maskThresholdMin:0.5;maskSpreadAtMin:1.0}
-                                            Rectangle{id:hcArtMask;anchors.fill:parent;radius:width/2;color:"white";opacity:0;layer.enabled:true}}
-                                        Text{anchors.centerIn:parent;visible:!hcIcImg.visible;text:NotificationsState.iconGlyph(notif);font.pixelSize:12;font.family:Config.fontFamily;color:notif.urgency>=2?Theme.cErr:Theme.cOnSurfVar}
+                            ColumnLayout { id: hcBody
+                                anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+                                spacing: 4
+                                RowLayout { Layout.fillWidth: true; spacing: 8
+                                    Rectangle { width: 6; height: 6; radius: 3; Layout.alignment: Qt.AlignVCenter
+                                        color: notif.urgency>=2 ? Theme.cErr : notif.category==="bt" ? Theme.cPrimary : Qt.rgba(Theme.cOnSurfVar.r,Theme.cOnSurfVar.g,Theme.cOnSurfVar.b,0.5) }
+                                    Item { width: 20; height: 20
+                                        Image { id: hcIcImg
+                                            anchors { fill: parent; margins: notif.category==="media.playing" ? 0 : 1 }
+                                            source: { const ic = notif.icon || ""; if (ic.startsWith("/") || ic.startsWith("file://")) return ""; return notif.iconPath ? "file://" + notif.iconPath : "" }
+                                            fillMode: notif.category==="media.playing" ? Image.PreserveAspectCrop : Image.PreserveAspectFit; smooth: true; mipmap: true; visible: status === Image.Ready; cache: false
+                                            layer.enabled: notif.category === "media.playing"
+                                            layer.effect: MultiEffect { maskEnabled: true; maskSource: hcArtMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
+                                            Rectangle { id: hcArtMask; anchors.fill: parent; radius: width / 2; color: "white"; opacity: 0; layer.enabled: true } }
+                                        Text { anchors.centerIn: parent; visible: !hcIcImg.visible; text: NotificationsState.iconGlyph(notif); font.pixelSize: 12; font.family: Config.fontFamily; color: notif.urgency>=2 ? Theme.cErr : Theme.cOnSurfVar }
                                     }
-                                    ColumnLayout{Layout.fillWidth:true;spacing:0
-                                        RowLayout{Text{Layout.fillWidth:true;text:notif.summary||notif.appName||"Notification";color:Config.wsPersistentColor;font.pixelSize:11;font.weight:Font.Medium;elide:Text.ElideRight}
-                                            Rectangle{visible:(notif.count||1)>1;height:16;implicitWidth:cntT.implicitWidth+10;radius:8;color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.25);border.width:1;border.color:Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.4)
-                                                Text{id:cntT;anchors.centerIn:parent;text:"×"+(notif.count||1);font.pixelSize:9;color:Theme.cPrimary}
+                                    ColumnLayout { Layout.fillWidth: true; spacing: 0
+                                        RowLayout { Text { Layout.fillWidth: true; text: notif.summary || notif.appName || "Notification"; color: Config.wsPersistentColor; font.pixelSize: 11; font.weight: Font.Medium; elide: Text.ElideRight }
+                                            Rectangle { visible: (notif.count || 1) > 1; height: 16; implicitWidth: cntT.implicitWidth + 10; radius: 8; color: Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.25); border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.4)
+                                                Text { id: cntT; anchors.centerIn: parent; text: "×" + (notif.count || 1); font.pixelSize: 9; color: Theme.cPrimary }
                                             }
                                         }
-                                        Text{visible:notif.appName!==""&&notif.summary!=="";text:notif.appName;color:Theme.cOnSurfVar;font.pixelSize:9;opacity:0.7}
+                                        Text { visible: notif.appName !== "" && notif.summary !== ""; text: notif.appName; color: Theme.cOnSurfVar; font.pixelSize: 9; opacity: 0.7 }
                                     }
-                                    Text{text:{const d=new Date(notif.timestamp),now=new Date();const dm=Math.floor((now-d)/60000);if(dm<1)return"now";if(dm<60)return dm+"m";const dh=Math.floor(dm/60);if(dh<24)return dh+"h";return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
-                                        color:Theme.cOnSurfVar;font.pixelSize:9;opacity:0.65;Layout.alignment:Qt.AlignVCenter}
-                                    Text{visible:(notif.body||"")!==""||((notif.actions||[]).length>0)
-                                        text:_exp?"󰅃":"󰅀";font.pixelSize:10;font.family:Config.fontFamily;color:Theme.cOnSurfVar;opacity:0.8;Layout.alignment:Qt.AlignVCenter
-                                        MouseArea{anchors.fill:parent;anchors.margins:-4;cursorShape:Qt.PointingHandCursor;onClicked:_exp=!_exp}}
-                                    Rectangle{width:18;height:18;radius:5;color:hcDH.containsMouse?Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.9):"transparent";Behavior on color{ColorAnimation{duration:80}}
-                                        Text{anchors.centerIn:parent;text:"×";font.pixelSize:9;color:Theme.cOnSurfVar;opacity:0.7}
-                                        MouseArea{id:hcDH;anchors.fill:parent;hoverEnabled:true;cursorShape:Qt.PointingHandCursor;onClicked:NotificationsState.history=NotificationsState.history.filter(function(n){return n.id!==notif.id})}}
+                                    Text { text: { const d = new Date(notif.timestamp), now = new Date(); const dm = Math.floor((now - d) / 60000); if (dm < 1) return "now"; if (dm < 60) return dm + "m"; const dh = Math.floor(dm / 60); if (dh < 24) return dh + "h"; return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) }
+                                        color: Theme.cOnSurfVar; font.pixelSize: 9; opacity: 0.65; Layout.alignment: Qt.AlignVCenter }
+                                    Text { visible: (notif.body || "") !== "" || ((notif.actions || []).length > 0)
+                                        text: _exp ? "󰅃" : "󰅀"; font.pixelSize: 10; font.family: Config.fontFamily; color: Theme.cOnSurfVar; opacity: 0.8; Layout.alignment: Qt.AlignVCenter
+                                        MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: _exp = !_exp } }
+                                    Rectangle { width: 18; height: 18; radius: 5; color: hcDH.containsMouse ? Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.9) : "transparent"; Behavior on color { ColorAnimation { duration: 80 } }
+                                        Text { anchors.centerIn: parent; text: "×"; font.pixelSize: 9; color: Theme.cOnSurfVar; opacity: 0.7 }
+                                        MouseArea { id: hcDH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: histCard._commitDismiss() } }
                                 }
                                 ColumnLayout{visible:_exp;Layout.fillWidth:true;spacing:6
                                     Image{id:hcThumb
@@ -627,7 +679,6 @@ Item {
                             }
                         }
                     }
-                    Item{height:4}
                 }
             }
         }

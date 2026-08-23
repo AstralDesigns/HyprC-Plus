@@ -552,7 +552,11 @@ function hotReload() {
         _ahDelaySec = conf.autoHideDelay;
         if (!_ahEnabled) {
             _ahCancelTimer();
-            if (dockWindow) { dockWindow.set_visible(true); if (_ahHotspot) _ahHotspot.set_visible(false); }
+            _ahCancelFade();
+            if (dockWindow) {
+                if (_ahHotspot) _ahHotspot.set_visible(false);
+                _ahFadeIn(dockWindow);
+            }
         } else {
             // Autohide enabled — start timer immediately; pointer may already be away
             _ahStartTimer();
@@ -975,10 +979,14 @@ const HyprCandyDock = GObject.registerClass({
                 if (!_ahEnabled) return;
                 // Pointer entered — cancel any pending hide
                 _ahCancelTimer();
-                // Re-show if we were hidden (shouldn't happen often, but safe)
+                _ahCancelFade();
+                // Re-show with fade if we were hidden
                 if (!this.get_visible()) {
-                    this.set_visible(true);
                     if (_ahHotspot) _ahHotspot.set_visible(false);
+                    _ahFadeIn(this);
+                } else if (this.get_opacity() < 1.0) {
+                    // Was mid-fade-out — ramp back up
+                    _ahFadeIn(this);
                 }
             });
             motion.connect('leave', () => {
@@ -2316,6 +2324,59 @@ function _ahCancelTimer() {
     }
 }
 
+// ── Smooth opacity ramp helpers ──────────────────────────────────────
+// GTK4 top-level windows don't support CSS transitions for opacity, so we
+// step it manually via GLib.timeout_add (12 steps @ 17 ms ≈ 200 ms total).
+const _AH_STEPS    = 12;
+const _AH_INTERVAL = 17;  // ms per step
+let _ahFadeTimerId = 0;
+
+function _ahCancelFade() {
+    if (_ahFadeTimerId) {
+        GLib.source_remove(_ahFadeTimerId);
+        _ahFadeTimerId = 0;
+    }
+}
+
+function _ahFadeOut(win, onDone) {
+    _ahCancelFade();
+    let step = 0;
+    _ahFadeTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, _AH_INTERVAL, () => {
+        step++;
+        const t = step / _AH_STEPS;
+        // Ease-out cubic: 1 - (1-t)^3
+        const eased = 1 - Math.pow(1 - t, 3);
+        win.set_opacity(1.0 - eased);
+        if (step >= _AH_STEPS) {
+            win.set_opacity(0.0);
+            _ahFadeTimerId = 0;
+            onDone();
+            return GLib.SOURCE_REMOVE;
+        }
+        return GLib.SOURCE_CONTINUE;
+    });
+}
+
+function _ahFadeIn(win) {
+    _ahCancelFade();
+    win.set_opacity(0.0);
+    win.set_visible(true);
+    let step = 0;
+    _ahFadeTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, _AH_INTERVAL, () => {
+        step++;
+        const t = step / _AH_STEPS;
+        // Ease-out cubic
+        const eased = 1 - Math.pow(1 - t, 3);
+        win.set_opacity(eased);
+        if (step >= _AH_STEPS) {
+            win.set_opacity(1.0);
+            _ahFadeTimerId = 0;
+            return GLib.SOURCE_REMOVE;
+        }
+        return GLib.SOURCE_CONTINUE;
+    });
+}
+
 // Call when a dock popover opens so autohide is suppressed.
 function _ahPopoverOpened() {
     _ahPopoverCount++;
@@ -2348,11 +2409,14 @@ function _ahStartTimer() {
             const json = new TextDecoder().decode(out);
             if (/"fullscreen"\s*:\s*true/.test(json)) return GLib.SOURCE_REMOVE;
         } catch (_) { }
-        dockWindow.set_visible(false);
-        if (_ahHotspot) {
-            _ahHotspot._applySize();
-            _ahHotspot.set_visible(true);
-        }
+        dockWindow.set_opacity(1.0);
+        _ahFadeOut(dockWindow, () => {
+            dockWindow.set_visible(false);
+            if (_ahHotspot) {
+                _ahHotspot._applySize();
+                _ahHotspot.set_visible(true);
+            }
+        });
         return GLib.SOURCE_REMOVE;
     });
 }

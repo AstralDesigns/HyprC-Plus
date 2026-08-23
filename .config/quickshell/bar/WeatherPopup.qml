@@ -83,8 +83,10 @@ Item {
                       Config.barBorderColor.b, Config.barBorderAlpha)
 
         scale: popupMode && WeatherPopupState.visible ? 1.0 : (popupMode ? 0.94 : 1.0)
+        opacity: popupMode ? (WeatherPopupState.visible ? 1.0 : 0.0) : 1.0
         transformOrigin: popupMode && Config.barPosition === "bottom" ? Item.BottomRight : Item.TopRight
-        Behavior on scale { enabled: popupMode; NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on scale   { enabled: popupMode; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on opacity { enabled: popupMode; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
         MouseArea { anchors.fill: parent; enabled: popupMode }
 
@@ -464,6 +466,12 @@ Item {
         readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 4
         readonly property real _panelMargin: Config.barMode === "shell" ? Config.popupSideMargin : Config.popupSideMargin * 2
 
+        // ── Deferred-destroy animation pattern ──────────────────────────────
+        property bool _stateVisible: WeatherPopupState.visible
+        Timer { id: _wxExitDelay; interval: 220; repeat: false }
+        visible: _stateVisible || _wxExitDelay.running
+        on_StateVisibleChanged: { if (!_stateVisible) _wxExitDelay.restart() }
+
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
         margins {
             top: _barAtBottom ? 0 : _barGap
@@ -476,7 +484,6 @@ Item {
         WlrLayershell.namespace: "quickshell:weather-popup"
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         color: "transparent"
-        visible: WeatherPopupState.visible
 
         Connections {
             target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null

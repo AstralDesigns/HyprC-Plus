@@ -6,7 +6,11 @@ import Quickshell.Io
 
 PanelWindow {
     id: win
-    visible: UpdatesPopupState.visible
+    // ── Deferred-destroy animation pattern ──────────────────────────────
+    property bool _stateVisible: UpdatesPopupState.visible
+    Timer { id: _updExitDelay; interval: 220; repeat: false }
+    visible: _stateVisible || _updExitDelay.running
+    on_StateVisibleChanged: { if (!_stateVisible) _updExitDelay.restart() }
     color: "transparent"
 
     readonly property bool _barAtBottom: Config.barPosition === "bottom"
@@ -20,9 +24,9 @@ PanelWindow {
         bottom: _barAtBottom ? _barGapBot : 0
         right:  _panelMargin + 125
     }
-    implicitWidth: popRect.implicitWidth
+    implicitWidth: 320
     exclusionMode: ExclusionMode.Ignore
-    implicitHeight: popRect.implicitHeight + 8
+    implicitHeight: 460
 
     // ── Tracks whether Candy_Update.sh is alive in the OS, even across QS reloads ──
     property bool _hcScriptRunning: false
@@ -39,12 +43,14 @@ PanelWindow {
 
     Rectangle {
         id: popRect
-        anchors.fill: parent
-        // Add anchors.rightMargin here to nudge left under the updates module
-        y: 3
+        anchors {
+            top: !_barAtBottom ? parent.top : undefined
+            bottom: _barAtBottom ? parent.bottom : undefined
+            right: parent.right
+        }
 
-        implicitWidth:  Math.max(220, col.implicitWidth + 32)
-        implicitHeight: col.implicitHeight + 24
+        width:  Math.max(240, col.implicitWidth + 32)
+        height: col.implicitHeight + 24
 
         color: Theme.blurBackground
         radius:       20
@@ -52,6 +58,12 @@ PanelWindow {
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
 
+        // Animate in/out with opacity + scale
+        opacity: win._stateVisible ? 1.0 : 0.0
+        scale:   win._stateVisible ? 1.0 : 0.92
+        transformOrigin: win._barAtBottom ? Item.BottomRight : Item.TopRight
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Column {
             id: col
             anchors {
@@ -101,19 +113,17 @@ PanelWindow {
             Text {
                 width: parent.width
                 visible: UpdatesPopupState.hasUpdates
-                height:  UpdatesPopupState.hasUpdates ? implicitHeight : 0
                 text:  UpdatesPopupState.text || ""
                 color: Theme.cOnSurfVar
                 font.family:    Config.labelFont
                 font.pixelSize: Config.labelFontSize
                 wrapMode: Text.WordWrap
                 lineHeight: 1.4
-                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             }
 
             Rectangle {
                 width:  parent.width
-                height: UpdatesPopupState.hasUpdates ? 36 : 0
+                height: 36
                 radius: 10
                 color: sysUpdateHover.containsMouse
                     ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
@@ -122,7 +132,6 @@ PanelWindow {
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 visible: UpdatesPopupState.hasUpdates
                 clip: true
-                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                 Behavior on color  { ColorAnimation   { duration: 120 } }
                 Text {
                     anchors.centerIn: parent
@@ -207,19 +216,17 @@ PanelWindow {
             Text {
                 width: parent.width
                 visible: UpdatesPopupState.hcHasUpdates
-                height:  UpdatesPopupState.hcHasUpdates ? implicitHeight : 0
                 text:  UpdatesPopupState.hcTooltip || ""
                 color: Theme.cOnSurfVar
                 font.family:    Config.labelFont
                 font.pixelSize: Config.labelFontSize
                 wrapMode: Text.WordWrap
                 lineHeight: 1.4
-                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
             }
 
             Rectangle {
                 width:  parent.width
-                height: UpdatesPopupState.hcHasUpdates ? 36 : 0
+                height: 36
                 radius: 10
                 color: hcUpdateHover.containsMouse
                     ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.12)
@@ -228,7 +235,6 @@ PanelWindow {
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 visible: UpdatesPopupState.hcHasUpdates
                 clip: true
-                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                 Behavior on color  { ColorAnimation   { duration: 120 } }
                 Text {
                     anchors.centerIn: parent

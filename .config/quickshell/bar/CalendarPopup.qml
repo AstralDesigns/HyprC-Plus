@@ -48,7 +48,11 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell:calendar-popup"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     color: "transparent"
-    visible: CalendarPopupState.visible
+    // ── Deferred-destroy animation pattern ──────────────────────────────
+    property bool _stateVisible: CalendarPopupState.visible
+    Timer { id: _calExitDelay; interval: 220; repeat: false }
+    visible: _stateVisible || _calExitDelay.running
+    on_StateVisibleChanged: { if (!_stateVisible) _calExitDelay.restart() }
 
     // ── Dismiss on focus change ───────────────────────────────────────────
     // BUG FIX: guard target with typeof check (same pattern as
@@ -165,6 +169,12 @@ PanelWindow {
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
 
+        // Animate in/out with opacity + scale
+        opacity: calWin._stateVisible ? 1.0 : 0.0
+        scale:   calWin._stateVisible ? 1.0 : 0.92
+        transformOrigin: calWin._barAtBottom ? Item.Bottom : Item.Top
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         // Subtle inner glass sheen — transparent base so only gradient alpha shows;
         // clip:true on parent keeps everything inside the rounded corners
         Rectangle {

@@ -376,7 +376,15 @@ Item {
         id: clkPopup
         readonly property bool _barAtBottom: Config.barPosition === "bottom"
         readonly property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop - 8) : Config.outerMarginTop + 4) + Config.barHeight
-    readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom - 8) : Config.outerMarginBottom + 4) + Config.barHeight
+        readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom - 8) : Config.outerMarginBottom + 4) + Config.barHeight
+
+        // ── Deferred-destroy animation pattern ──────────────────────────────
+        // Surface stays alive during exit animation so the panel can animate
+        // out; only destroyed (visible=false) after the Timer fires.
+        property bool _stateVisible: ClockPopupState.visible
+        Timer { id: _clkExitDelay; interval: 220; repeat: false }
+        visible: _stateVisible || _clkExitDelay.running
+        on_StateVisibleChanged: { if (!_stateVisible) _clkExitDelay.restart() }
 
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
         margins {
@@ -391,7 +399,6 @@ Item {
         WlrLayershell.namespace: "quickshell:clock-popup"
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         color: "transparent"
-        visible: ClockPopupState.visible
 
         Connections {
             target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
@@ -408,6 +415,12 @@ Item {
             id: clkPanel
             root: scope
             anchors.horizontalCenter: parent.horizontalCenter
+            // Animate in/out with opacity + scale
+            opacity: clkPopup._stateVisible ? 1.0 : 0.0
+            scale:   clkPopup._stateVisible ? 1.0 : 0.92
+            transformOrigin: clkPopup._barAtBottom ? Item.Bottom : Item.Top
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         }
     }
 

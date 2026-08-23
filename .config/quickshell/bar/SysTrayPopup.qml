@@ -6,7 +6,11 @@ import Quickshell.Services.SystemTray
 PanelWindow {
     id: win
     color: "transparent"
-    visible: SysTrayPopupState.visible
+    // ── Deferred-destroy animation pattern ──────────────────────────────
+    property bool _stateVisible: SysTrayPopupState.visible
+    Timer { id: _stExitDelay; interval: 220; repeat: false }
+    visible: _stateVisible || _stExitDelay.running
+    on_StateVisibleChanged: { if (!_stateVisible) _stExitDelay.restart() }
 
     WlrLayershell.namespace: "quickshell:systraypopup"
 
@@ -51,6 +55,12 @@ PanelWindow {
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
 
+        // Animate in/out with opacity + scale
+        opacity: win._stateVisible ? 1.0 : 0.0
+        scale:   win._stateVisible ? 1.0 : 0.92
+        transformOrigin: win._barAtBottom ? Item.Bottom : Item.Top
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Row {
             id: trayRow
             anchors.centerIn: parent

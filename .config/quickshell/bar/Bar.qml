@@ -535,6 +535,15 @@ PanelWindow {
 
     on_AhHiddenChanged: updateBarVisibility()
 
+    // ── Bar exit-animation delay timer ───────────────────────────────────
+    // The bar surface is kept alive for 230ms after _ahHidden goes true so the
+    // fade+slide exit animation can finish before the surface is destroyed.
+    Timer {
+        id: _ahAnimExitTimer
+        interval: 230; repeat: false
+        onTriggered: { if (bar._ahHidden) bar.visible = false }
+    }
+
     function updateBarVisibility() {
         if (Config.barMode === "tri") {
             const leftVisible   = !Config.triLeftAutoHide   || !_triLeftAhHidden   || _triLeftPinned
@@ -544,7 +553,13 @@ PanelWindow {
         } else if (Config.barMode === "shell") {
             bar.visible = true
         } else {
-            bar.visible = !bar._ahHidden
+            if (!bar._ahHidden) {
+                // Showing: make visible immediately so animation can play
+                bar.visible = true
+            } else {
+                // Hiding: keep visible during exit animation, destroy after
+                _ahAnimExitTimer.restart()
+            }
         }
     }
 
@@ -649,10 +664,10 @@ PanelWindow {
     property bool _shellModHidden:    false
 
     on_ShellModHiddenChanged: {
-        // Animate opacity on barBg and barLayout directly.
-        // Both objects are declared below but QML forward-refs inside the same Item are fine.
-        barBg.opacity     = bar._shellModHidden ? 0.0 : 1.0
-        barLayout.opacity = bar._shellModHidden ? 0.0 : 1.0
+        // Opacity + slide is now handled declaratively on barBg/barLayout via
+        // their opacity bindings and the Translate transform on barBg.
+        // Trigger the shellFrame repaint for the center-island tab shape.
+        if (Config.barMode === "shell") shellFrame.requestPaint()
     }
 
     on_ShellModAhEnabledChanged: {
@@ -689,7 +704,7 @@ PanelWindow {
             const mon = bar._monitor
             if (mon && mon.activeWindow && mon.activeWindow.fullscreen) return
             bar._ahHidden = true
-            bar.visible   = false
+            // visible = false is handled by _ahAnimExitTimer after animation completes
         }
     }
 
@@ -702,6 +717,7 @@ PanelWindow {
             if (hovered) {
                 // Pointer entered — cancel pending hide, ensure bar visible
                 _ahHideTimer.stop()
+                _ahAnimExitTimer.stop()
                 if (bar._ahHidden) {
                     bar._ahHidden = false
                     bar.visible   = true
@@ -1029,7 +1045,30 @@ PanelWindow {
         bottomLeftRadius:  Config.barBottomLeftRadius
         bottomRightRadius: Config.barBottomRightRadius
         Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
-        Behavior on opacity { NumberAnimation { duration: 250 } }
+        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+        // Autohide slide: shift toward the anchored edge as bar fades out
+        readonly property real _slideAmount: 8
+        transform: Translate {
+            y: {
+                if (!bar._ahHidden && !bar._shellModHidden) return 0
+                if (bar._isTop)    return bar._ahHidden ? -barBg._slideAmount
+                                       : (bar._shellModHidden ? -barBg._slideAmount : 0)
+                if (bar._isBottom) return bar._ahHidden ? barBg._slideAmount
+                                       : (bar._shellModHidden ? barBg._slideAmount  : 0)
+                return 0
+            }
+            x: {
+                if (!bar._ahHidden) return 0
+                if (bar._isLeft)  return -barBg._slideAmount
+                if (bar._isRight) return  barBg._slideAmount
+                return 0
+            }
+            Behavior on y { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+            Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        }
+        // Opacity driven by both autohide and shell-module autohide
+        opacity: (bar._ahHidden || bar._shellModHidden) ? 0.0 : 1.0
 
         // Shell-module auto-hide: reveal modules on hover, restart timer on leave
         HoverHandler {
@@ -1176,7 +1215,9 @@ PanelWindow {
             top:    barBg.top
             bottom: barBg.bottom
         }
-        Behavior on opacity { NumberAnimation { duration: 250 } }
+        Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+        // Mirror barBg opacity so both fade together
+        opacity: (bar._ahHidden || bar._shellModHidden) ? 0.0 : 1.0
         readonly property int _minGap: 4
         property bool _mediaActive: MediaPlayerState.active
         readonly property real _leftEdge:   Config.islandSpacing + Config.barEdgePaddingLeft
@@ -1285,7 +1326,14 @@ PanelWindow {
         Rectangle {
             id: triLeft
             visible: bar._isHorizontal && Config.barMode === "tri"
-                     && (!bar._triLeftAhHidden || bar._triLeftPinned)
+            // Animate hide/show with opacity + slide from the left edge
+            readonly property bool _shown: !bar._triLeftAhHidden || bar._triLeftPinned
+            opacity: _shown ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            transform: Translate {
+                x: triLeft._shown ? 0 : -10
+                Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            }
             anchors {
                 left:           parent.left
                 leftMargin:     Config.triModuleSideMargin
@@ -1379,7 +1427,14 @@ PanelWindow {
         Item {
             id: shellCenter
             visible: bar._isHorizontal && Config.barMode === "shell"
-                     && (!bar._triCenterAhHidden || bar._triCenterPinned)
+            // Animate hide/show with opacity + vertical slide
+            readonly property bool _shown: !bar._triCenterAhHidden || bar._triCenterPinned
+            opacity: _shown ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            transform: Translate {
+                y: shellCenter._shown ? 0 : (bar._isTop ? -10 : 10)
+                Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            }
             anchors {
                 horizontalCenter: parent.horizontalCenter
             }
@@ -1424,7 +1479,14 @@ PanelWindow {
         Rectangle {
             id: triCenter
             visible: bar._isHorizontal && Config.barMode === "tri"
-                     && (!bar._triCenterAhHidden || bar._triCenterPinned)
+            // Animate hide/show with opacity + vertical slide
+            readonly property bool _shown: !bar._triCenterAhHidden || bar._triCenterPinned
+            opacity: _shown ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            transform: Translate {
+                y: triCenter._shown ? 0 : (bar._isTop ? -10 : 10)
+                Behavior on y { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            }
             anchors {
                 horizontalCenter: parent.horizontalCenter
                 verticalCenter:   parent.verticalCenter
@@ -1503,7 +1565,14 @@ PanelWindow {
         Rectangle {
             id: triRight
             visible: bar._isHorizontal && Config.barMode === "tri"
-                     && (!bar._triRightAhHidden || bar._triRightPinned)
+            // Animate hide/show with opacity + slide from the right edge
+            readonly property bool _shown: !bar._triRightAhHidden || bar._triRightPinned
+            opacity: _shown ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            transform: Translate {
+                x: triRight._shown ? 0 : 10
+                Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            }
             anchors {
                 right:          parent.right
                 rightMargin:    Config.triModuleSideMargin

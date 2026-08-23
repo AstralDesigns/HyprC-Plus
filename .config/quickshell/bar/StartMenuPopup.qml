@@ -15,7 +15,11 @@ import Quickshell.Hyprland
 
 PanelWindow {
     id: startMenuPanel
-    visible: StartMenuState.menuVisible
+    // ── Deferred-destroy animation pattern ──────────────────────────────
+    property bool _stateVisible: StartMenuState.menuVisible
+    Timer { id: _menuExitDelay; interval: 220; repeat: false }
+    visible: _stateVisible || _menuExitDelay.running
+    on_StateVisibleChanged: { if (!_stateVisible) _menuExitDelay.restart() }
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.namespace: "quickshell:startmenu"
     WlrLayershell.layer: WlrLayer.Top
@@ -38,7 +42,8 @@ PanelWindow {
         bottom: _barAtBottom ? _barGapBot : 0
         right:  _panelMargin
     }
-    implicitHeight: mainCol.implicitHeight + 10
+    implicitHeight: 700
+    implicitWidth: 348
     color: "transparent"
 
     // Click-outside dismiss
@@ -50,8 +55,13 @@ PanelWindow {
 
     Rectangle {
         id: panelRect
-        anchors { top: parent.top; right: parent.right; bottom: parent.bottom }
+        anchors {
+            top: !_barAtBottom ? parent.top : undefined
+            bottom: _barAtBottom ? parent.bottom : undefined
+            right: parent.right
+        }
         width: 340
+        height: Math.min(mainCol.implicitHeight + 32, 690)
         color: Theme.blurBackground
         //radius: startMenuPanel._panelRadius
         topLeftRadius: 20
@@ -62,9 +72,11 @@ PanelWindow {
         border.width: Config.barBorderWidth
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
-        scale: StartMenuState.menuVisible ? 1.0 : 0.92
-        transformOrigin: Item.TopRight
-        Behavior on scale { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        opacity: startMenuPanel._stateVisible ? 1.0 : 0.0
+        scale: startMenuPanel._stateVisible ? 1.0 : 0.92
+        transformOrigin: startMenuPanel._barAtBottom ? Item.BottomRight : Item.TopRight
+        Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Keys.onEscapePressed: StartMenuState.menuVisible = false
         Connections { target: StartMenuState; function onMenuVisibleChanged() { if (StartMenuState.menuVisible) panelRect.forceActiveFocus() } }
 
@@ -366,18 +378,25 @@ PanelWindow {
                 // then becomes scrollable with a minimal scrollbar.
                 Item {
                     id: netListWrap
-                    visible: StartMenuState.networkExpanded
                     Layout.fillWidth: true
-                    // - 34px row + 2px spacing per entry; cap at 3 rows when both expanded, else 6.
+                    clip: true
+                    // 34px row + 2px spacing per entry; cap at 3 rows when both expanded, else 6.
                     readonly property real _rowH: 36
                     readonly property int  _maxRows: (StartMenuState.networkExpanded && StartMenuState.btExpanded) ? 3 : 6
                     readonly property real _maxHeight: _rowH * _maxRows
-                    implicitHeight: netListFlick.height
+                    readonly property real _targetH: StartMenuState.networkExpanded ? Math.min(netListCol.implicitHeight, _maxHeight) : 0
+                    property real _animH: 0
+                    Binding on _animH { value: netListWrap._targetH }
+                    Behavior on _animH { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    implicitHeight: _animH
+                    Layout.preferredHeight: _animH
+                    height: _animH
+                    visible: _animH > 0.5 || StartMenuState.networkExpanded
+                    opacity: Math.min(1.0, _targetH > 0 ? (_animH / _targetH) : 0.0)
 
                     Flickable {
                         id: netListFlick
-                        width: parent.width
-                        height: Math.min(netListCol.implicitHeight, netListWrap._maxHeight)
+                        anchors.fill: parent
                         contentWidth: width
                         contentHeight: netListCol.implicitHeight
                         clip: true
@@ -393,9 +412,9 @@ PanelWindow {
                             background: Rectangle { color: "transparent" }
                         }
 
-                    Column {
-                        id: netListCol
-                        width: netListFlick.width; spacing: 2
+                        Column {
+                            id: netListCol
+                            width: netListFlick.width; spacing: 2
 
                     Repeater {
                         model: StartMenuState.networkList
@@ -604,102 +623,123 @@ PanelWindow {
                 }
 
                 // Bluetooth panel (expanded)
-                Column {
-                    visible: StartMenuState.btExpanded
-                    Layout.fillWidth: true; width: parent.width; spacing: 2
+                Item {
+                    id: btSectionWrap
+                    Layout.fillWidth: true
+                    clip: true
+                    readonly property real _rowH: 36
+                    readonly property int  _maxRows: (StartMenuState.networkExpanded && StartMenuState.btExpanded) ? 3 : 6
+                    readonly property real _maxHeight: _rowH * _maxRows
+                    readonly property real _btListH: (StartMenuState.btPowered && StartMenuState.btDevices.length > 0)
+                        ? Math.min(btListCol.implicitHeight, _maxHeight)
+                        : (StartMenuState.btPowered ? 0 : 26)
+                    readonly property real _targetH: StartMenuState.btExpanded ? (btToolbar.implicitHeight + 4 + _btListH) : 0
+                    property real _animH: 0
+                    Binding on _animH { value: btSectionWrap._targetH }
+                    Behavior on _animH { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    implicitHeight: _animH
+                    Layout.preferredHeight: _animH
+                    height: _animH
+                    visible: _animH > 0.5 || StartMenuState.btExpanded
+                    opacity: Math.min(1.0, _targetH > 0 ? (_animH / _targetH) : 0.0)
 
-                    // Toolbar: Discoverable + Scan + Receive
-                    Row { width: parent.width; spacing: 6
-                        Rectangle {
-                            height: 26; radius: 8; width: 96
-                            color: StartMenuState.btDiscoverable
-                                ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.2)
-                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.6)
-                            border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                            RowLayout { anchors.centerIn: parent; spacing: 4
-                                Text { text: "󰂯"; font.pixelSize: 11; font.family: Config.fontFamily
-                                    color: StartMenuState.btDiscoverable ? Theme.cPrimary : Theme.cOnSurf }
-                                Text { text: StartMenuState.btDiscoverable ? "Visible" : "Hidden"; font.pixelSize: 9; color: Config.wsPersistentColor }
-                            }
-                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                onClicked: StartMenuState.btPowered ? StartMenuState.toggleBtDiscoverable() : StartMenuState.toggleBtPower() }
-                        }
-                        Rectangle {
-                            height: 26; radius: 8; width: 82
-                            color: StartMenuState.btScanning
-                                ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.20)
-                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.6)
-                            border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                            RowLayout { anchors.centerIn: parent; spacing: 4
-                                Text {
-                                    text: "󰑪"; font.pixelSize: 11; font.family: Config.fontFamily
-                                    color: StartMenuState.btScanning ? Theme.cPrimary : Theme.cOnSurf
-                                    RotationAnimator on rotation { from: 0; to: 360; duration: 1000; loops: Animation.Infinite
-                                        running: StartMenuState.btScanning }
+                    Column {
+                        id: btCol
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        spacing: 2
+
+                        // Toolbar: Discoverable + Scan + Receive
+                        Row {
+                            id: btToolbar
+                            width: parent.width; spacing: 6
+                            Rectangle {
+                                height: 26; radius: 8; width: 96
+                                color: StartMenuState.btDiscoverable
+                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.2)
+                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.6)
+                                border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                RowLayout { anchors.centerIn: parent; spacing: 4
+                                    Text { text: "󰂯"; font.pixelSize: 11; font.family: Config.fontFamily
+                                        color: StartMenuState.btDiscoverable ? Theme.cPrimary : Theme.cOnSurf }
+                                    Text { text: StartMenuState.btDiscoverable ? "Visible" : "Hidden"; font.pixelSize: 9; color: Config.wsPersistentColor }
                                 }
-                                Text { text: StartMenuState.btScanning ? "Scanning…" : "Scan"; font.pixelSize: 10; color: Config.wsPersistentColor }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                    onClicked: StartMenuState.btPowered ? StartMenuState.toggleBtDiscoverable() : StartMenuState.toggleBtPower() }
                             }
-                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                onClicked: StartMenuState.btPowered ? StartMenuState.toggleBtScan() : StartMenuState.toggleBtPower() }
-                        }
-                        Rectangle {
-                            height: 26; radius: 8; width: 110
-                            color: NotificationsState.btReceiving
-                                ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.20)
-                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.6)
-                            border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                            RowLayout { anchors.centerIn: parent; spacing: 4
-                                Text { text: "󰶫"; font.pixelSize: 11; font.family: Config.fontFamily
-                                    color: NotificationsState.btReceiving ? Theme.cPrimary : Theme.cOnSurf }
-                                Text { text: NotificationsState.btReceiving ? "Receiving…" : "Receive Files"
-                                    font.pixelSize: 10; color: Config.wsPersistentColor }
+                            Rectangle {
+                                height: 26; radius: 8; width: 82
+                                color: StartMenuState.btScanning
+                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.20)
+                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.6)
+                                border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                RowLayout { anchors.centerIn: parent; spacing: 4
+                                    Text {
+                                        text: "󰑪"; font.pixelSize: 11; font.family: Config.fontFamily
+                                        color: StartMenuState.btScanning ? Theme.cPrimary : Theme.cOnSurf
+                                        RotationAnimator on rotation { from: 0; to: 360; duration: 1000; loops: Animation.Infinite
+                                            running: StartMenuState.btScanning }
+                                    }
+                                    Text { text: StartMenuState.btScanning ? "Scanning…" : "Scan"; font.pixelSize: 10; color: Config.wsPersistentColor }
+                                }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                    onClicked: StartMenuState.btPowered ? StartMenuState.toggleBtScan() : StartMenuState.toggleBtPower() }
                             }
-                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                onClicked: NotificationsState.btToggleReceive() }
+                            Rectangle {
+                                height: 26; radius: 8; width: 110
+                                color: NotificationsState.btReceiving
+                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.20)
+                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.6)
+                                border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                RowLayout { anchors.centerIn: parent; spacing: 4
+                                    Text { text: "󰶫"; font.pixelSize: 11; font.family: Config.fontFamily
+                                        color: NotificationsState.btReceiving ? Theme.cPrimary : Theme.cOnSurf }
+                                    Text { text: NotificationsState.btReceiving ? "Receiving…" : "Receive Files"
+                                        font.pixelSize: 10; color: Config.wsPersistentColor }
+                                }
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                    onClicked: NotificationsState.btToggleReceive() }
+                            }
                         }
-                    }
 
-                    Text {
-                        visible: !StartMenuState.btPowered
-                        text: "Bluetooth is off"; color: Theme.cOnSurfVar; font.pixelSize: 11; font.italic: true; leftPadding: 4; topPadding: 4
-                    }
+                        Text {
+                            visible: !StartMenuState.btPowered
+                            text: "Bluetooth is off"; color: Theme.cOnSurfVar; font.pixelSize: 11; font.italic: true; leftPadding: 4; topPadding: 4
+                        }
 
-                    // Device list — caps at 3 rows when both net & BT are expanded, 6 rows when alone
-                    Item {
-                        id: btListWrap
-                        visible: StartMenuState.btPowered && StartMenuState.btDevices.length > 0
-                        width: parent.width
-                        // 34px row + 2px spacing per entry; cap at 3 rows when both expanded, else 6.
-                        readonly property real _rowH: 36
-                        readonly property int  _maxRows: (StartMenuState.networkExpanded && StartMenuState.btExpanded) ? 3 : 6
-                        readonly property real _maxHeight: _rowH * _maxRows
-                        implicitHeight: btListFlick.height
-
-                        Flickable {
-                            id: btListFlick
+                        // Device list — caps at 3 rows when both net & BT are expanded, 6 rows when alone
+                        Item {
+                            id: btListWrap
+                            visible: StartMenuState.btPowered && StartMenuState.btDevices.length > 0
                             width: parent.width
-                            height: Math.min(btListCol.implicitHeight, btListWrap._maxHeight)
-                            contentWidth: width
-                            contentHeight: btListCol.implicitHeight
+                            height: Math.min(btListCol.implicitHeight, btSectionWrap._maxHeight)
                             clip: true
-                            boundsBehavior: Flickable.StopAtBounds
-                            ScrollBar.vertical: ScrollBar {
-                                policy: (StartMenuState.btDevices && StartMenuState.btDevices.length > btListWrap._maxRows) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-                                visible: (StartMenuState.btDevices && StartMenuState.btDevices.length > btListWrap._maxRows) && size < 1.0
-                                contentItem: Rectangle {
-                                    implicitWidth: 4
-                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
-                                    radius: 2
-                                }
-                                background: Rectangle { color: "transparent" }
-                            }
 
-                            Column {
-                                id: btListCol
-                                width: btListFlick.width; spacing: 2
+                            Flickable {
+                                id: btListFlick
+                                anchors.fill: parent
+                                contentWidth: width
+                                contentHeight: btListCol.implicitHeight
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                ScrollBar.vertical: ScrollBar {
+                                    policy: (StartMenuState.btDevices && StartMenuState.btDevices.length > btSectionWrap._maxRows) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                                    visible: (StartMenuState.btDevices && StartMenuState.btDevices.length > btSectionWrap._maxRows) && size < 1.0
+                                    contentItem: Rectangle {
+                                        implicitWidth: 4
+                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                        radius: 2
+                                    }
+                                    background: Rectangle { color: "transparent" }
+                                }
+
+                                Column {
+                                    id: btListCol
+                                    width: btListFlick.width; spacing: 2
 
                                 Repeater {
                                     model: StartMenuState.btDevices
@@ -903,6 +943,7 @@ PanelWindow {
                         font.pixelSize: 11; font.italic: true; leftPadding: 4; topPadding: 4
                     }
                 }
+            }
             }
 
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }

@@ -358,11 +358,56 @@ const CHEV_UP    = '󰬬';  // nf-md-chevron_up_circle  (section expanded)
 const CHEV_DOWN  = '󰬦';  // nf-md-chevron_down_circle (section collapsed)
 const GLYPH_INDICATOR = '\u{F09DF}';  //  active-window dot (same glyph as dock)
 
-// FlowBox helpers for arrow-key edge detection
-function flowSelIdx(fb) {
-    const sel = fb.get_selected_children();
-    return sel.length ? sel[0].get_index() : -1;
+// FlowBox helpers for arrow-key navigation and item activation
+function widgetContains(parent, child) {
+    if (!parent || !child) return false;
+    if (parent === child) return true;
+    if (typeof parent.contains === 'function' && parent.contains(child)) return true;
+    let cur = child;
+    while (cur) {
+        if (cur === parent) return true;
+        cur = cur.get_parent ? cur.get_parent() : null;
+    }
+    return false;
 }
+
+function getFlowActiveChild(fb) {
+    if (!fb) return null;
+    const root = fb.get_root ? fb.get_root() : null;
+    const focused = root && root.get_focus ? root.get_focus() : null;
+    let cur = focused;
+    while (cur && cur.get_parent && cur.get_parent() !== fb) {
+        cur = cur.get_parent();
+    }
+    if (cur && cur.get_parent && cur.get_parent() === fb) return cur;
+    let focus = fb.get_focus_child ? fb.get_focus_child() : null;
+    while (focus && focus.get_parent && focus.get_parent() !== fb) {
+        focus = focus.get_parent();
+    }
+    if (focus) return focus;
+    const sel = fb.get_selected_children ? fb.get_selected_children() : [];
+    if (sel && sel.length > 0) return sel[0];
+    return fb.get_first_child ? fb.get_first_child() : null;
+}
+
+function flowSelIdx(fb) {
+    const c = getFlowActiveChild(fb);
+    return c && typeof c.get_index === 'function' ? c.get_index() : 0;
+}
+
+function getAppDataFromChild(child) {
+    if (!child) return null;
+    let cur = child;
+    if (cur.get_child) cur = cur.get_child(); // Gtk.Overlay
+    if (cur && cur.get_child) {
+        const inner = cur.get_child(); // Gtk.Button
+        if (inner && inner._appData) return inner._appData;
+    }
+    if (cur && cur._appData) return cur._appData;
+    if (child._appData) return child._appData;
+    return null;
+}
+
 function flowCount(fb) {
     let n = 0, c = fb.get_first_child();
     while (c) { n++; c = c.get_next_sibling(); }
@@ -538,7 +583,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @inverse_primary;
+    border-color: @color2;
     margin: 8px;
 }
 
@@ -1411,6 +1456,7 @@ const AppLauncherWindow = GObject.registerClass({
         scroll.set_vexpand(true);
         scroll.add_css_class('launcher-scroll');
         listPage.append(scroll);
+        this._launcherScroll = scroll;   // saved for scroll-to-top on tab switch
 
         const scrollInner = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
         scrollInner.set_vexpand(true);
@@ -1429,8 +1475,9 @@ const AppLauncherWindow = GObject.registerClass({
         this._favCollapsed = true;   // collapsed by default on clean launch
         const favToggleBtn = Gtk.Button.new();
         favToggleBtn.add_css_class('fav-toggle-btn');
-        favToggleBtn.set_can_focus(false);
+        favToggleBtn.set_can_focus(true);
         favToggleBtn.set_hexpand(true);
+        this._favToggleBtn = favToggleBtn;
 
         const favBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
         favBtnBox.set_hexpand(true);
@@ -1455,12 +1502,13 @@ const AppLauncherWindow = GObject.registerClass({
         favToggleBtn.set_child(favBtnBox);
         favHeaderRow.append(favToggleBtn);
 
-        favToggleBtn.connect('clicked', () => {
+        this._toggleFav = () => {
             this._favCollapsed = !this._favCollapsed;
             this._favFlow.set_visible(!this._favCollapsed);
             this._favSep.set_visible(!this._favCollapsed);
             this._favChevron.set_text(this._favCollapsed ? CHEV_UP : CHEV_DOWN);
-        });
+        };
+        favToggleBtn.connect('clicked', () => this._toggleFav());
 
         this._favFlow = new Gtk.FlowBox();
         this._favFlow.set_max_children_per_line(this._isVert ? COLS_VERT : COLS_HORIZ);
@@ -1475,8 +1523,8 @@ const AppLauncherWindow = GObject.registerClass({
 
         // Keyboard Enter on a focused favorites item → launch
         this._favFlow.connect('child-activated', (_fb, child) => {
-            const btn = child.get_child();
-            if (btn && btn._appData) { spawnApp(btn._appData.exec); this.close(); }
+            const appData = getAppDataFromChild(child);
+            if (appData && appData.exec) { spawnApp(appData.exec); this.close(); }
         });
 
         const favSep = Gtk.Separator.new(Gtk.Orientation.HORIZONTAL);
@@ -1505,8 +1553,8 @@ const AppLauncherWindow = GObject.registerClass({
 
         // Keyboard Enter on a focused main-grid item → launch
         this._flow.connect('child-activated', (_fb, child) => {
-            const btn = child.get_child();
-            if (btn && btn._appData) { spawnApp(btn._appData.exec); this.close(); }
+            const appData = getAppDataFromChild(child);
+            if (appData && appData.exec) { spawnApp(appData.exec); this.close(); }
         });
 
         // ── Build other tab pages ─────────────────────────────────────
@@ -1516,7 +1564,7 @@ const AppLauncherWindow = GObject.registerClass({
 
         // Initial population
         this._refreshFavorites('');
-        this._refreshEmojiGroups();
+        this._refreshGroups('');
         this._populateApps(this._allApps);
 
         // ── Search filtering ───────────────────────────────────────────
@@ -1554,8 +1602,9 @@ const AppLauncherWindow = GObject.registerClass({
 
     // ── Tab switching ─────────────────────────────────────────────────────
 
-    _switchTab(id) {
-        if (this._activeTab === id) return;
+    _switchTab(id, force = false) {
+        if (this._activeTab === id && !force) return;
+        this._lastTab   = id;
         this._activeTab = id;
 
         // Update sidebar button active state
@@ -1582,9 +1631,15 @@ const AppLauncherWindow = GObject.registerClass({
         } else if (id === 'websearch') {
             this._performWebSearch('');
         } else {
+            // Launcher tab: always scroll back to the top so the user sees
+            // the beginning of their app list, not wherever they scrolled last.
             this._refreshFavorites('');
-            this._refreshEmojiGroups();
+            this._refreshGroups('');
             this._populateApps(this._allApps);
+            if (this._launcherScroll) {
+                const adj = this._launcherScroll.get_vadjustment();
+                if (adj) adj.set_value(0);
+            }
         }
 
         GLib.idle_add(GLib.PRIORITY_HIGH, () => {
@@ -13980,8 +14035,9 @@ const EMOJI_ALL = [
 
             const toggleBtn = Gtk.Button.new();
             toggleBtn.add_css_class('fav-toggle-btn');
-            toggleBtn.set_can_focus(false);
+            toggleBtn.set_can_focus(true);
             toggleBtn.set_hexpand(true);
+            strip._toggleBtn = toggleBtn;
 
             const btnInner = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
             btnInner.set_hexpand(true);
@@ -14015,11 +14071,12 @@ const EMOJI_ALL = [
             flow.set_selection_mode(Gtk.SelectionMode.SINGLE);
             flow.add_css_class('launcher-grid');
             flow.set_visible(!collapsed);
+            strip._flow = flow;
             // Pass groupName so tiles show "Remove from <group>" context menu
             for (const app of groupApps) flow.append(this._makeAppTile(app, groupName));
             flow.connect('child-activated', (_fb, child) => {
-                const btn = child.get_child();
-                if (btn && btn._appData) { spawnApp(btn._appData.exec); this.close(); }
+                const appData = getAppDataFromChild(child);
+                if (appData && appData.exec) { spawnApp(appData.exec); this.close(); }
             });
             strip.append(flow);
 
@@ -14055,14 +14112,15 @@ const EMOJI_ALL = [
             sep.set_visible(!collapsed);
             strip.append(sep);
 
-            // Toggle collapse on header click
-            toggleBtn.connect('clicked', () => {
+            // Toggle collapse on header click or Return key
+            strip._toggleFn = () => {
                 this._groupCollapsed[groupName] = !this._groupCollapsed[groupName];
                 const nowCollapsed = this._groupCollapsed[groupName];
                 flow.set_visible(!nowCollapsed);
                 sep.set_visible(!nowCollapsed);
                 chevron.set_text(nowCollapsed ? CHEV_UP : CHEV_DOWN);
-            });
+            };
+            toggleBtn.connect('clicked', () => strip._toggleFn());
 
             // ── Right-click on header → Rename / Delete group popover ────
             const headerRc = new Gtk.GestureClick();
@@ -14952,122 +15010,207 @@ const EMOJI_ALL = [
 
     _setupKeyboard() {
         const cols = this._isVert ? COLS_VERT : COLS_HORIZ;
+        const TAB_IDS = ['launcher', 'clipboard', 'emoji', 'websearch'];
 
-        // ── Search entry key handler ─────────────────────────────────────
-        const kc = new Gtk.EventControllerKey();
-        kc.connect('key-pressed', (_ctrl, keyval) => {
-            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
-            if (keyval === Gdk.KEY_Down) {
-                // Down from search:
-                //   1. Favorites if visible AND expanded
-                //   2. Otherwise main grid
-                const favVisible = this._favSection?.get_visible() && !this._favCollapsed;
-                if (favVisible) {
-                    this._favFlow.grab_focus();
-                } else {
-                    this._flow.grab_focus();
+        // Helper: retrieve navigatable UI elements in natural top-to-bottom order
+        const getNavElements = () => {
+            const list = [];
+            // 1. Favorites header (+ flow if expanded)
+            if (this._favSection?.get_visible() && this._favToggleBtn) {
+                list.push({ type: 'header', widget: this._favToggleBtn, toggleFn: this._toggleFav });
+                if (!this._favCollapsed && this._favFlow?.get_visible() && flowCount(this._favFlow) > 0) {
+                    list.push({ type: 'flow', widget: this._favFlow });
                 }
+            }
+            // 2. Group strips (header + flow if expanded)
+            if (this._groupsContainer?.get_visible()) {
+                let strip = this._groupsContainer.get_first_child();
+                while (strip) {
+                    if (strip._toggleBtn) {
+                        list.push({ type: 'header', widget: strip._toggleBtn, toggleFn: strip._toggleFn });
+                        if (strip._flow && strip._flow.get_visible() && flowCount(strip._flow) > 0) {
+                            list.push({ type: 'flow', widget: strip._flow });
+                        }
+                    }
+                    strip = strip.get_next_sibling();
+                }
+            }
+            // 3. Main grid
+            if (this._flow?.get_visible() && flowCount(this._flow) > 0) {
+                list.push({ type: 'flow', widget: this._flow });
+            }
+            return list;
+        };
+
+        const focusNav = (elem, pos = 'first') => {
+            if (!elem) return;
+            if (elem.type === 'header') {
+                elem.widget.grab_focus();
+            } else if (elem.type === 'flow') {
+                const fb = elem.widget;
+                if (pos === 'last') {
+                    let last = fb.get_first_child();
+                    while (last?.get_next_sibling()) last = last.get_next_sibling();
+                    if (last) {
+                        fb.select_child(last);
+                        last.grab_focus();
+                    } else {
+                        fb.grab_focus();
+                    }
+                } else {
+                    const first = fb.get_first_child();
+                    if (first) {
+                        fb.select_child(first);
+                        first.grab_focus();
+                    } else {
+                        fb.grab_focus();
+                    }
+                }
+            }
+        };
+
+        // ── Window-level key handler in CAPTURE phase ─────────────────────
+        const winKc = new Gtk.EventControllerKey();
+        winKc.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+        winKc.connect('key-pressed', (_ctrl, keyval, _code, state) => {
+            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
+
+            // Ctrl+Tab cycle between sidebar tabs
+            const ctrl = (state & Gdk.ModifierType.CONTROL_MASK) !== 0;
+            if (ctrl && keyval === Gdk.KEY_Tab) {
+                const idx = TAB_IDS.indexOf(this._activeTab);
+                const next = TAB_IDS[(idx + 1) % TAB_IDS.length];
+                this._switchTab(next);
                 return true;
             }
-            return false;
-        });
-        this._searchEntry.add_controller(kc);
 
-        // ── _favFlow key handler — arrow-key edge detection ──────────────
-        // Let GTK handle internal FlowBox navigation.  Only intercept when the
-        // selected child is at the boundary of the grid so we can jump to the
-        // adjacent widget instead of stopping at the edge.
-        const favKc = new Gtk.EventControllerKey();
-        favKc.connect('key-pressed', (_ctrl, keyval) => {
-            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
+            // Only custom-handle arrow/return navigation on the Launcher tab
+            if (this._activeTab !== 'launcher') return false;
 
-            if (keyval === Gdk.KEY_Down) {
-                const idx   = flowSelIdx(this._favFlow);
-                const total = flowCount(this._favFlow);
-                // Last row starts at the largest multiple of cols ≤ total-1
-                const lastRowStart = total > 0 ? Math.floor((total - 1) / cols) * cols : 0;
-                if (idx < 0 || idx >= lastRowStart) {
-                    // Move to main grid, select first item
-                    this._flow.grab_focus();
-                    const firstChild = this._flow.get_first_child();
-                    if (firstChild) this._flow.select_child(firstChild);
+            const nav = getNavElements();
+            if (nav.length === 0) return false;
+
+            const focused = this.get_focus();
+            const isSearch = !focused || focused === this._searchEntry || widgetContains(this._searchEntry, focused);
+
+            // ── Case 1: Focus is in Search Entry ─────────────────────────────
+            if (isSearch) {
+                if (keyval === Gdk.KEY_Down) {
+                    focusNav(nav[0], 'first');
                     return true;
                 }
-            }
-            if (keyval === Gdk.KEY_Up) {
-                const idx = flowSelIdx(this._favFlow);
-                if (idx < 0 || idx < cols) {
-                    this._searchEntry.grab_focus();
+                if (keyval === Gdk.KEY_Up) {
+                    focusNav(nav[nav.length - 1], 'last');
                     return true;
                 }
-            }
-            // Printable → back to search
-            if (keyval === Gdk.KEY_BackSpace ||
-                (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
-                this._searchEntry.grab_focus();
                 return false;
             }
-            return false;
-        });
-        this._favFlow.add_controller(favKc);
 
-        // ── _flow key handler — arrow-key edge detection ─────────────────
-        const flowKc = new Gtk.EventControllerKey();
-        flowKc.connect('key-pressed', (_ctrl, keyval) => {
-            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
-
-            if (keyval === Gdk.KEY_Down) {
-                const idx   = flowSelIdx(this._flow);
-                const total = flowCount(this._flow);
-                const lastRowStart = total > 0 ? Math.floor((total - 1) / cols) * cols : 0;
-                if (idx < 0 || idx >= lastRowStart) {
-                    // Wrap around: jump back to the first item
-                    const firstChild = this._flow.get_first_child();
-                    if (firstChild) {
-                        this._flow.select_child(firstChild);
-                        firstChild.grab_focus();
-                    }
+            // ── Case 2: Focus is on a Section Header ─────────────────────────
+            const headerIdx = nav.findIndex(n => n.type === 'header' && (n.widget === focused || widgetContains(n.widget, focused)));
+            if (headerIdx !== -1) {
+                const item = nav[headerIdx];
+                if (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter || keyval === Gdk.KEY_space) {
+                    if (item.toggleFn) item.toggleFn();
                     return true;
                 }
-            }
-            if (keyval === Gdk.KEY_Up) {
-                const idx = flowSelIdx(this._flow);
-                if (idx < 0 || idx < cols) {
-                    // At top row — go to favorites if visible+expanded, else search
-                    if (this._favSection?.get_visible() && !this._favCollapsed) {
-                        this._favFlow.grab_focus();
-                        // Select last item in favFlow for intuitive Up-from-top feel
-                        const total = flowCount(this._favFlow);
-                        if (total > 0) {
-                            let last = this._favFlow.get_first_child();
-                            while (last?.get_next_sibling()) last = last.get_next_sibling();
-                            if (last) this._favFlow.select_child(last);
-                        }
+                if (keyval === Gdk.KEY_Down) {
+                    if (headerIdx < nav.length - 1) {
+                        focusNav(nav[headerIdx + 1], 'first');
                     } else {
                         this._searchEntry.grab_focus();
                     }
                     return true;
                 }
-            }
-            // Printable → back to search
-            if (keyval === Gdk.KEY_BackSpace ||
-                (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
-                this._searchEntry.grab_focus();
+                if (keyval === Gdk.KEY_Up) {
+                    if (headerIdx > 0) {
+                        focusNav(nav[headerIdx - 1], 'last');
+                    } else {
+                        this._searchEntry.grab_focus();
+                    }
+                    return true;
+                }
+                if (keyval === Gdk.KEY_BackSpace ||
+                    (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
+                    this._searchEntry.grab_focus();
+                    return false;
+                }
                 return false;
             }
-            return false;
-        });
-        this._flow.add_controller(flowKc);
 
-        // ── Window-level ESC handler (fallback for any focused widget) ───
-        const winKc = new Gtk.EventControllerKey();
-        winKc.connect('key-pressed', (_ctrl, keyval) => {
-            if (keyval === Gdk.KEY_Escape) { this.close(); return true; }
-            if (keyval === Gdk.KEY_BackSpace ||
-                (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
-                this._searchEntry.grab_focus();
-                return false;
+            // ── Case 3: Focus is inside a FlowBox (App Grid / Fav / Group) ───
+            const flowIdx = nav.findIndex(n => n.type === 'flow' && (n.widget === focused || widgetContains(n.widget, focused)));
+            if (flowIdx !== -1) {
+                const fb = nav[flowIdx].widget;
+                if (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter) {
+                    const active = getFlowActiveChild(fb);
+                    const appData = getAppDataFromChild(active);
+                    if (appData && appData.exec) {
+                        spawnApp(appData.exec);
+                        this.close();
+                        return true;
+                    }
+                    return false;
+                }
+
+                // Left Arrow: wrap from first item to last item
+                if (keyval === Gdk.KEY_Left) {
+                    const idx = flowSelIdx(fb);
+                    if (idx <= 0) {
+                        focusNav(nav[flowIdx], 'last');
+                        return true;
+                    }
+                    return false;
+                }
+
+                // Right Arrow: wrap from last item to first item
+                if (keyval === Gdk.KEY_Right) {
+                    const idx = flowSelIdx(fb);
+                    const total = flowCount(fb);
+                    if (idx >= total - 1) {
+                        focusNav(nav[flowIdx], 'first');
+                        return true;
+                    }
+                    return false;
+                }
+
+                // Down Arrow: move to next section or search
+                if (keyval === Gdk.KEY_Down) {
+                    const idx   = flowSelIdx(fb);
+                    const total = flowCount(fb);
+                    const lastRowStart = total > 0 ? Math.floor((total - 1) / cols) * cols : 0;
+                    if (idx >= lastRowStart) {
+                        if (flowIdx < nav.length - 1) {
+                            focusNav(nav[flowIdx + 1], 'first');
+                        } else {
+                            this._searchEntry.grab_focus();
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+
+                // Up Arrow: move to previous section or search
+                if (keyval === Gdk.KEY_Up) {
+                    const idx = flowSelIdx(fb);
+                    if (idx >= 0 && idx < cols) {
+                        if (flowIdx > 0) {
+                            focusNav(nav[flowIdx - 1], 'last');
+                        } else {
+                            this._searchEntry.grab_focus();
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+
+                if (keyval === Gdk.KEY_BackSpace ||
+                    (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
+                    this._searchEntry.grab_focus();
+                    return false;
+                }
             }
+
             return false;
         });
         this.add_controller(winKc);
@@ -15379,6 +15522,58 @@ const EMOJI_ALL = [
 const LauncherApp = GObject.registerClass({
     GTypeName: 'HyprCandyLauncherApp',
 }, class LauncherApp extends Gtk.Application {
+
+    // ── Smooth opacity ramp helpers (same pattern as dock-main.js) ────────
+    // GTK4 top-level windows don’t support CSS opacity transitions.
+    _laFadeTimerId = 0;
+    _LA_STEPS    = 12;
+    _LA_INTERVAL = 17;  // ms/step  (12 × 17 ≈ 200 ms total)
+
+    _laCancelFade() {
+        if (this._laFadeTimerId) {
+            GLib.source_remove(this._laFadeTimerId);
+            this._laFadeTimerId = 0;
+        }
+    }
+
+    _laFadeOut(win, onDone) {
+        this._laCancelFade();
+        let step = 0;
+        this._laFadeTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, this._LA_INTERVAL, () => {
+            step++;
+            const t = step / this._LA_STEPS;
+            const eased = 1 - Math.pow(1 - t, 3);  // ease-out cubic
+            win.set_opacity(1.0 - eased);
+            if (step >= this._LA_STEPS) {
+                win.set_opacity(0.0);
+                this._laFadeTimerId = 0;
+                onDone();
+                return GLib.SOURCE_REMOVE;
+            }
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
+    _laFadeIn(win, onReady) {
+        this._laCancelFade();
+        win.set_opacity(0.0);
+        win.set_visible(true);
+        let step = 0;
+        this._laFadeTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, this._LA_INTERVAL, () => {
+            step++;
+            const t = step / this._LA_STEPS;
+            const eased = 1 - Math.pow(1 - t, 3);  // ease-out cubic
+            win.set_opacity(eased);
+            if (step >= this._LA_STEPS) {
+                win.set_opacity(1.0);
+                this._laFadeTimerId = 0;
+                if (onReady) onReady();
+                return GLib.SOURCE_REMOVE;
+            }
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
     vfunc_activate() {
         this._win = new AppLauncherWindow(this);
         this.add_window(this._win);
@@ -15389,9 +15584,13 @@ const LauncherApp = GObject.registerClass({
         // dock-main.js sends pkill -10 -f "gjs app-launcher.js" instead of
         // spawning toggle-app-launcher.sh, which is faster (no shell fork).
         try {
-            GLibUnix.signal_add_full(GLib.PRIORITY_DEFAULT, 10, () => {
+            GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, 10, () => {
                 if (this._win.get_visible()) {
-                    this._win.set_visible(false);
+                    // Hide with fade-out
+                    this._laCancelFade();
+                    this._laFadeOut(this._win, () => {
+                        this._win.set_visible(false);
+                    });
                 } else {
                     // Re-anchor to the current dock edge (user may have cycled
                     // positions since the launcher daemon last showed).
@@ -15407,17 +15606,18 @@ const LauncherApp = GObject.registerClass({
                     this._win._favSep.set_visible(false);
                     this._win._favChevron.set_text(CHEV_UP);
                     this._win._groupCollapsed = {};
-                    // Reset to launcher tab on every open
-                    this._win._switchTab('launcher');
-                    this._win.set_visible(true);
-                    this._win.present();
-                    GLib.idle_add(GLib.PRIORITY_HIGH, () => {
-                        this._win._searchEntry.set_text('');
-                        this._win._refreshFavorites('');
-                        this._win._refreshGroups('');
-                        this._win._populateApps(this._win._allApps);
-                        this._win._searchEntry.grab_focus();
-                        return GLib.SOURCE_REMOVE;
+                    // Restore last active tab (or 'launcher' if none was saved).
+                    // Launcher tab always resets scroll position to the top.
+                    const tabToOpen = this._win._lastTab || 'launcher';
+                    this._win._switchTab(tabToOpen, true);
+                    // Show with fade-in; search entry is focused once visible
+                    this._laFadeIn(this._win, () => {
+                        this._win.present();
+                        GLib.idle_add(GLib.PRIORITY_HIGH, () => {
+                            this._win._searchEntry.set_text('');
+                            this._win._searchEntry.grab_focus();
+                            return GLib.SOURCE_REMOVE;
+                        });
                     });
                 }
                 return GLib.SOURCE_CONTINUE;
