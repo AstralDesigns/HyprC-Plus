@@ -27,7 +27,7 @@ var LauncherConfig = {
 
     // ── Main frame — vertical dock (left / right) ─────────────────────
     frameWidthVert:  1175,           // @LC:frameWidthVert
-    frameHeightVert: 675,           // @LC:frameHeightVert
+    frameHeightVert: 655,           // @LC:frameHeightVert
 
     // ── Border ────────────────────────────────────────────────────────
     borderRadius: 18,               // @LC:borderRadius
