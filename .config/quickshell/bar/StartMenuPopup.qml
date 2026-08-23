@@ -61,7 +61,7 @@ PanelWindow {
             right: parent.right
         }
         width: 340
-        height: Math.min(mainCol.implicitHeight + 32, 690)
+        height: Math.min(mainCol.implicitHeight + 18, 690)
         color: Theme.blurBackground
         //radius: startMenuPanel._panelRadius
         topLeftRadius: 20
