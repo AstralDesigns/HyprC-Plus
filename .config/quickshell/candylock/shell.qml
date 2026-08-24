@@ -1065,13 +1065,13 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "󰫢  󰫢"; color: root.cWc12
+                                                text: "󰫢  󰫢"; color: root.cWc10
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
                                                 topPadding: 6; bottomPadding: 6
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockMin; color: root.cWc10
+                                                text: root.clockMin; color: root.cWc6
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
@@ -1143,11 +1143,11 @@ ShellRoot {
                                                     anchors.centerIn: parent; spacing: 6
                                                     visible: root.pinEntry.length === 0 && !root.authChecking
                                                     Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc12 }
-                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cPrimary; opacity: 1.00 }
+                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc6; opacity: 1.00 }
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; visible: root.authChecking
-                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc12
+                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc5
                                                     RotationAnimator on rotation { from: 0; to: 360; duration: 900; loops: Animation.Infinite; running: root.authChecking }
                                                 }
                                                 Row {
@@ -1204,7 +1204,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDateNum; color: root.cWc12
+                                                text: root.clockDateNum; color: root.cWc10
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.DemiBold
                                                 lineHeight: 0.88
@@ -1212,7 +1212,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockMonthName; color: root.cWc10
+                                                text: root.clockMonthName; color: root.cWc6
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 22
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
@@ -1261,7 +1261,7 @@ ShellRoot {
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: root.weatherTemp
-                                                color: root.cWc5
+                                                color: root.cWc12
                                                 font.pixelSize: 18
                                                 font.weight: Font.Bold
                                                 font.family: "C059"
@@ -1308,7 +1308,7 @@ ShellRoot {
 
                                                     Text {
                                                         text: modelData.glyph
-                                                        color: root.cWc6
+                                                        color: root.cWc13
                                                         font.pixelSize: 14
                                                         font.family: "Symbols Nerd Font Mono"
                                                     }
@@ -1476,7 +1476,7 @@ ShellRoot {
                                                 text: root._volumeMuted ? "󰝟" : "󰕾"
                                                 font.family: "Symbols Nerd Font Mono"
                                                 font.pixelSize: 14
-                                                color: root.cWc2
+                                                color: root.cWc13
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     cursorShape: Qt.PointingHandCursor
@@ -2094,14 +2094,14 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maRebt.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.85) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
                                 border.width: 1
-                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cWc3.r, root.cWc3.g, root.cWc3.b,0.65) : "transparent"
+                                border.color: _maRebt.containsMouse ? Qt.rgba(root.cWc4.r, root.cWc4.g, root.cWc4.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰑙"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cWc3; opacity: _maRebt.containsMouse ? 1.0 : 1.0
+                                color: root.cWc4; opacity: _maRebt.containsMouse ? 1.0 : 1.0
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
@@ -2119,14 +2119,14 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maHib.containsMouse ? Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.85) : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.65)
                                 border.width: 1
-                                border.color: _maHib.containsMouse ? Qt.rgba(root.cWc3.r, root.cWc3.g, root.cWc3.b,0.65) : "transparent"
+                                border.color: _maHib.containsMouse ? Qt.rgba(root.cWc4.r, root.cWc4.g, root.cWc4.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰈉"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cWc3; opacity: _maHib.containsMouse ? 1.0 : 1.0
+                                color: root.cWc4; opacity: _maHib.containsMouse ? 1.0 : 1.0
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
