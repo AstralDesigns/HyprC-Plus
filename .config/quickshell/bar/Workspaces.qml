@@ -1,7 +1,10 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Hyprland
+import Quickshell.Wayland
+import Quickshell.Io
 import ".."
 
 Item {
