@@ -3807,11 +3807,11 @@ PanelWindow {
                             RowLayout { Layout.fillWidth:true; spacing:5
                                 CCPillBtn {
                                     text:" Smart"
-                                    active: ccThemeSettings.currentTheme === "smart"
+                                    active: ccThemeSettings.currentTheme === "scheme-smart"
                                     onClicked: {
                                         _themeProc.command = [scriptDir+"/theme-set.sh", "scheme-smart"]
                                         _themeProc.running = true
-                                        ccThemeSettings.currentTheme = "smart"
+                                        ccThemeSettings.currentTheme = "scheme-smart"
                                     }
                                 }
                             }
