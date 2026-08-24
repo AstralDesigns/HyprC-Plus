@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
 import Quickshell
@@ -455,8 +456,8 @@ Item {
         Rectangle {
             id: histPanel
             anchors {
-                top: !_barAtBottom ? parent.top : undefined
-                bottom: _barAtBottom ? parent.bottom : undefined
+                top: !historyWindow._barAtBottom ? parent.top : undefined
+                bottom: historyWindow._barAtBottom ? parent.bottom : undefined
                 left: parent.left
             }
             width: 380
@@ -474,7 +475,7 @@ Item {
             // Animate in/out with opacity + scale
             opacity: historyWindow._stateVisible ? 1.0 : 0.0
             scale: historyWindow._stateVisible ? 1.0 : 0.92
-            transformOrigin: _barAtBottom ? Item.BottomLeft : Item.TopLeft
+            transformOrigin: historyWindow._barAtBottom ? Item.BottomLeft : Item.TopLeft
             Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
             Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
             Keys.onEscapePressed: NotificationsState.historyVisible = false
@@ -542,6 +543,16 @@ Item {
                 contentHeight: histScrollContent.implicitHeight
                 flickableDirection: Flickable.VerticalFlick
                 boundsBehavior: Flickable.StopAtBounds
+                ScrollBar.vertical: ScrollBar {
+                    policy: histFlickable.contentHeight > histFlickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                    visible: histFlickable.contentHeight > histFlickable.height && size < 1.0
+                    contentItem: Rectangle {
+                        implicitWidth: 3
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                        radius: 2
+                    }
+                    background: Rectangle { color: "transparent" }
+                }
                 ColumnLayout {
                     id: histScrollContent
                     width: parent.width

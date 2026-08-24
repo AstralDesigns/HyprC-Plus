@@ -5013,8 +5013,8 @@ PanelWindow {
                                         ScrollBar.vertical: ScrollBar {
                                             policy: ScrollBar.AsNeeded
                                             contentItem: Rectangle {
-                                                implicitWidth: 4
-                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
+                                                implicitWidth: 3
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
                                                 radius: 2
                                             }
                                             background: Rectangle { color: "transparent" }
@@ -5252,7 +5252,7 @@ PanelWindow {
                                                     policy: ScrollBar.AsNeeded
                                                     contentItem: Rectangle {
                                                         implicitWidth: 3
-                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
                                                         radius: 2
                                                     }
                                                     background: Rectangle { color: "transparent" }
@@ -5756,8 +5756,8 @@ PanelWindow {
                                     ScrollBar.vertical: ScrollBar {
                                         policy: ScrollBar.AsNeeded
                                         contentItem: Rectangle {
-                                            implicitWidth: 4
-                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.05)
+                                            implicitWidth: 3
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
                                             radius: 2
                                         }
                                         background: Rectangle { color: "transparent" }
@@ -6766,8 +6766,8 @@ PanelWindow {
                         width: 6
                         padding: 4
                         contentItem: Rectangle {
-                            implicitWidth: 4; radius: 2
-                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                            implicitWidth: 3; radius: 2
+                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
                             Behavior on color { ColorAnimation { duration: 150 } }
                         }
                         background: Rectangle { color: "transparent" }

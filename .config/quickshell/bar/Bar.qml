@@ -338,8 +338,8 @@ PanelWindow {
 
         // Add back input region for Left Island when visible
         Region {
-            x:      shellLeftPW.x
-            y:      shellLeftPW.y
+            x:      shellLeftPW.x || 0
+            y:      shellLeftPW.y || 0
             width:  shellLeftPW.visible ? shellLeftPW.width : 0
             height: shellLeftPW.visible ? shellLeftPW.height : 0
         }
@@ -358,8 +358,8 @@ PanelWindow {
 
         // Add back input region for Right Island when visible
         Region {
-            x:      shellRightPW.x
-            y:      shellRightPW.y
+            x:      shellRightPW.x || 0
+            y:      shellRightPW.y || 0
             width:  shellRightPW.visible ? shellRightPW.width : 0
             height: shellRightPW.visible ? shellRightPW.height : 0
         }

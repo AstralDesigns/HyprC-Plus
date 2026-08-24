@@ -405,8 +405,8 @@ PanelWindow {
                             policy: (StartMenuState.networkList && StartMenuState.networkList.length > netListWrap._maxRows) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
                             visible: (StartMenuState.networkList && StartMenuState.networkList.length > netListWrap._maxRows) && size < 1.0
                             contentItem: Rectangle {
-                                implicitWidth: 4
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                implicitWidth: 3
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
                                 radius: 2
                             }
                             background: Rectangle { color: "transparent" }
@@ -730,8 +730,8 @@ PanelWindow {
                                     policy: (StartMenuState.btDevices && StartMenuState.btDevices.length > btSectionWrap._maxRows) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
                                     visible: (StartMenuState.btDevices && StartMenuState.btDevices.length > btSectionWrap._maxRows) && size < 1.0
                                     contentItem: Rectangle {
-                                        implicitWidth: 4
-                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                        implicitWidth: 3
+                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
                                         radius: 2
                                     }
                                     background: Rectangle { color: "transparent" }
