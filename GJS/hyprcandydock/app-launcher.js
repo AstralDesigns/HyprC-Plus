@@ -640,7 +640,7 @@ window.hyprcandy-launcher {
 .launcher-search > text,
 .launcher-search text {
     background: transparent;
-    color: @primary;
+    color: white;
 }
 
 .launcher-search image {
