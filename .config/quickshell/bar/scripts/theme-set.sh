@@ -21,6 +21,7 @@ SCHEME="${1:-scheme-content}"
 if [ "$SCHEME" = "light" ]; then
     sed -i 's/wal -i "$bg_path" -n --cols16 darken/wal -l -i "$bg_path" -n --cols16 lighten/g' "$WI"
     sed -i 's/-m dark/-m light/g' "$WI"
+    sed -i 's/-m smart/-m light/g' "$WI"
 
     # GTK3
     sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @primary_fixed_dim;/' "$G3"
@@ -29,10 +30,17 @@ if [ "$SCHEME" = "light" ]; then
     sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @primary_fixed_dim;/' "$G4"
     sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @inverse_primary;/'  "$G4"
 
+# ── Smart  ──
+elif [ "$SCHEME" = "scheme-smart" ]; then
+    sed -i 's/-m light/-m smart/g' "$WI"
+    sed -i 's/-m dark/-m smart/g' "$WI"
+    sed -i "s/--type scheme-[^ ]*/--type scheme-smart/" "$WI"
+
 # ── Dark — all other schemes ──
 else
     sed -i 's/wal -l -i "$bg_path" -n --cols16 lighten/wal -i "$bg_path" -n --cols16 darken/g' "$WI"
     sed -i 's/-m light/-m dark/g' "$WI"
+    sed -i 's/-m smart/-m dark/g' "$WI"
     sed -i "s/--type scheme-[^ ]*/--type ${SCHEME}/" "$WI"
 
     # GTK3: global swap @on_primary_fixed_variant → @on_secondary, then dialog colors

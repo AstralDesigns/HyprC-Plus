@@ -3793,6 +3793,28 @@ PanelWindow {
                                     }
                                 }
                             }
+                            
+                            // ── Smart Mode button alone at top ─────────────────────────────────
+                            CCSection { text: "Adaptive" }
+                            Text {
+                                Layout.fillWidth: true
+                                text: "Matugen automatically determines which scheme and mode to apply based on the wallpaper"
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                               Theme.cPrimary.b, 0.55)
+                                font.family: Config.labelFont; font.pixelSize: 11
+                                wrapMode: Text.Wrap
+                            }
+                            RowLayout { Layout.fillWidth:true; spacing:5
+                                CCPillBtn {
+                                    text:" Smart"
+                                    active: ccThemeSettings.currentTheme === "smart"
+                                    onClicked: {
+                                        _themeProc.command = [scriptDir+"/theme-set.sh", "scheme-smart"]
+                                        _themeProc.running = true
+                                        ccThemeSettings.currentTheme = "smart"
+                                    }
+                                }
+                            }
 
                             // ── Window Background Alpha ────────────────────────────────────────
                             // Patches alpha(@on_secondary, N.NN) in both GTK matugen templates.
@@ -3804,7 +3826,7 @@ PanelWindow {
                             CCSection { text: "GTK Background Alpha" }
                             Text {
                                 Layout.fillWidth: true
-                                text: "GTK app window background color opacity via GTK colors. Use with Hyprland blur for a glass effect when direct color opacity is decreased independent of Hyprland opacity. Wait around 5 seconds before the next value change"
+                                text: "GTK app window background color opacity independent from Hyprland opacity setting. Wait around 5 seconds before the next value change"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                Theme.cPrimary.b, 0.55)
                                 font.family: Config.labelFont; font.pixelSize: 11
