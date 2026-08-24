@@ -544,8 +544,18 @@ Item {
                 flickableDirection: Flickable.VerticalFlick
                 boundsBehavior: Flickable.StopAtBounds
                 ScrollBar.vertical: ScrollBar {
-                    policy: histFlickable.contentHeight > histFlickable.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
-                    visible: histFlickable.contentHeight > histFlickable.height && size < 1.0
+                    // Only consider the panel "full" once its Behavior-animated height has
+                    // actually settled at the clamped max (histPanel height: 540, i.e. the
+                    // window's implicitHeight of 560 minus margins). Comparing contentHeight
+                    // to histFlickable.height directly is unreliable while expanding/collapsing
+                    // a card, because histPanel.height animates via its own Behavior chasing
+                    // histScrollContent.implicitHeight (which is itself animating via each
+                    // card's Behavior on height) — the two lag each other, so contentHeight can
+                    // transiently exceed height even when the panel isn't actually capped,
+                    // producing a scrollbar that flashes and disappears.
+                    readonly property bool _panelAtMax: histPanel.height >= 539.5
+                    policy: (_panelAtMax && histFlickable.contentHeight > histFlickable.height) ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                    visible: _panelAtMax && histFlickable.contentHeight > histFlickable.height && size < 1.0
                     contentItem: Rectangle {
                         implicitWidth: 3
                         color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
