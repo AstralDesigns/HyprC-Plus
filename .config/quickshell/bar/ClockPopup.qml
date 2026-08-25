@@ -362,11 +362,11 @@ Item {
                 ctx.textBaseline = "middle"
 
                 // Hour text where hour hand points
-                ctx.fillStyle = Theme.cWc6.toString()
+                ctx.fillStyle = Theme.cSurfaceTint.toString()
                 ctx.fillText(hrText, hrX, hrY)
 
                 // Minute text where minute hand points
-                ctx.fillStyle = Theme.cWc5.toString()
+                ctx.fillStyle = Theme.cSecondary.toString()
                 ctx.fillText(minText, minX, minY)
             }
         }
