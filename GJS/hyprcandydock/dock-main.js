@@ -2412,10 +2412,7 @@ function _ahStartTimer() {
         dockWindow.set_opacity(1.0);
         _ahFadeOut(dockWindow, () => {
             dockWindow.set_visible(false);
-            if (_ahHotspot) {
-                _ahHotspot._applySize();
-                _ahHotspot.set_visible(true);
-            }
+            _ahShowHotspot();
         });
         return GLib.SOURCE_REMOVE;
     });
@@ -2468,13 +2465,40 @@ function teardownLauncherMonitor() {
 
 let _ahHotspot = null;   // HotspotWindow instance, created after dockWindow
 
+// Re-show the dock from the edge hotspot.  Hide-fade leaves opacity at 0, so
+// mapping the window alone would look like hover did nothing.
+function _ahRevealFromHotspot() {
+    if (!_ahEnabled || !dockWindow) return;
+    if (_ahHotspot)
+        _ahHotspot.set_visible(false);
+    _ahCancelTimer();
+    _ahFadeIn(dockWindow);
+    dockWindow.present();
+}
+
+function _ahShowHotspot() {
+    if (!_ahHotspot || !_ahEnabled) return;
+    _ahHotspot._applySize();
+    _ahHotspot.set_visible(true);
+    _ahHotspot.present();
+    GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+        if (!_ahHotspot || !_ahHotspot.get_visible()) return GLib.SOURCE_REMOVE;
+        _ahHotspot._applySize();
+        _ahHotspot._ensureInputRegion();
+        _ahHotspot._revealIfPointerInside();
+        return GLib.SOURCE_REMOVE;
+    });
+}
+
 // --- Hotspot Window (auto-hide re-show strip) -------------------------
-// A 2 px tall/wide layer surface anchored to the same edge as the dock.
+// A thin layer surface anchored to the same edge as the dock.
 // It is visible only while the dock is hidden and auto-hide is active.
-// EventControllerMotion.enter re-shows the dock and hides the hotspot.
+// Pointer enter/motion re-shows the dock and hides the hotspot.
+// Gtk.Window (not ApplicationWindow): ApplicationWindow injects a HeaderBar
+// that consumes a thin layer-shell allocation and drops pointer events.
 const HotspotWindow = GObject.registerClass({
     GTypeName: 'HyprCandyDockHotspot',
-}, class HotspotWindow extends Gtk.ApplicationWindow {
+}, class HotspotWindow extends Gtk.Window {
     _init(application) {
         super._init({
             application: application,
@@ -2482,6 +2506,7 @@ const HotspotWindow = GObject.registerClass({
             decorated: false,
             resizable: false,
         });
+        this.add_css_class('dock-hotspot');
 
         Gtk4LayerShell.init_for_window(this);
         Gtk4LayerShell.set_namespace(this, 'hyprcandy-dock-hotspot');
@@ -2489,48 +2514,87 @@ const HotspotWindow = GObject.registerClass({
         this._applyHotspotColor();
         this.get_style_context().add_provider(this._hotspotCss,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 10);
-        Gtk4LayerShell.set_layer(this, Gtk4LayerShell.Layer.TOP);
+        // OVERLAY so a TOP-layer bar on the same edge cannot steal the hit strip.
+        Gtk4LayerShell.set_layer(this, Gtk4LayerShell.Layer.OVERLAY);
         Gtk4LayerShell.set_exclusive_zone(this, 0);
+        if (Gtk4LayerShell.KeyboardMode)
+            Gtk4LayerShell.set_keyboard_mode(this, Gtk4LayerShell.KeyboardMode.NONE);
 
         // Size the hotspot surface by querying the monitor geometry directly
-        // rather than relying on GTK anchor-stretch, which is unreliable inside
-        // Gtk.ApplicationWindow's internal frame hierarchy.  _refreshAnchors()
+        // rather than relying on GTK anchor-stretch.  _refreshAnchors()
         // calls _applySize() which sets an explicit size_request matching the
         // monitor's along-edge dimension so pointer events cover the full strip.
-        const fill = new Gtk.DrawingArea();
+        const fill = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
         fill.set_hexpand(true);
         fill.set_vexpand(true);
+        fill.set_can_target(true);
+        this._fill = fill;
         this.set_child(fill);
 
         // Anchor same edge as the dock (read from DockConfig at creation time;
         // _refreshAnchors() is also called by hotReload() to track position changes)
         this._refreshAnchors();
 
-        // Re-show dock when pointer enters the hotspot strip
-        const motion = new Gtk.EventControllerMotion();
-        motion.connect('enter', () => {
-            if (!_ahEnabled || !dockWindow) return;
-            dockWindow.set_visible(true);
-            dockWindow.present();
-            this.set_visible(false);
+        const attachMotion = (widget) => {
+            const motion = new Gtk.EventControllerMotion();
+            motion.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+            motion.connect('enter', () => _ahRevealFromHotspot());
+            // 'enter' does not fire if the pointer is already inside when we map.
+            motion.connect('motion', () => _ahRevealFromHotspot());
+            widget.add_controller(motion);
+        };
+        attachMotion(this);
+        attachMotion(fill);
+
+        this.connect('map', () => {
+            this._ensureInputRegion();
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                this._ensureInputRegion();
+                this._revealIfPointerInside();
+                return GLib.SOURCE_REMOVE;
+            });
         });
-        this.add_controller(motion);
 
         // Start hidden; shown by _ahStartTimer() when the dock hides
         this.set_visible(false);
     }
 
-    // Update hotspot background to match the current rectBgStyle.
-    // The CC Bar:Background fill toggle controls the dock surface — the hotspot
-    // always stays @blur so it remains invisible regardless of dock style.
-    // Called at construction and by hotReload() so live changes take effect.
+    // Keep the strip visually empty while remaining a GTK/Hyprland hit target.
+    // Display-level window.background rules (padding, radius, gradient) would
+    // otherwise shrink a 4 px surface to a zero-sized child.
     _applyHotspotColor() {
-        // background-image: none is required here — without it the display-level
-        // dynamicConfigProvider (APP+1) bleeds its gradient rule onto this window
-        // when rectBgStyle=gradient.  The hotspot always stays @blur regardless
-        // of dock fill style; the explicit none at widget-level (APP+10) wins.
         this._hotspotCss.load_from_data(
-            'window.background { background-color: @blur; background-image: none; border: none; box-shadow: none; }', -1);
+            'window.dock-hotspot, window.dock-hotspot.background {' +
+            ' background-color: rgba(0,0,0,0.03); background-image: none;' +
+            ' border: none; border-radius: 0; box-shadow: none;' +
+            ' padding: 0; margin: 0; min-width: 0; min-height: 0; }', -1);
+    }
+
+    _ensureInputRegion() {
+        try {
+            const native = this.get_native();
+            const surface = native ? native.get_surface() : null;
+            if (surface)
+                surface.set_input_region(null);
+        } catch (e) {
+            log('[dock] hotspot input region: ' + e.message);
+        }
+    }
+
+    _revealIfPointerInside() {
+        try {
+            const native = this.get_native();
+            const surface = native ? native.get_surface() : null;
+            if (!surface) return;
+            const display = this.get_display();
+            const seat = display ? display.get_default_seat() : null;
+            const pointer = seat ? seat.get_pointer() : null;
+            if (!pointer) return;
+            const at = pointer.get_surface_at_position();
+            const atSurf = at && (Array.isArray(at) ? at[0] : at[0]);
+            if (atSurf === surface)
+                _ahRevealFromHotspot();
+        } catch (_) { }
     }
 
     _refreshAnchors() {
@@ -2547,11 +2611,11 @@ const HotspotWindow = GObject.registerClass({
         Gtk4LayerShell.set_margin(this, Gtk4LayerShell.Edge.RIGHT, 0);
 
         // Use an explicit size_request derived from the monitor geometry so
-        // pointer events cover the entire edge.  GTK4 anchor-stretching inside
-        // Gtk.ApplicationWindow is unreliable (the internal frame widget does
-        // not propagate expands to the Wayland surface commit), causing the
-        // hotspot to only respond near the left/top corner.  Querying the
-        // monitor and calling set_size_request bypasses that entirely.
+        // pointer events cover the entire edge.  GTK4 anchor-stretching is
+        // unreliable (the internal frame widget does not propagate expands
+        // to the Wayland surface commit), causing the hotspot to only respond
+        // near the left/top corner.  Querying the monitor and calling
+        // set_size_request bypasses that entirely.
         this._applySize();
     }
 
@@ -2569,7 +2633,7 @@ const HotspotWindow = GObject.registerClass({
         // Fall back to a large sentinel (4096) if the display isn't ready yet;
         // _applySize() is called again after show() in _ahStartTimer so it will
         // correct itself once the surface is mapped.
-        let along = isHoriz ? 4096 : 4096;
+        let along = 4096;
         try {
             const display = Gdk.Display.get_default();
             if (display) {
@@ -2588,13 +2652,13 @@ const HotspotWindow = GObject.registerClass({
             log('[dock] hotspot _applySize: monitor query failed: ' + e.message);
         }
 
-        if (isHoriz) {
-            this.set_size_request(along, thickness);
-            this.set_default_size(along, thickness);
-        } else {
-            this.set_size_request(thickness, along);
-            this.set_default_size(thickness, along);
-        }
+        const w = isHoriz ? along : thickness;
+        const h = isHoriz ? thickness : along;
+        this.set_size_request(w, h);
+        this.set_default_size(w, h);
+        if (this._fill)
+            this._fill.set_size_request(w, h);
+        this._ensureInputRegion();
     }
 });
 
@@ -2637,9 +2701,9 @@ const DockApplication = GObject.registerClass({
             }
         }
 
-        // Hotspot window — strip at the same edge as the dock, Layer.TOP,
-        // exclusiveZone=0.  Shown only when dock is hidden.  Its own
-        // EventControllerMotion re-shows the dock when the pointer enters.
+        // Hotspot window — strip at the same edge as the dock, Layer.OVERLAY,
+        // exclusiveZone=0.  Shown only when dock is hidden.  Pointer enter
+        // re-shows the dock.
         _ahHotspot = new HotspotWindow(this);
         this.add_window(_ahHotspot);
 
