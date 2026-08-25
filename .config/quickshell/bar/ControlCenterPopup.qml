@@ -416,7 +416,13 @@ PanelWindow {
                 if (activeVal.length > 0) {
                     if (activeVal.startsWith("$color") || activeVal === "$foreground" || activeVal === "$background" && lines[7].indexOf("color") < 0) {
                         // Pywal variable detected (color0-color15, foreground, background from wal)
-                        const isPywal = /^\$(color\d+|foreground)$/.test(activeVal)
+                        // NOTE: "$background" exists in BOTH _matugenBorderVars and _pywalBorderVars,
+                        // so the raw value alone can't tell them apart. Fall back to the last
+                        // persisted mode/var to break the tie instead of always assuming matugen.
+                        const isPywal = /^\$(color\d+|foreground)$/.test(activeVal) ||
+                            (activeVal === "$background" &&
+                             ccBorderColorSettings.activeBorderMode === "pywal" &&
+                             ccBorderColorSettings.activeBorderPywalVar === "$background")
                         if (isPywal) {
                             ccWin._activeBorderMode = "pywal"
                             ccWin._activeBorderPywalVar = activeVal
@@ -445,7 +451,17 @@ PanelWindow {
             if (lines.length > 8) {
                 const inactiveVal = lines[8] ? lines[8].trim() : ""
                 if (inactiveVal.length > 0) {
-                    const isPywal = /^\$(color\d+|foreground)$/.test(inactiveVal)
+                    // NOTE: "$background" exists in BOTH _matugenBorderVars and _pywalBorderVars
+                    // (and is the DEFAULT matugen var for inactive border, see _inactiveBorderVar),
+                    // so a raw value of "$background" is inherently ambiguous — the regex alone
+                    // can't tell whether it came from matugen or pywal. Fall back to the last
+                    // persisted mode/var to break the tie instead of always assuming matugen,
+                    // which is what was causing pywal's "$background" selection to keep
+                    // reverting to matugen every time the panel re-read the config.
+                    const isPywal = /^\$(color\d+|foreground)$/.test(inactiveVal) ||
+                        (inactiveVal === "$background" &&
+                         ccBorderColorSettings.inactiveBorderMode === "pywal" &&
+                         ccBorderColorSettings.inactiveBorderPywalVar === "$background")
                     if (isPywal) {
                         ccWin._inactiveBorderMode = "pywal"
                         ccWin._inactiveBorderPywalVar = inactiveVal
