@@ -1681,7 +1681,7 @@ ShellRoot {
                                                 radius: width / 2
                                                 color: "transparent"
                                                 border.width: 1
-                                                border.color: root.cWc10
+                                                border.color: root.cWc9
                                             }
                                             RotationAnimator on rotation {
                                                 from:0; to:360; duration:16000

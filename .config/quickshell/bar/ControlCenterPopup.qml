@@ -1433,7 +1433,7 @@ PanelWindow {
                                 Text {
                                     text: modelData.icon
                                     font.family: Config.fontFamily; font.pixelSize: 15
-                                    color: Theme.cWc4; opacity: 0.55
+                                    color: Theme.cWc12; opacity: 0.55
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
@@ -5032,10 +5032,10 @@ PanelWindow {
                                                 Layout.topMargin: 4; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰌌 hyprviz.lua"
-                                                    color: Theme.cWc5
+                                                    color: Theme.cSurfaceTint
             					    opacity: 0.85
                                                     font.family: Config.labelFont
-                                                    font.pixelSize: 14; font.weight: Font.Bold
+                                                    font.pixelSize: 15; font.weight: Font.Bold
                                                     font.letterSpacing: 0.5
                                                 }
                                                 Rectangle {
@@ -5109,10 +5109,10 @@ PanelWindow {
                                                 Layout.topMargin: 14; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰏫 custom.lua"
-                                                    color: Theme.cWc5
+                                                    color: Theme.cSurfaceTint
             					    opacity: 0.85
                                                     font.family: Config.labelFont
-                                                    font.pixelSize: 14; font.weight: Font.Bold
+                                                    font.pixelSize: 15; font.weight: Font.Bold
                                                     font.letterSpacing: 0.5
                                                 }
                                                 Rectangle {
@@ -5682,10 +5682,10 @@ PanelWindow {
 
                                 Text {
                                     text: " 󰗘 Animations"
-                                    color: Theme.cWc5
+                                    color: Theme.cSurfaceTint
 				    opacity: 0.85
                                     font.family: Config.labelFont
-                                    font.pixelSize: 14
+                                    font.pixelSize: 15
                                     font.weight: Font.Bold
                                 }
 
@@ -7427,15 +7427,15 @@ PanelWindow {
         Layout.bottomMargin: 4
         Text {
             id: _sh
-            color: Theme.cWc5
+            color: Theme.cSurfaceTint
             opacity: 0.85
             font.family: Config.labelFont
-            font.pixelSize: 14
+            font.pixelSize: 15
             font.weight: Font.Bold
             font.letterSpacing: 0.5
         }
         Rectangle {
-            Layout.fillWidth: true; height: 1
+            Layout.fillWidth: true; height: 2
             color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
         }
     }
@@ -7503,7 +7503,7 @@ PanelWindow {
                         gradient: Gradient {
                             orientation: Gradient.Horizontal
                             GradientStop { position: 0.0; color: Theme.cInversePrimary }
-                            GradientStop { position: 1.0; color: Theme.cOnPrimary }
+                            GradientStop { position: 1.0; color: Theme.cOnSecondary }
                         }
                     }
                 }

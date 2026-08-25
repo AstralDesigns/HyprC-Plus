@@ -806,7 +806,7 @@ Item {
                         radius: width / 2
                         color: "transparent"
                         border.width: 1
-                        border.color: Theme.cWc10
+                        border.color: Theme.cWc9
                     }
                     RotationAnimator on rotation {
                         from: 0; to: 360; duration: 16000

@@ -583,7 +583,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @color2;
+    border-color: @primary_container;
     margin: 8px;
 }
 
@@ -595,11 +595,11 @@ window.hyprcandy-launcher {
    No padding here — the border sits flush against the SearchEntry.       */
 
 .search-frame {
-    background-color: alpha(@color2, 0.65);
+    background-color: alpha(@inverse_primary, 0.75);
     border-radius: ${sr}px;
     border-style: solid;
     border-width: 0px;
-    border-color: @primary;
+    border-color: @scrim;
     margin-top: ${ip}px;
     margin-bottom: ${Math.round(ip / 2)}px;
 }
@@ -619,7 +619,7 @@ window.hyprcandy-launcher {
     border-radius: ${sr}px;
     border: none;
     color: @primary;
-    caret-color: @primary;
+    caret-color: @surface_tint;
     font-size: 14px;
     padding: 0px 10px;
     min-height: 38px;
@@ -640,11 +640,11 @@ window.hyprcandy-launcher {
 .launcher-search > text,
 .launcher-search text {
     background: transparent;
-    color: white;
+    color: @primary;
 }
 
 .launcher-search image {
-    color: alpha(@primary, 0.85);
+    color: alpha(@surface_tint, 0.9);
 }
 
 /* ── Arrow-key navigation — FlowBoxChild focus/selected state ─────────── */
@@ -878,7 +878,7 @@ window.hyprcandy-group-dialog {
    pillWrap margin-start: 2px  → 2px from the list-frame left inner edge.
    pillWrap margin-end:   2px  → 2px gap between pill and stack content.  */
 .tab-pill {
-    background-color: alpha(@inverse_primary, 0.45);
+    background-color: alpha(@inverse_primary, 0.55);
     border-radius: 30px;
     border: 1px solid alpha(@scrim, 1.00);
     padding: 1px 0;
