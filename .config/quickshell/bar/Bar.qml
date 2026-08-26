@@ -593,8 +593,8 @@ PanelWindow {
         }
     }
 
-    // ── Tri & Shell Center Auto-Hide ──
-    property bool _triCenterAhEnabled: Config.triCenterAutoHide && (Config.barMode === "tri" || Config.barMode === "shell")
+    // ── Tri & Shell Center Auto-Hide ── (Shell center AH currently disabled)
+    property bool _triCenterAhEnabled: Config.triCenterAutoHide && Config.barMode === "tri" //-> (Config.barMode === "tri" || Config.barMode === "shell")
     property int  _triCenterAhDelaySec: Config.triCenterAutoHideDelay
     property bool _triCenterAhHidden: false
 

@@ -583,7 +583,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @primary_container;
+    border-color: @inverse_primary;
     margin: 8px;
 }
 
@@ -595,7 +595,7 @@ window.hyprcandy-launcher {
    No padding here — the border sits flush against the SearchEntry.       */
 
 .search-frame {
-    background-color: alpha(@inverse_primary, 0.75);
+    background-color: alpha(@inverse_primary, 0.85);
     border-radius: ${sr}px;
     border-style: solid;
     border-width: 0px;
@@ -619,7 +619,7 @@ window.hyprcandy-launcher {
     border-radius: ${sr}px;
     border: none;
     color: @primary;
-    caret-color: @surface_tint;
+    caret-color: @primary;
     font-size: 14px;
     padding: 0px 10px;
     min-height: 38px;
@@ -644,7 +644,7 @@ window.hyprcandy-launcher {
 }
 
 .launcher-search image {
-    color: alpha(@surface_tint, 0.9);
+    color: alpha(@primary, 0.9);
 }
 
 /* ── Arrow-key navigation — FlowBoxChild focus/selected state ─────────── */
@@ -878,7 +878,7 @@ window.hyprcandy-group-dialog {
    pillWrap margin-start: 2px  → 2px from the list-frame left inner edge.
    pillWrap margin-end:   2px  → 2px gap between pill and stack content.  */
 .tab-pill {
-    background-color: alpha(@inverse_primary, 0.55);
+    background-color: alpha(@inverse_primary, 0.75);
     border-radius: 30px;
     border: 1px solid alpha(@scrim, 1.00);
     padding: 1px 0;
@@ -907,11 +907,11 @@ window.hyprcandy-group-dialog {
 }
 
 .tab-btn.active {
-    background-color: alpha(@on_secondary, 0.8);
+    background-color: alpha(@primary, 0.8);
 }
 
 .tab-btn:active {
-    background-color: alpha(@on_secondary, 0.25);
+    background-color: alpha(@primary, 0.25);
 }
 
 /* Glyph label — same fixed size as button so it never widens the circle. */
@@ -926,7 +926,7 @@ window.hyprcandy-group-dialog {
 }
 
 .tab-btn.active .tab-glyph {
-    color: @color9;
+    color: @on_secondary;
 }
 
 /* ── Clipboard tab ───────────────────────────────────────────────────── */

@@ -146,7 +146,7 @@ Item {
                                         ? modelData.glyphplay
                                         : (modelData.glyph || "")
                                     color: modelData.glyphplay !== undefined
-                                        ? (ctlMa.containsMouse ? Config.textColor : Theme.cWc11)
+                                        ? (ctlMa.containsMouse ? Config.textColor : Theme.cWc12)
                                         : (ctlMa.containsMouse ? Config.textColor : Theme.cWc9)
                                     opacity: 0.8
                                     font.family:    Config.fontFamily
