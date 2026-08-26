@@ -1332,8 +1332,8 @@ PanelWindow {
                         Layout.fillWidth: true
                         height: 125
                         radius: 16
-                        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.45)
+                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                               Theme.cPrimary.b, 0.82)
                         border.width: 2
                         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
                                               Theme.cScrim.b, 0.85)
@@ -7522,7 +7522,7 @@ PanelWindow {
 
                 // Dot-glyph thumb (󰟃) — matches startmenu
                 Text {
-                    text: "󰟃"
+                    text: "󰟃\u2009"
                     font.family: "Symbols Nerd Font Mono"
                     font.pixelSize: _trough.iH + 2
                     color: Theme.cWc4

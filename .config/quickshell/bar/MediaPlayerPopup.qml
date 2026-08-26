@@ -560,7 +560,7 @@ Item {
                         }
 
                         Text {
-                            text: "󰟃"
+                            text: "󰟃\u2009"
                             font.family: "Symbols Nerd Font Mono"; font.pixelSize: 10
                             color: Theme.cWc4
                             style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.25)
@@ -635,7 +635,7 @@ Item {
                         }
 
                         Text {
-                            text: "󰟃"
+                            text: "󰟃\u2009"
                             font.family: "Symbols Nerd Font Mono"; font.pixelSize: 10
                             color: Theme.cWc4
                             style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.25)

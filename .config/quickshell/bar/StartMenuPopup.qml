@@ -87,7 +87,7 @@ PanelWindow {
             
             Rectangle {
                 Layout.fillWidth: true; height: 88; radius: 12; clip: true
-                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.5)
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
                 border.width: 2
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	// ── Row 1: user + power ────────────────────────────────────
@@ -107,7 +107,7 @@ PanelWindow {
                    }
                     ColumnLayout { Layout.fillWidth: true; spacing: 1
                     	Text { text: Quickshell.env("USER"); color: Theme.cWc6; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
-                    	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Theme.cPrimary; font.pixelSize: 13 }
+                    	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Theme.cOnSecondary; font.pixelSize: 13 }
                     }
                     // Recorder
                     Rectangle {
@@ -156,7 +156,7 @@ PanelWindow {
             // ── Brightness ────────────────────────────────────────────
             Rectangle {
                 Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.5)
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	RowLayout { Layout.fillWidth: true; spacing: 10
@@ -168,7 +168,7 @@ PanelWindow {
                     		onMoved: function(v) { StartMenuState.backlightValue = v; StartMenuState.setBacklight(v) }
                     		gradA: Theme.cInversePrimary; gradB: Theme.cOnSecondary; track: Theme.cScrim
                 	}
-                	Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cPrimary
+                	Text { text: Math.round(StartMenuState.backlightValue * 100) + "%"; color: Theme.cOnSecondary
                     		font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
                 }
             }
@@ -176,7 +176,7 @@ PanelWindow {
             // ── Volume ────────────────────────────────────────────────
             Rectangle {
                     Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.5)
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
                     border.width: 1
         	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     RowLayout { Layout.fillWidth: true; spacing: 10
@@ -192,7 +192,7 @@ PanelWindow {
                     		onMoved: function(v) { StartMenuState.volumeValue = v; StartMenuState.setVolume(v) }
                     		gradA: Theme.cInversePrimary; gradB: Theme.cOnSecondary; track: Theme.cScrim
                 	}
-                	Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cPrimary
+                	Text { text: Math.round(StartMenuState.volumeValue * 100) + "%"; color: Theme.cOnSecondary
                     	font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
               	  }
             }
@@ -201,7 +201,7 @@ PanelWindow {
             Rectangle {
                     Layout.fillWidth: true; height: 25; radius: 99; clip: true
                     visible: StartMenuState.micActive
-                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.5)
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
                     border.width: 1
         	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     RowLayout { Layout.fillWidth: true; spacing: 10
@@ -215,7 +215,7 @@ PanelWindow {
                     		onMoved: function(v) { StartMenuState.micValue = v; StartMenuState.setMic(v) }
                     		gradA: Theme.cInversePrimary; gradB: Theme.cOnSecondary; track: Theme.cScrim
                 	}
-                	Text { text: Math.round(StartMenuState.micValue * 100) + "%"; color: Theme.cPrimary
+                	Text { text: Math.round(StartMenuState.micValue * 100) + "%"; color: Theme.cOnSecondary
                     	font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
               	  }
             }
@@ -1042,8 +1042,8 @@ PanelWindow {
         property real value: 0.0
         property color gradA: Theme.cInversePrimary
         property color gradB: Theme.cOnSecondary
-        property color track: Theme.cOutVar
-        property color accent: Theme.cPrimary
+        property color track: Theme.scrim
+        property color accent: Theme.cOnSecondary
         signal moved(real v)
 
         readonly property int trackH: 14
@@ -1055,7 +1055,7 @@ PanelWindow {
             Rectangle {
                 anchors.fill: parent; radius: sl.trackH / 2
                 color: Qt.rgba(sl.track.r, sl.track.g, sl.track.b, 0.28)
-                border.width: 1; border.color: Qt.rgba(sl.accent.r, sl.accent.g, sl.accent.b, 0.55)
+                border.width: 1; border.color: Qt.rgba(sl.accent.r, sl.accent.g, sl.accent.b, 1.0)
             }
             Item {
                 x: sl.pad; y: sl.pad
@@ -1069,7 +1069,7 @@ PanelWindow {
                 }
             }
             Text {
-                text: "󰟃"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: sl.innerH + 2
+                text: "󰟃\u2009"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: sl.innerH + 2
                 color: Theme.cWc4; style: Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.25)
                 x: { const tw = parent.width - sl.pad * 2; const cx = sl.pad + tw * sl.value - implicitWidth / 2
                      return Math.max(sl.pad - implicitWidth/2 + 1, Math.min(parent.width - sl.pad - implicitWidth/2 - 1, cx)) }
