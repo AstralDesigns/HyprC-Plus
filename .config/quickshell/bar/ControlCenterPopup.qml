@@ -7497,7 +7497,7 @@ PanelWindow {
                 // Trough background
                 Rectangle {
                     anchors.fill: parent; radius: _trough.tH / 2
-                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                 }
@@ -7596,7 +7596,7 @@ PanelWindow {
             color: value
                 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                       Theme.cInversePrimary.b, 0.82)
-                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                   Theme.cPrimary.b, value ? 0.6 : 0.6)
