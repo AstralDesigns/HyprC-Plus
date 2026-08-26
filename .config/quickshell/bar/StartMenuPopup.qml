@@ -112,8 +112,8 @@ PanelWindow {
                     // Recorder
                     Rectangle {
 			width: 30; height: 30; radius: 15
-			color: StartMenuState.isRecording ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
-                            : rrh.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
+			color: StartMenuState.isRecording ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.25)
+                            : rrh.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.6)
                             : Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
 			border.width: 1
 			border.color: StartMenuState.isRecording ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.85)
@@ -140,7 +140,7 @@ PanelWindow {
                      // Screenshot
                      Rectangle {
                     	width: 30; height: 30; radius: 15
-                    	color: ssh.containsMouse ? Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.18)
+                    	color: ssh.containsMouse ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.6)
                         		: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.6)
                     	border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                     	Behavior on color { ColorAnimation { duration: 100 } }
