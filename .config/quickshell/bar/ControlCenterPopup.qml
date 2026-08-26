@@ -7522,7 +7522,7 @@ PanelWindow {
 
                 // Dot-glyph thumb (󰟃) — matches startmenu
                 Text {
-                    text: "󰟃\u2009"
+                    text: "󰟃"
                     font.family: "Symbols Nerd Font Mono"
                     font.pixelSize: _trough.iH + 2
                     color: Theme.cWc4
