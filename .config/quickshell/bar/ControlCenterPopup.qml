@@ -1398,7 +1398,7 @@ PanelWindow {
                                 id: userNameText
                                 Layout.alignment: Qt.AlignHCenter
                                 text: "—"
-                                color: Theme.cWc6
+                                color: Theme.cOnSecondary
                                 font.family: Config.styleFont
                                 font.pixelSize: 16
                                 font.weight: Font.Bold

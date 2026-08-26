@@ -106,7 +106,7 @@ PanelWindow {
                         	font.pixelSize: 20; font.family: Config.fontFamily; color: Theme.cOnSurfVar }
                    }
                     ColumnLayout { Layout.fillWidth: true; spacing: 1
-                    	Text { text: Quickshell.env("USER"); color: Theme.cWc6; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
+                    	Text { text: Quickshell.env("USER"); color: Theme.cOnSecondary; font.pixelSize: 20; font.family: Config.styleFont; font.weight: Font.Bold; font.italic: true }
                     	Text { text: Qt.formatDate(StartMenuState._now, "ddd d MMM") + " · " + Qt.formatTime(StartMenuState._now, "hh:mm"); color: Theme.cOnSecondary; font.pixelSize: 13 }
                     }
                     // Recorder
@@ -160,7 +160,7 @@ PanelWindow {
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	RowLayout { Layout.fillWidth: true; spacing: 10
-                	Text { text: " 󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc5 }
+                	Text { text: " 󰃟"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cOnSecondary }
                 	//Text { text: "Brightness"; color: Theme.cPrimary; font.pixelSize: 11; Layout.preferredWidth: 72 }
                 	SliderBg {
                     		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
@@ -181,7 +181,7 @@ PanelWindow {
         	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     RowLayout { Layout.fillWidth: true; spacing: 10
                 	Text {
-                        	text: StartMenuState.volumeMuted ? " 󰖁" : " 󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc5
+                        	text: StartMenuState.volumeMuted ? " 󰖁" : " 󰕾";font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cOnSecondary
                         	MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMute() }
                 	}
                 
@@ -206,7 +206,7 @@ PanelWindow {
         	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     RowLayout { Layout.fillWidth: true; spacing: 10
                 	Text {
-                        	text: StartMenuState.micMuted ? " 󰍭" : " 󰍬"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc5
+                        	text: StartMenuState.micMuted ? " 󰍭" : " 󰍬"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cOnSecondary
                         	MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMicMute() }
                 	}
                 	SliderBg {
