@@ -316,7 +316,7 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 text: modelData
                                 color: (index === 5 || index === 6)
-                                    ? Theme.cWc4
+                                    ? Theme.cWc3
                                     : Theme.cPrimary
                                 font.family: Config.labelFont
                                 font.pixelSize: 10
@@ -409,7 +409,7 @@ PanelWindow {
                                         color: _isToday
                                             ? Theme.cPrimary
                                             : _isWeekend
-                                                ? Theme.cWc4
+                                                ? Theme.cWc3
                                                 : Theme.cPrimary
                                         font.family: Config.labelFont
                                         font.pixelSize: 12
