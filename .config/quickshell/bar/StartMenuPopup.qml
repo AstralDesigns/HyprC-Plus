@@ -197,27 +197,146 @@ PanelWindow {
               	  }
             }
 
-            // ── Microphone (only while something is actually recording) ─
+            // ── Microphone (always visible) ────────────────────────────
             Rectangle {
-                    Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                    visible: StartMenuState.micActive
+                    Layout.fillWidth: true; clip: true
+                    radius: micInputsRow.height > 0 ? 12 : 99
+                    Behavior on radius { NumberAnimation { duration: 150 } }
+                    implicitHeight: micCol.implicitHeight + (micInputsRow.height > 0 ? 4 : 0)
                     color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
                     border.width: 1
-        	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
-                    RowLayout { Layout.fillWidth: true; spacing: 10
-                	Text {
-                        	text: StartMenuState.micMuted ? " 󰍭" : " 󰍬"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cOnSecondary
-                        	MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: StartMenuState.toggleMicMute() }
-                	}
-                	SliderBg {
-                    		Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
-                    		value: StartMenuState.micValue
-                    		onMoved: function(v) { StartMenuState.micValue = v; StartMenuState.setMic(v) }
-                    		gradA: Theme.cInversePrimary; gradB: Theme.cOnSecondary; track: Theme.cScrim
-                	}
-                	Text { text: Math.round(StartMenuState.micValue * 100) + "%"; color: Theme.cOnSecondary
-                    	font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
-              	  }
+                    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+
+                    Column {
+                        id: micCol
+                        anchors { left: parent.left; right: parent.right }
+                        topPadding: 2
+                        bottomPadding: micInputsRow.height > 0 ? 4 : 2
+                        spacing: 2
+
+                        // Slider row
+                        RowLayout {
+                            Layout.fillWidth: true; spacing: 10
+
+                            // Mute/unmute microphone toggle with direct pulsating alert when mic is active
+                            Text {
+                                id: micIconText
+                                text: StartMenuState.micMuted ? " 󰍭" : " 󰍬"
+                                font.pixelSize: 17; font.family: Config.fontFamily
+                                color: StartMenuState.micActive ? Theme.cErr : Theme.cOnSecondary
+                                Behavior on color { enabled: !StartMenuState.micActive; ColorAnimation { duration: 150 } }
+
+                                SequentialAnimation on opacity {
+                                    running: StartMenuState.micActive
+                                    loops: Animation.Infinite
+                                    NumberAnimation { to: 0.35; duration: 500; easing.type: Easing.InOutSine }
+                                    NumberAnimation { to: 1.0;  duration: 500; easing.type: Easing.InOutSine }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: StartMenuState.toggleMicMute()
+                                }
+                            }
+
+                            SliderBg {
+                                Layout.fillWidth: true; Layout.fillHeight: true; width: 218; height: 20
+                                value: StartMenuState.micValue
+                                onMoved: function(v) { StartMenuState.micValue = v; StartMenuState.setMic(v) }
+                                gradA: Theme.cInversePrimary; gradB: Theme.cOnSecondary; track: Theme.cScrim
+                            }
+                            Text { text: Math.round(StartMenuState.micValue * 100) + "%"; color: Theme.cOnSecondary
+                                font.pixelSize: 12; Layout.preferredWidth: 30; horizontalAlignment: Text.AlignRight }
+                        }
+
+                        // ── Audio inputs row (visible when >1 inputs or active recording with mic) ────
+                        Item {
+                            id: micInputsRow
+                            readonly property bool _shouldShow: ((StartMenuState.micInputs && StartMenuState.micInputs.length > 1) || StartMenuState.micActive || (RecorderPopupState.isRecording && RecorderPopupState.audioMode === "mic"))
+                            width: parent.width
+                            height: _shouldShow && StartMenuState.micInputs && StartMenuState.micInputs.length > 0 ? 28 : 0
+                            visible: height > 0
+                            clip: true
+                            Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+                            Flickable {
+                                id: micInputsFlick
+                                anchors {
+                                    left: parent.left; right: parent.right
+                                    top: parent.top; bottom: parent.bottom
+                                    leftMargin: 8; rightMargin: 8
+                                }
+                                contentWidth: Math.max(width, micInputsInner.implicitWidth)
+                                contentHeight: height
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                flickableDirection: Flickable.HorizontalFlick
+
+                                // Map vertical wheel to horizontal scroll
+                                MouseArea {
+                                    anchors.fill: parent
+                                    propagateComposedEvents: true
+                                    onWheel: function(e) {
+                                        const delta = e.angleDelta.y !== 0 ? e.angleDelta.y : e.angleDelta.x
+                                        const step = 60
+                                        micInputsFlick.contentX = Math.max(0,
+                                            Math.min(micInputsFlick.contentWidth - micInputsFlick.width,
+                                                micInputsFlick.contentX - delta / 120 * step))
+                                    }
+                                    onClicked: function(e) { e.accepted = false }
+                                }
+
+                                Row {
+                                    id: micInputsInner
+                                    height: micInputsFlick.height
+                                    spacing: 6
+                                    topPadding: 2; bottomPadding: 2
+
+                                    Repeater {
+                                        model: StartMenuState.micInputs
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            height: parent.height - 4
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            radius: 6
+                                            implicitWidth: micInpLbl.implicitWidth + 18
+                                            color: micInpMA.containsMouse
+                                                ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.5)
+                                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                            border.width: 1
+                                            border.color: modelData.isDefault
+                                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.75)
+                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.40)
+                                            Behavior on color { ColorAnimation { duration: 100 } }
+                                            Behavior on border.color { ColorAnimation { duration: 100 } }
+
+                                            Text {
+                                                id: micInpLbl
+                                                anchors.centerIn: parent
+                                                text: modelData.label || modelData.name
+                                                font.pixelSize: 9
+                                                font.family: Config.labelFont
+                                                elide: Text.ElideRight
+                                                maximumLineCount: 1
+                                                color: Theme.cPrimary
+                                            }
+
+                                            MouseArea {
+                                                id: micInpMA
+                                                anchors.fill: parent
+                                                hoverEnabled: true
+                                                cursorShape: modelData.isDefault ? Qt.ArrowCursor : Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (!modelData.isDefault) StartMenuState.setMicInput(modelData.name)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
             }
 
             // ── Night light ──────────────────────────────────────────────

@@ -21,6 +21,7 @@ Item {
         if (!volReadProc.running) volReadProc.running = true
         if (!micReadProc.running) micReadProc.running = true
         if (!micActiveProc.running) micActiveProc.running = true
+        if (!micSourcesProc.running) micSourcesProc.running = true
         if (!nightLightStatusProc.running) nightLightStatusProc.running = true
     }
     function close()  { sm.menuVisible = false }
@@ -32,6 +33,7 @@ Item {
         if (!volReadProc.running) volReadProc.running = true
         if (!micReadProc.running) micReadProc.running = true
         if (!micActiveProc.running) micActiveProc.running = true
+        if (!micSourcesProc.running) micSourcesProc.running = true
         if (!blReadProc.running) blReadProc.running = true
         if (!netStatusProc.running) netStatusProc.running = true
         if (!netSavedProc.running) netSavedProc.running = true
@@ -106,9 +108,11 @@ Item {
 
     // ── Microphone ───────────────────────────────────────────────────────────
     // micActive tracks whether any app currently holds an open recording
-    // stream against a genuine input device (not a sink .monitor) — the
-    // slider only shows up then. See micActiveProc below for the filter.
+    // stream against a genuine input device (not a sink .monitor). Used to
+    // pulse the mute toggle like the recorder button. See micActiveProc.
     property real micValue: 0.5; property bool micMuted: false; property bool micActive: false
+    property var micInputs: []
+    property string micDefaultName: ""
     Process { id: micReadProc
         command:["bash","-c","pactl get-source-volume @DEFAULT_SOURCE@ && pactl get-source-mute @DEFAULT_SOURCE@"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){ const vm=l.match(/(\d+)%/); if(vm) sm.micValue=parseInt(vm[1])/100; if(l.includes("Mute:")) sm.micMuted=l.includes("yes") } }
@@ -118,7 +122,7 @@ Item {
         onExited: { if(_queued!==""){ _cmd=_queued; _queued=""; running=true } else micMuteRefreshTimer.restart() }
     }
     function setMic(v){ const c="pactl set-source-volume @DEFAULT_SOURCE@ "+Math.round(v*100)+"%"; if(micSetProc.running){ micSetProc._queued=c } else { micSetProc._cmd=c; micSetProc.running=true } }
-    function toggleMicMute(){ const c="pactl set-source-mute @DEFAULT_SOURCE@ toggle"; if(micSetProc.running){ micSetProc._queued=c } else { micSetProc._cmd=c; micSetProc.running=true; micMuteRefreshTimer.restart() } }
+    function toggleMicMute(){ sm.micMuted = !sm.micMuted; const c="pactl set-source-mute @DEFAULT_SOURCE@ toggle"; if(micSetProc.running){ micSetProc._queued=c } else { micSetProc._cmd=c; micSetProc.running=true; micMuteRefreshTimer.restart() } }
     Timer { id:micMuteRefreshTimer; interval:350; repeat:false; onTriggered: if(!micReadProc.running) micReadProc.running=true }
     Timer { interval:200; repeat:true; running: sm._pollActive
         onTriggered: { if(!micReadProc.running) micReadProc.running=true } }
@@ -141,6 +145,72 @@ Item {
     }
     Timer { interval:1000; repeat:true; running: sm._pollActive; triggeredOnStart: true
         onTriggered: { if(!micActiveProc.running) micActiveProc.running=true } }
+
+    Process { id: micSourcesProc
+        command:["bash","-c",
+            "DEF=$(pactl get-default-source 2>/dev/null); " +
+            "pactl list sources 2>/dev/null | awk -v def=\"$DEF\" '" +
+            "function esc(s) { gsub(/\\\\/,\"\\\\\\\\\",s); gsub(/\"/,\"\\\\\\\"\",s); return s } " +
+            "function flush() { " +
+            "  if (name != \"\" && name !~ /\\.monitor$/) { " +
+            "    if (n++) printf \",\"; " +
+            "    lab = (desc != \"\" ? desc : name); " +
+            "    printf \"{\\\"name\\\":\\\"%s\\\",\\\"label\\\":\\\"%s\\\",\\\"isDefault\\\":%s}\", esc(name), esc(lab), (name==def?\"true\":\"false\") " +
+            "  } name=\"\"; desc=\"\" " +
+            "} " +
+            "BEGIN { printf \"[\" } " +
+            "/^Source #/ { flush() } " +
+            "$1==\"Name:\" { name=$2 } " +
+            "$1==\"Description:\" { desc=$0; sub(/^[^:]+:[ \\t]*/,\"\",desc) } " +
+            "END { flush(); printf \"]\" }'"
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const arr = JSON.parse(this.text.trim() || "[]")
+                    const out = []
+                    let defName = ""
+                    for (let i = 0; i < arr.length; i++) {
+                        const it = arr[i]
+                        if (!it || !it.name) continue
+                        let lab = String(it.label || it.name)
+                            .replace(/\s+Analog Stereo$/i, "")
+                            .replace(/\s+Digital Stereo$/i, "")
+                            .replace(/\s+Multichannel$/i, "")
+                        out.push({ name: it.name, label: lab, isDefault: !!it.isDefault })
+                        if (it.isDefault) defName = it.name
+                    }
+                    sm.micInputs = out
+                    sm.micDefaultName = defName
+                } catch (e) { }
+            }
+        }
+    }
+    Process { id: micInputSetProc; property string _cmd:""
+        command:["bash","-c",micInputSetProc._cmd]
+        onExited: {
+            if (!micSourcesProc.running) micSourcesProc.running = true
+            if (!micReadProc.running) micReadProc.running = true
+        }
+    }
+    function setMicInput(name) {
+        if (!name || name === sm.micDefaultName) return
+        const n = String(name).replace(/'/g, "'\\''")
+        micInputSetProc._cmd =
+            "pactl set-default-source '" + n + "' && " +
+            "pactl list short source-outputs 2>/dev/null | awk '{print $1}' | " +
+            "xargs -r -I{} pactl move-source-output {} '" + n + "' 2>/dev/null; true"
+        micInputSetProc.running = true
+        const next = []
+        for (let i = 0; i < sm.micInputs.length; i++) {
+            const it = sm.micInputs[i]
+            next.push({ name: it.name, label: it.label, isDefault: it.name === name })
+        }
+        sm.micInputs = next
+        sm.micDefaultName = name
+    }
+    Timer { interval:2500; repeat:true; running: sm._pollActive; triggeredOnStart: true
+        onTriggered: { if(!micSourcesProc.running) micSourcesProc.running=true } }
 
     // ── Clock tick ────────────────────────────────────────────────────────
     property date _now: new Date()
@@ -780,70 +850,14 @@ Item {
     }
 
     // ── Recorder ─────────────────────────────────────────────────────────
-    property bool isRecording: false
-    property string _recFile: ""
-
-    Process { id: recCheckProc
-        command:["bash","-c","pgrep -x wf-recorder > /dev/null && echo 1 || echo 0"]
-        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){ sm.isRecording=l.trim()==="1" } }
-    }
-    Timer { interval:3000; repeat:true; running: sm._pollActive || sm.isRecording
-        onTriggered: if(!recCheckProc.running) recCheckProc.running=true }
-
-    Process { id: recProc; property string _cmd:""; command:["bash","-c",recProc._cmd]
-        onRunningChanged: if(!running) recStopRefreshTimer.restart()
-    }
-    Timer { id:recStopRefreshTimer; interval:500; repeat:false
-        onTriggered: if(!recCheckProc.running) recCheckProc.running=true }
-
-    Process { id: recNotifyProc; property string _cmd:""
-        command:["bash","-c",recNotifyProc._cmd] }
+    readonly property bool isRecording: RecorderPopupState.isRecording
 
     function toggleRecorder(){
-        if(sm.isRecording){
-            const savedFile = sm._recFile
-            sm._recFile = ""
-            recProc._cmd = "pkill -SIGINT wf-recorder"
-            if(!recProc.running) recProc.running=true
-
-            const sf = savedFile.replace(/'/g, "'\\''")
-            recNotifyProc._cmd =
-                "sleep 2; " +
-                "FILE='" + sf + "'; " +
-                "[ -f \"$FILE\" ] || FILE=$(ls -t ~/Videos/Recordings/*.mp4 2>/dev/null | head -1); " +
-                "[ -f \"$FILE\" ] || exit 0; " +
-                "THUMB=/tmp/qs_rec_thumb.jpg; " +
-                "ffmpeg -y -loglevel quiet -ss 00:00:01 -i \"$FILE\" -vframes 1 -q:v 3 \"$THUMB\" 2>/dev/null || " +
-                "magick \"${FILE}[24]\" -resize '640x360>' \"$THUMB\" 2>/dev/null || " +
-                "magick \"${FILE}[0]\"  -resize '640x360>' \"$THUMB\" 2>/dev/null || true; " +
-                "BASE=$(basename \"$FILE\"); " +
-                "if [ -f \"$THUMB\" ]; then " +
-                "  notify-send -a Recorder -i \"$THUMB\" '\󰻂 Recording Saved' \"$BASE\"; " +
-                "else " +
-                "  notify-send -a Recorder -i media-record '\󰻂 Recording Saved' \"$BASE\"; " +
-                "fi"
-            if(!recNotifyProc.running) recNotifyProc.running=true
+        if(RecorderPopupState.isRecording){
+            RecorderPopupState.stopRecording()
         } else {
-            const home   = Quickshell.env("HOME")
-            const folder = home + "/Videos/Recordings"
-            const ts     = Qt.formatDateTime(new Date(), "yyyyMMdd-HHmmss")
-            const dest   = folder + "/recording-" + ts + ".mp4"
-            sm._recFile = dest
-            const sf2    = dest.replace(/'/g, "'\\''")
-            const sfo    = folder.replace(/'/g, "'\\''")
-            const s      = home + "/.config/hyprcandy/scripts/recorder.sh"
-            const ss     = s.replace(/'/g, "'\\''")
-            recProc._cmd =
-                "mkdir -p '" + sfo + "'; " +
-                "MONITOR=$(pactl get-default-sink 2>/dev/null || pactl info 2>/dev/null | grep 'Default Sink' | cut -d: -f2 | xargs); " +
-                "if [ -n \"$MONITOR\" ]; then MONITOR=\"${MONITOR}.monitor\"; " +
-                "else MONITOR=$(pactl list sources short 2>/dev/null | grep 'monitor' | head -1 | awk '{print $2}'); fi; " +
-                "if [ -n \"$MONITOR\" ]; then " +
-                "  wf-recorder -g -a --audio=\"$MONITOR\" -f '" + sf2 + "' $(slurp) &>/dev/null & " +
-                "else " +
-                "  wf-recorder -g -f '" + sf2 + "' $(slurp) &>/dev/null & " +
-                "fi"
-            if(!recProc.running) recProc.running=true
+            StartMenuState.close()
+            RecorderPopupState.toggle()
         }
     }
 

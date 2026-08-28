@@ -141,7 +141,7 @@ button.dock-button image {
    Short, centered, @primary tinted — purely decorative. */
 separator.dock-sep-v {
     background-color: @scrim;
-    opacity: 0.75;
+    opacity: 0.45;
     min-width: 1px;
     max-width: 1px;
     /* min-height / max-height injected at runtime = btnSize */
@@ -151,7 +151,7 @@ separator.dock-sep-v {
 
 separator.dock-sep-h {
     background-color: @scrim;
-    opacity: 0.75;
+    opacity: 0.45;
     min-height: 1px;
     max-height: 1px;
     /* min-width / max-width injected at runtime = btnSize */

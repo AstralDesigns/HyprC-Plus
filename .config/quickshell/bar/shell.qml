@@ -166,6 +166,7 @@ ShellRoot {
     Loader { active: LicenseState.activated && (NotificationsState.historyVisible || NotificationsState.notifications.length > 0); source: "NotificationsPopup.qml" }
     Loader { active: StartMenuState.menuVisible;    source: "StartMenuPopup.qml"    }
     Loader { active: LicenseState.activated && ScreenshotPopupState.visible; source: "ScreenshotPopup.qml" }
+    Loader { active: LicenseState.activated && RecorderPopupState.visible; source: "RecorderPopup.qml" }
     Loader { active: WorkspacesPopupState.visible; source: "WorkspacesPopup.qml" }
     Loader { active: WorkspacesPopupState.tileTooltipVisible; source: "WorkspaceTileTooltip.qml" }
 
@@ -266,5 +267,7 @@ ShellRoot {
         function closeStartMenu()  { StartMenuState.close() }
         // Screenshot
         function toggleScreenshot() { if (LicenseState.activated) ScreenshotPopupState.toggle() }
+        // Recorder
+        function toggleRecorder()   { if (LicenseState.activated) (RecorderPopupState.isRecording ? RecorderPopupState.stopRecording() : RecorderPopupState.toggle()) }
     }
 }

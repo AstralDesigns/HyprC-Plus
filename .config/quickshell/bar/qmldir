@@ -56,6 +56,8 @@ singleton NotifAppState 1.0 NotifAppState.qml
 
 singleton ScreenshotPopupState 1.0 ScreenshotPopupState.qml
 ScreenshotPopup 1.0 ScreenshotPopup.qml
+singleton RecorderPopupState 1.0 RecorderPopupState.qml
+RecorderPopup 1.0 RecorderPopup.qml
 SsBtn 1.0 SsBtn.qml
 ShellLayer 1.0 ShellLayer.qml
 

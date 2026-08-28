@@ -79,10 +79,10 @@ PanelWindow {
                 }
                 goBack = function() { ScreenshotPopupState.step = "timing" }
             } else if (step === "region") {
-                count = 3
-                const regions = ["output", "active"]
+                count = 4
+                const regions = ["output", "region", "active"]
                 activate = function(idx) {
-                    if (idx < 2) ScreenshotPopupState.pickRegion(regions[idx])
+                    if (idx < 3) ScreenshotPopupState.pickRegion(regions[idx])
                     else ScreenshotPopupState.step = "timing"
                 }
                 goBack = function() { ScreenshotPopupState.step = "timing" }
@@ -123,7 +123,7 @@ PanelWindow {
         }
 
         // Width fixed; height driven only by the visible step column
-        width:  220
+        width:  230
         height: col.height + 48
 
         color:        Theme.background
@@ -153,10 +153,8 @@ PanelWindow {
                 Layout.alignment: Qt.AlignHCenter
                 visible: ScreenshotPopupState.step !== "running"
                         && ScreenshotPopupState.step !== "countdown"
-                // hide but still take space so header text doesn't jump
-                // actually collapse it when running
-                text:    ""
-                color:   Theme.text
+                text:    "󰹑"
+                color:   Theme.cPrimary
                 font.family:    Config.fontFamily
                 font.pixelSize: Config.glyphSize + 4
                 Layout.bottomMargin: 4
@@ -188,8 +186,8 @@ PanelWindow {
                 visible: ScreenshotPopupState.step === "timing"
                 Layout.fillWidth: true
                 spacing: 6
-                SsBtn { Layout.fillWidth: true; label: "  Immediate"; highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickTiming(0) }
-                SsBtn { Layout.fillWidth: true; label: "  Delayed";   highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.step = "delay" }
+                SsBtn { Layout.fillWidth: true; label: "󱦟 Immediate"; highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickTiming(0) }
+                SsBtn { Layout.fillWidth: true; label: "󱦠  Delayed";   highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.step = "delay" }
             }
 
             // ── Step: delay ───────────────────────────────────────────
@@ -211,8 +209,9 @@ PanelWindow {
                 Layout.fillWidth: true
                 spacing: 6
                 SsBtn { Layout.fillWidth: true; label: "󰍹  Entire Display"; highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickRegion("output") }
-                SsBtn { Layout.fillWidth: true; label: "  Active Window";   highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.pickRegion("active") }
-                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.step = "timing" }
+                SsBtn { Layout.fillWidth: true; label: "󰹑  Select Region";  highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.pickRegion("region") }
+                SsBtn { Layout.fillWidth: true; label: "󰖲  Active Window";   highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.pickRegion("active") }
+                SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; highlighted: card._focusedIndex === 3; onActivated: ScreenshotPopupState.step = "timing" }
             }
 
             // ── Step: action ──────────────────────────────────────────
@@ -220,10 +219,10 @@ PanelWindow {
                 visible: ScreenshotPopupState.step === "action"
                 Layout.fillWidth: true
                 spacing: 6
-                SsBtn { Layout.fillWidth: true; label: "  Copy";         highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickAction("copy")     }
-                SsBtn { Layout.fillWidth: true; label: "  Save";         highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.pickAction("save")     }
-                SsBtn { Layout.fillWidth: true; label: "  Copy & Save";  highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.pickAction("copysave") }
-                SsBtn { Layout.fillWidth: true; label: "  Edit (satty)"; highlighted: card._focusedIndex === 3; onActivated: ScreenshotPopupState.pickAction("edit")     }
+                SsBtn { Layout.fillWidth: true; label: "󰆏  Copy";         highlighted: card._focusedIndex === 0; onActivated: ScreenshotPopupState.pickAction("copy")     }
+                SsBtn { Layout.fillWidth: true; label: "󰆓  Save";         highlighted: card._focusedIndex === 1; onActivated: ScreenshotPopupState.pickAction("save")     }
+                SsBtn { Layout.fillWidth: true; label: "󰹑  Copy & 󰆓 Save";  highlighted: card._focusedIndex === 2; onActivated: ScreenshotPopupState.pickAction("copysave") }
+                SsBtn { Layout.fillWidth: true; label: "󰏫  Edit (satty)"; highlighted: card._focusedIndex === 3; onActivated: ScreenshotPopupState.pickAction("edit")     }
                 SsBtn { Layout.fillWidth: true; label: "  Back"; accent: false; highlighted: card._focusedIndex === 4; onActivated: ScreenshotPopupState.step = "region" }
             }
 
