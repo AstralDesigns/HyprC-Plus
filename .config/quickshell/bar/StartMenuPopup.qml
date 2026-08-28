@@ -253,7 +253,15 @@ PanelWindow {
                         // ── Audio inputs row (visible when >1 inputs or active recording with mic) ────
                         Item {
                             id: micInputsRow
-                            readonly property bool _shouldShow: ((StartMenuState.micInputs && StartMenuState.micInputs.length > 1) || StartMenuState.micActive || (RecorderPopupState.isRecording && RecorderPopupState.audioMode === "mic"))
+                            // Block-body properties don't re-bind in QML; use a pure expression instead.
+                            // Use recordingAudioMode (stable for the session) not audioMode (reset to "mic" after launch).
+                            // Suppress entirely when recorder is running without mic; otherwise show
+                            // when mic is active or >1 inputs exist to switch between.
+                            readonly property bool _shouldShow:
+                                !(RecorderPopupState.isRecording && RecorderPopupState.recordingAudioMode !== "mic") &&
+                                ((StartMenuState.micInputs && StartMenuState.micInputs.length > 1) ||
+                                 StartMenuState.micActive ||
+                                 (RecorderPopupState.isRecording && RecorderPopupState.recordingAudioMode === "mic"))
                             width: parent.width
                             height: _shouldShow && StartMenuState.micInputs && StartMenuState.micInputs.length > 0 ? 28 : 0
                             visible: height > 0

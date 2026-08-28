@@ -141,13 +141,13 @@ Singleton {
             '  notify-send -a Screenshot -i camera-photo-symbolic "Screenshot" "Copied to clipboard"; ' +
             'elif [ "$ACTION" = "save" ]; then ' +
             '  mv "$temp" "$out"; ' +
-            '  notify-send -a Screenshot -i camera-photo-symbolic "Screenshot" "Saved $(basename "$out") to $SCREENSHOT_DIR"; ' +
+            '  notify-send -a Screenshot -i "$out" "Screenshot" "$out"; ' +
             'elif [ "$ACTION" = "copysave" ]; then ' +
             '  wl-copy < "$temp" && mv "$temp" "$out"; ' +
-            '  notify-send -a Screenshot -i camera-photo-symbolic "Screenshot" "Copied & Saved $(basename "$out") to $SCREENSHOT_DIR"; ' +
+            '  notify-send -a Screenshot -i "$out" "Screenshot" "Copied & Saved $out"; ' +
             'elif [ "$ACTION" = "edit" ]; then ' +
             '  mv "$temp" "$out"; ' +
-            '  notify-send -a Screenshot -i camera-photo-symbolic "Screenshot" "Opening in Satty"; ' +
+            '  notify-send -a Screenshot -i "$out" "Screenshot" "Opening in Satty: $out"; ' +
             '  satty --filename "$out"; ' +
             'fi'
 

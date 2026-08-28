@@ -35,6 +35,8 @@ Singleton {
     // ── Recording State ───────────────────────────────────────────────────────
     property bool   isRecording: false
     property string currentFile: ""
+    // Persists the audio mode for the *active* session (survives reset())
+    property string recordingAudioMode: "mic"
 
     // ── Derived paths ─────────────────────────────────────────────────────────
     readonly property string recordingsDir: {
@@ -99,6 +101,8 @@ Singleton {
         const ts     = Qt.formatDateTime(new Date(), "yyyyMMdd-HHmmss")
         const dest   = folder + "/recording-" + ts + ".mp4"
         root.currentFile = dest
+        // Capture chosen mode before reset() wipes audioMode back to "mic"
+        root.recordingAudioMode = root.audioMode
 
         const selectedAudio  = root.audioMode
         const selectedRegion = root.regionMode
@@ -152,6 +156,12 @@ Singleton {
         const savedFile = root.currentFile
         root.currentFile = ""
         root.isRecording = false
+        // NOTE: recordingAudioMode is intentionally NOT reset here.
+        // wf-recorder takes ~1.2s to die (pkill + sleep 1.2), during which
+        // the pgrep poll may flip isRecording back to true. Keeping
+        // recordingAudioMode at the session value ensures the inputs-row
+        // suppression stays active for the entire shutdown window.
+        // It will be correctly overwritten by _doStartRecording() next session.
 
         const sf = savedFile.replace(/'/g, "'\\''")
         const cmd =
@@ -166,9 +176,9 @@ Singleton {
             "magick \"${FILE}[0]\"  -resize '640x360>' \"$THUMB\" 2>/dev/null || true; " +
             "BASE=$(basename \"$FILE\"); " +
             "if [ -f \"$THUMB\" ]; then " +
-            "  notify-send -a Recorder -i \"$THUMB\" '󰻂 Recording Saved' \"$BASE\"; " +
+            "  notify-send -a Recorder -i \"$THUMB\" '󰻂 Recording Saved' \"$FILE\"; " +
             "else " +
-            "  notify-send -a Recorder -i media-record '󰻂 Recording Saved' \"$BASE\"; " +
+            "  notify-send -a Recorder -i media-record '󰻂 Recording Saved' \"$FILE\"; " +
             "fi"
 
         Quickshell.execDetached(["bash", "-c", cmd])
