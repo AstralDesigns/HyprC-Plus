@@ -35,8 +35,8 @@
 @define-color card_bg_color @window_bg_color;
 @define-color card_fg_color @primary;
 @define-color card_shade_color rgba(0, 0, 6, 0.36);
-@define-color dialog_bg_color @primary_fixed_dim;
-@define-color dialog_fg_color @inverse_primary;
+@define-color dialog_bg_color @window_bg_color;
+@define-color dialog_fg_color @window_fg_color;
 @define-color thumbnail_bg_color @window_bg_color;
 @define-color thumbnail_fg_color @primary;
 @define-color shade_color rgba(0, 0, 6, 0.25);
