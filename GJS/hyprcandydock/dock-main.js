@@ -383,7 +383,7 @@ function _injectGlyphSizeCSS(display) {
         * {
             font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', monospace;
         }
-        window.background {
+        window.background:not(.dock-hotspot) {
             border-width: ${borderW}px;
             border-style: solid;
             ${wRule}
