@@ -1899,8 +1899,12 @@ PanelWindow {
                                                      "mkdir -p \"$(dirname \"$f\")\";" +
                                                      "printf '%s\\n' '" + v.toString() + "' > \"$f\""
                                                  ]
-                                                 _barBorderWStateWrite.running = true
-                                             }
+                                                 Config.launcherBorderWidth = Math.round(v)
+                                                 _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                                     "borderWidth", Math.round(v).toString()]
+                                                 _lcWrite.running = true
+                                                 _barBorderWStateWrite.running = true   
+                                            }
                                          }
                                          Process {
                                              id: _barBorderWFromBarWrite
@@ -4311,17 +4315,17 @@ PanelWindow {
                             // every other CC tab. onMoved sets the Config property (reactive,
                             // survives re-opens) AND calls launcher-config-set.sh to write the
                             // value back into launcherConfig.js for the GJS launcher to pick up.
-                            CCSlider {
-                                label: "Search Width"
-                                from: 0.2; to: 1.0; stepSize: 0.05; decimals: 2
-                                value: Config.launcherSearchWidth
-                                onMoved: function(v) {
-                                    Config.launcherSearchWidth = v
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "searchWidthFraction", v.toFixed(2)]
-                                    _lcWrite.running = true
-                                }
-                            }
+                            //CCSlider {
+                                //label: "Search Width"
+                                //from: 0.2; to: 1.0; stepSize: 0.05; decimals: 2
+                                //value: Config.launcherSearchWidth
+                                //onMoved: function(v) {
+                                    //Config.launcherSearchWidth = v
+                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        //"searchWidthFraction", v.toFixed(2)]
+                                    //_lcWrite.running = true
+                                //}
+                            //}
 
                             CCSection { text: "Icon" }
                             CCSlider {
@@ -4419,40 +4423,40 @@ PanelWindow {
                                 }
                             }
 
-                            CCSection { text: "Borders" }
-                            CCSlider {
-                                label: "Outer Radius"
-                                from: 0; to: 40
-                                value: Config.launcherBorderRadius
-                                onMoved: function(v) {
-                                    Config.launcherBorderRadius = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "borderRadius", Math.round(v).toString()]
-                                    _lcWrite.running = true
-                                }
-                            }
-                            CCSlider {
-                                label: "Outer Width"
-                                from: 0; to: 8
-                                value: Config.launcherBorderWidth
-                                onMoved: function(v) {
-                                    Config.launcherBorderWidth = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "borderWidth", Math.round(v).toString()]
-                                    _lcWrite.running = true
-                                }
-                            }
-                            CCSlider {
-                                label: "Search Radius"
-                                from: 0; to: 30
-                                value: Config.launcherSearchRadius
-                                onMoved: function(v) {
-                                    Config.launcherSearchRadius = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "searchRadius", Math.round(v).toString()]
-                                    _lcWrite.running = true
-                                }
-                            }
+                            //CCSection { text: "Borders" }
+                            //CCSlider {
+                                //label: "Outer Radius"
+                                //from: 0; to: 40
+                                //value: Config.launcherBorderRadius
+                                //onMoved: function(v) {
+                                    //Config.launcherBorderRadius = Math.round(v)
+                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        //"borderRadius", Math.round(v).toString()]
+                                    //_lcWrite.running = true
+                                //}
+                            //}
+                            //CCSlider {
+                                //label: "Outer Width"
+                                //from: 0; to: 8
+                                //value: Config.launcherBorderWidth
+                                //onMoved: function(v) {
+                                    //Config.launcherBorderWidth = Math.round(v)
+                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        //"borderWidth", Math.round(v).toString()]
+                                    //_lcWrite.running = true
+                                //}
+                            //}
+                            //CCSlider {
+                                //label: "Search Radius"
+                                //from: 0; to: 30
+                                //value: Config.launcherSearchRadius
+                                //onMoved: function(v) {
+                                    //Config.launcherSearchRadius = Math.round(v)
+                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        //"searchRadius", Math.round(v).toString()]
+                                    //_lcWrite.running = true
+                                //}
+                            //}
                             //CCSlider {
                                 //label: "List Radius"
                                 //from: 0; to: 30
