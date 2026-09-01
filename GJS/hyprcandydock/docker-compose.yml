@@ -1,0 +1,11 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: hyprcandy-searxng
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./searxng-settings:/etc/searxng:rw
+    environment:
+      - SEARXNG_SECRET_KEY=hyprcandy-permanent-local-secret-key-3f98a21b44c8
+    restart: unless-stopped

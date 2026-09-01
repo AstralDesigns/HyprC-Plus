@@ -1862,29 +1862,87 @@ PanelWindow {
                                         CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"R.Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
                                         CCSlider { label:"Island"; from:0;to:90; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
                                         // Shell-specific geometry
-                                        CCSlider { visible: Config.barMode === "shell"; label:"Inner Radii"; from:0;to:90;               value:Config.shellInnerRadius;           onMoved:function(v){Config.shellInnerRadius=v} }
-                                        //CCSlider { visible: Config.barMode === "shell"; label:"C.Junction";  from:0;to:90;               value:Config.shellCenterJunctionRadius;  onMoved:function(v){Config.shellCenterJunctionRadius=v} }
+                                         CCSlider { visible: Config.barMode === "shell"; label:"Inner Radii"; from:0;to:90;               value:Config.shellInnerRadius;           onMoved:function(v){Config.shellInnerRadius=v} }
+                                         //CCSlider { visible: Config.barMode === "shell"; label:"C.Junction";  from:0;to:90;               value:Config.shellCenterJunctionRadius;  onMoved:function(v){Config.shellCenterJunctionRadius=v} }
 
-                                        CCSection { text: "Dimensions" }
-                                        CCSlider { visible: Config.barMode === "shell"; label:"Shell Pad";   from:4;to:120; stepSize:1;  value:Config.shellArmThickness;         onMoved:function(v){Config.shellArmThickness=v} }
-                                        CCSlider { label:"Bar Height";    from:20;to:80;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
-                                        CCSlider { label:"Module Height";  from:12;to:70;  stepSize:2;  value:Config.moduleHeight;  onMoved:function(v){Config.moduleHeight=v} }
+                                         CCSection { text: "Dimensions" }
+                                         CCSlider { visible: Config.barMode === "shell"; label:"Shell Pad";   from:4;to:120; stepSize:1;  value:Config.shellArmThickness;         onMoved:function(v){Config.shellArmThickness=v} }
+                                         CCSlider { label:"Bar Height";    from:20;to:80;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
+                                         CCSlider { label:"Module Height";  from:12;to:70;  stepSize:2;  value:Config.moduleHeight;  onMoved:function(v){Config.moduleHeight=v} }
 
-                                        CCSection { text: "Screen Margins" }
-                                        CCSlider { label:"Top Margin";    from:0;to:30; value:Config.outerMarginTop;    onMoved:function(v){Config.outerMarginTop=v} }
-                                        CCSlider { label:"Bottom Margin"; from:0;to:30; value:Config.outerMarginBottom; onMoved:function(v){Config.outerMarginBottom=v} }
-                                        // "tri" and "shell" islands have their own side-margin, split from bar/island's outerMarginSide
-                                        CCSlider { visible: Config.barMode !== "tri" && Config.barMode !== "shell"; label:"Side Margin";       from:0;to:200; value:Config.outerMarginSide;      onMoved:function(v){Config.outerMarginSide=v} }
-                                        CCSlider { visible: Config.barMode === "tri";                              label:"Side Margin (Tri)";   from:0;to:200; value:Config.triModuleSideMargin;  onMoved:function(v){Config.triModuleSideMargin=v} }
-                                        CCSlider { visible: Config.barMode === "shell";                            label:"Side Margin (Shell)"; from:0;to:200; value:Config.shellModuleSideMargin;onMoved:function(v){Config.shellModuleSideMargin=v} }
-                                        CCSlider { label:"Edge Pad Left"; from:0;to:30; value:Config.barEdgePaddingLeft; onMoved:function(v){Config.barEdgePaddingLeft=v} }
-                                        CCSlider { label:"Edge Pad Right";from:0;to:30; value:Config.barEdgePaddingRight;onMoved:function(v){Config.barEdgePaddingRight=v} }
+                                         CCSection { text: "Screen Margins" }
+                                         CCSlider { label:"Top Margin";    from:0;to:30; value:Config.outerMarginTop;    onMoved:function(v){Config.outerMarginTop=v} }
+                                         CCSlider { label:"Bottom Margin"; from:0;to:30; value:Config.outerMarginBottom; onMoved:function(v){Config.outerMarginBottom=v} }
+                                         // "tri" and "shell" islands have their own side-margin, split from bar/island's outerMarginSide
+                                         CCSlider { visible: Config.barMode !== "tri" && Config.barMode !== "shell"; label:"Side Margin";       from:0;to:200; value:Config.outerMarginSide;      onMoved:function(v){Config.outerMarginSide=v} }
+                                         CCSlider { visible: Config.barMode === "tri";                              label:"Side Margin (Tri)";   from:0;to:200; value:Config.triModuleSideMargin;  onMoved:function(v){Config.triModuleSideMargin=v} }
+                                         CCSlider { visible: Config.barMode === "shell";                            label:"Side Margin (Shell)"; from:0;to:200; value:Config.shellModuleSideMargin;onMoved:function(v){Config.shellModuleSideMargin=v} }
+                                         CCSlider { label:"Edge Pad Left"; from:0;to:30; value:Config.barEdgePaddingLeft; onMoved:function(v){Config.barEdgePaddingLeft=v} }
+                                         CCSlider { label:"Edge Pad Right";from:0;to:30; value:Config.barEdgePaddingRight;onMoved:function(v){Config.barEdgePaddingRight=v} }
 
-                                        CCSection { text: "Border" }
-                                        CCSlider { label:"Border W";        from:0;to:8; value:Config.barBorderWidth;    onMoved:function(v){Config.barBorderWidth=v} }
-                                        CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
-                                        CCSlider { label:"Island B-W";     from:0;to:8; value:Config.islandBorder;      onMoved:function(v){Config.islandBorder=v} }
-                                        CCSlider { label:"Island B-α";   from:0;to:1;stepSize:0.05;decimals:2; value:Config.islandBorderAlpha;  onMoved:function(v){Config.islandBorderAlpha=v} }
+                                         CCSection { text: "Border" }
+                                         CCSlider {
+                                             label: "Border W"
+                                             from: 0; to: 8
+                                             value: Config.barBorderWidth
+                                             onMoved: function(v) {
+                                                 Config.barBorderWidth = v
+                                                 _dockBorderWVal = v.toString()
+                                                 if (_barBorderWFromBarWrite.running) {
+                                                     _barBorderWFromBarWrite._pending = [scriptDir + "/dock-set.sh", "borderWidth", v.toString()]
+                                                 } else {
+                                                     _barBorderWFromBarWrite.command = [scriptDir + "/dock-set.sh", "borderWidth", v.toString()]
+                                                     _barBorderWFromBarWrite.running = true
+                                                 }
+                                                 _barBorderWStateWrite.command = ["bash", "-c",
+                                                     "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/dock-border-w.state\";" +
+                                                     "mkdir -p \"$(dirname \"$f\")\";" +
+                                                     "printf '%s\\n' '" + v.toString() + "' > \"$f\""
+                                                 ]
+                                                 _barBorderWStateWrite.running = true
+                                             }
+                                         }
+                                         Process {
+                                             id: _barBorderWFromBarWrite
+                                             property var _pending: null
+                                             running: false
+                                             onExited: {
+                                                 running = false
+                                                 if (_pending !== null) {
+                                                     command = _pending; _pending = null; running = true
+                                                 }
+                                             }
+                                         }
+                                         Process { id: _barBorderWStateWrite; running: false; onExited: running = false }
+                                         CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
+                                         CCSlider {
+                                             label: "Island B-W"
+                                             from: 0; to: 8
+                                             value: Config.islandBorder
+                                             onMoved: function(v) {
+                                                 Config.islandBorder = v
+                                                 if (_islBorderDockWrite.running) {
+                                                     _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", "width", v.toString()]
+                                                 } else {
+                                                     _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", "width", v.toString()]
+                                                     _islBorderDockWrite.running = true
+                                                 }
+                                             }
+                                         }
+                                         CCSlider {
+                                             label: "Island B-α"
+                                             from: 0; to: 1; stepSize: 0.05; decimals: 2
+                                             value: Config.islandBorderAlpha
+                                             onMoved: function(v) {
+                                                 Config.islandBorderAlpha = v
+                                                 if (_islBorderDockWrite.running) {
+                                                     _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", "alpha", v.toString()]
+                                                 } else {
+                                                     _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", "alpha", v.toString()]
+                                                     _islBorderDockWrite.running = true
+                                                 }
+                                             }
+                                         }
 
                                         CCSection { text: "Bar Border Color" }
                                         // ── matugen / wallust 2-option pill ─────────────────────────
@@ -2215,7 +2273,7 @@ PanelWindow {
                                         CCSection { text: "Spacing & Padding" }
                                         CCSlider { label:"Island Spacing";  from:0;to:24; value:Config.islandSpacing;  onMoved:function(v){Config.islandSpacing=v} }
                                         CCSlider { label:"Grouped Spacing"; from:0;to:12; value:Config.groupedSpacing; onMoved:function(v){Config.groupedSpacing=v} }
-                                        CCSlider { label:"Module Pad H";    from:0;to:20; value:Config.modPadH;        onMoved:function(v){Config.modPadH=v} }
+                                        CCSlider { label:"Module Pad H";    from:3;to:20; value:Config.modPadH;        onMoved:function(v){Config.modPadH=v} }
 
                                         Item { height: 10 }
                                     }
@@ -4003,26 +4061,6 @@ PanelWindow {
                                     _dockWrite.running = true
                                 }
                             }
-                            CCSlider {
-                                label: "Border W"
-                                from: 0; to: 10; stepSize: 1
-                                value: parseInt(_dockBorderWVal) || 0
-                                onMoved: function(v) {
-                                    _dockBorderWVal = v.toString()
-                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderWidth", v.toString()]
-                                    _dockWrite.running = true
-                                    // Always persist to state file — including 0 — so the restore
-                                    // on glass switch reflects the user's actual last-set value.
-                                    _dockBorderWStateWrite.command = ["bash", "-c",
-                                        "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/dock-border-w.state\";" +
-                                        "mkdir -p \"$(dirname \"$f\")\";" +
-                                        "printf '%s\\n' '" + v.toString() + "' > \"$f\""
-                                    ]
-                                    _dockBorderWStateWrite.running = true
-                                }
-                            }
-                            Process { id: _dockBorderWStateWrite; running: false; onExited: running = false }
-
                             CCSection { text: "Corner Radius" }
                             CCSlider {
                                 label: "Top-Left"

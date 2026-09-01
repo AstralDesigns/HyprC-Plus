@@ -1,5 +1,5 @@
 #!/bin/bash
-# Dock setting writer (numeric + rectBgStyle — border color uses dock-border.sh)
+# Dock setting writer (numeric, floats, strings + rectBgStyle — border color uses dock-border.sh)
 CONFIG="$HOME/.hyprcandy/GJS/hyprcandydock/config.js"
 
 key="$1"
@@ -11,8 +11,6 @@ _dock_hot_reload() {
 
 # marginFromEdge writes margin_from_edge to the [dock] section of hyprcandy-bar.conf
 # and hot-reloads the dock via SIGUSR2 (signal 12).
-# Kept in a dedicated Process (_dockMarginWrite) in QML so it never contends
-# with the Hyprland Lua state writer that runs through _confWriteProc.
 if [ "$key" = "marginFromEdge" ]; then
     f="$HOME/.config/hyprcandy/hyprcandy-bar.conf"
     mkdir -p "$(dirname "$f")"
@@ -45,12 +43,20 @@ case "$key" in
         fi
         _dock_hot_reload
         ;;
+    islandBorderColorVar|borderColorVar)
+        val="${value#@}"
+        val="${val#\$}"
+        if grep -q "^[[:space:]]*${key}:" "$CONFIG"; then
+            sed -i "s/^\([[:space:]]*${key}:\)[[:space:]]*'[^']*'/\1 '${val}'/" "$CONFIG"
+        fi
+        _dock_hot_reload
+        ;;
     *)
         if grep -q "^[[:space:]]*${key}:" "$CONFIG"; then
-            sed -i "s/^\([[:space:]]*${key}:\)[[:space:]]*[0-9]*/\1 ${value}/" "$CONFIG"
+            sed -i "s/^\([[:space:]]*${key}:\)[[:space:]]*[0-9.]*/\1 ${value}/" "$CONFIG"
         fi
         _dock_hot_reload
         ;;
 esac
 
-pkill -SIGUSR2 -f 'gjs dock-main.js' 2>/dev/null || pkill -12 -f 'gjs dock-main.js' 2>/dev/null || true
+_dock_hot_reload

@@ -1,25 +1,32 @@
 #!/bin/bash
-# toggle-app-launcher.sh — toggle the HyprCandy App Launcher daemon.
+# toggle-app-launcher.sh — show/hide the HyprCandy App Launcher daemon.
 #
-# The launcher now runs as a persistent daemon (started once by autostart.sh).
-# Toggle = send SIGUSR1 (10) to the running daemon.
+# The launcher runs as a persistent daemon (started once by autostart.sh or
+# when the dock is first shown).
 #
-# If the daemon is not running yet (first boot before autostart fires, or it
-# crashed), fall back to launching it so the user isn't left with nothing.
+# Toggle = send SIGUSR1 (10) to the running daemon.  The daemon's own signal
+# handler shows or hides the window without creating a new process, preserving
+# all WebKit sessions, cookies, and search results in memory.
 #
-# Called by the dock's start-button left-click handler.
+# If the daemon is not running (first boot, crashed, etc.) we start it here.
+#
+# Called by:
+#   • dock start-button left-click
+#   • Hyprland keybind (SUPER + A)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAUNCHER="$SCRIPT_DIR/app-launcher.js"
 
-# ── Send SIGUSR1 to the running daemon ─────────────────────────────────────
+# ── Send SIGUSR1 to the running daemon ──────────────────────────────────────
+# Use a broad pattern so it matches regardless of how the path was passed,
+# avoiding false "not found" that would spawn a duplicate process.
 
-if pkill -10 -f "gjs $LAUNCHER" 2>/dev/null; then
+if pkill -10 -f "gjs.*app-launcher\.js" 2>/dev/null; then
     # Signal delivered — daemon will show/hide itself
     exit 0
 fi
 
-# ── Daemon not running — start it ──────────────────────────────────────────
+# ── Daemon not running — start it ───────────────────────────────────────────
 # gtk4-layer-shell must be LD_PRELOADed for layer-shell anchoring to work.
 
 if   [ -f "/usr/lib/libgtk4-layer-shell.so"   ]; then

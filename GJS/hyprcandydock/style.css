@@ -53,11 +53,13 @@ window.background {
     /*min-height: 22px;           /* overridden at runtime — keeps circle square  */
     /*border-radius: 50%;*/
     background-image: linear-gradient(to bottom, @background, @scrim);
+    background-clip: padding-box;
     /*padding: 0px;
     margin: 0px;*/
-    border: 2px solid;
+    border-width: 2px;
+    border-style: solid;
     border-color: @scrim;
-    /* CC border picker → dock-border.sh writes @gtk_name here */
+    /* CC island border color picker → dock-island-border.sh writes @gtk_name here */
 }
 
 /* Fallback icon — shown when an app has no icon in the theme.

@@ -4,8 +4,12 @@
 # Position is always read from dock.pos (written by cycle.sh and direction
 # scripts).  No positional args — use cycle.sh to change position.
 #
-# When the dock is shown:   app-launcher daemon is also started.
-# When the dock is hidden:  app-launcher daemon is also killed.
+# When the dock is shown:   app-launcher daemon is also started (if not already
+#                           running — existing daemon is ALWAYS preserved).
+# When the dock is hidden:  SIGUSR1 is sent to hide the launcher window
+#                           WITHOUT killing the daemon — WebKit sessions,
+#                           cookies, and search state are preserved in memory.
+#
 # The dock's start-button continues to use toggle-app-launcher.sh (SIGUSR1)
 # to show/hide the launcher UI while the dock is running.
 #
@@ -31,10 +35,18 @@ _pos_flag() {
     esac
 }
 
-# ── launcher helper ────────────────────────────────────────────────────────────
+# ── launcher helpers ───────────────────────────────────────────────────────────
 
-_start_launcher() {
-    pkill -f "gjs $LAUNCHER" 2>/dev/null
+_launcher_running() {
+    pgrep -f "gjs.*app-launcher\.js" > /dev/null 2>&1
+}
+
+_ensure_launcher() {
+    # NEVER kill an existing daemon — it holds WebKit sessions, cookies,
+    # search results, and all in-memory state.  Only launch if not running.
+    if _launcher_running; then
+        return 0
+    fi
     if   [ -f "/usr/lib/libgtk4-layer-shell.so"   ]; then
         export LD_PRELOAD="/usr/lib/libgtk4-layer-shell.so:${LD_PRELOAD}"
     elif [ -f "/usr/lib64/libgtk4-layer-shell.so" ]; then
@@ -42,18 +54,36 @@ _start_launcher() {
     fi
     cd "$SCRIPT_DIR"
     setsid gjs "$LAUNCHER" </dev/null >/dev/null 2>&1 &
+    # Give daemon a moment to fully initialise before any SIGUSR1
+    sleep 0.5
+}
+
+_hide_launcher_window() {
+    # Send SIGUSR1 to hide the launcher window gracefully (same as start button).
+    # Only send if window is currently shown (launcher.state == open).
+    local state_path="$HOME/.cache/hyprcandy/launcher.state"
+    if [ -f "$state_path" ] && grep -q "^open" "$state_path" 2>/dev/null; then
+        pkill -10 -f "gjs.*app-launcher\.js" 2>/dev/null
+    else
+        # Send anyway if state file is missing/stale — no harm if window is hidden
+        pkill -10 -f "gjs.*app-launcher\.js" 2>/dev/null || true
+    fi
 }
 
 # ── toggle ─────────────────────────────────────────────────────────────────────
 
 if pgrep -f "gjs dock-main.js" > /dev/null 2>&1; then
-    # Dock is running → hide it and kill the launcher daemon
+    # Dock is running → hide it
     echo 0 > "$STATE_FILE"
     pkill -f "gjs dock-main.js"
-    pkill -f "gjs $LAUNCHER" 2>/dev/null
+
+    # Hide launcher window but KEEP daemon alive — preserves WebKit &
+    # search state so next re-show is instant with full session intact.
+    _hide_launcher_window
 else
-    # Dock is hidden → show it and start the launcher daemon
+    # Dock is hidden → show it
     echo 1 > "$STATE_FILE"
-    _start_launcher
+    # Ensure launcher daemon is running (start only if not already alive)
+    _ensure_launcher
     exec "$SCRIPT_DIR/launch-modular.sh" "$(_pos_flag)"
 fi

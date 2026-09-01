@@ -8,8 +8,12 @@
 #   - If dock.state exists and equals "0", the user intentionally hid the
 #     dock last session — skip launch to respect that choice.
 #   - Otherwise (file missing = first run, or value is "1") launch the dock
-#     at the position saved in dock.pos (default: bottom), then start the
-#     app-launcher daemon so it is ready for the dock's start-button.
+#     at the position saved in dock.pos (default: bottom), then ensure the
+#     app-launcher daemon is running so it is ready for the dock's start-button.
+#
+# IMPORTANT: The launcher daemon is NEVER killed here — if it is already
+# running from a previous session (persistent daemon mode) its in-memory
+# WebKit sessions, cookies, and search state are preserved intact.
 #
 # State files (same directory):
 #   dock.pos   0=bottom 1=right 2=top 3=left  (default: 0)
@@ -35,18 +39,20 @@ case "$idx" in
     *) FLAG="-b" ;;
 esac
 
-# ── Start the app-launcher daemon ──────────────────────────────────────────
-# Kill any stale instance first, then launch fresh in the background.
-pkill -f "gjs $LAUNCHER" 2>/dev/null
+# ── Ensure the app-launcher daemon is running ──────────────────────────────
+# Only start if NOT already running — never kill an existing daemon so that
+# WebKit sessions, cookies, and search state survive Hyprland restarts.
 
-if   [ -f "/usr/lib/libgtk4-layer-shell.so"   ]; then
-    export LD_PRELOAD="/usr/lib/libgtk4-layer-shell.so:${LD_PRELOAD}"
-elif [ -f "/usr/lib64/libgtk4-layer-shell.so" ]; then
-    export LD_PRELOAD="/usr/lib64/libgtk4-layer-shell.so:${LD_PRELOAD}"
+if ! pgrep -f "gjs $LAUNCHER" > /dev/null 2>&1; then
+    if   [ -f "/usr/lib/libgtk4-layer-shell.so"   ]; then
+        export LD_PRELOAD="/usr/lib/libgtk4-layer-shell.so:${LD_PRELOAD}"
+    elif [ -f "/usr/lib64/libgtk4-layer-shell.so" ]; then
+        export LD_PRELOAD="/usr/lib64/libgtk4-layer-shell.so:${LD_PRELOAD}"
+    fi
+    cd "$SCRIPT_DIR"
+    setsid gjs "$LAUNCHER" </dev/null >/dev/null 2>&1 &
+    sleep 0.5
 fi
-
-cd "$SCRIPT_DIR"
-setsid gjs "$LAUNCHER" </dev/null >/dev/null 2>&1 &
 
 # ── Launch the dock ────────────────────────────────────────────────────────
 exec "$SCRIPT_DIR/launch-modular.sh" "$FLAG"

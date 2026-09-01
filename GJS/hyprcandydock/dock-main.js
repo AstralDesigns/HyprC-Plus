@@ -204,6 +204,53 @@ function _readBorderColorFromStyle() {
     }
 }
 
+function _readIslandBorderColorFromStyle() {
+    try {
+        const [ok, contents] = GLib.file_get_contents(DOCK_STYLE_PATH);
+        if (!ok) return null;
+        const text = new TextDecoder().decode(contents);
+        const m = text.match(/#start-icon[^{]*{[^}]*border-color:\s*@([a-zA-Z0-9_]+)/);
+        return m ? m[1] : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Resolve a GTK named color token (e.g. 'color2', 'primary') to a CSS rgba() string.
+// Searches all loaded GTK color CSS files in priority order (wallust → matugen).
+// Returns 'rgba(r,g,b,alpha)' on success, or 'alpha(@token, a)' as a best-effort fallback.
+function _resolveGtkColorToRgba(token, alpha) {
+    const paths = [
+        GTK3_WALLUST_PATH, GTK4_WALLUST_PATH,
+        GTK3_COLORS_PATH,  GTK4_COLORS_PATH,
+    ];
+    const re = new RegExp('@define-color\\s+' + token + '\\s+(#[0-9a-fA-F]{3,8}|rgba?\\([^)]+\\))');
+    for (const p of paths) {
+        try {
+            const [ok, bytes] = GLib.file_get_contents(p);
+            if (!ok) continue;
+            const txt = new TextDecoder().decode(bytes);
+            const m = txt.match(re);
+            if (!m) continue;
+            const raw = m[1].trim();
+            // Parse #rgb / #rrggbb / #rrggbbaa
+            if (raw.startsWith('#')) {
+                let hex = raw.slice(1);
+                if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+                const r = parseInt(hex.slice(0, 2), 16);
+                const g = parseInt(hex.slice(2, 4), 16);
+                const b = parseInt(hex.slice(4, 6), 16);
+                if (!isNaN(r) && !isNaN(g) && !isNaN(b))
+                    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+            }
+            // Already an rgba() — just return with desired alpha (best effort)
+            return raw;
+        } catch (e) { /* skip missing file */ }
+    }
+    // Fallback: let GTK try to resolve it (works if alpha() does work in this context)
+    return 'alpha(@' + token + ', ' + alpha + ')';
+}
+
 function _mapCornersForPosition(edge, storedTL, storedTR, storedBL, storedBR) {
     switch (edge) {
         case 'top':
@@ -242,6 +289,14 @@ function _injectGlyphSizeCSS(display) {
     const borderBL = mapped.bl;
     const borderBR = mapped.br;
     const padPx = DockConfig.innerPadding;
+
+    const islBorderW = DockConfig.islandBorderWidth !== undefined && DockConfig.islandBorderWidth !== null
+        ? DockConfig.islandBorderWidth
+        : (DockConfig.islandBorder !== undefined ? DockConfig.islandBorder : 0);
+    const islBorderAlpha = DockConfig.islandBorderAlpha !== undefined && DockConfig.islandBorderAlpha !== null
+        ? DockConfig.islandBorderAlpha
+        : 0.22;
+    const islBorderColor = DockConfig.islandBorderColorVar || _readIslandBorderColorFromStyle() || 'outline_variant';
 
     // Gradient style mirrors the Bar / Tri rect gradient: inversePrimary → scrim.
     // GTK4 CSS @-variable references work in background-image just like in color.
@@ -338,17 +393,20 @@ function _injectGlyphSizeCSS(display) {
         #box {
             padding: 0px;
         }
-        /* ── Circular badge for start / trash glyphs ──────────────────────
-           min-width = min-height = glyphPx ensures the label is always a
-           perfect square before border-radius: 50% rounds it into a circle.
-           The gradient direction is flipped to match the dock edge so the
-           badge depth-illusion is consistent with the dock surface fill. */
+        /* ── Circular badge for start / trash glyphs ───────────────────────
+           border-color is written as a literal rgba() so GTK4 applies alpha
+           reliably — @define-color is ignored in CssProvider.load_from_data()
+           and alpha() inline in border-color fails silently in GTK4.          */
         #start-icon, #trash-icon {
             font-size: calc(${appPx}px + 2px);
             border-radius: 999px;
             background-image: ${glyphBadgeGradient};
+            background-clip: padding-box;
             padding-left: calc(${appPx}px * 0.35);
             padding-right: calc(${appPx}px * 0.3);
+            border-width: ${islBorderW}px;
+            border-style: solid;
+            border-color: ${_resolveGtkColorToRgba(islBorderColor, islBorderAlpha)};
         }
         .fallback-icon {
             font-size: calc(${glyphPx}px + 4px);
@@ -382,18 +440,20 @@ function _injectGlyphSizeCSS(display) {
         }
     `;
 
-    // Reuse the same provider object — just update its CSS in-place.
-    // This provider lives outside cssProviders so loadCSS() never removes it.
-    // It is registered once with the display at APPLICATION+1 priority
-    // (higher than style.css at APPLICATION) so it always wins.
-    if (!dynamicConfigProvider) {
-        dynamicConfigProvider = new Gtk.CssProvider();
-        Gtk.StyleContext.add_provider_for_display(
-            display, dynamicConfigProvider,
-            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
+    // Recreate or re-register the dynamic provider at USER+10 priority
+    // (higher than user theme colors at 800 and style.css at 600)
+    // so config-driven overrides (border width, alpha, padding, sizes) always win.
+    if (dynamicConfigProvider) {
+        try {
+            Gtk.StyleContext.remove_provider_for_display(display, dynamicConfigProvider);
+        } catch (e) { /* ignore */ }
     }
+    dynamicConfigProvider = new Gtk.CssProvider();
     try {
         dynamicConfigProvider.load_from_data(css, -1);
+        Gtk.StyleContext.add_provider_for_display(
+            display, dynamicConfigProvider,
+            Gtk.STYLE_PROVIDER_PRIORITY_USER + 10);
     } catch (e) {
         log('[dock] Failed to inject config CSS: ' + e.message);
     }

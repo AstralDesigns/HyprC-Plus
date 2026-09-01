@@ -33,11 +33,7 @@ const GLibUnix       = imports.gi.GLibUnix;   // import before Gtk.Application s
 const Gtk4LayerShell = imports.gi.Gtk4LayerShell;
 
 // ── Paths ──────────────────────────────────────────────────────────────────
-
 const HOME       = GLib.get_home_dir();
-// Resolve SCRIPT_DIR to an absolute path so it works regardless of whether
-// the launcher was invoked with a relative or absolute path to the script.
-// GLib.canonicalize_filename resolves '.' / '..' against cwd correctly.
 const _rawDir    = GLib.path_get_dirname(imports.system.programInvocationName);
 const SCRIPT_DIR = GLib.canonicalize_filename(_rawDir, GLib.get_current_dir());
 
@@ -45,6 +41,119 @@ const SCRIPT_DIR = GLib.canonicalize_filename(_rawDir, GLib.get_current_dir());
 imports.searchPath.unshift(SCRIPT_DIR);
 const DockConfig     = imports.config.DockConfig;
 const LauncherConfig = imports.launcherConfig.LauncherConfig;
+
+// Soup 3 — used for native SearXNG JSON API calls in the web search tab.
+imports.gi.versions.Soup = '3.0';
+const Soup = imports.gi.Soup;
+
+// WebKit 6.0 — used for embedded web content preview in the web search tab.
+imports.gi.versions.WebKit = '6.0';
+const WebKit = imports.gi.WebKit;
+
+// libsecret 1 — GNOME Secrets credentials store for secure local storage.
+try {
+    imports.gi.versions.Secret = '1';
+} catch (_) {}
+const Secret = imports.gi.Secret;
+
+// ── GNOME Secrets / Credentials Store ──────────────────────────────────────
+let _secretSchema = null;
+
+function getSecretSchema() {
+    if (!_secretSchema) {
+        try {
+            _secretSchema = new Secret.Schema(
+                'org.hyprcandy.LauncherCredentials',
+                Secret.SchemaFlags.NONE,
+                {
+                    'service': Secret.SchemaAttributeType.STRING,
+                    'account': Secret.SchemaAttributeType.STRING,
+                }
+            );
+        } catch (_) {}
+    }
+    return _secretSchema;
+}
+
+var CredentialsManager = {
+    store(service, account, secret) {
+        try {
+            const schema = getSecretSchema();
+            if (schema && Secret) {
+                Secret.password_store_sync(
+                    schema,
+                    { service: String(service), account: String(account) },
+                    Secret.COLLECTION_DEFAULT,
+                    `HyprCandy: ${service} (${account})`,
+                    String(secret),
+                    null
+                );
+                return true;
+            }
+        } catch (e) {
+            console.warn('[launcher] CredentialsManager.store failed:', e.message);
+        }
+        return false;
+    },
+
+    lookup(service, account) {
+        try {
+            const schema = getSecretSchema();
+            if (schema && Secret) {
+                return Secret.password_lookup_sync(
+                    schema,
+                    { service: String(service), account: String(account) },
+                    null
+                );
+            }
+        } catch (e) {
+            console.warn('[launcher] CredentialsManager.lookup failed:', e.message);
+        }
+        return null;
+    },
+
+    clear(service, account) {
+        try {
+            const schema = getSecretSchema();
+            if (schema && Secret) {
+                return Secret.password_clear_sync(
+                    schema,
+                    { service: String(service), account: String(account) },
+                    null
+                );
+            }
+        } catch (e) {
+            console.warn('[launcher] CredentialsManager.clear failed:', e.message);
+        }
+        return false;
+    }
+};
+
+// ── Persistent Web State across reloads ─────────────────────────────────────
+const LAUNCHER_SAVED_STATE_PATH = GLib.build_filenamev([HOME, '.cache', 'hyprcandy', 'launcher_web_state.json']);
+
+function readLauncherWebState() {
+    try {
+        const [ok, raw] = GLib.file_get_contents(LAUNCHER_SAVED_STATE_PATH);
+        if (ok) return JSON.parse(new TextDecoder().decode(raw));
+    } catch (_) {}
+    return {};
+}
+
+function saveLauncherWebState(state) {
+    try {
+        const stateDir = GLib.path_get_dirname(LAUNCHER_SAVED_STATE_PATH);
+        GLib.mkdir_with_parents(stateDir, 0o755);
+        const file = Gio.File.new_for_path(LAUNCHER_SAVED_STATE_PATH);
+        const json = JSON.stringify(state, null, 2);
+        file.replace_contents(
+            new TextEncoder().encode(json + '\n'),
+            null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null
+        );
+    } catch (e) {
+        console.error('[launcher] saveLauncherWebState error:', e.message);
+    }
+}
 
 // ── Layout constants (read from LauncherConfig) ────────────────────────────
 
@@ -172,6 +281,29 @@ function spawnAppOnGPU(exec, envVars) {
             GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
             null);
     } catch (e) { console.error('[launcher] spawnAppOnGPU:', e.message); }
+}
+
+/** Open a URL in the user's default browser cleanly (stripping LD_PRELOAD) */
+function openInBrowser(url) {
+    if (!url) return;
+    try {
+        let envp = GLib.environ_unsetenv(GLib.get_environ(), 'LD_PRELOAD');
+        GLib.spawn_async(
+            HOME,
+            ['xdg-open', url],
+            envp,
+            GLib.SpawnFlags.SEARCH_PATH | GLib.SpawnFlags.DO_NOT_REAP_CHILD,
+            null
+        );
+        return;
+    } catch (e) {
+        console.warn('[launcher] xdg-open spawn failed, trying Gio.AppInfo:', e.message);
+    }
+    try {
+        Gio.AppInfo.launch_default_for_uri(url, null);
+    } catch (e) {
+        console.error('[launcher] openInBrowser failed:', e.message);
+    }
 }
 
 /** Focus a Hyprland window by address */
@@ -562,7 +694,30 @@ function abbreviateGpuName(name) {
 // These rules use the same matugen GTK colour variables the dock uses.
 // They are loaded at APPLICATION priority so they win over the GTK default
 // theme but still sit below the inline popover provider used for transparency.
-// CSS is built dynamically so border-radius / border-width read from LauncherConfig.
+function _readLauncherBorderColor() {
+    // 1. Try reading from config.js (updated by dock-border.sh)
+    try {
+        const configPath = GLib.build_filenamev([SCRIPT_DIR, 'config.js']);
+        const [ok, raw] = GLib.file_get_contents(configPath);
+        if (ok) {
+            const text = new TextDecoder().decode(raw);
+            const m = text.match(/borderColorVar:\s*['"]([a-zA-Z0-9_]+)['"]/);
+            if (m && m[1]) return m[1];
+        }
+    } catch (_) {}
+    // 2. Try reading from style.css
+    try {
+        const stylePath = GLib.build_filenamev([SCRIPT_DIR, 'style.css']);
+        const [ok, raw] = GLib.file_get_contents(stylePath);
+        if (ok) {
+            const text = new TextDecoder().decode(raw);
+            const m = text.match(/border-color:\s*@([a-zA-Z0-9_]+)/);
+            if (m && m[1]) return m[1];
+        }
+    } catch (_) {}
+    return 'source_color';
+}
+
 function buildLauncherCSS() {
     const r  = LauncherConfig.borderRadius     || 20;
     const bw = LauncherConfig.borderWidth      || 2;
@@ -570,6 +725,7 @@ function buildLauncherCSS() {
     const lr = LauncherConfig.listRadius       ?? LauncherConfig.innerRadius ?? 12;
     const ib = LauncherConfig.innerBorderWidth || 1;
     const ip = LauncherConfig.innerPadding     || 10;
+    const bc = _readLauncherBorderColor();
 
     return `
 
@@ -583,7 +739,7 @@ window.hyprcandy-launcher {
     border-radius: ${r}px;
     border-style: solid;
     border-width: ${bw}px;
-    border-color: @inverse_primary;
+    border-color: @${bc};
     margin: 8px;
 }
 
@@ -1066,6 +1222,316 @@ window.hyprcandy-group-dialog {
     color: @primary;
     font-size: 12px;
 }
+
+/* ── SearXNG web search tab ─────────────────────────────────────────── */
+
+/* Header row: title glyph + Docker toggle button */
+.searx-header-row {
+    background: transparent;
+    padding: 6px ${ip}px 4px ${ip}px;
+}
+.searx-title-glyph {
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', monospace;
+    color: @color3;
+    font-size: 20px;
+    margin-right: 6px;
+}
+.searx-title-label {
+    color: @primary;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+/* Docker power toggle button */
+.searx-docker-btn {
+    background: transparent;
+    background-color: transparent;
+    border: 1px solid alpha(@primary, 0.28);
+    border-radius: 20px;
+    padding: 3px 12px;
+    outline: none;
+    box-shadow: none;
+    min-height: 28px;
+}
+.searx-docker-btn:hover {
+    background-color: alpha(@primary, 0.09);
+    border-color: alpha(@primary, 0.45);
+}
+.searx-docker-btn:active {
+    background-color: alpha(@inverse_primary, 0.45);
+}
+/* Running state: green-ish highlight */
+.searx-docker-btn.docker-on {
+    border-color: alpha(@color3, 0.6);
+    background-color: alpha(@color3, 0.10);
+}
+.searx-docker-btn.docker-on:hover {
+    background-color: alpha(@color3, 0.18);
+}
+/* Stopped state: subtly dimmed */
+.searx-docker-btn.docker-off {
+    border-color: alpha(@primary, 0.20);
+    background-color: transparent;
+    color: alpha(@primary, 0.55);
+}
+.searx-docker-glyph {
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', monospace;
+    font-size: 16px;
+    color: @primary;
+    margin-right: 5px;
+}
+.searx-docker-btn.docker-off .searx-docker-glyph {
+    color: alpha(@primary, 0.50);
+}
+.searx-docker-label {
+    color: @primary;
+    font-size: 12px;
+}
+.searx-docker-btn.docker-off .searx-docker-label {
+    color: alpha(@primary, 0.55);
+}
+
+/* Status / info card (offline, loading, empty) */
+.searx-status-card {
+    background-color: alpha(@inverse_primary, 0.18);
+    border-radius: 14px;
+    border: 1px solid alpha(@primary, 0.12);
+    margin: 20px ${ip}px 10px ${ip}px;
+    padding: 22px 18px;
+}
+.searx-status-glyph {
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', monospace;
+    font-size: 36px;
+    color: alpha(@primary, 0.50);
+    margin-bottom: 8px;
+}
+.searx-status-title {
+    color: @primary;
+    font-size: 13px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+.searx-status-body {
+    color: alpha(@primary, 0.60);
+    font-size: 11px;
+    margin-bottom: 12px;
+}
+.searx-action-btn {
+    background-color: alpha(@primary, 0.15);
+    border: 1px solid alpha(@primary, 0.40);
+    border-radius: 8px;
+    padding: 6px 18px;
+    color: @primary;
+    font-size: 12px;
+    font-weight: bold;
+    outline: none;
+    box-shadow: none;
+    margin-top: 4px;
+}
+.searx-action-btn:hover {
+    background-color: alpha(@primary, 0.28);
+    border-color: @primary;
+}
+.searx-action-btn:active {
+    background-color: alpha(@inverse_primary, 0.55);
+}
+
+.searx-fallback-btn {
+    background: transparent;
+    background-color: transparent;
+    border: 1px solid alpha(@primary, 0.30);
+    border-radius: 8px;
+    padding: 5px 14px;
+    color: @primary;
+    font-size: 12px;
+    outline: none;
+    box-shadow: none;
+    margin-top: 4px;
+}
+.searx-fallback-btn:hover {
+    background-color: alpha(@primary, 0.10);
+}
+
+/* ── New Tab & Header Tabs Buttons ───────────────────────────────────── */
+.searx-header-tabs-btn {
+    background: transparent;
+    background-color: alpha(@primary, 0.15);
+    border: 1px solid alpha(@primary, 0.35);
+    border-radius: 8px;
+    padding: 3px 10px;
+    margin-right: 6px;
+    outline: none;
+    box-shadow: none;
+}
+.searx-header-tabs-btn:hover {
+    background-color: alpha(@primary, 0.25);
+    border-color: alpha(@primary, 0.55);
+}
+.searx-header-tabs-btn:active {
+    background-color: alpha(@inverse_primary, 0.65);
+}
+.searx-header-tabs-glyph {
+    color: @primary;
+    font-size: 13px;
+    margin-right: 5px;
+}
+.searx-header-tabs-label {
+    color: @primary;
+    font-size: 11px;
+    font-weight: bold;
+}
+.searx-newtab-btn {
+    background: transparent;
+    background-color: alpha(@inverse_primary, 0.40);
+    border: 1px solid alpha(@primary, 0.25);
+    border-radius: 8px;
+    padding: 3px 10px;
+    margin-right: 6px;
+    outline: none;
+    box-shadow: none;
+}
+.searx-newtab-btn:hover {
+    background-color: alpha(@primary, 0.15);
+    border-color: alpha(@primary, 0.45);
+}
+.searx-newtab-btn:active {
+    background-color: alpha(@inverse_primary, 0.70);
+}
+.searx-newtab-glyph {
+    color: @primary;
+    font-size: 13px;
+    margin-right: 4px;
+}
+.searx-newtab-label {
+    color: @primary;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+/* ── Interactive Web Toolbar Title + URL + Tabs Trigger ──────────────── */
+.searx-nav-info-btn {
+    background: transparent;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 2px 8px;
+    outline: none;
+    box-shadow: none;
+}
+.searx-nav-info-btn:hover {
+    background-color: alpha(@primary, 0.12);
+    border-color: alpha(@primary, 0.25);
+}
+.searx-nav-info-btn:active {
+    background-color: alpha(@inverse_primary, 0.40);
+}
+.searx-tabs-badge {
+    background-color: alpha(@primary, 0.20);
+    color: @primary;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: bold;
+    padding: 1px 5px;
+    margin-left: 6px;
+}
+.searx-tabs-chevron {
+    color: alpha(@primary, 0.60);
+    font-size: 11px;
+    margin-left: 4px;
+}
+
+/* ── Tabs Popover List ────────────────────────────────────────────────── */
+.searx-tab-row {
+    background: transparent;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 6px 8px;
+    margin: 2px 0;
+}
+.searx-tab-row:hover {
+    background-color: alpha(@primary, 0.12);
+}
+.searx-tab-row.active {
+    background-color: alpha(@primary, 0.20);
+    border-color: alpha(@primary, 0.35);
+}
+.searx-tab-glyph {
+    color: @primary;
+    font-size: 14px;
+    margin-right: 8px;
+}
+.searx-tab-title {
+    color: @primary;
+    font-size: 12px;
+    font-weight: bold;
+}
+.searx-tab-url {
+    color: alpha(@color3, 0.85);
+    font-size: 10px;
+}
+.searx-tab-close-btn {
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 2px 6px;
+    color: alpha(@primary, 0.55);
+    font-size: 11px;
+    outline: none;
+    box-shadow: none;
+}
+.searx-tab-close-btn:hover {
+    background-color: alpha(@error, 0.25);
+    color: @error;
+}
+
+/* Individual result rows */
+.searx-result-item {
+    background: transparent;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    padding: 8px 12px;
+    outline: none;
+    box-shadow: none;
+    margin: 1px 0;
+}
+.searx-result-item:hover {
+    background-color: alpha(@primary, 0.07);
+    border-color: alpha(@primary, 0.14);
+}
+.searx-result-item:active {
+    background-color: alpha(@inverse_primary, 0.45);
+}
+.searx-result-title {
+    color: @primary;
+    font-size: 13px;
+    font-weight: bold;
+}
+.searx-result-url {
+    color: alpha(@color3, 0.80);
+    font-size: 10px;
+    margin-top: 1px;
+}
+.searx-result-snippet {
+    color: alpha(@on_surface, 0.75);
+    font-size: 11px;
+    margin-top: 3px;
+}
+
+/* Thin separator between results */
+listbox.searx-list row {
+    background: transparent;
+    padding: 0;
+}
+listbox.searx-list row:selected {
+    background-color: alpha(@inverse_primary, 0.35);
+    border-radius: 10px;
+}
+listbox.searx-list row:focus {
+    outline: none;
+}
 `;
 }
 
@@ -1150,6 +1616,21 @@ const AppLauncherWindow = GObject.registerClass({
         this._appDirMonitors          = [];     // Gio.FileMonitor[] for XDG application directories
         this._appDirReloadTimer       = 0;      // debounce source ID for app-dir changes
         this._appsDirty               = false;  // true when app directories changed while hidden
+        // ── SearXNG search tab state ────────────────────────────────────
+        const savedState = readLauncherWebState();
+        this._lastTab                 = savedState.lastTab || 'launcher';
+        this._searxDockerRunning      = false;  // last known Docker container state
+        this._searxSearchTimer        = 0;      // debounce GLib source ID for queries
+        this._soupSession             = null;   // lazy-initialised Soup.Session
+        this._searxLastQuery          = savedState.searxLastQuery || '';
+        this._searxWebView            = null;   // active WebKit.WebView
+        this._searxCurrentWebUrl      = savedState.searxCurrentWebUrl || '';
+        this._searxNavTitleText       = savedState.searxNavTitle || '';
+        this._searxWebBoxOpen         = !!savedState.searxWebBoxOpen;
+        this._searxTabs               = [];     // array of { id, url, title, webView, webWrap }
+        this._searxActiveTabId        = savedState.searxActiveTabId || null;
+        this._searxPendingNewTab      = false;  // when true, next search result opens in new tab
+        this._searxSavedTabs          = savedState.searxTabs || [];
 
         this._loadGlobalCSS();
         this._setupLayerShell();
@@ -1202,13 +1683,15 @@ const AppLauncherWindow = GObject.registerClass({
             } catch (_) {}
         }
 
-        // Launcher-specific rules (built dynamically from LauncherConfig)
-        const launcherProv = new Gtk.CssProvider();
-        try {
-            launcherProv.load_from_data(buildLauncherCSS(), -1);
+        // Launcher-specific rules (built dynamically from LauncherConfig & live border color)
+        if (!this._launcherCSSProv) {
+            this._launcherCSSProv = new Gtk.CssProvider();
             Gtk.StyleContext.add_provider_for_display(
-                display, launcherProv, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+                display, this._launcherCSSProv, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
             );
+        }
+        try {
+            this._launcherCSSProv.load_from_data(buildLauncherCSS(), -1);
         } catch (e) { console.error('[launcher] CSS load failed:', e.message); }
     }
 
@@ -1581,20 +2064,26 @@ const AppLauncherWindow = GObject.registerClass({
             } else if (this._activeTab === 'emoji') {
                 this._filterEmoji(q);
             } else if (this._activeTab === 'websearch') {
-                this._performWebSearch(q);
+                this._performWebSearch(q, false);
             }
         });
 
-        // Enter on search → launch first filtered result (launcher tab only)
+        // Enter on search → launch first filtered app (launcher tab) or instant search (websearch tab)
         this._searchEntry.connect('activate', () => {
-            if (this._activeTab !== 'launcher') return;
-            const q = this._searchEntry.get_text().toLowerCase().trim();
-            const filtered = q
-                ? this._allApps.filter(a => a.name.toLowerCase().includes(q))
-                : this._allApps;
-            if (filtered.length > 0) {
-                spawnApp(filtered[0].exec);
-                this.close();
+            const rawQ = this._searchEntry.get_text().trim();
+            if (this._activeTab === 'launcher') {
+                const lowerQ = rawQ.toLowerCase();
+                const filtered = lowerQ
+                    ? this._allApps.filter(a => a.name.toLowerCase().includes(lowerQ))
+                    : this._allApps;
+                if (filtered.length > 0) {
+                    spawnApp(filtered[0].exec);
+                    this.close();
+                }
+            } else if (this._activeTab === 'websearch') {
+                if (rawQ) {
+                    this._performWebSearch(rawQ, true);
+                }
             }
         });
 
@@ -1614,25 +2103,50 @@ const AppLauncherWindow = GObject.registerClass({
         }
 
         this._stack.set_visible_child_name(id);
-        this._searchEntry.set_text('');
 
-        const placeholders = {
-            launcher:  ' Search applications…',
-            clipboard: ' Search clipboard…',
-            emoji:     this._emojiMode === 'nerd' ? ' Search glyph…' : ' Search emoji…',
-            websearch: ' Search the web...',
-        };
-        this._searchEntry.set_placeholder_text(placeholders[id] || ' Search…');
+        // ── websearch tab
+        if (id === 'websearch') {
+            if (this._searxWebBoxOpen && this._searxTabs && this._searxTabs.length > 0 && this._searxActiveTabId) {
+                // Naturally bring back active tab in WebKit view
+                const activeTab = this._searxTabs.find(t => t.id === this._searxActiveTabId) || this._searxTabs[0];
+                if (activeTab) {
+                    this._searxSwitchToTab(activeTab.id);
+                }
+            } else if (this._searxPendingNewTab) {
+                this._searchEntry.set_placeholder_text(' Search the web in new tab…');
+                this._searchEntry.set_text('');
+                this._searxLastQuery = '';
+                this._searxClearList();
+                this._searxShowIdle();
+            } else {
+                this._searchEntry.set_placeholder_text(' Search the web...');
+                this._searchEntry.set_text('');
+                this._searxLastQuery = '';
+                this._searxClearList();
+                this._searxShowIdle();
+            }
 
-        if (id === 'clipboard') {
+            // Probe Docker just to update the Docker button indicator
+            this._searxCheckDockerStatus((running) => {
+                this._searxDockerRunning = running;
+                if (!running && !this._searxWebBoxOpen) {
+                    this._searxShowStatus('󰡨', 'Docker stopped',
+                        'Click Start SearXNG or the Docker button to launch.', false, true);
+                }
+            });
+        } else if (id === 'clipboard') {
+            this._searchEntry.set_placeholder_text(' Search clipboard…');
+            this._searchEntry.set_text('');
             this._loadClipboard('');
         } else if (id === 'emoji') {
+            this._searchEntry.set_placeholder_text(
+                this._emojiMode === 'nerd' ? ' Search glyph…' : ' Search emoji…');
+            this._searchEntry.set_text('');
             this._filterEmoji('');
-        } else if (id === 'websearch') {
-            this._performWebSearch('');
         } else {
-            // Launcher tab: always scroll back to the top so the user sees
-            // the beginning of their app list, not wherever they scrolled last.
+            // Launcher tab: clear search, scroll to top
+            this._searchEntry.set_placeholder_text(' Search applications…');
+            this._searchEntry.set_text('');
             this._refreshFavorites('');
             this._refreshGroups('');
             this._populateApps(this._allApps);
@@ -15130,11 +15644,6 @@ const EMOJI_ALL = [
                     }
                     return true;
                 }
-                if (keyval === Gdk.KEY_BackSpace ||
-                    (keyval >= Gdk.KEY_space && keyval <= Gdk.KEY_asciitilde)) {
-                    this._searchEntry.grab_focus();
-                    return false;
-                }
                 return false;
             }
 
@@ -15414,6 +15923,7 @@ const EMOJI_ALL = [
             if (!this.get_visible()) {
                 _runningAppsCache   = null;
                 _runningAppsCacheUs = 0;
+                this._persistWebState();
             }
         });
 
@@ -15450,48 +15960,1172 @@ const EMOJI_ALL = [
     // rebinding after remove() never leaves a stale reference (fixes
     // the single-last-favorite stuck-tile bug).
 
-    // ── Web Search Tab (WebKitGTK) ───────────────────────────────────────────
+    // ── Web Search Tab — SearXNG native results ──────────────────────────────
+    //
+    // Architecture:
+    //   • Header row: SearXNG title + Docker toggle button (start/stop container)
+    //   • Status card: shown when Docker is stopped, starting, or unreachable
+    //   • Native Gtk.ListBox: one row per SearXNG result — no WebKitGTK
+    //   • Soup 3 async GET to http://127.0.0.1:8080/search?q=…&format=json
+    //   • Fallback: xdg-open to SearXNG HTML when JSON fails
+    //
+    // Setup (first use):
+    //   cd ~/.hyprcandy/GJS/hyprcandydock && docker compose up -d
+    //   Settings are in ./searxng-settings/settings.yml (JSON format enabled)
 
     _buildWebSearchTab(ip) {
         const page = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
         page.set_hexpand(true);
         page.set_vexpand(true);
 
-        // Padded wrapper: 5px margin on all sides, rounded corners via CSS.
-        // overflow:hidden on the wrapper clips the WebView to the radius.
-        const webWrap = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
-        webWrap.add_css_class('webview-wrap');
-        webWrap.set_hexpand(true);
-        webWrap.set_vexpand(true);
-        webWrap.set_margin_top(8);
-        webWrap.set_margin_bottom(8);
-        webWrap.set_margin_start(6);
-        webWrap.set_margin_end(8);
-        page.append(webWrap);
+        // ── Header: title + Docker toggle ────────────────────────────────
+        const headerRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        headerRow.add_css_class('searx-header-row');
+        headerRow.set_valign(Gtk.Align.CENTER);
+        page.append(headerRow);
 
-        try {
-            const WebKit = imports.gi.WebKit;
-            this._webView = new WebKit.WebView();
-            this._webView.set_hexpand(true);
-            this._webView.set_vexpand(true);
-            this._webView.add_css_class('webview-inner');
-            webWrap.append(this._webView);
-        } catch (e) {
-            const error = Gtk.Label.new('WebKitGTK not available.');
-            error.add_css_class('dim-label');
-            error.set_valign(Gtk.Align.CENTER);
-            error.set_halign(Gtk.Align.CENTER);
-            webWrap.append(error);
-        }
+        const titleGlyph = Gtk.Label.new('󱎸');
+        titleGlyph.add_css_class('searx-title-glyph');
+        titleGlyph.set_valign(Gtk.Align.CENTER);
+        headerRow.append(titleGlyph);
+
+        const titleLbl = Gtk.Label.new('SearXNG');
+        titleLbl.add_css_class('searx-title-label');
+        titleLbl.set_halign(Gtk.Align.START);
+        titleLbl.set_hexpand(true);
+        headerRow.append(titleLbl);
+
+        // ── Header Tabs button (visible in plain search mode when open tabs exist) ─
+        const headerTabsBtn = Gtk.Button.new();
+        headerTabsBtn.add_css_class('searx-header-tabs-btn');
+        headerTabsBtn.set_valign(Gtk.Align.CENTER);
+        headerTabsBtn.set_can_focus(false);
+        headerTabsBtn.set_visible(false);
+        const headerTabsBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        headerTabsBox.set_valign(Gtk.Align.CENTER);
+        const headerTabsGlyph = Gtk.Label.new('󰖟');
+        headerTabsGlyph.add_css_class('searx-header-tabs-glyph');
+        headerTabsBox.append(headerTabsGlyph);
+        const headerTabsLbl = Gtk.Label.new('Tabs (0)');
+        headerTabsLbl.add_css_class('searx-header-tabs-label');
+        this._searxHeaderTabsLbl = headerTabsLbl;
+        headerTabsBox.append(headerTabsLbl);
+        const headerTabsChev = Gtk.Label.new('󰅀');
+        headerTabsChev.add_css_class('searx-tabs-chevron');
+        headerTabsBox.append(headerTabsChev);
+        headerTabsBtn.set_child(headerTabsBox);
+        this._searxHeaderTabsBtn = headerTabsBtn;
+        headerTabsBtn.connect('clicked', () => this._searxShowTabsPopover(headerTabsBtn));
+        headerRow.append(headerTabsBtn);
+
+        // ── "+ New Tab" button ───────────────────────────────────────────
+        const newTabBtn = Gtk.Button.new();
+        newTabBtn.add_css_class('searx-newtab-btn');
+        newTabBtn.set_valign(Gtk.Align.CENTER);
+        newTabBtn.set_can_focus(false);
+        const newTabBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        newTabBox.set_valign(Gtk.Align.CENTER);
+        const newTabGlyph = Gtk.Label.new('󰐕');
+        newTabGlyph.add_css_class('searx-newtab-glyph');
+        newTabBox.append(newTabGlyph);
+        const newTabLbl = Gtk.Label.new('New Tab');
+        newTabLbl.add_css_class('searx-newtab-label');
+        newTabBox.append(newTabLbl);
+        newTabBtn.set_child(newTabBox);
+        this._searxNewTabBtn = newTabBtn;
+        newTabBtn.connect('clicked', () => this._searxCreateNewTab());
+        headerRow.append(newTabBtn);
+
+        // Docker toggle button
+        const dockerBtn = Gtk.Button.new();
+        dockerBtn.add_css_class('searx-docker-btn');
+        dockerBtn.set_can_focus(false);
+        dockerBtn.set_valign(Gtk.Align.CENTER);
+        const dockerBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
+        dockerBtnBox.set_valign(Gtk.Align.CENTER);
+        const dockerGlyph = Gtk.Label.new('󰡨');
+        dockerGlyph.add_css_class('searx-docker-glyph');
+        this._searxDockerGlyph = dockerGlyph;
+        dockerBtnBox.append(dockerGlyph);
+        const dockerLbl = Gtk.Label.new('Docker');
+        dockerLbl.add_css_class('searx-docker-label');
+        this._searxDockerLbl = dockerLbl;
+        dockerBtnBox.append(dockerLbl);
+        dockerBtn.set_child(dockerBtnBox);
+        this._searxDockerBtn = dockerBtn;
+        dockerBtn.connect('clicked', () => this._searxToggleDocker());
+        headerRow.append(dockerBtn);
+
+        // ── Status card (offline / loading / empty) ───────────────────────
+        const statusCard = Gtk.Box.new(Gtk.Orientation.VERTICAL, 4);
+        statusCard.add_css_class('searx-status-card');
+        statusCard.set_halign(Gtk.Align.FILL);
+        statusCard.set_valign(Gtk.Align.START);
+        statusCard.set_visible(true);
+        this._searxStatusCard = statusCard;
+        page.append(statusCard);
+
+        const statusGlyph = Gtk.Label.new('󰡨');
+        statusGlyph.add_css_class('searx-status-glyph');
+        statusGlyph.set_halign(Gtk.Align.CENTER);
+        this._searxStatusGlyph = statusGlyph;
+        statusCard.append(statusGlyph);
+
+        const statusTitle = Gtk.Label.new('Docker stopped');
+        statusTitle.add_css_class('searx-status-title');
+        statusTitle.set_halign(Gtk.Align.CENTER);
+        statusTitle.set_wrap(true);
+        statusTitle.set_max_width_chars(32);
+        this._searxStatusTitle = statusTitle;
+        statusCard.append(statusTitle);
+
+        const statusBody = Gtk.Label.new('Click Start SearXNG or the Docker button above to launch.');
+        statusBody.add_css_class('searx-status-body');
+        statusBody.set_halign(Gtk.Align.CENTER);
+        statusBody.set_wrap(true);
+        statusBody.set_max_width_chars(40);
+        this._searxStatusBody = statusBody;
+        statusCard.append(statusBody);
+
+        // Action button (Start SearXNG / Retry)
+        const actionBtn = Gtk.Button.new_with_label('󰡨  Start SearXNG');
+        actionBtn.add_css_class('searx-action-btn');
+        actionBtn.set_halign(Gtk.Align.CENTER);
+        actionBtn.set_visible(true);
+        this._searxActionBtn = actionBtn;
+        actionBtn.connect('clicked', () => this._searxToggleDocker());
+        statusCard.append(actionBtn);
+
+        // Fallback: open in browser
+        const fallbackBtn = Gtk.Button.new_with_label('󰖟  Open in Browser');
+        fallbackBtn.add_css_class('searx-fallback-btn');
+        fallbackBtn.set_halign(Gtk.Align.CENTER);
+        fallbackBtn.set_visible(false);
+        this._searxFallbackBtn = fallbackBtn;
+        fallbackBtn.connect('clicked', () => {
+            const q = this._searchEntry.get_text().trim();
+            const url = q
+                ? `http://127.0.0.1:8080/search?q=${encodeURIComponent(q)}`
+                : 'http://127.0.0.1:8080';
+            openInBrowser(url);
+            this.close();
+        });
+        statusCard.append(fallbackBtn);
+
+        // ── Result list (native Gtk.ListBox) ──────────────────────────────
+        const resultScroll = new Gtk.ScrolledWindow();
+        resultScroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
+        resultScroll.set_vexpand(true);
+        resultScroll.add_css_class('launcher-scroll');
+        resultScroll.set_margin_start(6);
+        resultScroll.set_margin_end(8);
+        resultScroll.set_margin_bottom(8);
+        resultScroll.set_visible(false);
+        this._searxResultScroll = resultScroll;
+        page.append(resultScroll);
+
+        const listBox = new Gtk.ListBox();
+        listBox.add_css_class('searx-list');
+        listBox.set_selection_mode(Gtk.SelectionMode.NONE);
+        listBox.set_vexpand(false);
+        listBox.set_valign(Gtk.Align.START);
+        this._searxList = listBox;
+        resultScroll.set_child(listBox);
+
+        // ── Embedded WebKit View (multi-tab content stack) ────────────────
+        const webBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        webBox.set_vexpand(true);
+        webBox.set_hexpand(true);
+        webBox.set_visible(false);
+        this._searxWebBox = webBox;
+        page.append(webBox);
+
+        // Mini web toolbar
+        const webBar = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        webBar.add_css_class('searx-webview-bar');
+        webBar.set_valign(Gtk.Align.CENTER);
+        webBox.append(webBar);
+
+        const backBtn = Gtk.Button.new_with_label('󰁍  Results');
+        backBtn.add_css_class('searx-nav-btn');
+        backBtn.set_valign(Gtk.Align.CENTER);
+        backBtn.connect('clicked', () => this._searxCloseWebView());
+        webBar.append(backBtn);
+
+        // Interactive Title + URL section (triggers tabs popover)
+        const infoBtn = Gtk.Button.new();
+        infoBtn.add_css_class('searx-nav-info-btn');
+        infoBtn.set_hexpand(true);
+        infoBtn.set_valign(Gtk.Align.CENTER);
+        this._searxWebInfoBtn = infoBtn;
+
+        const infoBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        infoBtnBox.set_valign(Gtk.Align.CENTER);
+
+        const webInfoCol = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        webInfoCol.set_hexpand(true);
+        webInfoCol.set_valign(Gtk.Align.CENTER);
+        infoBtnBox.append(webInfoCol);
+
+        const navTitle = Gtk.Label.new('Web Page');
+        navTitle.add_css_class('searx-nav-title');
+        navTitle.set_halign(Gtk.Align.START);
+        navTitle.set_ellipsize(3);
+        navTitle.set_max_width_chars(42);
+        this._searxNavTitle = navTitle;
+        webInfoCol.append(navTitle);
+
+        const navUrl = Gtk.Label.new('');
+        navUrl.add_css_class('searx-nav-url');
+        navUrl.set_halign(Gtk.Align.START);
+        navUrl.set_ellipsize(3);
+        navUrl.set_max_width_chars(50);
+        this._searxNavUrl = navUrl;
+        webInfoCol.append(navUrl);
+
+        const tabsBadge = Gtk.Label.new('');
+        tabsBadge.add_css_class('searx-tabs-badge');
+        tabsBadge.set_valign(Gtk.Align.CENTER);
+        tabsBadge.set_visible(false);
+        this._searxTabsBadge = tabsBadge;
+        infoBtnBox.append(tabsBadge);
+
+        const chevron = Gtk.Label.new('󰅀');
+        chevron.add_css_class('searx-tabs-chevron');
+        chevron.set_valign(Gtk.Align.CENTER);
+        infoBtnBox.append(chevron);
+
+        infoBtn.set_child(infoBtnBox);
+        infoBtn.connect('clicked', () => this._searxShowTabsPopover(infoBtn));
+        webBar.append(infoBtn);
+
+        const reloadBtn = Gtk.Button.new_with_label('󰑐');
+        reloadBtn.add_css_class('searx-nav-btn');
+        reloadBtn.set_tooltip_text('Reload');
+        reloadBtn.connect('clicked', () => {
+            if (this._searxWebView) this._searxWebView.reload();
+        });
+        webBar.append(reloadBtn);
+
+        const openExtBtn = Gtk.Button.new_with_label('󰖟  Browser');
+        openExtBtn.add_css_class('searx-nav-btn');
+        openExtBtn.set_tooltip_text('Open in external browser');
+        openExtBtn.connect('clicked', () => {
+            const u = this._searxCurrentWebUrl;
+            if (u) {
+                openInBrowser(u);
+            }
+        });
+        webBar.append(openExtBtn);
+
+        // Multi-tab view container (Gtk.Stack)
+        const webStack = new Gtk.Stack();
+        webStack.add_css_class('searx-webview-wrap');
+        webStack.set_vexpand(true);
+        webStack.set_hexpand(true);
+        webStack.set_transition_type(Gtk.StackTransitionType.CROSSFADE);
+        this._searxWebStack = webStack;
+        webBox.append(webStack);
 
         this._stack.add_named(page, 'websearch');
+
+        // Restore previous webview session if saved
+        if (this._searxWebBoxOpen && this._searxSavedTabs && this._searxSavedTabs.length > 0) {
+            for (const st of this._searxSavedTabs) {
+                if (st.url) this._createTabWebView(st.url, st.title);
+            }
+            const activeId = this._searxActiveTabId || (this._searxTabs[0] && this._searxTabs[0].id);
+            if (activeId) {
+                this._searxSwitchToTab(activeId);
+            }
+        } else if (this._searxWebBoxOpen && this._searxCurrentWebUrl) {
+            this._searxOpenUrl(this._searxCurrentWebUrl, this._searxNavTitleText);
+        }
+
+        // Probe Docker state immediately so the button shows correct status
+        this._searxCheckDockerStatus();
     }
 
-    _performWebSearch(query) {
-        if (!query || query.trim().length === 0) return;
-        const url = 'https://duckduckgo.com/?q=' + encodeURIComponent(query);
-        if (this._webView) {
-            this._webView.load_uri(url);
+    // ── SearXNG: persist web tab state ────────────────────────────────────
+    _persistWebState() {
+        saveLauncherWebState({
+            lastTab: this._lastTab || this._activeTab || 'launcher',
+            searxLastQuery: this._searxLastQuery || '',
+            searxCurrentWebUrl: this._searxCurrentWebUrl || '',
+            searxNavTitle: (this._searxNavTitle && this._searxNavTitle.get_text()) || this._searxNavTitleText || '',
+            searxWebBoxOpen: !!(this._searxWebBox && this._searxWebBox.get_visible()),
+            searxTabs: (this._searxTabs || []).filter(t => t.url).map(t => ({
+                id: t.id,
+                url: t.url,
+                title: t.title || t.url
+            })),
+            searxActiveTabId: this._searxActiveTabId || null
+        });
+    }
+
+    // ── WebKit: Shared Network Session ───────────────────────────────────
+    _getWebKitSession() {
+        if (!this._searxNetworkSession) {
+            const webkitDataDir  = GLib.build_filenamev([HOME, '.local', 'share', 'hyprcandy', 'webkit']);
+            const webkitCacheDir = GLib.build_filenamev([HOME, '.cache', 'hyprcandy', 'webkit']);
+            GLib.mkdir_with_parents(webkitDataDir, 0o755);
+            GLib.mkdir_with_parents(webkitCacheDir, 0o755);
+
+            const session = new WebKit.NetworkSession({
+                data_directory: webkitDataDir,
+                cache_directory: webkitCacheDir,
+            });
+            const cookieMgr = session.get_cookie_manager();
+            const cookieFile = GLib.build_filenamev([webkitDataDir, 'cookies.sqlite']);
+            cookieMgr.set_persistent_storage(cookieFile, WebKit.CookiePersistentStorage.SQLITE);
+            cookieMgr.set_accept_policy(WebKit.CookieAcceptPolicy.ALWAYS);
+            this._searxNetworkSession = session;
+            this._searxWebkitCacheDir = webkitCacheDir;
+        }
+        return this._searxNetworkSession;
+    }
+
+    // ── WebKit: Native Ad & Tracker Blocker setup ────────────────────────
+    _setupAdBlocker(ucm, cacheDir) {
+        try {
+            // 1. Compile & apply Safari-compatible content blocking rules
+            const storePath = GLib.build_filenamev([cacheDir, 'filters']);
+            GLib.mkdir_with_parents(storePath, 0o755);
+            const filterStore = new WebKit.UserContentFilterStore({ path: storePath });
+
+            const domains = [
+                "*doubleclick.net", "*googlesyndication.com", "*googleadservices.com",
+                "*adnxs.com", "*taboola.com", "*outbrain.com", "*scorecardresearch.com",
+                "*criteo.com", "*advertising.com", "*popads.net", "*adroll.com",
+                "*pubmatic.com", "*rubiconproject.com", "*amazon-adsystem.com",
+                "*moatads.com", "*buysellads.com", "*adservice.google.com"
+            ];
+
+            const rules = [
+                {
+                    "trigger": { "url-filter": ".*", "if-domain": domains },
+                    "action": { "type": "block" }
+                },
+                {
+                    "trigger": {
+                        "url-filter": ".*",
+                        "resource-type": ["image", "script", "raw"],
+                        "load-type": ["third-party"],
+                        "if-domain": ["*ads*.*", "*telemetry*.*", "*analytics*.*"]
+                    },
+                    "action": { "type": "block" }
+                },
+                {
+                    "trigger": { "url-filter": ".*" },
+                    "action": {
+                        "type": "css-display-none",
+                        "selector": ".adsbygoogle, .ad-container, [id^=\"google_ads_iframe\"], ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-banner-promo-renderer, ytd-statement-banner-renderer, ytd-action-companion-ad-renderer, .ytp-ad-overlay-container, .ytp-ad-message-container, .ytp-ad-preview-container, .ytp-ad-overlay-slot"
+                    }
+                }
+            ];
+
+            const bytes = new GLib.Bytes(new TextEncoder().encode(JSON.stringify(rules)));
+            filterStore.save("adblock", bytes, null, (s, res) => {
+                try {
+                    const filter = s.save_finish(res);
+                    ucm.add_filter(filter);
+                } catch (e) {
+                    console.warn('[launcher] Adblock filter compile:', e.message);
+                }
+            });
+
+            // 2. Global cosmetic style sheet for ad hiding
+            const css = `
+                .adsbygoogle, .ad-container, .ad-banner, .advertisement, [id^="google_ads_iframe"],
+                .taboola-placeholder, .outbrain_widget, .criteo-ad, .ad-slot, .sponsored-post,
+                .ytp-ad-overlay-container, .ytp-ad-message-container, .ytp-ad-preview-container,
+                ytd-ad-slot-renderer, ytd-in-feed-ad-layout-renderer, ytd-banner-promo-renderer,
+                ytd-statement-banner-renderer, ytd-action-companion-ad-renderer, #player-ads {
+                    display: none !important;
+                    visibility: hidden !important;
+                    height: 0 !important;
+                    max-height: 0 !important;
+                    opacity: 0 !important;
+                    pointer-events: none !important;
+                }
+            `;
+            const style = new WebKit.UserStyleSheet(
+                css,
+                WebKit.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit.UserStyleLevel.USER,
+                null, null
+            );
+            ucm.add_style_sheet(style);
+
+            // 3. YouTube Ad Skipper & Element Cleaner UserScript
+            const ytScript = `
+                (function() {
+                    'use strict';
+                    function cleanYouTube() {
+                        if (!window.location.hostname.includes('youtube.com')) return;
+
+                        // Auto-skip and fast-forward video ads
+                        const video = document.querySelector('video.html5-main-video') || document.querySelector('video');
+                        const adShowing = document.querySelector('.ad-showing, .ad-interrupting, .ytp-ad-player-overlay');
+                        if (adShowing && video && !isNaN(video.duration)) {
+                            video.muted = true;
+                            video.playbackRate = 16.0;
+                            video.currentTime = video.duration || 9999;
+                        }
+
+                        // Auto-click skip buttons
+                        const skipSelectors = [
+                            '.ytp-ad-skip-button',
+                            '.ytp-ad-skip-button-modern',
+                            '.ytp-skip-ad-button',
+                            '.ytp-ad-skip-button-slot',
+                            'button.ytp-ad-skip-button-modern',
+                            '.ytp-ad-overlay-close-button'
+                        ];
+                        for (const sel of skipSelectors) {
+                            const btn = document.querySelector(sel);
+                            if (btn && typeof btn.click === 'function') {
+                                btn.click();
+                            }
+                        }
+
+                        // Remove overlay elements
+                        const adEls = document.querySelectorAll(
+                            '.ytp-ad-overlay-container, .ytp-ad-message-container, ' +
+                            'ytd-ad-slot-renderer, ytd-banner-promo-renderer, ' +
+                            'ytd-in-feed-ad-layout-renderer, ytd-statement-banner-renderer, ' +
+                            '#player-ads, ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-ads"]'
+                        );
+                        for (const el of adEls) {
+                            el.remove();
+                        }
+                    }
+                    setInterval(cleanYouTube, 250);
+                    document.addEventListener('DOMContentLoaded', cleanYouTube);
+                })();
+            `;
+            const script = new WebKit.UserScript(
+                ytScript,
+                WebKit.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit.UserScriptInjectionTime.START,
+                null, null
+            );
+            ucm.add_script(script);
+        } catch (e) {
+            console.warn('[launcher] _setupAdBlocker error:', e.message);
+        }
+    }
+
+    // ── WebKit: Create a new Tab & WebView ───────────────────────────────
+    _createTabWebView(url, title) {
+        if (!this._searxTabs) this._searxTabs = [];
+        const session = this._getWebKitSession();
+        const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
+
+        const tabWrap = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        tabWrap.set_hexpand(true);
+        tabWrap.set_vexpand(true);
+
+        const webView = new WebKit.WebView({ network_session: session });
+        webView.set_hexpand(true);
+        webView.set_vexpand(true);
+        webView.set_visible(true);
+        tabWrap.append(webView);
+
+        const settings = webView.get_settings();
+        if (settings) {
+            settings.set_enable_page_cache(true);
+            settings.set_enable_back_forward_navigation_gestures(true);
+            settings.set_enable_javascript(true);
+            try {
+                settings.set_hardware_acceleration_policy(WebKit.HardwareAccelerationPolicy.ON_DEMAND);
+            } catch (_) {}
+        }
+
+        const ucm = webView.get_user_content_manager();
+        if (ucm && this._searxWebkitCacheDir) {
+            this._setupAdBlocker(ucm, this._searxWebkitCacheDir);
+        }
+
+        const tab = {
+            id: tabId,
+            url: url || '',
+            title: title || url || 'New Tab',
+            webView: webView,
+            webWrap: tabWrap
+        };
+
+        webView.connect('notify::title', () => {
+            const t = webView.get_title();
+            if (t) {
+                tab.title = t;
+                if (this._searxActiveTabId === tabId && this._searxNavTitle) {
+                    this._searxNavTitle.set_text(t);
+                }
+                this._persistWebState();
+            }
+        });
+
+        webView.connect('notify::uri', () => {
+            const u = webView.get_uri();
+            if (u) {
+                tab.url = u;
+                if (this._searxActiveTabId === tabId) {
+                    this._searxCurrentWebUrl = u;
+                    if (this._searxNavUrl) this._searxNavUrl.set_text(u);
+                }
+                this._persistWebState();
+            }
+        });
+
+        webView.connect('load-failed', (wv, loadEvent, failingUri, error) => {
+            console.warn('[launcher] WebKit load-failed:', failingUri, error.message);
+        });
+
+        this._searxWebStack.add_named(tabWrap, tabId);
+        this._searxTabs.push(tab);
+
+        if (url) {
+            let targetUrl = url;
+            if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('file://')) {
+                targetUrl = 'https://' + targetUrl;
+            }
+            webView.load_uri(targetUrl);
+        }
+
+        return tab;
+    }
+
+    // ── SearXNG: create a new search tab ─────────────────────────────────
+    _searxCreateNewTab() {
+        this._searxPendingNewTab = true;
+        this._searxWebBoxOpen = false;
+        if (this._searxWebBox)       this._searxWebBox.set_visible(false);
+        if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+        this._searchEntry.set_placeholder_text(' Search the web in new tab…');
+        this._searchEntry.set_text('');
+        this._searxLastQuery = '';
+        this._searxClearList();
+        this._searxShowIdle();
+        this._searchEntry.grab_focus();
+        this._searxUpdateTabsBadge();
+    }
+
+    // ── SearXNG: switch to a specific tab ────────────────────────────────
+    _searxSwitchToTab(tabId) {
+        if (!this._searxTabs) return;
+        const tab = this._searxTabs.find(t => t.id === tabId);
+        if (!tab) return;
+
+        this._searxActiveTabId   = tab.id;
+        this._searxWebView       = tab.webView;
+        this._searxCurrentWebUrl = tab.url;
+        this._searxWebBoxOpen    = true;
+        this._searxPendingNewTab = false;
+
+        if (this._searxNavTitle) this._searxNavTitle.set_text(tab.title || tab.url);
+        if (this._searxNavUrl)   this._searxNavUrl.set_text(tab.url);
+
+        if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+        if (this._searxStatusCard)   this._searxStatusCard.set_visible(false);
+        if (this._searxWebBox)       this._searxWebBox.set_visible(true);
+
+        if (this._searxWebStack) {
+            this._searxWebStack.set_visible_child_name(tab.id);
+        }
+        this._searxUpdateTabsBadge();
+        this._persistWebState();
+    }
+
+    // ── SearXNG: close a specific tab ────────────────────────────────────
+    _searxCloseTab(tabId) {
+        if (!this._searxTabs) return;
+        const idx = this._searxTabs.findIndex(t => t.id === tabId);
+        if (idx === -1) return;
+
+        const [removed] = this._searxTabs.splice(idx, 1);
+        if (removed && removed.webWrap) {
+            this._searxWebStack.remove(removed.webWrap);
+        }
+
+        if (this._searxTabs.length === 0) {
+            this._searxActiveTabId = null;
+            this._searxWebView = null;
+            this._searxCloseWebView();
+        } else {
+            if (this._searxActiveTabId === tabId) {
+                const nextTab = this._searxTabs[Math.min(idx, this._searxTabs.length - 1)];
+                this._searxSwitchToTab(nextTab.id);
+            }
+        }
+        this._searxUpdateTabsBadge();
+        this._persistWebState();
+    }
+
+    // ── SearXNG: update badge text/visibility ─────────────────────────────
+    _searxUpdateTabsBadge() {
+        const count = (this._searxTabs && this._searxTabs.length) || 0;
+        const inWebKitView = !!(this._searxWebBox && this._searxWebBox.get_visible());
+
+        // Badge pill on interactive title+url button inside WebKit toolbar
+        if (this._searxTabsBadge) {
+            if (count > 1) {
+                this._searxTabsBadge.set_text(`${count} tabs`);
+                this._searxTabsBadge.set_visible(true);
+            } else {
+                this._searxTabsBadge.set_visible(false);
+            }
+        }
+
+        // Header "Tabs (N)" button: only visible in search mode when tabs exist
+        if (this._searxHeaderTabsBtn && this._searxHeaderTabsLbl) {
+            if (!inWebKitView && count > 0) {
+                this._searxHeaderTabsLbl.set_text(`Tabs (${count})`);
+                this._searxHeaderTabsBtn.set_visible(true);
+            } else {
+                this._searxHeaderTabsBtn.set_visible(false);
+            }
+        }
+    }
+
+    // ── SearXNG: show interactive tabs popover ────────────────────────────
+    _searxShowTabsPopover(parentBtn) {
+        if (!this._searxTabs || this._searxTabs.length === 0) return;
+
+        const pop = new Gtk.Popover();
+        pop.set_parent(parentBtn);
+        pop.set_has_arrow(true);
+        pop.set_position(Gtk.PositionType.BOTTOM);
+        pop.add_css_class('launcher-popover');
+        pop.get_style_context().add_provider(
+            this._getPopoverCSSProvider(),
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        );
+
+        const contentBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 4);
+        contentBox.set_margin_top(8);
+        contentBox.set_margin_bottom(8);
+        contentBox.set_margin_start(8);
+        contentBox.set_margin_end(8);
+
+        // Header row: "Open Tabs (N)"
+        const header = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 8);
+        header.set_valign(Gtk.Align.CENTER);
+        header.set_margin_bottom(4);
+
+        const headerLbl = Gtk.Label.new(`Open Tabs (${this._searxTabs.length})`);
+        headerLbl.add_css_class('pop-section-header');
+        headerLbl.set_halign(Gtk.Align.START);
+        headerLbl.set_hexpand(true);
+        header.append(headerLbl);
+        contentBox.append(header);
+
+        const sep = new Gtk.Separator({ orientation: Gtk.Orientation.HORIZONTAL });
+        contentBox.append(sep);
+
+        // Scrollable list of open tabs
+        const scroll = new Gtk.ScrolledWindow();
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
+        scroll.set_max_content_height(240);
+        scroll.set_propagate_natural_height(true);
+        scroll.add_css_class('launcher-scroll');
+
+        const list = new Gtk.ListBox();
+        list.set_selection_mode(Gtk.SelectionMode.NONE);
+
+        for (const tab of this._searxTabs) {
+            const row = new Gtk.ListBoxRow();
+            const rowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+            rowBox.add_css_class('searx-tab-row');
+            if (tab.id === this._searxActiveTabId) {
+                rowBox.add_css_class('active');
+            }
+
+            // Tab icon (custom glyph for popular sites)
+            let glyphChar = '󰖟';
+            if (tab.url.includes('youtube.com') || tab.url.includes('youtu.be')) glyphChar = '';
+            else if (tab.url.includes('github.com')) glyphChar = '󰊤';
+            else if (tab.url.includes('reddit.com')) glyphChar = '󰑍';
+            else if (tab.url.includes('wikipedia.org')) glyphChar = '󰖬';
+
+            const glyph = Gtk.Label.new(glyphChar);
+            glyph.add_css_class('searx-tab-glyph');
+            glyph.set_valign(Gtk.Align.CENTER);
+            rowBox.append(glyph);
+
+            const textCol = Gtk.Box.new(Gtk.Orientation.VERTICAL, 1);
+            textCol.set_hexpand(true);
+            textCol.set_valign(Gtk.Align.CENTER);
+
+            const titleLbl = Gtk.Label.new(tab.title || tab.url);
+            titleLbl.add_css_class('searx-tab-title');
+            titleLbl.set_halign(Gtk.Align.START);
+            titleLbl.set_ellipsize(3);
+            titleLbl.set_max_width_chars(32);
+            textCol.append(titleLbl);
+
+            const urlLbl = Gtk.Label.new(tab.url || '');
+            urlLbl.add_css_class('searx-tab-url');
+            urlLbl.set_halign(Gtk.Align.START);
+            urlLbl.set_ellipsize(3);
+            urlLbl.set_max_width_chars(36);
+            textCol.append(urlLbl);
+            rowBox.append(textCol);
+
+            // Tab Click target
+            const clickBtn = Gtk.Button.new();
+            clickBtn.set_child(rowBox);
+            clickBtn.add_css_class('pop-item');
+            clickBtn.set_hexpand(true);
+            clickBtn.connect('clicked', () => {
+                pop.popdown();
+                this._searxSwitchToTab(tab.id);
+            });
+
+            const fullRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 2);
+            fullRowBox.append(clickBtn);
+
+            // Tab Close button
+            const closeBtn = Gtk.Button.new_with_label('󰅖');
+            closeBtn.add_css_class('searx-tab-close-btn');
+            closeBtn.set_valign(Gtk.Align.CENTER);
+            closeBtn.set_tooltip_text('Close tab');
+            closeBtn.connect('clicked', () => {
+                this._searxCloseTab(tab.id);
+                pop.popdown();
+                if (this._searxTabs && this._searxTabs.length > 0 && this._searxWebBoxOpen) {
+                    this._searxShowTabsPopover(parentBtn);
+                }
+            });
+            fullRowBox.append(closeBtn);
+
+            row.set_child(fullRowBox);
+            list.append(row);
+        }
+
+        scroll.set_child(list);
+        contentBox.append(scroll);
+        pop.set_child(contentBox);
+        pop.popup();
+    }
+
+    // ── SearXNG: open URL in embedded WebKit view ─────────────────────────
+    _searxOpenUrl(url, title) {
+        if (!this._searxTabs) this._searxTabs = [];
+        this._searxCurrentWebUrl = url;
+        this._searxWebBoxOpen    = true;
+
+        let tab;
+        if (this._searxPendingNewTab || this._searxTabs.length === 0) {
+            tab = this._createTabWebView(url, title);
+            this._searxPendingNewTab = false;
+        } else {
+            tab = this._searxTabs.find(t => t.id === this._searxActiveTabId) || this._searxTabs[0];
+            if (!tab) {
+                tab = this._createTabWebView(url, title);
+            } else {
+                tab.title = title || url;
+                tab.url   = url;
+                let targetUrl = url;
+                if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('file://')) {
+                    targetUrl = 'https://' + targetUrl;
+                }
+                if (tab.webView.get_uri() !== targetUrl) {
+                    tab.webView.load_uri(targetUrl);
+                }
+            }
+        }
+
+        this._searxActiveTabId = tab.id;
+        this._searxWebView     = tab.webView;
+
+        if (this._searxNavTitle) this._searxNavTitle.set_text(tab.title || url);
+        if (this._searxNavUrl)   this._searxNavUrl.set_text(url);
+
+        // Hide search results and status card
+        if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+        if (this._searxStatusCard)   this._searxStatusCard.set_visible(false);
+
+        // Show webview container and set stack active child
+        if (this._searxWebBox)   this._searxWebBox.set_visible(true);
+        if (this._searxWebStack) {
+            this._searxWebStack.set_visible(true);
+            this._searxWebStack.set_visible_child_name(tab.id);
+        }
+
+        this._searxUpdateTabsBadge();
+        this._persistWebState();
+    }
+
+    // ── SearXNG: return from WebKit view back to results list ────────────
+    _searxCloseWebView() {
+        this._searxWebBoxOpen = false;
+        if (this._searxWebBox)       this._searxWebBox.set_visible(false);
+        if (this._searxResultScroll) this._searxResultScroll.set_visible(true);
+        this._persistWebState();
+    }
+
+    // ── SearXNG: check if Docker container is running ─────────────────────
+    _searxCheckDockerStatus(onDone) {
+        try {
+            const proc = new Gio.Subprocess({
+                argv: [SCRIPT_DIR + '/searxng-control.sh', 'status'],
+                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE,
+            });
+            proc.init(null);
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                try {
+                    const [, stdout] = p.communicate_utf8_finish(res);
+                    const running = !!(stdout && stdout.trim() === 'running');
+                    this._searxDockerRunning = running;
+                    this._searxUpdateDockerBtn(running);
+                    if (onDone) onDone(running);
+                } catch (_) {
+                    this._searxDockerRunning = false;
+                    this._searxUpdateDockerBtn(false);
+                    if (onDone) onDone(false);
+                }
+            });
+        } catch (_) {
+            this._searxDockerRunning = false;
+            this._searxUpdateDockerBtn(false);
+            if (onDone) onDone(false);
+        }
+    }
+
+    // ── SearXNG: update Docker toggle button appearance ───────────────────
+    _searxUpdateDockerBtn(running) {
+        if (!this._searxDockerBtn) return;
+        if (running) {
+            this._searxDockerBtn.remove_css_class('docker-off');
+            this._searxDockerBtn.add_css_class('docker-on');
+            if (this._searxDockerGlyph) this._searxDockerGlyph.set_text('󰡨');
+            if (this._searxDockerLbl)   this._searxDockerLbl.set_text('Docker 󰓛');
+        } else {
+            this._searxDockerBtn.remove_css_class('docker-on');
+            this._searxDockerBtn.add_css_class('docker-off');
+            if (this._searxDockerGlyph) this._searxDockerGlyph.set_text('󰡨');
+            if (this._searxDockerLbl)   this._searxDockerLbl.set_text('Docker ▶');
+        }
+    }
+
+    // ── SearXNG: toggle Docker container on/off ───────────────────────────
+    _searxToggleDocker() {
+        if (this._searxDockerRunning) {
+            this._searxShowStatus('󰡨', 'Stopping SearXNG…', 'Stopping container...', false, false);
+            this._searxUpdateDockerBtn(false);
+
+            try {
+                const proc = new Gio.Subprocess({
+                    argv: [SCRIPT_DIR + '/searxng-control.sh', 'stop'],
+                    flags: Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE,
+                });
+                proc.init(null);
+                proc.wait_async(null, () => {
+                    this._searxDockerRunning = false;
+                    this._searxUpdateDockerBtn(false);
+                    this._searxShowStatus('󰡨', 'Docker stopped', 'SearXNG is stopped to save CPU & memory.', false, true);
+                });
+            } catch (_) {
+                this._searxDockerRunning = false;
+                this._searxUpdateDockerBtn(false);
+                this._searxShowStatus('󰡨', 'Docker stopped', 'SearXNG is stopped.', false, true);
+            }
+        } else {
+            this._searxShowStatus('󰡨', 'Starting Docker & SearXNG…', 'Starting service and container (authenticate if prompted)...', false, false);
+
+            try {
+                const proc = new Gio.Subprocess({
+                    argv: [SCRIPT_DIR + '/searxng-control.sh', 'start'],
+                    flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+                });
+                proc.init(null);
+
+                // Start periodic polling while starting to detect when it comes online quickly
+                let pollCount = 0;
+                let pollSource = 0;
+                pollSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
+                    pollCount++;
+                    this._searxCheckDockerStatus((running) => {
+                        if (running) {
+                            if (pollSource) {
+                                GLib.source_remove(pollSource);
+                                pollSource = 0;
+                            }
+                            this._searxShowIdle();
+                            const q = this._searchEntry.get_text().trim() || this._searxLastQuery;
+                            if (q) this._doSearxQuery(q);
+                        }
+                    });
+                    if (pollCount > 60) return GLib.SOURCE_REMOVE;
+                    return GLib.SOURCE_CONTINUE;
+                });
+
+                proc.wait_async(null, (p, res) => {
+                    if (pollSource) {
+                        try { GLib.source_remove(pollSource); pollSource = 0; } catch (_) {}
+                    }
+                    try {
+                        p.wait_finish(res);
+                        this._searxCheckDockerStatus((running) => {
+                            if (running) {
+                                this._searxShowIdle();
+                                const q = this._searchEntry.get_text().trim() || this._searxLastQuery;
+                                if (q) this._doSearxQuery(q);
+                            } else {
+                                this._searxShowStatus('󰡨', 'Could not start Docker', 'Authentication was cancelled or Docker service failed to start.', true, true);
+                            }
+                        });
+                    } catch (err) {
+                        this._searxShowStatus('󰡨', 'Could not start Docker', 'Error: ' + (err.message || 'Unknown error'), true, true);
+                    }
+                });
+            } catch (e) {
+                this._searxShowStatus('󰡨', 'Docker error', 'Could not execute ' + SCRIPT_DIR + '/searxng-control.sh', false, true);
+            }
+        }
+    }
+
+    // ── SearXNG: show the status card (hides result list & webview) ──────
+    _searxShowStatus(glyph, title, body, showFallback, showActionBtn = false) {
+        if (this._searxWebBox)       this._searxWebBox.set_visible(false);
+        if (this._searxStatusGlyph)  this._searxStatusGlyph.set_text(glyph);
+        if (this._searxStatusTitle)  this._searxStatusTitle.set_text(title);
+        if (this._searxStatusBody)   this._searxStatusBody.set_text(body);
+        if (this._searxActionBtn)    this._searxActionBtn.set_visible(!!showActionBtn);
+        if (this._searxFallbackBtn)  this._searxFallbackBtn.set_visible(!!showFallback);
+        if (this._searxStatusCard)   this._searxStatusCard.set_visible(true);
+        if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+    }
+
+    // ── SearXNG: show idle/empty state (result area hidden) ───────────────
+    _searxShowIdle() {
+        if (this._searxWebBox)       this._searxWebBox.set_visible(false);
+        if (this._searxStatusCard)   this._searxStatusCard.set_visible(false);
+        if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+    }
+
+    // ── SearXNG: clear the result list widget ─────────────────────────────
+    _searxClearList() {
+        if (!this._searxList) return;
+        let ch = this._searxList.get_first_child();
+        while (ch) {
+            const nx = ch.get_next_sibling();
+            this._searxList.remove(ch);
+            ch = nx;
+        }
+    }
+
+    // ── SearXNG: perform a search (debounced entry point) ─────────────────
+    _performWebSearch(query, immediate = false) {
+        // Cancel any pending debounce timer immediately
+        if (this._searxSearchTimer) {
+            GLib.source_remove(this._searxSearchTimer);
+            this._searxSearchTimer = 0;
+        }
+
+        const trimmed = (query || '').trim();
+
+        // If WebKit view is open and user typed a non-empty query — leave webkit and search
+        if (this._searxWebBoxOpen && this._searxCurrentWebUrl) {
+            if (trimmed.length > 0) {
+                this._searxWebBoxOpen = false;
+                this._searxCurrentWebUrl = '';
+                if (this._searxWebBox)       this._searxWebBox.set_visible(false);
+                if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+                this._persistWebState();
+            } else {
+                return;
+            }
+        }
+
+        if (!trimmed) {
+            this._searxLastQuery = '';
+            this._searxClearList();
+            if (this._searxDockerRunning) {
+                this._searxShowIdle();
+            } else {
+                this._searxShowStatus('󰡨', 'Docker stopped',
+                    'Click Start SearXNG or the Docker button to launch.', false, true);
+            }
+            return;
+        }
+
+        // If we already have results for this exact query, just show them
+        if (trimmed === this._searxLastQuery && this._searxList && this._searxList.get_first_child()) {
+            if (this._searxStatusCard)   this._searxStatusCard.set_visible(false);
+            if (this._searxResultScroll) this._searxResultScroll.set_visible(true);
+            return;
+        }
+
+        // Use cached Docker status for instant per-keystroke feedback.
+        if (!this._searxDockerRunning) {
+            this._searxShowStatus('󰡨', 'Docker stopped',
+                'Click Start SearXNG or the Docker button to launch.', false, true);
+            return;
+        }
+
+        // Show searching feedback immediately
+        this._searxShowStatus('󱃎', 'Searching…', trimmed, false, false);
+
+        if (immediate) {
+            this._doSearxQuery(trimmed);
+        } else {
+            // Debounce: fire query after user pauses typing (400ms)
+            this._searxSearchTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+                this._searxSearchTimer = 0;
+                this._doSearxQuery(trimmed);
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+    }
+
+    // ── SearXNG: execute JSON search via Soup 3 ───────────────────────────
+    _doSearxQuery(query) {
+        if (!query || !query.trim()) return;
+        const trimmed = query.trim();
+        this._searxLastQuery = trimmed;
+
+        // Lazy-init Soup session (one per launcher process lifetime)
+        if (!this._soupSession) {
+            this._soupSession = new Soup.Session();
+            this._soupSession.timeout = 8;  // seconds
+        }
+
+        const url = `http://127.0.0.1:8080/search?q=${encodeURIComponent(trimmed)}&format=json`;
+        const msg = new Soup.Message({ method: 'GET', uri: GLib.Uri.parse(url, GLib.UriFlags.NONE) });
+
+        this._soupSession.send_and_read_async(
+            msg, GLib.PRIORITY_DEFAULT, null,
+            (session, res) => {
+                try {
+                    const bytes = session.send_and_read_finish(res);
+                    if (!bytes) throw new Error('empty response');
+                    const status = msg.get_status();
+                    if (status !== Soup.Status.OK) throw new Error(`HTTP ${status}`);
+
+                    const text = new TextDecoder().decode(bytes.get_data());
+                    const json = JSON.parse(text);
+
+                    // Discard response if user has already queried something newer
+                    if (this._searxLastQuery !== trimmed) return;
+
+                    this._renderSearxResults(json.results || [], trimmed);
+                } catch (e) {
+                    if (this._searxLastQuery !== trimmed) return;
+                    console.warn('[launcher] SearXNG query failed:', e.message);
+                    this._searxShowStatus(
+                        '󰖟',
+                        'SearXNG unreachable',
+                        'Make sure Docker is running:\n  docker compose up -d',
+                        true  // show browser fallback button
+                    );
+                }
+            }
+        );
+    }
+
+    // ── SearXNG: render result list ───────────────────────────────────────
+    _renderSearxResults(results, query) {
+        this._searxClearList();
+
+        if (!results || results.length === 0) {
+            this._searxShowStatus('󰍉', 'No results', `Nothing found for "${query}"`, true);
+            return;
+        }
+
+        // Show result area, hide status card & webview only if webview not active
+        if (this._searxWebBoxOpen && this._searxCurrentWebUrl && this._searxWebBox && this._searxWebBox.get_visible()) {
+            if (this._searxWebBox)       this._searxWebBox.set_visible(true);
+            if (this._searxStatusCard)   this._searxStatusCard.set_visible(false);
+            if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+        } else {
+            if (this._searxWebBox)       this._searxWebBox.set_visible(false);
+            if (this._searxStatusCard)   this._searxStatusCard.set_visible(false);
+            if (this._searxResultScroll) this._searxResultScroll.set_visible(true);
+        }
+
+        for (const r of results) {
+            const title   = r.title   || '(no title)';
+            const url     = r.url     || '';
+            const snippet = r.content || '';
+
+            // Row container: HBox [ main button (flex) | mini external-browser button ]
+            const itemRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+            itemRow.set_hexpand(true);
+
+            // Each result is a button for clean keyboard + click activation
+            const rowBtn = Gtk.Button.new();
+            rowBtn.add_css_class('searx-result-item');
+            rowBtn.set_hexpand(true);
+            rowBtn.set_halign(Gtk.Align.FILL);
+
+            const colBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 2);
+            colBox.set_hexpand(true);
+
+            const titleLbl = Gtk.Label.new(title);
+            titleLbl.add_css_class('searx-result-title');
+            titleLbl.set_halign(Gtk.Align.START);
+            titleLbl.set_ellipsize(3 /* Pango.EllipsizeMode.END */);
+            titleLbl.set_max_width_chars(52);
+            colBox.append(titleLbl);
+
+            if (url) {
+                // Trim URL to a readable length
+                const displayUrl = url.length > 60 ? url.slice(0, 58) + '…' : url;
+                const urlLbl = Gtk.Label.new(displayUrl);
+                urlLbl.add_css_class('searx-result-url');
+                urlLbl.set_halign(Gtk.Align.START);
+                urlLbl.set_ellipsize(3);
+                urlLbl.set_max_width_chars(56);
+                colBox.append(urlLbl);
+            }
+
+            if (snippet) {
+                const snipLbl = Gtk.Label.new(snippet);
+                snipLbl.add_css_class('searx-result-snippet');
+                snipLbl.set_halign(Gtk.Align.START);
+                snipLbl.set_wrap(true);
+                snipLbl.set_max_width_chars(54);
+                snipLbl.set_lines(2);
+                snipLbl.set_ellipsize(3);
+                colBox.append(snipLbl);
+            }
+
+            rowBtn.set_child(colBox);
+
+            // Click → open in embedded WebKit view inside launcher
+            const resultUrl = url;
+            const resultTitle = title;
+            rowBtn.connect('clicked', () => {
+                if (resultUrl) {
+                    this._searxOpenUrl(resultUrl, resultTitle);
+                }
+            });
+            itemRow.append(rowBtn);
+
+            // Dedicated external browser button
+            const extBtn = Gtk.Button.new_with_label('󰖟');
+            extBtn.add_css_class('searx-ext-btn');
+            extBtn.set_valign(Gtk.Align.CENTER);
+            extBtn.set_tooltip_text('Open in external browser');
+            extBtn.connect('clicked', () => {
+                if (resultUrl) {
+                    openInBrowser(resultUrl);
+                }
+            });
+            itemRow.append(extBtn);
+
+            const row = new Gtk.ListBoxRow();
+            row.set_child(itemRow);
+            row.set_activatable(false);
+            this._searxList.append(row);
+        }
+
+        // Scroll back to top after populating
+        if (this._searxResultScroll) {
+            const adj = this._searxResultScroll.get_vadjustment();
+            if (adj) adj.set_value(0);
         }
     }
     _refreshFavorites(query) {
@@ -15610,11 +17244,15 @@ const LauncherApp = GObject.registerClass({
                     // Launcher tab always resets scroll position to the top.
                     const tabToOpen = this._win._lastTab || 'launcher';
                     this._win._switchTab(tabToOpen, true);
-                    // Show with fade-in; search entry is focused once visible
+                    // Show with fade-in
                     this._laFadeIn(this._win, () => {
                         this._win.present();
                         GLib.idle_add(GLib.PRIORITY_HIGH, () => {
-                            this._win._searchEntry.set_text('');
+                            // Only restore search text when NOT in webkit view
+                            // to avoid spurious search-changed that hijacks the view
+                            if (tabToOpen !== 'websearch') {
+                                this._win._searchEntry.set_text('');
+                            }
                             this._win._searchEntry.grab_focus();
                             return GLib.SOURCE_REMOVE;
                         });
@@ -15624,6 +17262,19 @@ const LauncherApp = GObject.registerClass({
             });
         } catch (e) {
             console.warn('[launcher] SIGUSR1 handler failed:', e.message);
+        }
+
+        // SIGUSR2 (12): Hot-reload CSS and colors in-place without restarting process
+        try {
+            GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, 12, () => {
+                if (this._win) {
+                    this._win._loadGlobalCSS();
+                    this._win.queue_draw();
+                }
+                return GLib.SOURCE_CONTINUE;
+            });
+        } catch (e) {
+            console.warn('[launcher] SIGUSR2 handler failed:', e.message);
         }
 
         // Keep the application alive indefinitely (daemon mode)
