@@ -4453,28 +4453,28 @@ PanelWindow {
                                     _lcWrite.running = true
                                 }
                             }
-                            CCSlider {
-                                label: "List Radius"
-                                from: 0; to: 30
-                                value: Config.launcherListRadius
-                                onMoved: function(v) {
-                                    Config.launcherListRadius = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "listRadius", Math.round(v).toString()]
-                                    _lcWrite.running = true
-                                }
-                            }
-                            CCSlider {
-                                label: "Inner Border W"
-                                from: 0; to: 4
-                                value: Config.launcherInnerBorderWidth
-                                onMoved: function(v) {
-                                    Config.launcherInnerBorderWidth = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "innerBorderWidth", Math.round(v).toString()]
-                                    _lcWrite.running = true
-                                }
-                            }
+                            //CCSlider {
+                                //label: "List Radius"
+                                //from: 0; to: 30
+                                //value: Config.launcherListRadius
+                                //onMoved: function(v) {
+                                    //Config.launcherListRadius = Math.round(v)
+                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        //"listRadius", Math.round(v).toString()]
+                                    //_lcWrite.running = true
+                                //}
+                            //}
+                            //CCSlider {
+                                //label: "Inner Border W"
+                                //from: 0; to: 4
+                                //value: Config.launcherInnerBorderWidth
+                                //onMoved: function(v) {
+                                    //Config.launcherInnerBorderWidth = Math.round(v)
+                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
+                                        //"innerBorderWidth", Math.round(v).toString()]
+                                    //_lcWrite.running = true
+                                //}
+                            //}
 
                             CCSection { text: "Padding" }
                             CCSlider {

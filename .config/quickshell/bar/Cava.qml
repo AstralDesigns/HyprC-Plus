@@ -72,8 +72,7 @@ Item {
         command: {
             const rev     = root.side === "right" ? 1 : 0
             const cfgPath = "/tmp/qs-cava-" + root.side + ".ini"
-            // Use lower framerate when no media is playing to save CPU/Memory
-            const fps = _mediaActive ? 60 : 15
+            const fps = 60
             const lines = [
                 "[general]",
                 "bars = "             + Config.cavaWidth,

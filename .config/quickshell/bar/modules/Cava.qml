@@ -15,11 +15,11 @@ Item {
     Layout.alignment: Qt.AlignVCenter
 
     readonly property bool _autoHideActive: Config.cavaAutoHide && !Config.showMediaPlayer
-    readonly property bool _mediaActive: MediaPlayerState.active
+    readonly property bool _mediaActive: MediaPlayerState.anyPlaying || MediaPlayerState.active
 
-    // Run whenever the island is shown — not only while Playing.
+    // Run whenever the island is shown — smooth continuous stream.
     readonly property bool _procShouldRun: Config.showCava && (!root._autoHideActive || root._mediaActive)
-    readonly property int  _cavaFramerate: MediaPlayerState.playing ? 30 : 2
+    readonly property int  _cavaFramerate: 60
 
     implicitWidth: {
         if (_autoHideActive && !_mediaActive) return 0
@@ -42,25 +42,15 @@ Item {
         }
     }
 
-    function _restartCavaForFramerate() {
-        if (!cavaProc.running || !root._procShouldRun) return
-        root._intentionalRestart = true
-        cavaProc.running = false
-    }
-
     Connections {
         target: MediaPlayerState
-        function onPlayingChanged() {
-            const wasRunning = cavaProc.running
-            root._syncCavaProc()
-            if (wasRunning && root._procShouldRun)
-                root._restartCavaForFramerate()
-        }
-        function onStatusChanged() { root._syncCavaProc() }
+        function onAnyPlayingChanged() { root._syncCavaProc() }
+        function onActiveChanged()     { root._syncCavaProc() }
     }
     Connections {
         target: Config
-        function onShowCavaChanged() { root._syncCavaProc() }
+        function onShowCavaChanged()     { root._syncCavaProc() }
+        function onCavaAutoHideChanged() { root._syncCavaProc() }
     }
     Component.onCompleted: root._syncCavaProc()
 

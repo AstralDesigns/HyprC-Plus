@@ -33,8 +33,8 @@ var LauncherConfig = {
     borderRadius: 18,               // @LC:borderRadius
     borderWidth:  3,                // @LC:borderWidth
     searchRadius: 19,               // @LC:searchRadius
-    listRadius:   10,               // @LC:listRadius
-    innerBorderWidth: 1,            // @LC:innerBorderWidth
+    listRadius:   12,               // @LC:listRadius
+    innerBorderWidth: 0,            // @LC:innerBorderWidth
 
     // ── Inner frame padding ───────────────────────────────────────────
     innerPadding: 10,               // @LC:innerPadding

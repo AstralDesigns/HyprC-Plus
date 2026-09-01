@@ -1219,7 +1219,7 @@ PanelWindow {
         // Mirror barBg opacity so both fade together
         opacity: (bar._ahHidden || bar._shellModHidden) ? 0.0 : 1.0
         readonly property int _minGap: 4
-        property bool _mediaActive: MediaPlayerState.active
+        property bool _mediaActive: MediaPlayerState.anyPlaying || MediaPlayerState.active
         readonly property real _leftEdge:   Config.islandSpacing + Config.barEdgePaddingLeft
         readonly property real _rightEdge:  Config.islandSpacing + Config.barEdgePaddingRight
         readonly property real _centerX:    width / 2

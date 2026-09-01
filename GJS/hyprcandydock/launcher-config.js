@@ -11,19 +11,19 @@ var LauncherConfig = {
     iconSize: 48,                   // @LC:iconSize
 
     // ── Main frame — horizontal dock (bottom / top) ───────────────────
-    frameWidth:  500,               // @LC:frameWidth
+    frameWidth: 500,               // @LC:frameWidth
     frameHeight: 480,               // @LC:frameHeight
 
     // ── Main frame — vertical dock (left / right) ─────────────────────
-    frameWidthVert:  380,           // @LC:frameWidthVert
+    frameWidthVert: 380,           // @LC:frameWidthVert
     frameHeightVert: 560,           // @LC:frameHeightVert
 
     // ── Border ────────────────────────────────────────────────────────
     // Applies to the outer window AND the inner search/list frames.
     borderRadius: 20,               // @LC:borderRadius   (outer window)
-    borderWidth:  2,                // @LC:borderWidth    (outer window)
-    innerRadius:  12,               // @LC:innerRadius    (search + list boxes)
-    innerBorderWidth: 1,            // @LC:innerBorderWidth
+    borderWidth: 2,                // @LC:borderWidth    (outer window)
+    innerRadius: 12,               // @LC:innerRadius    (search + list boxes)
+    innerBorderWidth: 0,            // @LC:innerBorderWidth
 
     // ── Inner frame padding ───────────────────────────────────────────
     // Gap between the outer window border and the inner search/list boxes.
