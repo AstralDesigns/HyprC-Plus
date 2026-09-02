@@ -2393,15 +2393,16 @@ const AppLauncherWindow = GObject.registerClass({
                 const activeTab = this._searxTabs.find(t => t.id === this._searxActiveTabId) || this._searxTabs[0];
                 if (activeTab) {
                     this._searxSwitchToTab(activeTab.id);
+                    this._searchEntry.set_placeholder_text(' Search the web…');
                 }
             } else if (this._searxPendingNewTab) {
-                this._searchEntry.set_placeholder_text(' Search the web in new tab…');
+                this._searchEntry.set_placeholder_text(' Search in current tab…');
                 this._searchEntry.set_text('');
                 this._searxLastQuery = '';
                 this._searxClearList();
                 this._searxShowIdle();
             } else {
-                this._searchEntry.set_placeholder_text(' Search the web...');
+                this._searchEntry.set_placeholder_text(' Search the web…');
                 this._searchEntry.set_text('');
                 this._searxLastQuery = '';
                 this._searxClearList();
@@ -17235,7 +17236,7 @@ const AppLauncherWindow = GObject.registerClass({
         this._searxWebBoxOpen = false;
         if (this._searxWebBox) this._searxWebBox.set_visible(false);
         if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
-        this._searchEntry.set_placeholder_text(' Search the web in new tab…');
+        this._searchEntry.set_placeholder_text(' Search in current tab…');
         this._searchEntry.set_text('');
         this._searxLastQuery = '';
         this._searxClearList();
