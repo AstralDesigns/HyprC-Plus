@@ -23,17 +23,17 @@ var LauncherConfig = {
 
     // ── Main frame — horizontal dock (bottom / top) ───────────────────
     frameWidth: 1175,               // @LC:frameWidth
-    frameHeight: 655,               // @LC:frameHeight
+    frameHeight: 645,               // @LC:frameHeight
 
     // ── Main frame — vertical dock (left / right) ─────────────────────
     frameWidthVert: 1175,           // @LC:frameWidthVert
-    frameHeightVert: 655,           // @LC:frameHeightVert
+    frameHeightVert: 645,           // @LC:frameHeightVert
 
     // ── Border ────────────────────────────────────────────────────────
     borderRadius: 18,               // @LC:borderRadius
     borderWidth: 2,                // @LC:borderWidth
-    searchRadius: 19,               // @LC:searchRadius
-    listRadius: 12,               // @LC:listRadius
+    searchRadius: 30,               // @LC:searchRadius
+    listRadius: 16,               // @LC:listRadius
     innerBorderWidth: 0,            // @LC:innerBorderWidth
 
     // ── Inner frame padding ───────────────────────────────────────────

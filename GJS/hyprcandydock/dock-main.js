@@ -665,6 +665,9 @@ function hotReload() {
         _ahHotspot._applyHotspotColor();
     }
     log('[dock] hot-reload complete');
+    try {
+        imports.system.gc();
+    } catch (_) { }
 }
 
 // --- Colour hot-reload (matugen) --------------------------------------

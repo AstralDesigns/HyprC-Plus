@@ -761,8 +761,7 @@ window.hyprcandy-launcher {
     border-style: solid;
     border-width: 0px;
     border-color: @scrim;
-    margin-top: ${ip}px;
-    margin-bottom: ${Math.round(ip / 2)}px;
+    margin: 0px;
 }
 
 .list-frame {
@@ -1139,9 +1138,10 @@ window.hyprcandy-group-dialog {
     background-color: transparent;
     border: 1px solid alpha(@primary, 0.25);
     border-radius: 20px;
-    padding: 3px 14px;
+    padding: 3px 12px;
     color: alpha(@primary, 0.55);
-    font-size: 12px;
+    font-size: 11px;
+    font-weight: bold;
     outline: none;
     box-shadow: none;
 }
@@ -1233,7 +1233,23 @@ window.hyprcandy-group-dialog {
 /* Header row: title glyph + Docker toggle button */
 .searx-header-row {
     background: transparent;
-    padding: 6px ${ip}px 4px ${ip}px;
+    padding: 0px;
+    margin: 0px;
+}
+.searx-title-btn {
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 2px 6px;
+    outline: none;
+    box-shadow: none;
+}
+.searx-title-btn:hover {
+    background-color: alpha(@primary, 0.12);
+}
+.searx-title-btn:active {
+    background-color: alpha(@inverse_primary, 0.40);
 }
 .searx-title-glyph {
     font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', monospace;
@@ -1413,7 +1429,75 @@ window.hyprcandy-group-dialog {
     font-weight: bold;
 }
 
+/* ── WebKit embedded webview container (12px rounded) ────────────────── */
+.searx-webview-box {
+    border-radius: 12px;
+    overflow: hidden;
+    margin-right: 10px;
+    margin-left: 6px;
+    margin-bottom: 12px;
+}
+.searx-webview-wrap {
+    border-radius: 12px;
+    overflow: hidden;
+}
+.searx-webview-wrap webview,
+webview.searx-webview {
+    border-radius: 12px;
+}
+
 /* ── Interactive Web Toolbar Title + URL + Tabs Trigger ──────────────── */
+.searx-webview-bar {
+    padding: 2px 4px 3px 4px;
+    margin-bottom: 2px;
+}
+.searx-nav-btn {
+    background: transparent;
+    background-color: alpha(@inverse_primary, 0.40);
+    border: 1px solid alpha(@primary, 0.25);
+    border-radius: 20px;
+    padding: 3px 10px;
+    color: @primary;
+    font-size: 11px;
+    font-weight: bold;
+    outline: none;
+    box-shadow: none;
+}
+.searx-nav-btn:hover {
+    background-color: alpha(@primary, 0.18);
+    border-color: alpha(@primary, 0.45);
+}
+.searx-nav-btn:active {
+    background-color: alpha(@inverse_primary, 0.70);
+}
+.searx-nav-circle-btn {
+    background: transparent;
+    background-color: alpha(@inverse_primary, 0.40);
+    border: 1px solid alpha(@primary, 0.25);
+    border-radius: 50%;
+    padding: 0;
+    margin: 0 2px;
+    min-width: 26px;
+    min-height: 26px;
+    max-width: 26px;
+    max-height: 26px;
+    color: @primary;
+    font-size: 13px;
+    outline: none;
+    box-shadow: none;
+}
+.searx-nav-circle-btn:hover {
+    background-color: alpha(@primary, 0.22);
+    border-color: alpha(@primary, 0.50);
+}
+.searx-nav-circle-btn:active {
+    background-color: alpha(@inverse_primary, 0.75);
+}
+.searx-nav-circle-btn.close:hover {
+    background-color: alpha(@error, 0.28);
+    border-color: alpha(@error, 0.60);
+    color: @error;
+}
 .searx-nav-info-btn {
     background: transparent;
     background-color: transparent;
@@ -1836,6 +1920,16 @@ const AppLauncherWindow = GObject.registerClass({
         this.set_size_request(W, H);
         this.set_default_size(W, H);
 
+        if (this._root) {
+            this._root.set_size_request(W, H);
+        }
+        if (this._searchFrame) {
+            const lc = LauncherConfig;
+            const ip = lc.innerPadding || 10;
+            const frac = Math.min(1, Math.max(0.2, lc.searchWidthFraction ?? 1.0));
+            this._searchFrame.set_size_request(Math.max(1, Math.round(W * frac) - (2 * ip)), -1);
+        }
+
         if (this._flow) {
             this._flow.set_max_children_per_line(cols);
             this._flow.set_min_children_per_line(cols);
@@ -1855,22 +1949,70 @@ const AppLauncherWindow = GObject.registerClass({
         const frac = Math.min(1, Math.max(0.2, lc.searchWidthFraction ?? 1.0));
         const sfExtraH = Math.max(0, Math.floor((winW - Math.round(winW * frac)) / 2));
 
-        // ── Root: vertical box (search on top, inner panel below) ────────
+        // ── Root: vertical box (search row on top, inner panel below) ────
         const root = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        const winH = this._isVert ? H_VERT : H_HORIZ;
+        root.set_size_request(winW, winH);
         this.set_child(root);
+        this._root = root;
 
-        // ── Search frame ─────────────────────────────────────────────────
+        // Centered search row using Gtk.CenterBox: left controls, locked center search, right actions.
+        const searchRow = new Gtk.CenterBox();
+        searchRow.set_orientation(Gtk.Orientation.HORIZONTAL);
+        searchRow.set_hexpand(true);
+        searchRow.set_margin_start(ip);
+        searchRow.set_margin_end(ip);
+        searchRow.set_margin_top(ip);
+        searchRow.set_margin_bottom(Math.round(ip / 2));
+        root.append(searchRow);
+
+        // Left slot for tab-specific controls (Emojis/Glyphs toggle, SearXNG title)
+        const searchLeftSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        searchLeftSlot.set_halign(Gtk.Align.START);
+        searchLeftSlot.set_valign(Gtk.Align.CENTER);
+        searchRow.set_start_widget(searchLeftSlot);
+
+        const webHeaderLeftSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        webHeaderLeftSlot.set_halign(Gtk.Align.START);
+        webHeaderLeftSlot.set_valign(Gtk.Align.CENTER);
+        webHeaderLeftSlot.set_visible(false);
+        searchLeftSlot.append(webHeaderLeftSlot);
+        this._webHeaderLeftSlot = webHeaderLeftSlot;
+
+        const emojiModeSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        emojiModeSlot.set_halign(Gtk.Align.START);
+        emojiModeSlot.set_valign(Gtk.Align.CENTER);
+        emojiModeSlot.set_visible(false);
+        searchLeftSlot.append(emojiModeSlot);
+        this._emojiModeSlot = emojiModeSlot;
+
+        // Center slot: search bar (always perfectly centered)
         const searchFrame = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
         searchFrame.add_css_class('search-frame');
-        searchFrame.set_margin_start(ip + sfExtraH);
-        searchFrame.set_margin_end(ip + sfExtraH);
-        root.append(searchFrame);
+        searchFrame.set_size_request(Math.max(1, Math.round(winW * frac) - (2 * ip)), -1);
+        searchFrame.set_halign(Gtk.Align.CENTER);
+        searchRow.set_center_widget(searchFrame);
+        this._searchFrame = searchFrame;
 
         this._searchEntry = new Gtk.SearchEntry();
         this._searchEntry.set_placeholder_text(' Search applications…');
         this._searchEntry.add_css_class('launcher-search');
         this._searchEntry.set_hexpand(true);
         searchFrame.append(this._searchEntry);
+
+        // Right slot for tab-specific controls (+ New Tab, Docker button, Tabs button)
+        const searchRightSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        searchRightSlot.set_halign(Gtk.Align.END);
+        searchRightSlot.set_valign(Gtk.Align.CENTER);
+        searchRow.set_end_widget(searchRightSlot);
+        this._searchRightSlot = searchRightSlot;
+
+        const webHeaderRightSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        webHeaderRightSlot.set_halign(Gtk.Align.END);
+        webHeaderRightSlot.set_valign(Gtk.Align.CENTER);
+        webHeaderRightSlot.set_visible(false);
+        searchRightSlot.append(webHeaderRightSlot);
+        this._webHeaderRightSlot = webHeaderRightSlot;
 
         // ── Inner panel: list-frame hosts pill + stack side-by-side ──────
         // .list-frame provides the bordered inner container (same as before).
@@ -2114,6 +2256,11 @@ const AppLauncherWindow = GObject.registerClass({
 
         this._stack.set_visible_child_name(id);
 
+        // Unified top-row controls follow the active tab.
+        if (this._webHeaderLeftSlot) this._webHeaderLeftSlot.set_visible(id === 'websearch');
+        if (this._webHeaderRightSlot) this._webHeaderRightSlot.set_visible(id === 'websearch');
+        if (this._emojiModeSlot) this._emojiModeSlot.set_visible(id === 'emoji');
+
         // ── websearch tab
         if (id === 'websearch') {
             if (this._searxWebBoxOpen && this._searxTabs && this._searxTabs.length > 0 && this._searxActiveTabId) {
@@ -2308,9 +2455,10 @@ const AppLauncherWindow = GObject.registerClass({
 
         // ── Mode toggle (Emoji | Nerd Glyphs) ───────────────────────────
         const modeRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
-        modeRow.set_margin_start(ip); modeRow.set_margin_end(ip);
-        modeRow.set_margin_top(6); modeRow.set_margin_bottom(2);
-        emojiFrame.append(modeRow);
+        modeRow.set_valign(Gtk.Align.CENTER);
+        // Keep Emojis/Glyphs outside the bordered icon list frame.
+        if (this._emojiModeSlot) this._emojiModeSlot.append(modeRow);
+        else emojiFrame.append(modeRow);
 
         const modeEmoji = Gtk.Button.new_with_label('Emojis');
         modeEmoji.add_css_class('emoji-mode-btn'); modeEmoji.add_css_class('active');
@@ -15898,6 +16046,7 @@ const AppLauncherWindow = GObject.registerClass({
 
             const bgClick = new Gtk.GestureClick();
             bgClick.connect('pressed', () => {
+                if (this._fileChooserOpen) return;
                 // set_visible(false) on the launcher triggers notify::visible
                 // which hides bgWin automatically (see handler below).
                 this.set_visible(false);
@@ -15934,6 +16083,9 @@ const AppLauncherWindow = GObject.registerClass({
                 _runningAppsCache = null;
                 _runningAppsCacheUs = 0;
                 this._persistWebState();
+                try {
+                    imports.system.gc();
+                } catch (_) { }
             }
         });
 
@@ -15949,7 +16101,7 @@ const AppLauncherWindow = GObject.registerClass({
             emptyClick.set_button(1);   // primary / left button only
             emptyClick.connect('released', (_g, _n, x, y) => {
                 if (!this.get_visible()) return;
-                if (this._popoverOpen || this._postPopoverGrace) return;
+                if (this._popoverOpen || this._postPopoverGrace || this._fileChooserOpen) return;
                 // pick() returns the deepest widget under the pointer; if it
                 // resolves to something other than the root box (or window),
                 // an interactive child already claimed the sequence — skip.
@@ -15989,21 +16141,37 @@ const AppLauncherWindow = GObject.registerClass({
         page.set_vexpand(true);
 
         // ── Header: title + Docker toggle ────────────────────────────────
-        const headerRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
-        headerRow.add_css_class('searx-header-row');
-        headerRow.set_valign(Gtk.Align.CENTER);
-        page.append(headerRow);
+        // The header is intentionally outside the bordered result/list frame.
+        const headerLeft = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        headerLeft.add_css_class('searx-header-row');
+        headerLeft.set_valign(Gtk.Align.CENTER);
+        if (this._webHeaderLeftSlot) this._webHeaderLeftSlot.append(headerLeft);
+        else page.append(headerLeft);
+
+        const titleBtn = Gtk.Button.new();
+        titleBtn.add_css_class('searx-title-btn');
+        titleBtn.set_valign(Gtk.Align.CENTER);
+        titleBtn.set_can_focus(false);
+        titleBtn.set_tooltip_text('Open SearXNG source repository (GitHub)');
+
+        const titleBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+        titleBtnBox.set_valign(Gtk.Align.CENTER);
 
         const titleGlyph = Gtk.Label.new('󱎸');
         titleGlyph.add_css_class('searx-title-glyph');
         titleGlyph.set_valign(Gtk.Align.CENTER);
-        headerRow.append(titleGlyph);
+        titleBtnBox.append(titleGlyph);
 
         const titleLbl = Gtk.Label.new('SearXNG');
         titleLbl.add_css_class('searx-title-label');
         titleLbl.set_halign(Gtk.Align.START);
-        titleLbl.set_hexpand(true);
-        headerRow.append(titleLbl);
+        titleBtnBox.append(titleLbl);
+
+        titleBtn.set_child(titleBtnBox);
+        titleBtn.connect('clicked', () => {
+            this._searxOpenUrlInNewTab('https://github.com/searxng/searxng', 'SearXNG GitHub');
+        });
+        headerLeft.append(titleBtn);
 
         // ── Header Tabs button (visible in plain search mode when open tabs exist) ─
         const headerTabsBtn = Gtk.Button.new();
@@ -16026,7 +16194,7 @@ const AppLauncherWindow = GObject.registerClass({
         headerTabsBtn.set_child(headerTabsBox);
         this._searxHeaderTabsBtn = headerTabsBtn;
         headerTabsBtn.connect('clicked', () => this._searxShowTabsPopover(headerTabsBtn));
-        headerRow.append(headerTabsBtn);
+        if (this._webHeaderRightSlot) this._webHeaderRightSlot.append(headerTabsBtn);
 
         // ── "+ New Tab" button ───────────────────────────────────────────
         const newTabBtn = Gtk.Button.new();
@@ -16044,7 +16212,7 @@ const AppLauncherWindow = GObject.registerClass({
         newTabBtn.set_child(newTabBox);
         this._searxNewTabBtn = newTabBtn;
         newTabBtn.connect('clicked', () => this._searxCreateNewTab());
-        headerRow.append(newTabBtn);
+        if (this._webHeaderRightSlot) this._webHeaderRightSlot.append(newTabBtn);
 
         // Docker toggle button
         const dockerBtn = Gtk.Button.new();
@@ -16064,7 +16232,7 @@ const AppLauncherWindow = GObject.registerClass({
         dockerBtn.set_child(dockerBtnBox);
         this._searxDockerBtn = dockerBtn;
         dockerBtn.connect('clicked', () => this._searxToggleDocker());
-        headerRow.append(dockerBtn);
+        if (this._webHeaderRightSlot) this._webHeaderRightSlot.append(dockerBtn);
 
         // ── Status card (offline / loading / empty) ───────────────────────
         const statusCard = Gtk.Box.new(Gtk.Orientation.VERTICAL, 4);
@@ -16144,6 +16312,7 @@ const AppLauncherWindow = GObject.registerClass({
 
         // ── Embedded WebKit View (multi-tab content stack) ────────────────
         const webBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        webBox.add_css_class('searx-webview-box');
         webBox.set_vexpand(true);
         webBox.set_hexpand(true);
         webBox.set_visible(false);
@@ -16210,15 +16379,19 @@ const AppLauncherWindow = GObject.registerClass({
         webBar.append(infoBtn);
 
         const reloadBtn = Gtk.Button.new_with_label('󰑐');
-        reloadBtn.add_css_class('searx-nav-btn');
+        reloadBtn.add_css_class('searx-nav-circle-btn');
+        reloadBtn.set_valign(Gtk.Align.CENTER);
+        reloadBtn.set_size_request(26, 26);
         reloadBtn.set_tooltip_text('Reload');
         reloadBtn.connect('clicked', () => {
             if (this._searxWebView) this._searxWebView.reload();
         });
         webBar.append(reloadBtn);
 
-        const openExtBtn = Gtk.Button.new_with_label('󰖟  Browser');
-        openExtBtn.add_css_class('searx-nav-btn');
+        const openExtBtn = Gtk.Button.new_with_label('󰌹');
+        openExtBtn.add_css_class('searx-nav-circle-btn');
+        openExtBtn.set_valign(Gtk.Align.CENTER);
+        openExtBtn.set_size_request(26, 26);
         openExtBtn.set_tooltip_text('Open in external browser');
         openExtBtn.connect('clicked', () => {
             const u = this._searxCurrentWebUrl;
@@ -16229,7 +16402,10 @@ const AppLauncherWindow = GObject.registerClass({
         webBar.append(openExtBtn);
 
         const closeTabBtn = Gtk.Button.new_with_label('󰅖');
-        closeTabBtn.add_css_class('searx-nav-btn');
+        closeTabBtn.add_css_class('searx-nav-circle-btn');
+        closeTabBtn.add_css_class('close');
+        closeTabBtn.set_valign(Gtk.Align.CENTER);
+        closeTabBtn.set_size_request(26, 26);
         closeTabBtn.set_tooltip_text('Close active tab');
         closeTabBtn.connect('clicked', () => {
             if (this._searxActiveTabId) {
@@ -16421,8 +16597,30 @@ const AppLauncherWindow = GObject.registerClass({
                             el.remove();
                         }
                     }
-                    setInterval(cleanYouTube, 250);
-                    document.addEventListener('DOMContentLoaded', cleanYouTube);
+                    // Event-driven mutation observer with throttle guard instead of 250ms polling
+                    let lastRun = 0;
+                    function throttledClean() {
+                        const now = Date.now();
+                        if (now - lastRun < 200) return;
+                        lastRun = now;
+                        cleanYouTube();
+                    }
+
+                    const observer = new MutationObserver(throttledClean);
+                    function initObserver() {
+                        const target = document.body || document.documentElement;
+                        if (target) {
+                            observer.observe(target, { childList: true, subtree: true });
+                            cleanYouTube();
+                        } else {
+                            setTimeout(initObserver, 100);
+                        }
+                    }
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', initObserver);
+                    } else {
+                        initObserver();
+                    }
                 })();
             `;
             const script = new WebKit.UserScript(
@@ -16444,10 +16642,12 @@ const AppLauncherWindow = GObject.registerClass({
         const tabId = 'tab_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
 
         const tabWrap = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        tabWrap.add_css_class('searx-webview-wrap');
         tabWrap.set_hexpand(true);
         tabWrap.set_vexpand(true);
 
         const webView = new WebKit.WebView({ network_session: session });
+        webView.add_css_class('searx-webview');
         webView.set_hexpand(true);
         webView.set_vexpand(true);
         webView.set_visible(true);
@@ -16455,9 +16655,10 @@ const AppLauncherWindow = GObject.registerClass({
 
         const settings = webView.get_settings();
         if (settings) {
-            settings.set_enable_page_cache(true);
+            settings.set_enable_page_cache(false); // Proactively free page cache memory
             settings.set_enable_back_forward_navigation_gestures(true);
             settings.set_enable_javascript(true);
+            settings.set_enable_smooth_scrolling(true);
             try {
                 settings.set_hardware_acceleration_policy(WebKit.HardwareAccelerationPolicy.ON_DEMAND);
             } catch (_) { }
@@ -16503,6 +16704,11 @@ const AppLauncherWindow = GObject.registerClass({
             console.warn('[launcher] WebKit load-failed:', failingUri, error.message);
         });
 
+        webView.connect('run-file-chooser', (wv, request) => {
+            this._handleWebKitFileChooser(request);
+            return true;
+        });
+
         this._searxWebStack.add_named(tabWrap, tabId);
         this._searxTabs.push(tab);
 
@@ -16515,6 +16721,64 @@ const AppLauncherWindow = GObject.registerClass({
         }
 
         return tab;
+    }
+
+    // ── SearXNG: handle file upload/selection dialogs safely ──────────────
+    _handleWebKitFileChooser(request) {
+        this._fileChooserOpen = true;
+        const isMultiple = (typeof request.get_select_multiple === 'function') ? request.get_select_multiple() : false;
+        const mimeTypes = (typeof request.get_mime_types === 'function') ? (request.get_mime_types() || []) : [];
+
+        const cmd = ['zenity', '--file-selection', '--title=Select file to upload'];
+        if (isMultiple) {
+            cmd.push('--multiple', '--separator=|');
+        }
+        if (mimeTypes.length > 0) {
+            const exts = [];
+            for (const m of mimeTypes) {
+                if (m.includes('/')) {
+                    const sub = m.split('/')[1].trim();
+                    if (sub && sub !== '*') exts.push('*.' + sub);
+                }
+            }
+            if (exts.length > 0) {
+                cmd.push(`--file-filter=Supported Files (${exts.join(', ')}) | ${exts.join(' ')}`);
+            }
+        }
+
+        try {
+            const proc = Gio.Subprocess.new(cmd, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                this._fileChooserOpen = false;
+                try {
+                    const [ok, stdout] = p.communicate_utf8_finish(res);
+                    if (ok && p.get_exit_status() === 0 && stdout) {
+                        const raw = stdout.trim();
+                        if (raw) {
+                            const files = isMultiple ? raw.split('|').map(s => s.trim()).filter(Boolean) : [raw];
+                            request.select_files(files);
+                            return;
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[launcher] File chooser finished with error:', err.message);
+                }
+                try { request.cancel(); } catch (_) { }
+            });
+        } catch (e) {
+            console.warn('[launcher] Failed to spawn zenity file chooser:', e.message);
+            this._fileChooserOpen = false;
+            try { request.cancel(); } catch (_) { }
+        }
+    }
+
+    // ── SearXNG: open URL in a fresh new tab ─────────────────────────────
+    _searxOpenUrlInNewTab(url, title) {
+        if (!this._searxTabs) this._searxTabs = [];
+        const tab = this._createTabWebView(url, title);
+        if (tab) {
+            this._searxSwitchToTab(tab.id);
+        }
     }
 
     // ── SearXNG: create a new search tab ─────────────────────────────────
@@ -16604,6 +16868,9 @@ const AppLauncherWindow = GObject.registerClass({
         }
         this._searxUpdateTabsBadge();
         this._persistWebState();
+        try {
+            imports.system.gc();
+        } catch (_) { }
     }
 
     // ── SearXNG: close all open tabs ──────────────────────────────────────
