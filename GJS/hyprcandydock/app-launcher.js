@@ -1077,7 +1077,7 @@ window.hyprcandy-group-dialog {
 /* Glyph label — same fixed size as button so it never widens the circle. */
 .tab-glyph {
     font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
-    color: alpha(@color5, 0.8);
+    color: @color3;
     font-size: 30px;
     min-width: 36px;
     min-height: 36px;
@@ -1094,14 +1094,14 @@ window.hyprcandy-group-dialog {
     background: transparent;
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 8px;
+    border-radius: 30px;
     padding: 8px 12px;
     outline: none;
     box-shadow: none;
 }
 .clip-item-btn:hover {
-    background-color: alpha(@primary, 0.08);
-    border-color: alpha(@primary, 0.15);
+    border-color: alpha(@color3, 0.18);
+    background-color: alpha(@primary, 0.07);
 }
 .clip-item-btn:active {
     background-color: alpha(@inverse_primary, 0.5);
@@ -1111,19 +1111,22 @@ window.hyprcandy-group-dialog {
     font-size: 12px;
 }
 .clip-clear-btn {
-    background: transparent;
-    background-color: transparent;
-    border: 1px solid alpha(@primary, 0.30);
-    border-radius: 8px;
-    padding: 5px 14px;
+    background-color: alpha(@color3, 0.10); 
+    border: 1px solid alpha(@color3, 0.6);
+    border-radius: 20px;
+    padding: 3px 12px;
     color: @primary;
     font-size: 12px;
     outline: none;
     box-shadow: none;
-    margin: 6px ${ip}px;
+    min-height: 28px;
 }
 .clip-clear-btn:hover {
-    background-color: alpha(@primary, 0.10);
+    border-color: alpha(@color3, 0.6);
+    background-color: alpha(@color3, 0.18);
+}
+.clip-clear-btn:active {
+    background-color: alpha(@inverse_primary, 0.45);
 }
 .clip-empty-label {
     color: alpha(@primary, 0.45);
@@ -1136,7 +1139,7 @@ window.hyprcandy-group-dialog {
 .emoji-mode-btn {
     background: transparent;
     background-color: transparent;
-    border: 1px solid alpha(@primary, 0.25);
+    border: 1px solid alpha(@primary, 0.28);
     border-radius: 20px;
     padding: 3px 12px;
     color: alpha(@primary, 0.55);
@@ -1144,15 +1147,23 @@ window.hyprcandy-group-dialog {
     font-weight: bold;
     outline: none;
     box-shadow: none;
-}
-.emoji-mode-btn.active {
-    background-color: alpha(@inverse_primary, 0.45);
-    border-color: transparent;
-    color: @primary;
+    min-height: 28px;
 }
 .emoji-mode-btn:hover {
     background-color: alpha(@primary, 0.09);
+    border-color: alpha(@primary, 0.45);
     color: @primary;
+}
+.emoji-mode-btn:active {
+    background-color: alpha(@inverse_primary, 0.45);
+}
+.emoji-mode-btn.active {
+    border-color: alpha(@color3, 0.6);
+    background-color: alpha(@color3, 0.10);
+    color: @primary;
+}
+.emoji-mode-btn.active:hover {
+    background-color: alpha(@color3, 0.18);
 }
 .emoji-btn {
     background: transparent;
@@ -1580,15 +1591,15 @@ webview.searx-webview {
     background: transparent;
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 10px;
+    border-radius: 99px;
     padding: 8px 12px;
     outline: none;
     box-shadow: none;
     margin: 1px 0;
 }
 .searx-result-item:hover {
+    border-color: alpha(@color3, 0.18);
     background-color: alpha(@primary, 0.07);
-    border-color: alpha(@primary, 0.14);
 }
 .searx-result-item:active {
     background-color: alpha(@inverse_primary, 0.45);
@@ -1622,9 +1633,113 @@ listbox.searx-list row:focus {
     outline: none;
 }
 
+
 /*Webkit-wrap*/
 .searx-webview-wrap {
     border-radius: 12px;
+}
+
+/* ── Bookmarks ─────────────────────────────────────────────────────── */
+/* Header toggle button — same visual as searx-docker-btn */
+.searx-bookmarks-btn {
+    background: transparent;
+    background-color: transparent;
+    border: 1px solid alpha(@primary, 0.28);
+    border-radius: 20px;
+    padding: 3px 12px;
+    outline: none;
+    box-shadow: none;
+    min-height: 28px;
+}
+.searx-bookmarks-btn:hover {
+    background-color: alpha(@primary, 0.09);
+    border-color: alpha(@primary, 0.45);
+}
+.searx-bookmarks-btn:active {
+    background-color: alpha(@inverse_primary, 0.45);
+}
+.searx-bookmarks-glyph {
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', monospace;
+    font-size: 15px;
+    color: @primary;
+    margin-right: 5px;
+}
+.searx-bookmarks-label {
+    color: @primary;
+    font-size: 12px;
+}
+/* Inline add/remove bookmark button on result rows and webview toolbar */
+.searx-bookmark-add-btn {
+    background: transparent;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 50%;
+    padding: 0;
+    margin: 0 2px;
+    min-width: 26px;
+    min-height: 26px;
+    max-width: 26px;
+    max-height: 26px;
+    color: alpha(@primary, 0.55);
+    font-size: 14px;
+    font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', monospace;
+    outline: none;
+    box-shadow: none;
+}
+.searx-bookmark-add-btn:hover {
+    background-color: alpha(@primary, 0.12);
+    border-color: alpha(@primary, 0.30);
+    color: @primary;
+}
+.searx-bookmark-add-btn.bookmarked {
+    color: @primary;
+    border-color: alpha(@primary, 0.35);
+    background-color: alpha(@inverse_primary, 0.25);
+}
+.searx-bookmark-add-btn.bookmarked:hover {
+    background-color: alpha(@error, 0.20);
+    border-color: alpha(@error, 0.45);
+    color: @error;
+}
+/* Popover bookmark rows */
+.searx-bookmark-pop-row {
+    border-radius: 8px;
+    padding: 1px 0;
+}
+.searx-bookmark-pop-row:hover {
+    background-color: alpha(@primary, 0.07);
+}
+.searx-bookmark-pop-open-btn {
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    border-radius: 8px;
+    padding: 5px 8px;
+    outline: none;
+    box-shadow: none;
+}
+.searx-bookmark-pop-open-btn:hover {
+    background-color: alpha(@primary, 0.09);
+}
+.searx-bookmark-pop-remove-btn {
+    background: transparent;
+    background-color: transparent;
+    border: none;
+    border-radius: 50%;
+    padding: 0;
+    margin: 0 4px;
+    min-width: 22px;
+    min-height: 22px;
+    max-width: 22px;
+    max-height: 22px;
+    color: alpha(@primary, 0.45);
+    font-size: 12px;
+    outline: none;
+    box-shadow: none;
+}
+.searx-bookmark-pop-remove-btn:hover {
+    background-color: alpha(@error, 0.22);
+    color: @error;
 }
 `;
 }
@@ -1725,6 +1840,7 @@ const AppLauncherWindow = GObject.registerClass({
         this._searxActiveTabId = savedState.searxActiveTabId || null;
         this._searxPendingNewTab = false;  // when true, next search result opens in new tab
         this._searxSavedTabs = savedState.searxTabs || [];
+        this._searxBookmarks = savedState.searxBookmarks || [];   // [{title, url}]
 
         this._loadGlobalCSS();
         this._setupLayerShell();
@@ -1972,7 +2088,7 @@ const AppLauncherWindow = GObject.registerClass({
         searchLeftSlot.set_valign(Gtk.Align.CENTER);
         searchRow.set_start_widget(searchLeftSlot);
 
-        const webHeaderLeftSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        const webHeaderLeftSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
         webHeaderLeftSlot.set_halign(Gtk.Align.START);
         webHeaderLeftSlot.set_valign(Gtk.Align.CENTER);
         webHeaderLeftSlot.set_visible(false);
@@ -1985,6 +2101,14 @@ const AppLauncherWindow = GObject.registerClass({
         emojiModeSlot.set_visible(false);
         searchLeftSlot.append(emojiModeSlot);
         this._emojiModeSlot = emojiModeSlot;
+
+        // Clipboard tab: Clear history button lives in the header (outside list frame)
+        const clipClearSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
+        clipClearSlot.set_halign(Gtk.Align.START);
+        clipClearSlot.set_valign(Gtk.Align.CENTER);
+        clipClearSlot.set_visible(false);
+        searchLeftSlot.append(clipClearSlot);
+        this._clipClearSlot = clipClearSlot;
 
         // Center slot: search bar (always perfectly centered)
         const searchFrame = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
@@ -2260,6 +2384,7 @@ const AppLauncherWindow = GObject.registerClass({
         if (this._webHeaderLeftSlot) this._webHeaderLeftSlot.set_visible(id === 'websearch');
         if (this._webHeaderRightSlot) this._webHeaderRightSlot.set_visible(id === 'websearch');
         if (this._emojiModeSlot) this._emojiModeSlot.set_visible(id === 'emoji');
+        if (this._clipClearSlot) this._clipClearSlot.set_visible(id === 'clipboard');
 
         // ── websearch tab
         if (id === 'websearch') {
@@ -2326,20 +2451,21 @@ const AppLauncherWindow = GObject.registerClass({
         clipPage.set_vexpand(true);
         this._stack.add_named(clipPage, 'clipboard');
 
-        // Clear button row
-        const clearRow = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
-        clearRow.set_halign(Gtk.Align.END);
-        clipPage.append(clearRow);
-
-        const clearBtn = Gtk.Button.new_with_label('󰃢  Clear history');
-        clearBtn.add_css_class('clip-clear-btn');
-        clearRow.append(clearBtn);
-        clearBtn.connect('clicked', () => {
-            try {
-                GLib.spawn_command_line_sync('cliphist wipe');
-            } catch (_) { }
-            this._loadClipboard('');
-        });
+        // Clear history button lives in the header slot (this._clipClearSlot), built during _buildUI.
+        // Attach it here so the callback can reference this._loadClipboard.
+        if (this._clipClearSlot) {
+            const clearBtn = Gtk.Button.new_with_label('󰃢  Clear history');
+            clearBtn.add_css_class('clip-clear-btn');
+            clearBtn.set_can_focus(false);
+            clearBtn.set_valign(Gtk.Align.CENTER);
+            clearBtn.connect('clicked', () => {
+                try {
+                    GLib.spawn_command_line_sync('cliphist wipe');
+                } catch (_) { }
+                this._loadClipboard('');
+            });
+            this._clipClearSlot.append(clearBtn);
+        }
 
         const clipScroll = new Gtk.ScrolledWindow();
         clipScroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
@@ -16173,6 +16299,28 @@ const AppLauncherWindow = GObject.registerClass({
         });
         headerLeft.append(titleBtn);
 
+        // Bookmarks toggle button — placed next to SearXNG button with 6px margin
+        const bookmarksBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
+        bookmarksBtnBox.set_valign(Gtk.Align.CENTER);
+        const bookmarksGlyph = Gtk.Label.new('󰃀');
+        bookmarksGlyph.add_css_class('searx-bookmarks-glyph');
+        bookmarksGlyph.set_valign(Gtk.Align.CENTER);
+        bookmarksBtnBox.append(bookmarksGlyph);
+        const bookmarksLbl = Gtk.Label.new('Bookmarks');
+        bookmarksLbl.add_css_class('searx-bookmarks-label');
+        bookmarksBtnBox.append(bookmarksLbl);
+
+        const bookmarksBtn = Gtk.Button.new();
+        bookmarksBtn.add_css_class('searx-bookmarks-btn');
+        bookmarksBtn.set_can_focus(false);
+        bookmarksBtn.set_valign(Gtk.Align.CENTER);
+        bookmarksBtn.set_child(bookmarksBtnBox);
+        bookmarksBtn.set_visible(!!(this._searxBookmarks && this._searxBookmarks.length > 0));
+        bookmarksBtn.connect('clicked', () => this._searxShowBookmarksPopover(bookmarksBtn));
+        headerLeft.append(bookmarksBtn);
+        this._bookmarksBtn = bookmarksBtn;
+        this._bookmarksGlyph = bookmarksGlyph;
+
         // ── Header Tabs button (visible in plain search mode when open tabs exist) ─
         const headerTabsBtn = Gtk.Button.new();
         headerTabsBtn.add_css_class('searx-header-tabs-btn');
@@ -16401,6 +16549,29 @@ const AppLauncherWindow = GObject.registerClass({
         });
         webBar.append(openExtBtn);
 
+        // Bookmark button in WebKit toolbar
+        const bmNavBtn = Gtk.Button.new();
+        bmNavBtn.add_css_class('searx-nav-circle-btn');
+        bmNavBtn.set_valign(Gtk.Align.CENTER);
+        bmNavBtn.set_size_request(26, 26);
+        const bmNavLabel = Gtk.Label.new('󰃀');
+        bmNavBtn.set_child(bmNavLabel);
+        bmNavBtn.set_tooltip_text('Bookmark this page');
+        this._searxNavBmBtn = bmNavBtn;
+        this._searxNavBmLabel = bmNavLabel;
+        bmNavBtn.connect('clicked', () => {
+            const u = this._searxCurrentWebUrl;
+            const t = (this._searxNavTitle && this._searxNavTitle.get_text()) || this._searxNavTitleText || u;
+            if (!u) return;
+            if (this._searxIsBookmarked(u)) {
+                this._searxRemoveBookmark(u);
+            } else {
+                this._searxAddBookmark(u, t);
+            }
+            this._searxUpdateNavBmBtn();
+        });
+        webBar.append(bmNavBtn);
+
         const closeTabBtn = Gtk.Button.new_with_label('󰅖');
         closeTabBtn.add_css_class('searx-nav-circle-btn');
         closeTabBtn.add_css_class('close');
@@ -16456,13 +16627,240 @@ const AppLauncherWindow = GObject.registerClass({
                 url: t.url,
                 title: t.title || t.url
             })),
-            searxActiveTabId: this._searxActiveTabId || null
+            searxActiveTabId: this._searxActiveTabId || null,
+            searxBookmarks: this._searxBookmarks || [],
         });
+    }
+
+    // ── SearXNG: Bookmarks ────────────────────────────────────────────────
+
+    _searxIsBookmarked(url) {
+        if (!url) return false;
+        const clean = url.split('#')[0];
+        return (this._searxBookmarks || []).some(b => b.url === clean);
+    }
+
+    _searxAddBookmark(url, title) {
+        if (!url) return;
+        const clean = url.split('#')[0];
+        if (!this._searxBookmarks) this._searxBookmarks = [];
+        if (this._searxBookmarks.some(b => b.url === clean)) return;
+        this._searxBookmarks.push({
+            url: clean,
+            title: (title || clean).trim(),
+            added: Date.now()
+        });
+        this._persistWebState();
+        this._searxUpdateBookmarksSlot();
+        this._searxUpdateNavBmBtn();
+    }
+
+    _searxRemoveBookmark(url) {
+        if (!this._searxBookmarks || !url) return;
+        const clean = url.split('#')[0];
+        const before = this._searxBookmarks.length;
+        this._searxBookmarks = this._searxBookmarks.filter(b => b.url !== clean && b.url !== url);
+        if (this._searxBookmarks.length !== before) {
+            this._persistWebState();
+            this._searxUpdateBookmarksSlot();
+            this._searxUpdateNavBmBtn();
+        }
+    }
+
+    _searxUpdateBookmarksSlot() {
+        const hasBookmarks = !!(this._searxBookmarks && this._searxBookmarks.length > 0);
+        if (this._bookmarksBtn) {
+            this._bookmarksBtn.set_visible(hasBookmarks);
+        }
+    }
+
+    _searxUpdateNavBmBtn() {
+        if (!this._searxNavBmBtn || !this._searxNavBmLabel) return;
+        const u = this._searxCurrentWebUrl;
+        const isBm = this._searxIsBookmarked(u);
+        this._searxNavBmLabel.set_text(isBm ? '󰃂' : '󰃀');
+        if (isBm) {
+            this._searxNavBmBtn.add_css_class('bookmarked');
+            this._searxNavBmBtn.set_tooltip_text('Remove bookmark');
+        } else {
+            this._searxNavBmBtn.remove_css_class('bookmarked');
+            this._searxNavBmBtn.set_tooltip_text('Bookmark this page');
+        }
+    }
+
+    _searxShowBookmarksPopover(parentBtn) {
+        if (!parentBtn) return;
+        if (this._bookmarksPopover) {
+            try { this._bookmarksPopover.popdown(); } catch (_) { }
+            this._bookmarksPopover = null;
+        }
+
+        const pop = new Gtk.Popover();
+        pop.set_parent(parentBtn);
+        pop.set_has_arrow(true);
+        pop.set_position(Gtk.PositionType.BOTTOM);
+        pop.add_css_class('launcher-popover');
+        pop.get_style_context().add_provider(
+            this._getPopoverCSSProvider(),
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        );
+
+        const contentBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 4);
+        contentBox.set_margin_top(8);
+        contentBox.set_margin_bottom(8);
+        contentBox.set_margin_start(8);
+        contentBox.set_margin_end(8);
+
+        // Header row: "Bookmarks (N)"
+        const header = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 8);
+        header.set_valign(Gtk.Align.CENTER);
+        header.set_margin_bottom(4);
+
+        const count = this._searxBookmarks ? this._searxBookmarks.length : 0;
+        const headerLbl = Gtk.Label.new(`Bookmarks (${count})`);
+        headerLbl.add_css_class('pop-section-header');
+        headerLbl.set_halign(Gtk.Align.START);
+        headerLbl.set_hexpand(true);
+        header.append(headerLbl);
+
+        if (count > 1) {
+            const clearAllBtn = Gtk.Button.new_with_label('Clear All');
+            clearAllBtn.add_css_class('searx-tab-close-all-btn');
+            clearAllBtn.set_valign(Gtk.Align.CENTER);
+            clearAllBtn.connect('clicked', () => {
+                this._searxBookmarks = [];
+                this._persistWebState();
+                this._searxUpdateBookmarksSlot();
+                this._searxUpdateNavBmBtn();
+                pop.popdown();
+            });
+            header.append(clearAllBtn);
+        }
+        contentBox.append(header);
+
+        const sep = new Gtk.Separator({ orientation: Gtk.Orientation.HORIZONTAL });
+        contentBox.append(sep);
+
+        // Scrollable list of bookmarks — capped at 260px max height
+        const scroll = new Gtk.ScrolledWindow();
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
+        scroll.set_max_content_height(260);
+        scroll.set_propagate_natural_height(true);
+        scroll.add_css_class('launcher-scroll');
+
+        const list = new Gtk.ListBox();
+        list.set_selection_mode(Gtk.SelectionMode.NONE);
+
+        const renderList = () => {
+            let child = list.get_first_child();
+            while (child) {
+                const next = child.get_next_sibling();
+                list.remove(child);
+                child = next;
+            }
+
+            if (!this._searxBookmarks || this._searxBookmarks.length === 0) {
+                const emptyRow = new Gtk.ListBoxRow();
+                emptyRow.set_activatable(false);
+                const emptyLbl = Gtk.Label.new('No bookmarks saved yet');
+                emptyLbl.add_css_class('searx-bm-empty');
+                emptyLbl.set_halign(Gtk.Align.CENTER);
+                emptyRow.set_child(emptyLbl);
+                list.append(emptyRow);
+                return;
+            }
+
+            for (const bm of [...this._searxBookmarks]) {
+                const row = new Gtk.ListBoxRow();
+                const rowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
+                rowBox.add_css_class('searx-tab-row');
+
+                // Custom glyph based on URL
+                let glyphChar = '󰖟';
+                if (bm.url.includes('youtube.com') || bm.url.includes('youtu.be')) glyphChar = '';
+                else if (bm.url.includes('github.com')) glyphChar = '󰊤';
+                else if (bm.url.includes('reddit.com')) glyphChar = '󰑍';
+                else if (bm.url.includes('wikipedia.org')) glyphChar = '󰖬';
+
+                const glyph = Gtk.Label.new(glyphChar);
+                glyph.add_css_class('searx-tab-glyph');
+                glyph.set_valign(Gtk.Align.CENTER);
+                rowBox.append(glyph);
+
+                const textCol = Gtk.Box.new(Gtk.Orientation.VERTICAL, 1);
+                textCol.set_hexpand(true);
+                textCol.set_valign(Gtk.Align.CENTER);
+
+                const titleLbl = Gtk.Label.new(bm.title || bm.url);
+                titleLbl.add_css_class('searx-tab-title');
+                titleLbl.set_halign(Gtk.Align.START);
+                titleLbl.set_ellipsize(3);
+                titleLbl.set_max_width_chars(32);
+                textCol.append(titleLbl);
+
+                const urlLbl = Gtk.Label.new(bm.url || '');
+                urlLbl.add_css_class('searx-tab-url');
+                urlLbl.set_halign(Gtk.Align.START);
+                urlLbl.set_ellipsize(3);
+                urlLbl.set_max_width_chars(36);
+                textCol.append(urlLbl);
+                rowBox.append(textCol);
+
+                // Bookmark click target
+                const clickBtn = Gtk.Button.new();
+                clickBtn.set_child(rowBox);
+                clickBtn.add_css_class('pop-item');
+                clickBtn.set_hexpand(true);
+                clickBtn.connect('clicked', () => {
+                    pop.popdown();
+                    this._searxOpenUrl(bm.url, bm.title || bm.url);
+                });
+
+                const fullRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 2);
+                fullRowBox.append(clickBtn);
+
+                // Bookmark delete button
+                const removeBtn = Gtk.Button.new_with_label('󰅖');
+                removeBtn.add_css_class('searx-tab-close-btn');
+                removeBtn.set_valign(Gtk.Align.CENTER);
+                removeBtn.set_tooltip_text('Remove bookmark');
+                removeBtn.connect('clicked', () => {
+                    this._searxRemoveBookmark(bm.url);
+                    if (!this._searxBookmarks || this._searxBookmarks.length === 0) {
+                        pop.popdown();
+                    } else {
+                        headerLbl.set_text(`Bookmarks (${this._searxBookmarks.length})`);
+                        renderList();
+                    }
+                });
+                fullRowBox.append(removeBtn);
+
+                row.set_child(fullRowBox);
+                list.append(row);
+            }
+        };
+
+        renderList();
+        scroll.set_child(list);
+        contentBox.append(scroll);
+        pop.set_child(contentBox);
+        this._bookmarksPopover = pop;
+        pop.connect('closed', () => { this._bookmarksPopover = null; });
+        pop.popup();
     }
 
     // ── WebKit: Shared Network Session ───────────────────────────────────
     _getWebKitSession() {
         if (!this._searxNetworkSession) {
+            try {
+                const ctx = WebKit.WebContext.get_default();
+                if (ctx && typeof ctx.set_cache_model === 'function') {
+                    ctx.set_cache_model(WebKit.CacheModel.DOCUMENT_VIEWER);
+                }
+            } catch (e) {
+                console.warn('[launcher] Failed to set WebKit cache model:', e.message);
+            }
+
             const webkitDataDir = GLib.build_filenamev([HOME, '.local', 'share', 'hyprcandy', 'webkit']);
             const webkitCacheDir = GLib.build_filenamev([HOME, '.cache', 'hyprcandy', 'webkit']);
             GLib.mkdir_with_parents(webkitDataDir, 0o755);
@@ -16630,6 +17028,52 @@ const AppLauncherWindow = GObject.registerClass({
                 null, null
             );
             ucm.add_script(script);
+
+            // 4. Hardware Video Acceleration Codec Preference Script
+            // Modern web players (e.g. YouTube) default to VP9/AV1 streams which lack hardware decode
+            // on many iGPUs/dGPUs, causing 90-100% CPU software decoding. Intercepting capability
+            // queries forces H.264 (AVC1) streams which are hardware-decoded by VA-API on GPU.
+            const h264Script = `
+                (function() {
+                    'use strict';
+                    function isBlockedCodec(type) {
+                        if (!type || typeof type !== 'string') return false;
+                        const lower = type.toLowerCase();
+                        if (lower.includes('vp8') || lower.includes('vp9') || lower.includes('vp09') ||
+                            lower.includes('av01') || lower.includes('av1') || lower.includes('webm')) {
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    try {
+                        if (window.MediaSource && typeof window.MediaSource.isTypeSupported === 'function') {
+                            const origIsTypeSupported = window.MediaSource.isTypeSupported.bind(window.MediaSource);
+                            window.MediaSource.isTypeSupported = function(type) {
+                                if (isBlockedCodec(type)) return false;
+                                return origIsTypeSupported(type);
+                            };
+                        }
+                    } catch (_) { }
+
+                    try {
+                        if (window.HTMLMediaElement && window.HTMLMediaElement.prototype && typeof window.HTMLMediaElement.prototype.canPlayType === 'function') {
+                            const origCanPlayType = window.HTMLMediaElement.prototype.canPlayType;
+                            window.HTMLMediaElement.prototype.canPlayType = function(type) {
+                                if (isBlockedCodec(type)) return '';
+                                return origCanPlayType.call(this, type);
+                            };
+                        }
+                    } catch (_) { }
+                })();
+            `;
+            const h264UserScript = new WebKit.UserScript(
+                h264Script,
+                WebKit.UserContentInjectedFrames.ALL_FRAMES,
+                WebKit.UserScriptInjectionTime.START,
+                null, null
+            );
+            ucm.add_script(h264UserScript);
         } catch (e) {
             console.warn('[launcher] _setupAdBlocker error:', e.message);
         }
@@ -16659,8 +17103,11 @@ const AppLauncherWindow = GObject.registerClass({
             settings.set_enable_back_forward_navigation_gestures(true);
             settings.set_enable_javascript(true);
             settings.set_enable_smooth_scrolling(true);
+            settings.set_enable_media_stream(false); // Avoid WebRTC background polling
+            settings.set_enable_dns_prefetching(false);
+            settings.set_enable_developer_extras(false);
             try {
-                settings.set_hardware_acceleration_policy(WebKit.HardwareAccelerationPolicy.ON_DEMAND);
+                settings.set_hardware_acceleration_policy(WebKit.HardwareAccelerationPolicy.ALWAYS);
             } catch (_) { }
         }
 
@@ -16695,6 +17142,7 @@ const AppLauncherWindow = GObject.registerClass({
                 if (this._searxActiveTabId === tabId) {
                     this._searxCurrentWebUrl = u;
                     if (this._searxNavUrl) this._searxNavUrl.set_text(u);
+                    this._searxUpdateNavBmBtn();
                 }
                 this._persistWebState();
             }
@@ -16819,6 +17267,7 @@ const AppLauncherWindow = GObject.registerClass({
             this._searxWebStack.set_visible_child_name(tab.id);
         }
         this._searxUpdateTabsBadge();
+        this._searxUpdateNavBmBtn();
         this._persistWebState();
     }
 
@@ -17085,6 +17534,7 @@ const AppLauncherWindow = GObject.registerClass({
         }
 
         this._searxUpdateTabsBadge();
+        this._searxUpdateNavBmBtn();
         this._persistWebState();
     }
 
@@ -17434,6 +17884,31 @@ const AppLauncherWindow = GObject.registerClass({
                 }
             });
             itemRow.append(rowBtn);
+
+            // Bookmark button for result item
+            const bmBtn = Gtk.Button.new();
+            bmBtn.add_css_class('searx-ext-btn');
+            bmBtn.add_css_class('searx-row-bm-btn');
+            bmBtn.set_valign(Gtk.Align.CENTER);
+            const isBm = this._searxIsBookmarked(resultUrl);
+            const bmLbl = Gtk.Label.new(isBm ? '󰃂' : '󰃀');
+            bmBtn.set_child(bmLbl);
+            bmBtn.set_tooltip_text(isBm ? 'Remove bookmark' : 'Bookmark result');
+            if (isBm) bmBtn.add_css_class('bookmarked');
+            bmBtn.connect('clicked', () => {
+                if (this._searxIsBookmarked(resultUrl)) {
+                    this._searxRemoveBookmark(resultUrl);
+                    bmLbl.set_text('󰃀');
+                    bmBtn.remove_css_class('bookmarked');
+                    bmBtn.set_tooltip_text('Bookmark result');
+                } else {
+                    this._searxAddBookmark(resultUrl, resultTitle);
+                    bmLbl.set_text('󰃂');
+                    bmBtn.add_css_class('bookmarked');
+                    bmBtn.set_tooltip_text('Remove bookmark');
+                }
+            });
+            itemRow.append(bmBtn);
 
             // Dedicated external browser button
             const extBtn = Gtk.Button.new_with_label('󰖟');
