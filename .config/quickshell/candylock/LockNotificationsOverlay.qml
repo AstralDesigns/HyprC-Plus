@@ -293,7 +293,7 @@ Item {
             anchors.fill: parent
             radius: frosted.cornerRadius
             color: Qt.rgba(overlay.cInvPrimary.r, overlay.cInvPrimary.g,
-                           overlay.cInvPrimary.b, 0.65)
+                           overlay.cInvPrimary.b, 0.35)
             border.width: 1
             border.color: frosted.borderCol
         }

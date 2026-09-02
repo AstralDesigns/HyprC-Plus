@@ -87,7 +87,7 @@ PanelWindow {
             
             Rectangle {
                 Layout.fillWidth: true; height: 88; radius: 12; clip: true
-                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
+                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.82)
                 border.width: 2
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	// ── Row 1: user + power ────────────────────────────────────
@@ -156,7 +156,7 @@ PanelWindow {
             // ── Brightness ────────────────────────────────────────────
             Rectangle {
                 Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
+                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.82)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	RowLayout { Layout.fillWidth: true; spacing: 10
@@ -176,7 +176,7 @@ PanelWindow {
             // ── Volume ────────────────────────────────────────────────
             Rectangle {
                     Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
+                    color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.82)
                     border.width: 1
         	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     RowLayout { Layout.fillWidth: true; spacing: 10
@@ -203,7 +203,7 @@ PanelWindow {
                     radius: micInputsRow.height > 0 ? 12 : 99
                     Behavior on radius { NumberAnimation { duration: 150 } }
                     implicitHeight: micCol.implicitHeight + (micInputsRow.height > 0 ? 4 : 0)
-                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.82)
+                    color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.82)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
