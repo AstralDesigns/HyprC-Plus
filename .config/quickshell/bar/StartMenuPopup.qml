@@ -1081,7 +1081,7 @@ PanelWindow {
                 implicitWidth: pwrRow.implicitWidth + 12
                 implicitHeight: 52
                 radius: 99
-                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.5)
+                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.75)
                 border.width: 1
                 border.color: Theme.cScrim
                 Row {
@@ -1104,8 +1104,8 @@ PanelWindow {
                                 anchors.fill: parent; anchors.topMargin: 2; anchors.bottomMargin: 2
                                 radius: 99
                                 color: ph.containsMouse
-                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
-                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                                    ? Theme.cOnSecondary
+                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.75)
                                 border.width: 1
                                 border.color: ph.containsMouse
                                     ? Qt.rgba(modelData.c.r, modelData.c.g, modelData.c.b, 0.65)
