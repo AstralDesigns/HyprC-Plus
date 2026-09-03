@@ -26,13 +26,6 @@ if [ "$SCHEME" = "light" ]; then
     sed -i 's/-m dark/-m light/g' "$WI"
     sed -i 's/-m smart/-m light/g' "$WI"
 
-    # GTK3
-    sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @primary_fixed_dim;/' "$G3"
-    sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @inverse_primary;/'  "$G3"
-    # GTK4
-    sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @primary_fixed_dim;/' "$G4"
-    sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @inverse_primary;/'  "$G4"
-
 # ── Smart  ──
 elif [ "$SCHEME" = "scheme-smart" ]; then
     sed -i 's/wal -s -t -l -i "$bg_path" -n --cols16 lighten/wal -s -t -i "$bg_path" -n --cols16 foxify-darken/g' "$WI"
@@ -50,15 +43,6 @@ else
     sed -i 's/-m light/-m dark/g' "$WI"
     sed -i 's/-m smart/-m dark/g' "$WI"
     sed -i "s/--type scheme-[^ ]*/--type ${SCHEME}/" "$WI"
-
-    # GTK3: global swap @on_primary_fixed_variant → @on_secondary, then dialog colors
-    sed -i 's/@on_primary_fixed_variant/@on_secondary/g' "$G3"
-    sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @on_secondary;/' "$G3"
-    sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @primary;/'      "$G3"
-    # GTK4: same
-    sed -i 's/@on_primary_fixed_variant/@on_secondary/g' "$G4"
-    sed -i 's/@define-color dialog_bg_color .*;/@define-color dialog_bg_color @on_secondary;/' "$G4"
-    sed -i 's/@define-color dialog_fg_color .*;/@define-color dialog_fg_color @primary;/'      "$G4"
 fi
 
 # Trigger wallpaper integration (runs matugen → rewrites GTK / Hyprland colors)

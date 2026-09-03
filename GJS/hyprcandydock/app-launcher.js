@@ -1067,11 +1067,11 @@ window.hyprcandy-group-dialog {
 }
 
 .tab-btn.active {
-    background-color: alpha(@primary, 0.8);
+    background-color: alpha(@surface_tint, 0.8);
 }
 
 .tab-btn:active {
-    background-color: alpha(@primary, 0.25);
+    background-color: alpha(@surface_tint, 0.25);
 }
 
 /* Glyph label — same fixed size as button so it never widens the circle. */
@@ -1111,8 +1111,8 @@ window.hyprcandy-group-dialog {
     font-size: 12px;
 }
 .clip-clear-btn {
-    background-color: alpha(@color3, 0.10); 
-    border: 1px solid alpha(@color3, 0.6);
+    background-color: alpha(@color3, 0.3); 
+    border: 1px solid alpha(@color3, 0.8);
     border-radius: 20px;
     padding: 3px 12px;
     color: @primary;
@@ -1122,11 +1122,10 @@ window.hyprcandy-group-dialog {
     min-height: 28px;
 }
 .clip-clear-btn:hover {
-    border-color: alpha(@color3, 0.6);
-    background-color: alpha(@color3, 0.18);
+    background-color: alpha(@color3, 0.6);
 }
 .clip-clear-btn:active {
-    background-color: alpha(@inverse_primary, 0.45);
+    background-color: alpha(@inverse_primary, 0.6);
 }
 .clip-empty-label {
     color: alpha(@primary, 0.45);
@@ -1158,12 +1157,12 @@ window.hyprcandy-group-dialog {
     background-color: alpha(@inverse_primary, 0.45);
 }
 .emoji-mode-btn.active {
-    border-color: alpha(@color3, 0.6);
-    background-color: alpha(@color3, 0.10);
+    border-color: alpha(@color3, 0.8);
+    background-color: alpha(@color3, 0.3);
     color: @primary;
 }
 .emoji-mode-btn.active:hover {
-    background-color: alpha(@color3, 0.18);
+    background-color: alpha(@color3, 0.6);
 }
 .emoji-btn {
     background: transparent;
@@ -1294,11 +1293,11 @@ window.hyprcandy-group-dialog {
 }
 /* Running state: green-ish highlight */
 .searx-docker-btn.docker-on {
-    border-color: alpha(@color3, 0.6);
-    background-color: alpha(@color3, 0.10);
+    border-color: alpha(@color3, 0.8);
+    background-color: alpha(@color3, 0.3);
 }
 .searx-docker-btn.docker-on:hover {
-    background-color: alpha(@color3, 0.18);
+    background-color: alpha(@color3, 0.6);
 }
 /* Stopped state: subtly dimmed */
 .searx-docker-btn.docker-off {
