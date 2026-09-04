@@ -1829,6 +1829,7 @@ const AppLauncherWindow = GObject.registerClass({
         const savedState = readLauncherWebState();
         this._lastTab = savedState.lastTab || 'launcher';
         this._searxDockerRunning = false;  // last known Docker container state
+        this._searxDockerStarting = false; // true while searxng-control.sh start is in flight
         this._searxSearchTimer = 0;      // debounce GLib source ID for queries
         this._soupSession = null;   // lazy-initialised Soup.Session
         this._searxLastQuery = savedState.searxLastQuery || '';
@@ -16815,6 +16816,7 @@ const AppLauncherWindow = GObject.registerClass({
                 clickBtn.connect('clicked', () => {
                     pop.popdown();
                     this._searxOpenUrl(bm.url, bm.title || bm.url);
+                    this._searxEnsureDockerRunning();
                 });
 
                 const fullRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 2);
@@ -17614,57 +17616,86 @@ const AppLauncherWindow = GObject.registerClass({
                 this._searxShowStatus('󰡨', 'Docker stopped', 'SearXNG is stopped.', false, true);
             }
         } else {
+            this._searxStartDocker();
+        }
+    }
+
+    // ── SearXNG: auto-start Docker if a bookmark is opened and it isn't running ──
+    _searxEnsureDockerRunning() {
+        if (this._searxDockerStarting) return;
+        this._searxCheckDockerStatus((running) => {
+            if (!running) this._searxStartDocker({ background: true });
+        });
+    }
+
+    // ── SearXNG: start Docker container (idempotent — safe to call speculatively) ──
+    // opts.background: start without the status card (bookmark open keeps the WebKit view).
+    _searxStartDocker(opts) {
+        const background = !!(opts && opts.background);
+        if (this._searxDockerRunning || this._searxDockerStarting) return;
+        this._searxDockerStarting = true;
+
+        if (!background) {
             this._searxShowStatus('󰡨', 'Starting Docker & SearXNG…', 'Starting service and container (authenticate if prompted)...', false, false);
+        }
 
-            try {
-                const proc = new Gio.Subprocess({
-                    argv: [SCRIPT_DIR + '/searxng-control.sh', 'start'],
-                    flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+        let settled = false;
+        const onStarted = () => {
+            if (settled) return;
+            settled = true;
+            this._searxDockerStarting = false;
+            if (background) return;
+            this._searxShowIdle();
+            const q = this._searchEntry.get_text().trim() || this._searxLastQuery;
+            if (q) this._doSearxQuery(q);
+        };
+
+        const onFailed = (title, body, showFallback) => {
+            if (settled) return;
+            settled = true;
+            this._searxDockerStarting = false;
+            if (background) return;
+            this._searxShowStatus('󰡨', title, body, showFallback, true);
+        };
+
+        try {
+            const proc = new Gio.Subprocess({
+                argv: [SCRIPT_DIR + '/searxng-control.sh', 'start'],
+                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+            });
+            proc.init(null);
+
+            let pollCount = 0;
+            let pollSource = 0;
+            pollSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
+                pollCount++;
+                this._searxCheckDockerStatus((running) => {
+                    if (running) {
+                        if (pollSource) { GLib.source_remove(pollSource); pollSource = 0; }
+                        onStarted();
+                    }
                 });
-                proc.init(null);
+                if (pollCount > 60) return GLib.SOURCE_REMOVE;
+                return GLib.SOURCE_CONTINUE;
+            });
 
-                // Start periodic polling while starting to detect when it comes online quickly
-                let pollCount = 0;
-                let pollSource = 0;
-                pollSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
-                    pollCount++;
+            proc.wait_async(null, (p, res) => {
+                if (pollSource) { try { GLib.source_remove(pollSource); pollSource = 0; } catch (_) { } }
+                try {
+                    p.wait_finish(res);
                     this._searxCheckDockerStatus((running) => {
                         if (running) {
-                            if (pollSource) {
-                                GLib.source_remove(pollSource);
-                                pollSource = 0;
-                            }
-                            this._searxShowIdle();
-                            const q = this._searchEntry.get_text().trim() || this._searxLastQuery;
-                            if (q) this._doSearxQuery(q);
+                            onStarted();
+                        } else {
+                            onFailed('Could not start Docker', 'Authentication was cancelled or Docker service failed to start.', true);
                         }
                     });
-                    if (pollCount > 60) return GLib.SOURCE_REMOVE;
-                    return GLib.SOURCE_CONTINUE;
-                });
-
-                proc.wait_async(null, (p, res) => {
-                    if (pollSource) {
-                        try { GLib.source_remove(pollSource); pollSource = 0; } catch (_) { }
-                    }
-                    try {
-                        p.wait_finish(res);
-                        this._searxCheckDockerStatus((running) => {
-                            if (running) {
-                                this._searxShowIdle();
-                                const q = this._searchEntry.get_text().trim() || this._searxLastQuery;
-                                if (q) this._doSearxQuery(q);
-                            } else {
-                                this._searxShowStatus('󰡨', 'Could not start Docker', 'Authentication was cancelled or Docker service failed to start.', true, true);
-                            }
-                        });
-                    } catch (err) {
-                        this._searxShowStatus('󰡨', 'Could not start Docker', 'Error: ' + (err.message || 'Unknown error'), true, true);
-                    }
-                });
-            } catch (e) {
-                this._searxShowStatus('󰡨', 'Docker error', 'Could not execute ' + SCRIPT_DIR + '/searxng-control.sh', false, true);
-            }
+                } catch (err) {
+                    onFailed('Could not start Docker', 'Error: ' + (err.message || 'Unknown error'), true);
+                }
+            });
+        } catch (e) {
+            onFailed('Docker error', 'Could not execute ' + SCRIPT_DIR + '/searxng-control.sh', false);
         }
     }
 
