@@ -1137,11 +1137,11 @@ window.hyprcandy-group-dialog {
 /* Mode toggle row */
 .emoji-mode-btn {
     background: transparent;
-    background-color: transparent;
-    border: 1px solid alpha(@primary, 0.28);
+    background-color: alpha(@primary, 0.15);
+    border: 1px solid alpha(@primary, 0.3);
     border-radius: 20px;
     padding: 3px 12px;
-    color: alpha(@primary, 0.55);
+    color: @primary;
     font-size: 11px;
     font-weight: bold;
     outline: none;
@@ -1149,8 +1149,8 @@ window.hyprcandy-group-dialog {
     min-height: 28px;
 }
 .emoji-mode-btn:hover {
-    background-color: alpha(@primary, 0.09);
-    border-color: alpha(@primary, 0.45);
+    background-color: alpha(@primary, 0.25);
+    border-color: alpha(@primary, 0.3);
     color: @primary;
 }
 .emoji-mode-btn:active {
@@ -1167,7 +1167,7 @@ window.hyprcandy-group-dialog {
 .emoji-btn {
     background: transparent;
     background-color: transparent;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 8px;
     padding: 4px;
     min-width: 42px;
@@ -1177,8 +1177,8 @@ window.hyprcandy-group-dialog {
     font-size: 22px;
 }
 .emoji-btn:hover {
-    background-color: alpha(@primary, 0.09);
-    border-color: alpha(@primary, 0.16);
+    background-color: alpha(@primary, 0.1);
+    border-color: alpha(@primary, 0.25);
 }
 .emoji-btn:active {
     background-color: alpha(@inverse_primary, 0.5);
@@ -1187,7 +1187,7 @@ window.hyprcandy-group-dialog {
 .nerd-btn {
     background: transparent;
     background-color: transparent;
-    border: 1px solid transparent;
+    border: none;
     border-radius: 8px;
     padding: 4px;
     min-width: 42px;
@@ -1199,8 +1199,8 @@ window.hyprcandy-group-dialog {
     color: @primary;
 }
 .nerd-btn:hover {
-    background-color: alpha(@primary, 0.09);
-    border-color: alpha(@primary, 0.16);
+    background-color: alpha(@primary, 0.1);
+    border-color: alpha(@primary, 0.25);
 }
 .nerd-btn:active {
     background-color: alpha(@inverse_primary, 0.45);
@@ -1212,7 +1212,7 @@ window.hyprcandy-group-dialog {
     border: none;
     border-radius: 6px;
     padding: 2px 8px;
-    color: alpha(@primary, 0.60);
+    color: @primary;
     font-size: 25px;
     min-height: 34px;
     outline: none;
@@ -1276,8 +1276,8 @@ window.hyprcandy-group-dialog {
 /* Docker power toggle button */
 .searx-docker-btn {
     background: transparent;
-    background-color: transparent;
-    border: 1px solid alpha(@primary, 0.28);
+    background-color: alpha(@primary, 0.15);
+    border: 1px solid alpha(@primary, 0.3);
     border-radius: 20px;
     padding: 3px 12px;
     outline: none;
@@ -1285,8 +1285,8 @@ window.hyprcandy-group-dialog {
     min-height: 28px;
 }
 .searx-docker-btn:hover {
-    background-color: alpha(@primary, 0.09);
-    border-color: alpha(@primary, 0.45);
+    background-color: alpha(@primary, 0.25);
+    border-color: alpha(@primary, 0.3);
 }
 .searx-docker-btn:active {
     background-color: alpha(@inverse_primary, 0.45);
@@ -1301,8 +1301,9 @@ window.hyprcandy-group-dialog {
 }
 /* Stopped state: subtly dimmed */
 .searx-docker-btn.docker-off {
-    border-color: alpha(@primary, 0.20);
-    background-color: transparent;
+    background: transparent;
+    background-color: alpha(@primary, 0.15);
+    border: 1px solid alpha(@primary, 0.3);
     color: alpha(@primary, 0.55);
 }
 .searx-docker-glyph {
@@ -1312,7 +1313,7 @@ window.hyprcandy-group-dialog {
     margin-right: 5px;
 }
 .searx-docker-btn.docker-off .searx-docker-glyph {
-    color: alpha(@primary, 0.50);
+    color:  @primary;
 }
 .searx-docker-label {
     color: @primary;
@@ -1386,8 +1387,8 @@ window.hyprcandy-group-dialog {
 /* ── New Tab & Header Tabs Buttons ───────────────────────────────────── */
 .searx-header-tabs-btn {
     background: transparent;
-    background-color: alpha(@primary, 0.15);
-    border: 1px solid alpha(@primary, 0.35);
+    background-color: alpha(@primary, 0.09);
+    border: 1px solid alpha(@primary, 0.15);
     border-radius: 30px;
     padding: 3px 10px;
     margin-right: 6px;
@@ -1395,8 +1396,8 @@ window.hyprcandy-group-dialog {
     box-shadow: none;
 }
 .searx-header-tabs-btn:hover {
-    background-color: alpha(@primary, 0.25);
-    border-color: alpha(@primary, 0.55);
+    background-color: alpha(@primary, 0.15);
+    border-color: alpha(@primary, 0.3);
 }
 .searx-header-tabs-btn:active {
     background-color: alpha(@inverse_primary, 0.65);
@@ -1413,8 +1414,8 @@ window.hyprcandy-group-dialog {
 }
 .searx-newtab-btn {
     background: transparent;
-    background-color: alpha(@inverse_primary, 0.40);
-    border: 1px solid alpha(@primary, 0.25);
+    background-color: alpha(@primary, 0.15);
+    border: 1px solid alpha(@primary, 0.3);
     border-radius: 30px;
     padding: 3px 10px;
     margin-right: 6px;
@@ -1422,8 +1423,8 @@ window.hyprcandy-group-dialog {
     box-shadow: none;
 }
 .searx-newtab-btn:hover {
-    background-color: alpha(@primary, 0.15);
-    border-color: alpha(@primary, 0.45);
+    background-color: alpha(@primary, 0.25);
+    border-color: alpha(@primary, 0.3);
 }
 .searx-newtab-btn:active {
     background-color: alpha(@inverse_primary, 0.70);
@@ -1642,8 +1643,8 @@ listbox.searx-list row:focus {
 /* Header toggle button — same visual as searx-docker-btn */
 .searx-bookmarks-btn {
     background: transparent;
-    background-color: transparent;
-    border: 1px solid alpha(@primary, 0.28);
+    background-color: alpha(@primary, 0.15);
+    border: 1px solid alpha(@primary, 0.3);
     border-radius: 20px;
     padding: 3px 12px;
     outline: none;
@@ -1651,8 +1652,8 @@ listbox.searx-list row:focus {
     min-height: 28px;
 }
 .searx-bookmarks-btn:hover {
-    background-color: alpha(@primary, 0.09);
-    border-color: alpha(@primary, 0.45);
+    background-color: alpha(@primary, 0.25);
+    border-color: alpha(@primary, 0.3);
 }
 .searx-bookmarks-btn:active {
     background-color: alpha(@inverse_primary, 0.45);
