@@ -1,0 +1,61 @@
+{
+  "name": "hyprcandy-agent-app",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "llama:build": "bash ./build-llama-server.sh",
+    "llama:pull:1.5b": "node ./scripts/llama-pull.cjs Qwen2.5-Coder-1.5B-Instruct",
+    "llama:pull:0.5b": "node ./scripts/llama-pull.cjs Qwen2.5-Coder-0.5B-Instruct",
+    "llama:test": "node ./scripts/llama-chat-test.cjs",
+    "preview": "vite preview",
+    "electron": "node node_modules/electron/cli.js electron/main.cjs",
+    "electron:debug": "HYPRCANDY_ELECTRON_DEVTOOLS=1 node node_modules/electron/cli.js electron/main.cjs"
+  },
+  "dependencies": {
+    "@mlc-ai/web-llm": "^0.2.79",
+    "@monaco-editor/react": "^4.7.0",
+    "@wllama/wllama": "^3.6.1",
+    "@wllama/wllama-compat": "3.6.1",
+    "electron": "^44.2.0",
+    "lucide-react": "^0.447.0",
+    "monaco-editor": "^0.55.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^5.6.2",
+    "vite": "^7.3.0"
+  },
+  "nativeDependencies": {
+    "llama.cpp": {
+      "repository": "https://github.com/ggml-org/llama.cpp.git",
+      "tag": "v0.4.0",
+      "binary": "llama-server",
+      "buildSystem": "cmake",
+      "archInstall": "HYPRCANDY_LLAMA_BACKEND=vulkan paru/yay -S --needed llama.cpp-vulkan-bin",
+      "api": "OpenAI-compatible /v1/chat/completions"
+    }
+  },
+  "llamaModels": {
+    "Qwen2.5-Coder-1.5B-Instruct": {
+      "repo": "bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+      "file": "Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf"
+    },
+    "Qwen2.5-Coder-0.5B-Instruct": {
+      "repo": "bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF",
+      "file": "Qwen2.5-Coder-0.5B-Instruct-Q4_K_M.gguf"
+    }
+  },
+  "allowScripts": {
+    "electron@44.2.0": true,
+    "esbuild": true
+  }
+}

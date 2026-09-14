@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
@@ -386,17 +387,103 @@ Item {
     }
 
     // ── Media Player Card (shared UI for popup + widget) ─────────────────
-    component MediaPlayerCard: Rectangle {
+    component MediaPlayerCard: Item {
         required property var root
 
         id: mediaCard
         implicitWidth:  450
         implicitHeight: Math.max(mediaCardRow.implicitHeight + 28, 198)
-        radius: 20
-        color: Theme.blurBackground
-        border.width: Config.barBorderWidth
-        border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
-                              Config.barBorderColor.b, Config.barBorderAlpha)
+
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            maskEnabled:      true
+            maskSource:       mediaCardMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin:  1.0
+        }
+
+        Rectangle {
+            id: mediaCardMask
+            anchors.fill: parent
+            radius: 20
+            color: "white"
+            opacity: 0
+            layer.enabled: true
+        }
+
+        // Base card background
+        Rectangle {
+            anchors.fill: parent
+            radius: 20
+            color: Theme.blurBackground
+        }
+
+        // Blurred album art background + 0.15 InversePrimary tint (margins 12, radius 16)
+        Item {
+            anchors.fill: parent
+            anchors.margins: 12
+            visible: bgArtImg.status === Image.Ready && root.mediaArtUrl !== ""
+            opacity: visible ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 300 } }
+
+            layer.enabled: true
+            layer.effect: MultiEffect {
+                maskEnabled:      true
+                maskSource:       innerArtMask
+                maskThresholdMin: 0.5
+                maskSpreadAtMin:  1.0
+            }
+
+            Rectangle {
+                id: innerArtMask
+                anchors.fill: parent
+                radius: 16
+                color: "white"
+                opacity: 0
+                layer.enabled: true
+            }
+
+            Item {
+                anchors.fill: parent
+                layer.enabled: bgArtImg.visible
+                layer.effect: MultiEffect {
+                    blurEnabled: true
+                    blur: 0.35
+                    blurMax: 32
+                }
+
+                Image {
+                    id: bgArtImg
+                    anchors.fill: parent
+                    source: {
+                        const u = root.mediaArtUrl || ""
+                        if (!u) return ""
+                        if (u.startsWith("/")) return "file://" + u
+                        return u
+                    }
+                    fillMode: Image.PreserveAspectCrop
+                    smooth: true
+                    cache: false
+                    visible: root.mediaArtUrl !== ""
+                }
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: 16
+                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.3)
+            }
+        }
+
+        // Card Border
+        Rectangle {
+            anchors.fill: parent
+            radius: 20
+            color: "transparent"
+            border.width: Config.barBorderWidth
+            border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                                  Config.barBorderColor.b, Config.barBorderAlpha)
+        }
 
         // Top Glass Sheen
         Rectangle {
@@ -493,7 +580,7 @@ Item {
                 Text {
                     Layout.fillWidth: true
                     text: root.mediaArtist
-                    color: Theme.cOnSurfVar
+                    color: Theme.cOnSurf
                     font.pixelSize: 11; elide: Text.ElideRight
                     visible: text !== ""
                 }
@@ -524,12 +611,12 @@ Item {
                             seekBarItem._drag
                                 ? seekBarItem._dragNorm * root.mediaDuration
                                 : root.mediaPosition)
-                        color: Theme.cOnSurfVar; font.pixelSize: 9
+                        color: Theme.cOnSurf; font.pixelSize: 9
                     }
                     Text {
                         anchors.right: parent.right; anchors.top: parent.top
                         text: seekBarItem._fmt(root.mediaDuration)
-                        color: Theme.cOnSurfVar; font.pixelSize: 9
+                        color: Theme.cOnSurf; font.pixelSize: 9
                     }
 
                     Item {
@@ -539,8 +626,8 @@ Item {
                         height: 14
 
                         Rectangle {
-                            anchors.fill: parent; radius: 7
-                            color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
+                            anchors.fill: parent; radius: 99
+                            color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.5)
                             border.width: 1
                             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
                         }
@@ -614,8 +701,8 @@ Item {
                         readonly property real _norm: root._volumePct / 100.0
 
                         Rectangle {
-                            anchors.fill: parent; radius: 7
-                            color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
+                            anchors.fill: parent; radius: 99
+                            color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.5)
                             border.width: 1
                             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
                         }
@@ -690,13 +777,13 @@ Item {
                             readonly property bool isActive: modelData.a
                             color: bma.containsMouse
                                 ? (isActive
-                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.75)
                                     : (isCenter
-                                        ? Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.22)
-                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)))
+                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.75)
+                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.75)))
                                 : (isActive
-                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
-                                    : "transparent")
+                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.75)
+                                    : Qt.rgba(Theme.cOnPrimary.r, Theme.cOnPrimary.g, Theme.cOnPrimary.b, 0.75))
                             border.width: isActive ? 2 : 1
                             border.color: isActive
                                 ? Theme.cPrimary
@@ -709,8 +796,7 @@ Item {
                                 text: modelData.i
                                 font.pixelSize: 14; font.family: "Symbols Nerd Font Mono"
                                 color: bma.containsMouse || parent.isActive
-                                    ? (parent.isCenter ? Theme.cOnSurf : Theme.cPrimary)
-                                    : Theme.cOnSurfVar
+                                    ? Theme.cOnSecondary : Theme.cPrimary
                                 Behavior on color { ColorAnimation { duration: 100 } }
                             }
                             MouseArea {
@@ -860,7 +946,7 @@ Item {
         MediaPlayerCard {
             id: mpPanel
             root: scope
-            anchors.left: parent.left
+            anchors.centerIn: parent
         }
     }
 

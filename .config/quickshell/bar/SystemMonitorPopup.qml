@@ -42,9 +42,6 @@ Item {
     property bool   _hasBat:    false
     property real   _batPct:    0
     property string _batStatus: ""
-    property real   _rxRate:    0
-    property real   _txRate:    0
-    property var    _prevNet:   null
     property string _uptime:    "--"
     property string _load:      "--"
     property var    _prevCpu:   null
@@ -55,11 +52,6 @@ Item {
         const k = 1024, s = ["B","KB","MB","GB","TB"]
         const i = Math.min(Math.floor(Math.log(b) / Math.log(k)), 4)
         return parseFloat((b / Math.pow(k, i)).toFixed(1)) + " " + s[i]
-    }
-    function _fmtRate(bps) {
-        if (bps < 1024)    return Math.round(bps) + " B/s"
-        if (bps < 1048576) return (bps / 1024).toFixed(1) + " KB/s"
-        return (bps / 1048576).toFixed(1) + " MB/s"
     }
     function _fmtUptime(sec) {
         const d = Math.floor(sec / 86400)
@@ -143,12 +135,9 @@ Item {
             " sta=$(cat \"$b/status\" 2>/dev/null);" +
             " [ -n \"$cap\" ] && printf 'BAT:%s:%s\\n' \"$cap\" \"$sta\" && break;" +
             " done;" +
-            // ── Network / Uptime / Load (popup mode only) ──
-            (SystemMonitorPopupState.visible ? (
-                "awk 'NR>2{gsub(\":\",\" \",$1);if($1!=\"lo\"){rx+=$2;tx+=$10}}END{printf \"NET:%d:%d\\n\",rx,tx}' /proc/net/dev;" +
-                "read ut _ < /proc/uptime && printf 'UPTIME:%s\\n' \"$ut\";" +
-                "read la _ < /proc/loadavg && printf 'LOAD:%s\\n' \"$la\""
-            ) : "")
+            // ── Uptime / Load ──
+            "read ut _ < /proc/uptime && printf 'UPTIME:%s\\n' \"$ut\";" +
+            "read la _ < /proc/loadavg && printf 'LOAD:%s\\n' \"$la\""
         ]
         running: false
 
@@ -252,20 +241,6 @@ Item {
                 continue
             }
 
-            // ── Network ──
-            if (l.startsWith("NET:")) {
-                const p = l.split(":")
-                const rx = parseInt(p[1]) || 0, tx = parseInt(p[2]) || 0
-                const now = Date.now() / 1000
-                if (_prevNet) {
-                    const dt = Math.max(0.1, now - _prevNet.ts)
-                    _rxRate = Math.max(0, (rx - _prevNet.rx) / dt)
-                    _txRate = Math.max(0, (tx - _prevNet.tx) / dt)
-                }
-                _prevNet = { rx, tx, ts: now }
-                continue
-            }
-
             if (l.startsWith("UPTIME:")) { _uptime = _fmtUptime(parseFloat(l.slice(7))); continue }
             if (l.startsWith("LOAD:"))   { _load   = parseFloat(l.slice(5)).toFixed(2);  continue }
         }
@@ -336,10 +311,10 @@ Item {
                 ctx.clearRect(0, 0, width, height)
                 const cx = width/2, cy = height/2, r = 31, lw = 6
                 const S = 0.75*Math.PI, E = 2.25*Math.PI
-                const onS = Theme.cOnSurf
+                const onS = Theme.cOnSecondary
                 ctx.lineWidth = lw; ctx.lineCap = "round"
                 ctx.beginPath(); ctx.arc(cx, cy, r, S, E)
-                ctx.strokeStyle = Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15).toString()
+                ctx.strokeStyle = Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35).toString()
                 ctx.stroke()
                 if (_v > 0.005) {
                     ctx.beginPath(); ctx.arc(cx, cy, r, S, S + _v*(E-S))
@@ -359,14 +334,14 @@ Item {
         Text {
             anchors.top: arcC.bottom; anchors.topMargin: 2
             anchors.horizontalCenter: parent.horizontalCenter
-            text: ag.sub; color: Theme.cOnSurfVar
+            text: ag.sub; color: Theme.cOnSecondary
             font.pixelSize: 11; font.family: Config.labelFont
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight; width: parent.width
         }
         Text {
             anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
-            text: ag.label; color: Theme.cOnSurfVar
+            text: ag.label; color: Theme.cOnSecondary
             font.pixelSize: 12; font.family: Config.labelFont
             horizontalAlignment: Text.AlignHCenter
         }
@@ -377,72 +352,208 @@ Item {
         id: cardRoot
         required property var root
 
-        readonly property int _gaugeCount: 3 + (cardRoot.root._swapOk ? 1 : 0) + cardRoot.root._gpus.length + (cardRoot.root._hasBat ? 1 : 0)
-        implicitWidth: _gaugeCount * 88 + Math.max(0, _gaugeCount - 1) * 8 + 24
-        implicitHeight: 112 + 16
-        radius: 20
-        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                       Theme.cInversePrimary.b, 0.5)
+        radius: 16
+        color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                       Theme.cSurfaceTint.b, 0.65)
         border.width: 1
         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
-        Row {
-            id: gaugesRow
-            anchors.centerIn: parent
-            spacing: 8
-
-            ArcGauge {
-                value:    cardRoot.root._cpu;  glyph: "󰻠"; label: "CPU"
-                valStr:   Math.round(cardRoot.root._cpu * 100) + "%"
+        // Unified list of all active dials
+        readonly property var _dials: {
+            let list = []
+            // 1. CPU
+            list.push({
+                value: cardRoot.root._cpu,
+                glyph: "󰻠",
+                label: "CPU",
+                valStr: Math.round(cardRoot.root._cpu * 100) + "%",
+                sub: "",
                 arcColor: Theme.cWc5
-            }
-            ArcGauge {
-                value:    cardRoot.root._ram;  glyph: "󰍛"; label: "RAM"
-                valStr:   Math.round(cardRoot.root._ram * 100) + "%"
-                sub:      cardRoot.root._fmtBytes(cardRoot.root._ramUsed)
+            })
+            // 2. RAM
+            list.push({
+                value: cardRoot.root._ram,
+                glyph: "󰍛",
+                label: "RAM",
+                valStr: Math.round(cardRoot.root._ram * 100) + "%",
+                sub: cardRoot.root._fmtBytes(cardRoot.root._ramUsed),
                 arcColor: Theme.cWc5
-            }
-            ArcGauge {
-                value:    cardRoot.root._tempOk ? Math.min(cardRoot.root._temp / 100, 1) : 0
-                glyph:    "󰔏"; label: "Temp"
-                valStr:   cardRoot.root._tempOk ? Math.round(cardRoot.root._temp) + "°" : "N/A"
+            })
+            // 3. Temp
+            list.push({
+                value: cardRoot.root._tempOk ? Math.min(cardRoot.root._temp / 100, 1) : 0,
+                glyph: "󰔏",
+                label: "Temp",
+                valStr: cardRoot.root._tempOk ? Math.round(cardRoot.root._temp) + "°" : "N/A",
+                sub: "",
                 arcColor: cardRoot.root._tempOk && cardRoot.root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cWc4
+            })
+            // 4. Swap (if swapOk)
+            if (cardRoot.root._swapOk) {
+                list.push({
+                    value: cardRoot.root._swap,
+                    glyph: "󰾴",
+                    label: "Swap",
+                    valStr: Math.round(cardRoot.root._swap * 100) + "%",
+                    sub: cardRoot.root._fmtBytes(cardRoot.root._swapUsed),
+                    arcColor: Theme.cWc4
+                })
             }
-            ArcGauge {
-                visible:  cardRoot.root._swapOk
-                value:    cardRoot.root._swap; glyph: "󰾴"; label: "Swap"
-                valStr:   Math.round(cardRoot.root._swap * 100) + "%"
-                sub:      cardRoot.root._swapOk ? cardRoot.root._fmtBytes(cardRoot.root._swapUsed) : ""
-                arcColor: Theme.cWc4
+            // 5. NPU (from SystemMonitorPopupState.npus)
+            for (let i = 0; i < SystemMonitorPopupState.npus.length; i++) {
+                const npu = SystemMonitorPopupState.npus[i]
+                list.push({
+                    value: (npu.pct || 0) / 100,
+                    glyph: "󰧑",
+                    label: "NPU",
+                    valStr: (npu.pct || 0) + "%",
+                    sub: (npu.name || "NPU").slice(0, 8),
+                    arcColor: Theme.cWc1
+                })
             }
-
-            // GPUs — all detected GPUs shown (iGPU and dGPU both visible)
-            Repeater {
-                model: cardRoot.root._gpus
-                delegate: ArcGauge {
-                    required property var modelData
-                    value:    modelData.pct / 100
-                    glyph:    modelData.isIgpu ? "󱤓" : "󰢮"
-                    label:    modelData.isIgpu ? "iGPU" : "dGPU"
-                    valStr:   modelData.pct + "%"
-                    sub:      (modelData.temp > 0 ? modelData.temp + "°  " : "") + modelData.name.slice(0, 8)
+            // 6. GPUs — all detected GPUs shown (iGPU and dGPU both visible)
+            for (let i = 0; i < cardRoot.root._gpus.length; i++) {
+                const gpu = cardRoot.root._gpus[i]
+                list.push({
+                    value: (gpu.pct || 0) / 100,
+                    glyph: gpu.isIgpu ? "󱤓" : "󰢮",
+                    label: gpu.isIgpu ? "iGPU" : "dGPU",
+                    valStr: (gpu.pct || 0) + "%",
+                    sub: (gpu.temp > 0 ? gpu.temp + "°  " : "") + (gpu.name || "GPU").slice(0, 8),
                     arcColor: Theme.cWc3
+                })
+            }
+            // 7. Battery — laptops only; hidden on desktops
+            if (cardRoot.root._hasBat) {
+                const bPct = cardRoot.root._batPct
+                const bSta = cardRoot.root._batStatus
+                list.push({
+                    value: bPct / 100,
+                    glyph: bPct > 80 ? "󰁹" : bPct > 60 ? "󰂀" : bPct > 40 ? "󰁾" : bPct > 20 ? "󰁼" : "󰁺",
+                    label: bSta === "Full" ? "Battery " : bSta === "Charging" ? "Battery 󱐋" : "Battery",
+                    valStr: bPct + "%",
+                    sub: bSta,
+                    arcColor: bPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1) : bSta === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1) : Theme.cWc6
+                })
+            }
+            return list
+        }
+
+        readonly property int _pairCount: Math.floor(_dials.length / 2)
+        readonly property bool _hasOddRemainder: _dials.length % 2 === 1
+        readonly property int _rowCount: Math.ceil(_dials.length / 2)
+
+        implicitWidth: 88 * 2 + 12 + 24
+        implicitHeight: _rowCount * 112 + Math.max(0, _rowCount - 1) * 10 + 24 + 28
+
+        ColumnLayout {
+            id: dialsCol
+            anchors {
+                top: parent.top
+                bottom: parent.bottom
+                horizontalCenter: parent.horizontalCenter
+                topMargin: 12
+                bottomMargin: 12
+            }
+            width: 88 * 2 + 12
+            spacing: 10
+
+            // 2-column paired rows
+            Repeater {
+                model: cardRoot._pairCount
+                delegate: RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 12
+
+                    required property int index
+
+                    ArcGauge {
+                        readonly property var d: cardRoot._dials[index * 2]
+                        value:    d ? d.value : 0
+                        glyph:    d ? d.glyph : ""
+                        label:    d ? d.label : ""
+                        valStr:   d ? d.valStr : "--"
+                        sub:      d ? d.sub : ""
+                        arcColor: d ? d.arcColor : Theme.cPrimary
+                    }
+
+                    ArcGauge {
+                        readonly property var d: cardRoot._dials[index * 2 + 1]
+                        value:    d ? d.value : 0
+                        glyph:    d ? d.glyph : ""
+                        label:    d ? d.label : ""
+                        valStr:   d ? d.valStr : "--"
+                        sub:      d ? d.sub : ""
+                        arcColor: d ? d.arcColor : Theme.cPrimary
+                    }
                 }
             }
 
-            // Battery — laptops only; hidden on desktops
-            ArcGauge {
-                visible:  cardRoot.root._hasBat
-                value:    cardRoot.root._batPct / 100
-                glyph:    cardRoot.root._batPct > 80 ? "󰁹" : cardRoot.root._batPct > 60 ? "󰂀"
-                          : cardRoot.root._batPct > 40 ? "󰁾" : cardRoot.root._batPct > 20 ? "󰁼" : "󰁺"
-                label:    cardRoot.root._batStatus === "Full"      ? "Battery "
-                          : cardRoot.root._batStatus === "Charging" ? "Battery 󱐋" : "Battery"
-                valStr:   cardRoot.root._batPct + "%"
-                sub:      cardRoot.root._batStatus
-                arcColor: cardRoot.root._batPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1)
-                          : cardRoot.root._batStatus === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1)
-                          : Theme.cWc6
+            // Odd remainder: single dial at the bottom, centered
+            Item {
+                visible: cardRoot._hasOddRemainder
+                Layout.alignment: Qt.AlignHCenter
+                implicitWidth: 88
+                implicitHeight: 112
+
+                ArcGauge {
+                    anchors.centerIn: parent
+                    readonly property var d: cardRoot._hasOddRemainder ? cardRoot._dials[cardRoot._dials.length - 1] : null
+                    value:    d ? d.value : 0
+                    glyph:    d ? d.glyph : ""
+                    label:    d ? d.label : ""
+                    valStr:   d ? d.valStr : "--"
+                    sub:      d ? d.sub : ""
+                    arcColor: d ? d.arcColor : Theme.cPrimary
+                }
+            }
+
+            // Bottom of inner card: Load (left-aligned) and Uptime (right-aligned)
+            RowLayout {
+                Layout.fillWidth: true
+                Layout.leftMargin: 4
+                Layout.rightMargin: 4
+                Layout.topMargin: 4
+
+                Row {
+                    Layout.alignment: Qt.AlignLeft
+                    spacing: 5
+                    Text {
+                        text: "󰒋"
+                        color: Theme.cOnSecondary
+                        font.pixelSize: 11
+                        font.family: Config.fontFamily
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: "Load: " + cardRoot.root._load
+                        color: Theme.cOnPrimary
+                        font.pixelSize: 10
+                        font.family: Config.labelFont
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Row {
+                    Layout.alignment: Qt.AlignRight
+                    spacing: 5
+                    Text {
+                        text: "󰅐"
+                        color: Theme.cOnSecondary
+                        font.pixelSize: 11
+                        font.family: Config.fontFamily
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        text: "Up: " + cardRoot.root._uptime
+                        color: Theme.cOnPrimary
+                        font.pixelSize: 10
+                        font.family: Config.labelFont
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
             }
         }
     }
@@ -453,9 +564,8 @@ Item {
         property bool showClose: true
         property bool popupMode: false
 
-        readonly property int _gaugeCount: 3 + (root._swapOk ? 1 : 0) + root._gpus.length + (root._hasBat ? 1 : 0)
-        width: _gaugeCount * 88 + (_gaugeCount - 1) * 8 + 24 + 32
-        implicitHeight: smCol.implicitHeight + 32
+        width: gaugesCard.implicitWidth + 24
+        implicitHeight: gaugesCard.implicitHeight + 24
 
         topLeftRadius: 20
         topRightRadius: 20
@@ -472,77 +582,17 @@ Item {
         Behavior on scale   { enabled: popupMode; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Behavior on opacity { enabled: popupMode; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
-        MouseArea { anchors.fill: parent; enabled: popupMode }
+        GaugesCard {
+            id: gaugesCard
+            root: smPanel.root
+            anchors.centerIn: parent
+        }
 
-        ColumnLayout {
-            id: smCol
-            anchors { top: parent.top; left: parent.left; right: parent.right; margins: 16 }
-            spacing: 10
-
-            // Header
-            RowLayout {
-                Layout.fillWidth: true
-                Text {
-                    text: "󰻠  System Monitor"; color: Theme.cPrimary
-                    font.pixelSize: 13; font.weight: Font.Medium; font.family: Config.fontFamily
-                }
-                Item { Layout.fillWidth: true }
-                Rectangle {
-                    visible: showClose
-                    width: 26; height: 26; radius: 99; color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.2)
-                    MouseArea {
-                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: SystemMonitorPopupState.close()
-                        Text {
-                            anchors.centerIn: parent; text: "󰅙"
-                            color: parent.containsMouse ? Theme.cPrimary : Theme.cPrimary
-                            font.pixelSize: 13; font.family: Config.fontFamily
-                            Behavior on color { ColorAnimation { duration: 100 } }
-                        }
-                    }
-                }
-            }
-
-            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
-
-            // Unified card background for gauges in a single horizontal line
-            GaugesCard {
-                id: gaugesCard
-                root: smPanel.root
-                Layout.fillWidth: true
-            }
-
-            Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
-
-            // Footer — network rates, uptime, load average
-            RowLayout {
-                Layout.fillWidth: true; spacing: 0
-                Column {
-                    spacing: 4
-                    Row { spacing: 6
-                        Text { text: "󰁅"; color: Theme.cPrimary; font.pixelSize: 12; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: root._fmtRate(root._rxRate); color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
-                    }
-                    Row { spacing: 6
-                        Text { text: "󰁝"; color: Theme.cPrimary; font.pixelSize: 12; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: root._fmtRate(root._txRate); color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
-                    }
-                }
-                Item { Layout.fillWidth: true }
-                Column {
-                    spacing: 4
-                    Row { spacing: 6; anchors.right: parent.right
-                        Text { text: "󰅐"; color: Theme.cPrimary; font.pixelSize: 12; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "Up: " + root._uptime; color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
-                    }
-                    Row { spacing: 6; anchors.right: parent.right
-                        Text { text: "󰒋"; color: Theme.cPrimary; font.pixelSize: 12; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "Load: " + root._load; color: Theme.cOnSurf; font.pixelSize: 11; font.family: Config.labelFont }
-                    }
-                }
-            }
-
-            Item { height: 0 }
+        MouseArea {
+            anchors.fill: parent
+            enabled: popupMode
+            cursorShape: Qt.PointingHandCursor
+            onClicked: SystemMonitorPopupState.close()
         }
     }
 

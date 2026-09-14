@@ -1333,7 +1333,7 @@ PanelWindow {
                         height: 125
                         radius: 16
                         color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                               Theme.cSurfaceTint.b, 0.82)
+                                               Theme.cSurfaceTint.b, 0.8)
                         border.width: 2
                         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
                                               Theme.cScrim.b, 0.85)
@@ -1433,7 +1433,7 @@ PanelWindow {
                             Behavior on opacity { NumberAnimation { duration: 300 } }
                             color: _stackIdx === modelData.idx
                                 ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                          Theme.cSurfaceTint.b, 0.82)
+                                          Theme.cSurfaceTint.b, 0.8)
                                 : (navHover.containsMouse && LicenseState.activated
                                     ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                               Theme.cInversePrimary.b, 0.2)
@@ -1573,7 +1573,7 @@ PanelWindow {
                                         radius: 9
                                         color: _subIdx === index
                                             ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                                      Theme.cSurfaceTint.b, 0.82)
+                                                      Theme.cSurfaceTint.b, 0.8)
                                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, 
                                             	      Theme.cOnSecondary.b, 0.15)
                                         border.width: _subIdx === index ? 1 : 0
@@ -1673,8 +1673,8 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 6
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 28; radius: 7
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                               Theme.cInversePrimary.b, 0.15)
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                                Theme.cOnSecondary.b, 0.85)
                                                 border.width: 1
                                                 border.color: _wLocInput.activeFocus
                                                     ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
@@ -1954,7 +1954,7 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             Rectangle {
                                                 Layout.preferredWidth: 174; height: 28; radius: 9
-                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
                                     		border.width: 1
                                     		border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                                 Row {
@@ -1966,7 +1966,7 @@ PanelWindow {
                                                             property bool _sel: Config.barBorderMode === modelData
                                                             width: (parent.width - 4) / 2; height: parent.height; radius: 7
                                                             color: _sel ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, 
-                                                                                  Theme.cSurfaceTint.b, 0.82) : "transparent"
+                                                                                  Theme.cSurfaceTint.b, 0.8) : "transparent"
                                                 	    border.width: _sel ? 1 : 0
                                                 	    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
                                                             Text {
@@ -2118,7 +2118,7 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             Rectangle {
                                                 Layout.preferredWidth: 174; height: 28; radius: 9
-                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
                                     		border.width: 1
                                     		border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                                 Row {
@@ -2130,7 +2130,7 @@ PanelWindow {
                                                             property bool _sel: Config.islandBorderMode === modelData
                                                             width: (parent.width - 4) / 2; height: parent.height; radius: 7
                                                             color: _sel ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, 
-                                                                                  Theme.cSurfaceTint.b, 0.82) : "transparent"
+                                                                                  Theme.cSurfaceTint.b, 0.8) : "transparent"
                                                 	    border.width: _sel ? 1 : 0
                                                 	    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
                                                             Text {
@@ -2403,7 +2403,7 @@ PanelWindow {
                                 ColumnLayout {
                                         width: parent.width; spacing: 5
 
-                                        CCSection { text: "ASCII Style" }
+                                        CCSection { text: "Style" }
                                         // Preview icons row — one per style, wraps to next line
                                         Flow {
                                             Layout.fillWidth: true
@@ -2499,7 +2499,7 @@ PanelWindow {
                                             // Three-button mode selector
                                             Rectangle {
                                                 Layout.preferredWidth: 216; height: 28; radius: 9
-                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
                                     		border.width: 1
                                     		border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                                 Row {
@@ -2511,7 +2511,7 @@ PanelWindow {
                                                             property bool _sel: Config.cavaStartMode === modelData
                                                             width: (parent.width - 6) / 3; height: parent.height; radius: 7
                                                             color: _sel ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, 
-                                                                                  Theme.cSurfaceTint.b, 0.82) : "transparent"
+                                                                                  Theme.cSurfaceTint.b, 0.8) : "transparent"
                                                 	    border.width: _sel ? 1 : 0
                                                 	    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
                                                             enabled: Config.cavaGradientEnabled
@@ -2667,7 +2667,7 @@ PanelWindow {
                                             // Three-button mode selector
                                             Rectangle {
                                                 Layout.preferredWidth: 216; height: 28; radius: 9
-                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
                                     		border.width: 1
                                     		border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                                 Row {
@@ -2679,7 +2679,7 @@ PanelWindow {
                                                             property bool _sel: Config.cavaEndMode === modelData
                                                             width: (parent.width - 6) / 3; height: parent.height; radius: 7
                                                             color: _sel ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, 
-                                                                                  Theme.cSurfaceTint.b, 0.82) : "transparent"
+                                                                                  Theme.cSurfaceTint.b, 0.8) : "transparent"
                                                 	    border.width: _sel ? 1 : 0
                                                 	    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
                                                             enabled: Config.cavaGradientEnabled
@@ -3107,7 +3107,7 @@ PanelWindow {
                                 }
                                 Rectangle {
                                     Layout.preferredWidth: 40; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.6)
+                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                     TextInput {
@@ -3366,7 +3366,7 @@ PanelWindow {
                                 // Three-button mode selector: Custom | Matugen | Pywal
                                 Rectangle {
                                     Layout.preferredWidth: 144; height: 28; radius: 9
-                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                     Row {
@@ -3378,7 +3378,7 @@ PanelWindow {
                                                 property bool _sel: ccWin._activeBorderMode === modelData
                                                 width: (parent.width - 4) / 2; height: parent.height; radius: 7
                                                 color: _sel ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, 
-                                                                      Theme.cSurfaceTint.b, 0.82) 
+                                                                      Theme.cSurfaceTint.b, 0.8) 
                                                 	    : "transparent"
                                                 border.width: _sel ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
@@ -3531,7 +3531,7 @@ PanelWindow {
                                 // Three-button mode selector: Custom | Matugen | Pywal
                                 Rectangle {
                                     Layout.preferredWidth: 144; height: 28; radius: 9
-                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
                                     border.width: 1
                                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                     Row {
@@ -3543,7 +3543,7 @@ PanelWindow {
                                                 property bool _sel: ccWin._inactiveBorderMode === modelData
                                                 width: (parent.width - 4) / 2; height: parent.height; radius: 7
                                                 color: _sel ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, 
-                                                                      Theme.cSurfaceTint.b, 0.82) 
+                                                                      Theme.cSurfaceTint.b, 0.8) 
                                                 	    : "transparent"
                                                 border.width: _sel ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
@@ -3700,7 +3700,7 @@ PanelWindow {
                                 Layout.fillWidth: true; spacing: 8
 
                                 Text {
-                                    text: "Process Matugen Colors"
+                                    text: "Apply matugen color palette from themes listed below?"
                                     color: Theme.cPrimary
                                     font.family: Config.labelFont
                                     font.pixelSize: 13
@@ -3719,7 +3719,7 @@ PanelWindow {
 
                                     color: regenEnabled
                                         ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                                  Theme.cSurfaceTint.b, 0.82)
+                                                  Theme.cSurfaceTint.b, 0.8)
                                         : (_colorRegenMA.containsMouse
                                             ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.55)
                                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.16))
@@ -3769,7 +3769,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 Layout.topMargin: 2
                                 visible: _colorRegenPill.regenEnabled
-                                text: " Matugen color palette will be reloaded on all theme and background changes"
+                                text: " All color palette engines will be reloaded on all theme and background changes"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                Theme.cPrimary.b, 0.55)
                                 font.family: Config.labelFont
@@ -3782,7 +3782,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 Layout.topMargin: 2
                                 visible: !_colorRegenPill.regenEnabled
-                                text: " Current color palette generation paused for matugen only"
+                                text: " Only wallust and pywal accent colors will be reloaded - matugen is disabled"
                                 color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                Theme.cPrimary.b, 0.55)
                                 font.family: Config.labelFont
@@ -4981,7 +4981,7 @@ PanelWindow {
                                         radius: 9
                                         color: _subIdx === index
                                             ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                                      Theme.cSurfaceTint.b, 0.82)
+                                                      Theme.cSurfaceTint.b, 0.8)
                                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, 
                                             	      Theme.cOnSecondary, 0.15)
                                         border.width: _subIdx === index ? 1 : 0
@@ -5011,7 +5011,7 @@ PanelWindow {
                                     visible: kbSubStack.currentIndex === 0
                                     height: 30
                                     width: 180
-                                    radius: 9
+                                    radius: 99
                                     color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                    Theme.cInversePrimary.b, 0.3)
                                     border.width: 1
@@ -5092,7 +5092,7 @@ PanelWindow {
                                                 Layout.topMargin: 4; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰌌 hyprviz.lua"
-                                                    color: Theme.cSurfaceTint
+                                                    color: Theme.cOnSurf
             					    opacity: 0.85
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 15; font.weight: Font.Bold
@@ -5169,7 +5169,7 @@ PanelWindow {
                                                 Layout.topMargin: 14; Layout.bottomMargin: 4
                                                 Text {
                                                     text: "󰏫 custom.lua"
-                                                    color: Theme.cSurfaceTint
+                                                    color: Theme.cOnSurf
             					    opacity: 0.85
                                                     font.family: Config.labelFont
                                                     font.pixelSize: 15; font.weight: Font.Bold
@@ -5435,12 +5435,12 @@ PanelWindow {
                                             Rectangle {
                                                 height: 26
                                                 implicitWidth: _newBtnLbl.implicitWidth + 18
-                                                radius: 8
+                                                radius: 99
                                                 color: _newBtnHov.containsMouse
                                                     ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                              Theme.cInversePrimary.b, 0.38)
+                                                              Theme.cInversePrimary.b, 0.85)
                                                     : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                              Theme.cInversePrimary.b, 0.18)
+                                                              Theme.cInversePrimary.b, 0.65)
                                                 Behavior on color { ColorAnimation { duration: 100 } }
                                                 Text {
                                                     id: _newBtnLbl; anchors.centerIn: parent
@@ -5472,8 +5472,8 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, 
-                                                              Theme.cInversePrimary.b, 0.6)
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                                Theme.cOnSecondary.b, 0.85)
                                                 border.width: kbKeysInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5512,8 +5512,8 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, 
-                                                              Theme.cInversePrimary.b, 0.6)
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                                Theme.cOnSecondary.b, 0.85)
                                                 border.width: kbCmdInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5552,8 +5552,8 @@ PanelWindow {
                                             }
                                             Rectangle {
                                                 Layout.fillWidth: true; height: 30; radius: 8
-                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, 
-                                                              Theme.cInversePrimary.b, 0.6)
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                                Theme.cOnSecondary.b, 0.85)
                                                 border.width: kbDescInput.activeFocus ? 1 : 0
                                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
                                                 Item {
@@ -5591,10 +5591,10 @@ PanelWindow {
                                             Rectangle {
                                                 height: 32
                                                 implicitWidth: _saveBtnLbl.implicitWidth + 22
-                                                radius: 9
+                                                radius: 99
                                                 color: _saveBtnHov.containsMouse
                                                     ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                                              Theme.cSurfaceTint.b, 0.82)
+                                                              Theme.cSurfaceTint.b, 0.8)
                                                     : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
                                                               Theme.cSurfaceTint.b, 0.45)
                                                 border.width: 1
@@ -5742,7 +5742,7 @@ PanelWindow {
 
                                 Text {
                                     text: " 󰗘 Animations"
-                                    color: Theme.cSurfaceTint
+                                    color: Theme.cOnSurf
 				    opacity: 0.85
                                     font.family: Config.labelFont
                                     font.pixelSize: 15
@@ -7487,7 +7487,7 @@ PanelWindow {
         Layout.bottomMargin: 4
         Text {
             id: _sh
-            color: Theme.cSurfaceTint
+            color: Theme.cOnSurf
             opacity: 0.85
             font.family: Config.labelFont
             font.pixelSize: 15
@@ -7545,7 +7545,7 @@ PanelWindow {
                 // Trough background
                 Rectangle {
                     anchors.fill: parent; radius: _trough.tH / 2
-                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
+                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.5)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                 }
@@ -7687,7 +7687,7 @@ PanelWindow {
         Rectangle {
             Layout.preferredWidth: Math.min(360, options.length * 88)
             height: 28; radius: 9
-            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                   Theme.cPrimary.b, 0.18)
@@ -7703,7 +7703,7 @@ PanelWindow {
                         height: parent.height; radius: 7
                         color: _isCurrent
                             ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                      Theme.cSurfaceTint.b, 0.82)
+                                      Theme.cSurfaceTint.b, 0.8)
                             : "transparent"
                         border.width: _isCurrent ? 1 : 0
                         border.color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
@@ -7734,18 +7734,18 @@ PanelWindow {
         signal clicked()
 
         implicitWidth: _pbt.implicitWidth + 22
-        implicitHeight: 30; radius: 9
+        implicitHeight: 30; radius: 99
         color: active
             ? (pbma.containsMouse
             	? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                          Theme.cOnSecondary.b, 1.0)
+                          Theme.cOnSecondary.b, 0.85)
                 : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                          Theme.cSurfaceTint.b, 0.82))
+                          Theme.cSurfaceTint.b, 0.8))
             : (pbma.containsMouse
                 ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
                           Theme.cSurfaceTint.b, 0.55)
-                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                          Theme.cOnSecondary.b, 0.15))
+                : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                          Theme.cInversePrimary.b, 0.65))
         border.width: 1
 	border.color: active 
 	    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, pbma.containsMouse ? 0.55 : 0.2) 
@@ -7790,7 +7790,7 @@ PanelWindow {
         }
         Rectangle {
             Layout.preferredWidth: 40; height: 28; radius: 7
-            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.6)
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
             TextInput {
@@ -7825,7 +7825,7 @@ PanelWindow {
         }
         Rectangle {
             Layout.preferredWidth: 100; height: 28; radius: 7
-            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.6)
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
             TextInput {

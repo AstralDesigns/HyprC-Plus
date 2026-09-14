@@ -238,7 +238,7 @@ PanelWindow {
                         anchors.centerIn: parent
                         text: calWin._monthNames[calWin._viewMonth] + "  " + calWin._viewYear
                         // Accent colour when already on today's month
-                        color: calWin._isCurrentMonth ? Theme.cPrimary : Theme.cOnSurf
+                        color: calWin._isCurrentMonth ? Theme.cOnSurf : Theme.cPrimary
                         font.family: Config.labelFont
                         font.pixelSize: 14
                         font.weight: Font.Medium
@@ -285,8 +285,8 @@ PanelWindow {
                 Layout.bottomMargin: 8
                 implicitHeight: headersRow.implicitHeight + 12
                 radius: 20
-                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.5)
+                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                                               Theme.cSurfaceTint.b, 0.65)
                 border.width: 1
                 border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
@@ -299,7 +299,7 @@ PanelWindow {
                     // Week-number gutter label
                     Item { width: 26; height: 20
                         Text { anchors.centerIn: parent; text: "Wk"
-                            color: Theme.cWc5
+                            color: Theme.cInversePrimary
                             font.family: Config.labelFont; font.pixelSize: 9 }
                     }
                     Repeater {
@@ -316,8 +316,8 @@ PanelWindow {
                                 anchors.centerIn: parent
                                 text: modelData
                                 color: (index === 5 || index === 6)
-                                    ? Theme.cWc6
-                                    : Theme.cPrimary
+                                    ? Theme.cInversePrimary
+                                    : Theme.cOnSecondary
                                 font.family: Config.labelFont
                                 font.pixelSize: 10
                                 font.weight: Font.Medium
@@ -333,8 +333,8 @@ PanelWindow {
                 Layout.bottomMargin: 4
                 implicitHeight: gridCol.implicitHeight + 16
                 radius: 12
-                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.5)
+                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                                               Theme.cSurfaceTint.b, 0.65)
                 border.width: 1
                 border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
@@ -365,7 +365,7 @@ PanelWindow {
                                         return 1
                                     }
                                     text: calWin._isoWeek(calWin._viewYear, calWin._viewMonth, _fd)
-                                    color: Theme.cWc5
+                                    color: Theme.cInversePrimary
                                     font.family: Config.labelFont; font.pixelSize: 9
                                 }
                             }
@@ -390,7 +390,7 @@ PanelWindow {
                                         anchors.centerIn: parent
                                         width: 26; height: 26; radius: 99
                                         visible: !_isToday && _day > 0 && dayHover.containsMouse
-                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
                                     }
 
                                     // Today pill
@@ -398,19 +398,19 @@ PanelWindow {
                                         anchors.centerIn: parent
                                         width: 26; height: 26; radius: 99
                                         visible: _isToday
-                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
                                         border.width: 1
-                                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+                                        border.color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
                                     }
 
                                     Text {
                                         anchors.centerIn: parent
                                         text: _day > 0 ? _day : ""
                                         color: _isToday
-                                            ? Theme.cPrimary
+                                            ? Theme.cSurfaceTint
                                             : _isWeekend
-                                                ? Theme.cWc6
-                                                : Theme.cPrimary
+                                                ? Theme.cInversePrimary
+                                                : Theme.cOnSecondary
                                         font.family: Config.labelFont
                                         font.pixelSize: 12
                                         font.weight: _isToday ? Font.Bold : Font.Normal

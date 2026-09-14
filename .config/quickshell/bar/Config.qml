@@ -645,7 +645,7 @@ QtObject {
     property color mediaGlyphColor:      Config.glyphColor
     property color discGlyphColor:       Theme.cSurfaceTint
     property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80)
-    property color powerGlyphColor:      Qt.rgba(Theme.cWc11.r, Theme.cWc11.g, Theme.cWc11.b, 1.00)
+    property color powerGlyphColor:      Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
     property real  ccGlyphOpacity:        1.0
     readonly property color ccGlyphColor: Qt.rgba(Theme.cWc11.r, Theme.cWc11.g, Theme.cWc11.b, ccGlyphOpacity)
@@ -702,7 +702,7 @@ QtObject {
     property real wsActiveOpacity:     1.0
     property real wsPersistentOpacity: 0.7
     property real wsEmptyOpacity:      0.55
-    readonly property color wsActiveColor:     Qt.rgba(Theme.cWc11.r, Theme.cWc11.g, Theme.cWc11.b, wsActiveOpacity)
+    readonly property color wsActiveColor:     Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, wsActiveOpacity)
     readonly property color wsPersistentColor: Qt.rgba(Theme.cWc12.r, Theme.cWc12.g, Theme.cWc12.b, wsPersistentOpacity)
     readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, wsEmptyOpacity)
 
@@ -1048,8 +1048,8 @@ QtObject {
     property color trayBgColor:   Theme.cOnSecondary
     property real  trayBgOpacity: 0
 
-    property color startMenuBgColor:   Theme.cOnSecondary
-    property real  startMenuBgOpacity: 0
+    property color startMenuBgColor:   Theme.cPrimary
+    property real  startMenuBgOpacity: 1.0
 
     property color mediaBgColor:   Theme.cOnSecondary
     property real  mediaBgOpacity: 0

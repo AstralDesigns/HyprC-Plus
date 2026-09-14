@@ -58,6 +58,8 @@ singleton ScreenshotPopupState 1.0 ScreenshotPopupState.qml
 ScreenshotPopup 1.0 ScreenshotPopup.qml
 singleton RecorderPopupState 1.0 RecorderPopupState.qml
 RecorderPopup 1.0 RecorderPopup.qml
+singleton CaptureMenuState 1.0 CaptureMenuState.qml
+CaptureMenuPopup 1.0 CaptureMenuPopup.qml
 SsBtn 1.0 SsBtn.qml
 ShellLayer 1.0 ShellLayer.qml
 

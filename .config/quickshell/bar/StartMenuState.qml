@@ -39,6 +39,7 @@ Item {
         if (!netSavedProc.running) netSavedProc.running = true
         if (!btStatusProc.running) btStatusProc.running = true
         if (!nightLightStatusProc.running) nightLightStatusProc.running = true
+        if (!netRateProc.running) netRateProc.running = true
     }
 
     // ── Network scan state ──────────────────────────────────────────────
@@ -285,6 +286,47 @@ Item {
     }
     Timer { interval:8000; repeat:true; running: sm._pollActive
         onTriggered: if(!netStatusProc.running) netStatusProc.running=true }
+
+    // ── Network traffic rates ───────────────────────────────────────────
+    property real   netRxRate: 0
+    property real   netTxRate: 0
+    property string netRxRateStr: "0 B/s"
+    property string netTxRateStr: "0 B/s"
+    property var    _prevNetTraffic: null
+
+    function _fmtRate(bps) {
+        if (bps < 1024)    return Math.round(bps) + " B/s"
+        if (bps < 1048576) return (bps / 1024).toFixed(1) + " KB/s"
+        return (bps / 1048576).toFixed(1) + " MB/s"
+    }
+
+    Process {
+        id: netRateProc
+        command: ["bash", "-c", "awk 'NR>2{gsub(\":\",\" \",$1);if($1!=\"lo\"){rx+=$2;tx+=$10}}END{printf \"%d:%d\\n\",rx,tx}' /proc/net/dev"]
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) {
+                const p = l.trim().split(":")
+                if (p.length >= 2) {
+                    const rx = parseInt(p[0]) || 0, tx = parseInt(p[1]) || 0
+                    const now = Date.now() / 1000
+                    if (sm._prevNetTraffic) {
+                        const dt = Math.max(0.1, now - sm._prevNetTraffic.ts)
+                        sm.netRxRate = Math.max(0, (rx - sm._prevNetTraffic.rx) / dt)
+                        sm.netTxRate = Math.max(0, (tx - sm._prevNetTraffic.tx) / dt)
+                        sm.netRxRateStr = sm._fmtRate(sm.netRxRate)
+                        sm.netTxRateStr = sm._fmtRate(sm.netTxRate)
+                    }
+                    sm._prevNetTraffic = { rx, tx, ts: now }
+                }
+            }
+        }
+        running: false
+    }
+    Timer {
+        interval: 1500; repeat: true; running: sm.menuVisible
+        onTriggered: if (!netRateProc.running) netRateProc.running = true
+    }
 
     // Auto-scan gate — allows at most one background nmcli wifi list call per
     // 30 seconds.  Resets whenever the network panel is first expanded or when

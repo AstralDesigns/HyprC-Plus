@@ -1065,7 +1065,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "󰫢  󰫢"; color: root.cWc10
+                                                text: "󰫢  󰫢"; color: root.cWc12
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
                                                 topPadding: 6; bottomPadding: 6
                                             }
@@ -1136,18 +1136,18 @@ ShellRoot {
                                                     border.color: root.authFailed ? root.cErr
                                                         : (root.authChecking
                                                             ? root.cWc5
-                                                            : root.cWc10)
+                                                            : root.cWc12)
                                                     Behavior on border.color { ColorAnimation { duration: 250 } }
                                                 }
                                                 RowLayout {
                                                     anchors.centerIn: parent; spacing: 6
                                                     visible: root.pinEntry.length === 0 && !root.authChecking
                                                     Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc6 }
-                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc12; opacity: 1.00 }
+                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc10; opacity: 1.00 }
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; visible: root.authChecking
-                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc5
+                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc10
                                                     RotationAnimator on rotation { from: 0; to: 360; duration: 900; loops: Animation.Infinite; running: root.authChecking }
                                                 }
                                                 Row {
@@ -1204,7 +1204,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDateNum; color: root.cWc10
+                                                text: root.clockDateNum; color: root.cWc12
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.DemiBold
                                                 lineHeight: 0.88
@@ -1261,7 +1261,7 @@ ShellRoot {
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: root.weatherTemp
-                                                color: root.cWc12
+                                                color: root.cWc10
                                                 font.pixelSize: 18
                                                 font.weight: Font.Bold
                                                 font.family: "C059"
@@ -1340,11 +1340,91 @@ ShellRoot {
                                 }
 
                             // ── MEDIA CARD — compact horizontal layout ────────────
-                            Rectangle {
+                            Item {
                                 Layout.fillWidth:true
                                 height: mediaCardRow.implicitHeight + 28
-                                radius:20; color:root.cCardWarm
-                                border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.22)
+
+                                layer.enabled: true
+                                layer.effect: MultiEffect {
+                                    maskEnabled:      true
+                                    maskSource:       mediaCardMask
+                                    maskThresholdMin: 0.5
+                                    maskSpreadAtMin:  1.0
+                                }
+
+                                Rectangle {
+                                    id: mediaCardMask
+                                    anchors.fill: parent
+                                    radius: 20
+                                    color: "white"
+                                    opacity: 0
+                                    layer.enabled: true
+                                }
+
+                                // Base card background
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 20; color: root.cCardWarm
+                                }
+
+                                // Blurred album art background + 0.15 InversePrimary tint (margins 10, radius 16)
+                                Item {
+                                    anchors.fill: parent
+                                    anchors.margins: 10
+                                    visible: bgArtImg.status === Image.Ready && root.mediaArtUrl !== ""
+                                    opacity: visible ? 1.0 : 0.0
+                                    Behavior on opacity { NumberAnimation { duration: 300 } }
+
+                                    layer.enabled: true
+                                    layer.effect: MultiEffect {
+                                        maskEnabled:      true
+                                        maskSource:       innerArtMask
+                                        maskThresholdMin: 0.5
+                                        maskSpreadAtMin:  1.0
+                                    }
+
+                                    Rectangle {
+                                        id: innerArtMask
+                                        anchors.fill: parent
+                                        radius: 16
+                                        color: "white"
+                                        opacity: 0
+                                        layer.enabled: true
+                                    }
+
+                                    Item {
+                                        anchors.fill: parent
+                                        layer.enabled: bgArtImg.visible
+                                        layer.effect: MultiEffect { blurEnabled: true; blur: 0.35; blurMax: 32 }
+                                        Image {
+                                            id: bgArtImg
+                                            anchors.fill: parent
+                                            source: {
+                                                const u = root.mediaArtUrl || ""
+                                                if (!u) return ""
+                                                if (u.startsWith("/")) return "file://" + u
+                                                return u
+                                            }
+                                            fillMode: Image.PreserveAspectCrop
+                                            smooth: true
+                                            cache: false
+                                            visible: root.mediaArtUrl !== ""
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: 16
+                                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.3)
+                                    }
+                                }
+
+                                // Card border
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 20; color: "transparent"
+                                    border.width: 1; border.color: Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.22)
+                                }
 
                                 // ── LEFT: info + progress + controls ───────────────
                                 RowLayout {
@@ -1366,7 +1446,7 @@ ShellRoot {
                                         // Artist
                                         Text {
                                             Layout.fillWidth:true
-                                            text: root.mediaArtist; color: root.cOnSurfVar
+                                            text: root.mediaArtist; color: root.cOnSurf
                                             font.pixelSize:11; elide:Text.ElideRight
                                             visible: text !== ""
                                         }
@@ -1412,7 +1492,7 @@ ShellRoot {
 
                                                 Rectangle {
                                                     anchors.fill: parent; radius: 7
-                                                    color: Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.15)
+                                                    color: Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.5)
                                                     border.width: 1
                                                     border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45)
                                                 }
@@ -1491,7 +1571,7 @@ ShellRoot {
 
                                                 Rectangle {
                                                     anchors.fill: parent; radius: 7
-                                                    color: Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.15)
+                                                    color: Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.5)
                                                     border.width: 1
                                                     border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45)
                                                 }
@@ -1572,13 +1652,13 @@ ShellRoot {
                                                     readonly property bool isActive: modelData.a
                                                     color: bma.containsMouse
                                                         ? (isActive
-                                                            ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.25)
+                                                            ? Qt.rgba(root.cOnSecondary.r,root.cOnSecondary.g,root.cOnSecondary.b,0.75)
                                                             : (isCenter
-                                                                ? Qt.rgba(root.cOnSurf.r,root.cOnSurf.g,root.cOnSurf.b,0.22)
-                                                                : Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.18)))
+                                                                ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.75)
+                                                                : Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.75)))
                                                         : (isActive
-                                                            ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.15)
-                                                            : "transparent")
+                                                            ? Qt.rgba(root.cOnSecondary.r,root.cOnSecondary.g,root.cOnSecondary.b,0.75)
+                                                            : Qt.rgba(root.cOnPrimary.r,root.cOnPrimary.g,root.cOnPrimary.b,0.75))
                                                     border.width: isActive ? 2 : 1
                                                     border.color: isActive
                                                         ? root.cPrimary
@@ -1590,8 +1670,7 @@ ShellRoot {
                                                         anchors.centerIn:parent
                                                         text: modelData.i; font.pixelSize:14; font.family:"Symbols Nerd Font Mono"
                                                         color: bma.containsMouse || parent.isActive
-                                                            ? (isCenter ? root.cOnSurf : root.cPrimary)
-                                                            : root.cOnSurfVar
+                                                            ? root.cOnSecondary : root.cPrimary
                                                         Behavior on color { ColorAnimation{duration:100} }
                                                     }
                                                     MouseArea { id:bma; anchors.fill:parent; hoverEnabled:true; onClicked: root.playerAction(modelData.c) }

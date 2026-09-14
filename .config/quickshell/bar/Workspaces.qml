@@ -97,12 +97,58 @@ Item {
         Repeater {
             model: root._wsModel
             delegate: Item {
+                id: wsBtn
                 required property var modelData
                 readonly property int _slot:    modelData.id
                 readonly property string _name: modelData.name
+                readonly property bool _isActive: _slot === (Hyprland.focusedMonitor?.activeWorkspace?.id ?? -999)
 
-                width: Config.wsIconMode === "number" ? 18 : 22
+                width: Math.max(Config.moduleHeight, Config.wsIconMode === "number" ? 18 : 22)
                 height: Config.moduleHeight
+
+                Rectangle {
+                    id: wsCircBg
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width, parent.height)
+                    height: width
+                    radius: width / 2
+                    clip: true
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        visible: Config.islandBgStyle !== "gradient"
+                        color: wsBtn._isActive ? Theme.cSurfaceTint : Config.wsBgColor
+                        opacity: wsBtn._isActive ? 1.0 : (Config.wsBgOpacity > 0 ? Config.wsBgOpacity : 1.0)
+                        Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        visible: Config.islandBgStyle === "gradient"
+                        opacity: wsBtn._isActive ? 1.0 : (Config.wsBgOpacity > 0 ? Config.wsBgOpacity : 1.0)
+                        gradient: Gradient {
+                            orientation: Gradient.Vertical
+                            GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                            GradientStop { position: 0.35; color: wsBtn._isActive ? Theme.cSurfaceTint : Theme.cOnSecondary }
+                            GradientStop { position: 0.7; color: wsBtn._isActive ? Theme.cSurfaceTint : Theme.cOnSecondary }
+                            GradientStop { position: 1.0; color: Theme.cInversePrimary }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: wsCircBg.width
+                    height: wsCircBg.height
+                    radius: width / 2
+                    color: "transparent"
+                    border.width: Config.islandBorder
+                    border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
+                                          Config.islandBorderColor.b, Config.islandBorderAlpha)
+                    visible: Config.islandBorder > 0 && Config.islandBorderAlpha > 0
+                }
 
                 Text {
                     anchors.centerIn: parent
@@ -144,8 +190,55 @@ Item {
         Repeater {
             model: root._wsModel
             delegate: Item {
+                id: vWsBtn
                 required property var modelData
+                readonly property int _slot: modelData.id
+                readonly property bool _isActive: _slot === (Hyprland.focusedMonitor?.activeWorkspace?.id ?? -999)
                 width: Config.barHeight; height: 26
+
+                Rectangle {
+                    id: vWsCircBg
+                    anchors.centerIn: parent
+                    width: Math.min(24, Config.moduleHeight)
+                    height: width
+                    radius: width / 2
+                    clip: true
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        visible: Config.islandBgStyle !== "gradient"
+                        color: vWsBtn._isActive ? Theme.cSurfaceTint : Config.wsBgColor
+                        opacity: vWsBtn._isActive ? 1.0 : (Config.wsBgOpacity > 0 ? Config.wsBgOpacity : 1.0)
+                        Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: parent.radius
+                        visible: Config.islandBgStyle === "gradient"
+                        opacity: vWsBtn._isActive ? 1.0 : (Config.wsBgOpacity > 0 ? Config.wsBgOpacity : 1.0)
+                        gradient: Gradient {
+                            orientation: Gradient.Vertical
+                            GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                            GradientStop { position: 0.35; color: vWsBtn._isActive ? Theme.cSurfaceTint : Theme.cOnSecondary }
+                            GradientStop { position: 0.7; color: vWsBtn._isActive ? Theme.cSurfaceTint : Theme.cOnSecondary }
+                            GradientStop { position: 1.0; color: Theme.cInversePrimary }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: vWsCircBg.width
+                    height: vWsCircBg.height
+                    radius: width / 2
+                    color: "transparent"
+                    border.width: Config.islandBorder
+                    border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
+                                          Config.islandBorderColor.b, Config.islandBorderAlpha)
+                    visible: Config.islandBorder > 0 && Config.islandBorderAlpha > 0
+                }
 
                 Text {
                     anchors.centerIn: parent

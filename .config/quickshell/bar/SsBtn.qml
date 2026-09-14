@@ -4,6 +4,7 @@ import "."
 Rectangle {
     id: btn
     signal activated()
+    signal hovered()
     property bool  accent: true
     property bool  highlighted: false   // driven by keyboard navigation
     property alias label:  lbl.text
@@ -29,7 +30,7 @@ Rectangle {
     Text {
         id: lbl
         anchors.centerIn: parent
-        color:          btn._emphasized ? Theme.cOnPrimary : Theme.text
+        color:          btn._emphasized ? Theme.cPrimary : Theme.text
         font.family:    Config.labelFont
         font.pixelSize: Config.infoFontSize
         font.weight:    Font.Medium
@@ -44,6 +45,7 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape:  Qt.PointingHandCursor
+        onEntered:    btn.hovered()
         onClicked:    btn.activated()
     }
 }

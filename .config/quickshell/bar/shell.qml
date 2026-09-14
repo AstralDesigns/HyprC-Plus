@@ -167,6 +167,7 @@ ShellRoot {
     Loader { active: StartMenuState.menuVisible;    source: "StartMenuPopup.qml"    }
     Loader { active: LicenseState.activated && ScreenshotPopupState.visible; source: "ScreenshotPopup.qml" }
     Loader { active: LicenseState.activated && RecorderPopupState.visible; source: "RecorderPopup.qml" }
+    Loader { active: LicenseState.activated && CaptureMenuState.visible; source: "CaptureMenuPopup.qml" }
     Loader { active: WorkspacesPopupState.visible; source: "WorkspacesPopup.qml" }
     Loader { active: WorkspacesPopupState.tileTooltipVisible; source: "WorkspaceTileTooltip.qml" }
 
@@ -193,10 +194,12 @@ ShellRoot {
         target: "bar"
 
         // Popup toggles — all gated on activation
-        function togglePowerMenu()  { if (LicenseState.activated) PowerMenuState.toggle() }
-        function toggleVolume()     { if (LicenseState.activated) VolumePopupState.toggle() }
-        function toggleNetwork()    { if (LicenseState.activated) NetworkPopupState.toggle() }
-        function toggleCalendar()   { if (LicenseState.activated) CalendarPopupState.toggle() }
+        function togglePowerMenu()      { if (LicenseState.activated) PowerMenuState.toggle() }
+        function toggleVolume()         { if (LicenseState.activated) VolumePopupState.toggle() }
+        function toggleNetwork()        { if (LicenseState.activated) NetworkPopupState.toggle() }
+        function toggleCalendar()       { if (LicenseState.activated) CalendarPopupState.toggle() }
+        function toggleSystemMonitor()  { if (LicenseState.activated) SystemMonitorPopupState.toggle() }
+        function toggleWeatherPopup()   { if (LicenseState.activated) WeatherPopupState.toggle() }
 
         // Cycle bar position: top → right → bottom → left → top
         // Affects all bar instances on the focused monitor
@@ -265,6 +268,9 @@ ShellRoot {
         function toggleStartMenu() { StartMenuState.toggle() }
         function openStartMenu()   { StartMenuState.open() }
         function closeStartMenu()  { StartMenuState.close() }
+        // Capture menu (Screenshot / Recorder chooser)
+        function toggleCaptureMenu() { if (LicenseState.activated) CaptureMenuState.toggle() }
+        function toggleCapture()     { if (LicenseState.activated) CaptureMenuState.toggle() }
         // Screenshot
         function toggleScreenshot() { if (LicenseState.activated) ScreenshotPopupState.toggle() }
         // Recorder

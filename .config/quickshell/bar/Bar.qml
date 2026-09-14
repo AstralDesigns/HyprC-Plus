@@ -75,7 +75,7 @@ PanelWindow {
     // Shell mode edge reservations (provides Hyprland exclusive zones & reserved area for all 4 shell arms)
     PanelWindow {
         id: shellResTop
-        visible: bar._shellMode && bar._shellTopT > 0
+        visible: bar.visible && bar._shellMode && bar._shellTopT > 0
         screen: bar.screen
         WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:shell-res-top"
@@ -88,7 +88,7 @@ PanelWindow {
     }
     PanelWindow {
         id: shellResBottom
-        visible: bar._shellMode && bar._shellBottomT > 0
+        visible: bar.visible && bar._shellMode && bar._shellBottomT > 0
         screen: bar.screen
         WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:shell-res-bottom"
@@ -101,7 +101,7 @@ PanelWindow {
     }
     PanelWindow {
         id: shellResLeft
-        visible: bar._shellMode && bar._shellLeftT > 0
+        visible: bar.visible && bar._shellMode && bar._shellLeftT > 0
         screen: bar.screen
         WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:shell-res-left"
@@ -114,7 +114,7 @@ PanelWindow {
     }
     PanelWindow {
         id: shellResRight
-        visible: bar._shellMode && bar._shellRightT > 0
+        visible: bar.visible && bar._shellMode && bar._shellRightT > 0
         screen: bar.screen
         WlrLayershell.layer: WlrLayer.Bottom
         WlrLayershell.namespace: "quickshell:shell-res-right"
@@ -132,7 +132,7 @@ PanelWindow {
     // surfaces and popups can open over app windows without z-fighting.
     PanelWindow {
         id: shellLeftPW
-        visible: bar._shellMode && bar._isHorizontal
+        visible: bar.visible && bar._shellMode && bar._isHorizontal
                  && (!bar._triLeftAhHidden || bar._triLeftPinned)
         screen: bar.screen
         WlrLayershell.layer:          WlrLayer.Top
@@ -224,7 +224,7 @@ PanelWindow {
     // ── Shell mode Right Island (WlrLayer.Top) ───────────────────────────────
     PanelWindow {
         id: shellRightPW
-        visible: bar._shellMode && bar._isHorizontal
+        visible: bar.visible && bar._shellMode && bar._isHorizontal
                  && (!bar._triRightAhHidden || bar._triRightPinned)
         screen: bar.screen
         WlrLayershell.layer:          WlrLayer.Top
@@ -1168,20 +1168,20 @@ PanelWindow {
 
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
-                visible: Config.islandBgStyle === "flat"
+                visible: Config.islandBgStyle === "flat" && isl.bgType !== "workspace"
                 color: Qt.rgba(isl._effectiveBgColor.r, isl._effectiveBgColor.g,
                                isl._effectiveBgColor.b, isl._bgOpacity)
                 Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
             }
             Rectangle {
                 anchors.fill: parent; radius: parent.radius
-                visible: Config.islandBgStyle === "gradient"
+                visible: Config.islandBgStyle === "gradient" && isl.bgType !== "workspace"
                 opacity: isl._bgOpacity
                 gradient: Gradient {
                     orientation: Gradient.Vertical
                     GradientStop { position: 0.0; color: Theme.cInversePrimary }
-                    GradientStop { position: 0.35; color: Theme.cOnSecondary }
-                    GradientStop { position: 0.7; color: Theme.cOnSecondary }
+                    GradientStop { position: 0.35; color: isl.bgType === "startmenu" ? Theme.cSurfaceTint : Theme.cOnSecondary }
+                    GradientStop { position: 0.7; color: isl.bgType === "startmenu" ? Theme.cSurfaceTint : Theme.cOnSecondary }
                     GradientStop { position: 1.0; color: Theme.cInversePrimary }
                 }
                 Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
@@ -1192,7 +1192,7 @@ PanelWindow {
             anchors.fill: parent
             radius: Config.islandRadius
             color: "transparent"
-            border.width: Config.islandBorder
+            border.width: isl.bgType === "workspace" ? 0 : Config.islandBorder
             border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
                                   Config.islandBorderColor.b, Config.islandBorderAlpha)
             z: 1
@@ -1663,7 +1663,7 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: (Config.barMode === "tri" || Config.barMode === "shell") && bar._triLeftAhEnabled && bar._triLeftAhHidden && !_fullscreen
+        visible: bar.visible && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triLeftAhEnabled && bar._triLeftAhHidden && !_fullscreen
 
         WlrLayershell.layer:     WlrLayer.Top
         WlrLayershell.namespace: "quickshell:tri-left-autohide-hotspot"
@@ -1698,7 +1698,7 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: (Config.barMode === "tri" || Config.barMode === "shell") && bar._triCenterAhEnabled && bar._triCenterAhHidden && !_fullscreen
+        visible: bar.visible && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triCenterAhEnabled && bar._triCenterAhHidden && !_fullscreen
 
         WlrLayershell.layer:     WlrLayer.Top
         WlrLayershell.namespace: "quickshell:tri-center-autohide-hotspot"
@@ -1733,7 +1733,7 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: (Config.barMode === "tri" || Config.barMode === "shell") && bar._triRightAhEnabled && bar._triRightAhHidden && !_fullscreen
+        visible: bar.visible && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triRightAhEnabled && bar._triRightAhHidden && !_fullscreen
 
         WlrLayershell.layer:     WlrLayer.Top
         WlrLayershell.namespace: "quickshell:tri-right-autohide-hotspot"
@@ -1772,7 +1772,7 @@ PanelWindow {
             spacing: Config.islandSpacing
             padding: Config.outerMarginEdge
 
-            Island { visible_: Config.showWorkspaces; Modules.Workspaces { vertical: true } }
+            Island { bgType: "workspace"; visible_: Config.showWorkspaces; Modules.Workspaces { vertical: true } }
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
             Island { visible_: Config.showClock; Modules.Clock {} }
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }

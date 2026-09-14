@@ -222,7 +222,7 @@ function _readIslandBorderColorFromStyle() {
 function _resolveGtkColorToRgba(token, alpha) {
     const paths = [
         GTK3_WALLUST_PATH, GTK4_WALLUST_PATH,
-        GTK3_COLORS_PATH,  GTK4_COLORS_PATH,
+        GTK3_COLORS_PATH, GTK4_COLORS_PATH,
     ];
     const re = new RegExp('@define-color\\s+' + token + '\\s+(#[0-9a-fA-F]{3,8}|rgba?\\([^)]+\\))');
     for (const p of paths) {
@@ -342,18 +342,18 @@ function _injectGlyphSizeCSS(display) {
     let glyphBadgeGradient;
     if (islandStyle === 'gradient') {
         if (_badgePos === 'top') {
-            glyphBadgeGradient = 'linear-gradient(to bottom, @inverse_primary, @on_secondary, @on_secondary, @inverse_primary)';
+            glyphBadgeGradient = 'linear-gradient(to bottom, @inverse_primary, @surface_tint, @surface_tint, @inverse_primary)';
         } else if (_badgePos === 'left') {
-            glyphBadgeGradient = 'linear-gradient(to left, @inverse_primary, @on_secondary, @on_secondary, @inverse_primary)';
+            glyphBadgeGradient = 'linear-gradient(to left, @inverse_primary, @surface_tint, @surface_tint, @inverse_primary)';
         } else if (_badgePos === 'right') {
-            glyphBadgeGradient = 'linear-gradient(to right, @inverse_primary, @on_secondary, @on_secondary, @inverse_primary)';
+            glyphBadgeGradient = 'linear-gradient(to right, @inverse_primary, @surface_tint, @surface_tint, @inverse_primary)';
         } else {
             // bottom (default)
-            glyphBadgeGradient = 'linear-gradient(to bottom, @inverse_primary, @on_secondary, @on_secondary, @inverse_primary)';
+            glyphBadgeGradient = 'linear-gradient(to bottom, @inverse_primary, @surface_tint, @surface_tint, @inverse_primary)';
         }
     } else {
         // flat
-        glyphBadgeGradient = 'linear-gradient(to bottom, @on_secondary, @on_secondary)';
+        glyphBadgeGradient = 'linear-gradient(to bottom, @surface_tint, @surface_tint)';
     }
 
     const _dckpos = DockConfig.position || 'bottom';
@@ -819,6 +819,7 @@ var DragDropManager = class {
         });
 
         dragSource.connect('drag-begin', (source) => {
+            _ahBeginRearrange();
             this.isDragging = true;
             this.draggedClass = className;
             overlay.set_opacity(0.4);
@@ -826,6 +827,7 @@ var DragDropManager = class {
         });
 
         dragSource.connect('drag-end', () => {
+            _ahEndRearrange();
             overlay.set_opacity(1.0);
             // Always clear — successful drop (deleteData=true) must also unlock updates
             this.isDragging = false;
@@ -873,6 +875,7 @@ var DragDropManager = class {
             this._applyReorder(draggedClass, afterClass);
             this.dock.daemon.reorderPinned(draggedClass, afterClass);
 
+            _ahEndRearrange();
             this.isDragging = false;
             this.draggedClass = null;
             return true;
@@ -2376,6 +2379,7 @@ const HyprCandyDock = GObject.registerClass({
 let _ahEnabled = false;
 let _ahDelaySec = 5000;     // ms
 let _ahTimerId = 0;        // GLib timeout source id, 0 = not running
+let _ahRearranging = false; // true while an app icon drag/reorder is active
 let _ahPopoverCount = 0;        // number of popovers currently open; dock stays
 // visible while this is > 0 (pointer-leave from
 // dock into a popover must not trigger hide)
@@ -2390,7 +2394,7 @@ function _ahCancelTimer() {
 // ── Smooth opacity ramp helpers ──────────────────────────────────────
 // GTK4 top-level windows don't support CSS transitions for opacity, so we
 // step it manually via GLib.timeout_add (12 steps @ 17 ms ≈ 200 ms total).
-const _AH_STEPS    = 12;
+const _AH_STEPS = 12;
 const _AH_INTERVAL = 17;  // ms per step
 let _ahFadeTimerId = 0;
 
@@ -2440,6 +2444,25 @@ function _ahFadeIn(win) {
     });
 }
 
+// App icon drag/reorder lifecycle. GTK drag grabs can skip the normal
+// pointer-enter/leave sequence, so autohide needs an explicit hold guard.
+function _ahBeginRearrange() {
+    _ahRearranging = true;
+    _ahCancelTimer();
+    _ahCancelFade();
+    if (dockWindow) {
+        try {
+            dockWindow.set_opacity(1.0);
+            if (!dockWindow.get_visible()) dockWindow.set_visible(true);
+        } catch (_) { }
+    }
+}
+
+function _ahEndRearrange() {
+    _ahRearranging = false;
+    if (_ahEnabled && _ahPopoverCount === 0) _ahStartTimer();
+}
+
 // Call when a dock popover opens so autohide is suppressed.
 function _ahPopoverOpened() {
     _ahPopoverCount++;
@@ -2456,6 +2479,8 @@ function _ahPopoverClosed() {
 }
 
 function _ahStartTimer() {
+    // App icon rearrangement must not be interrupted by an autohide fade.
+    if (_ahRearranging) return;
     // Don't start a hide timer while any popover is open — the pointer-leave
     // event fires when the cursor moves from the dock surface into the popover
     // (popovers are separate toplevels in GTK4), but the dock must stay visible.
@@ -2463,7 +2488,7 @@ function _ahStartTimer() {
     _ahCancelTimer();
     _ahTimerId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, _ahDelaySec, () => {
         _ahTimerId = 0;
-        if (!_ahEnabled || !dockWindow) return GLib.SOURCE_REMOVE;
+        if (!_ahEnabled || !dockWindow || _ahRearranging) return GLib.SOURCE_REMOVE;
         // Popover guard — a popover may have opened between timer start and fire
         if (_ahPopoverCount > 0) return GLib.SOURCE_REMOVE;
         // Fullscreen guard — skip hide if hyprctl reports an active fullscreen window

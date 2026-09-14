@@ -88,7 +88,11 @@ Item {
         Behavior on scale   { enabled: popupMode; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Behavior on opacity { enabled: popupMode; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
-        MouseArea { anchors.fill: parent; enabled: popupMode }
+        MouseArea {
+            anchors.fill: parent
+            enabled: popupMode
+            onClicked: WeatherPopupState.close()
+        }
 
         ColumnLayout {
             id: wxCol
@@ -101,13 +105,13 @@ Item {
 
                 Text {
                     text: "󰖐  Weather"
-                    color: Theme.cPrimary
+                    color: Theme.cOnSurf
                     font.pixelSize: 13; font.weight: Font.Medium; font.family: Config.fontFamily
                 }
                 Item { Layout.fillWidth: true }
                 Text {
                     text: WeatherPopupState.city ? "󰍎  " + WeatherPopupState.city : ""
-                    color: Theme.cOnSurfVar; font.pixelSize: 12; font.family: Config.labelFont
+                    color: Theme.cOnSurf; font.pixelSize: 12; font.family: Config.labelFont
                     elide: Text.ElideRight; Layout.maximumWidth: 180
                 }
 
@@ -131,22 +135,6 @@ Item {
                         onClicked: WeatherPopupState.toggleUnit()
                     }
                 }
-
-                // Close button (popup only)
-                Rectangle {
-                    visible: showClose
-                    width: 24; height: 24; radius: 99
-                    color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.2)
-                    MouseArea {
-                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                        onClicked: WeatherPopupState.close()
-                        Text {
-                            anchors.centerIn: parent; text: "󰅙"
-                            color: Theme.cPrimary
-                            font.pixelSize: 13; font.family: Config.fontFamily
-                        }
-                    }
-                }
             }
 
             Rectangle {
@@ -168,8 +156,8 @@ Item {
                     implicitHeight: 172
                     radius: 20
                     clip: true
-                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.5)
+                    color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                                               Theme.cSurfaceTint.b, 0.65)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
@@ -195,7 +183,7 @@ Item {
                             Text {
                                 Layout.alignment: Qt.AlignHCenter
                                 text: WeatherPopupState.temp
-                                color: Theme.cSurfaceTint
+                                color: Theme.cOnSecondary
                                 font.pixelSize: 21
                                 font.weight: Font.Bold
                                 font.family: Config.labelFont
@@ -204,7 +192,7 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 text: WeatherPopupState.condStr
-                                color: Theme.cOnSurfVar
+                                color: Theme.cOnSecondary
                                 font.pixelSize: 10
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -244,7 +232,7 @@ Item {
                                         Layout.fillWidth: true
                                         Text {
                                             text: modelData.label
-                                            color: Theme.cOnSurfVar
+                                            color: Theme.cOnSecondary
                                             font.pixelSize: 9
                                             font.family: Config.labelFont
                                             elide: Text.ElideRight
@@ -252,7 +240,7 @@ Item {
                                         }
                                         Text {
                                             text: modelData.val
-                                            color: Theme.cOnSurf
+                                            color: Theme.cOnSecondary
                                             font.pixelSize: 10
                                             font.weight: Font.Medium
                                             font.family: Config.labelFont
@@ -317,7 +305,7 @@ Item {
 
                             color: isCurrentHour
                                 ? "transparent"
-                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 1.0)
+                                : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.65)
 
                             gradient: isCurrentHour ? hrGradient : null
 
@@ -351,7 +339,7 @@ Item {
                                 Text {
                                     text: WeatherPopupState.hrTimes[index] || "--"
                                     color: isCurrentHour ? Theme.cSurfaceTint
-                                        : Theme.cSurfaceTint
+                                        : Theme.cOnSecondary
                                     font.pixelSize: 9; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -359,21 +347,21 @@ Item {
                                 Text {
                                     text: WeatherPopupState.hrIcons[index] || "󰖐"
                                     color: isCurrentHour ? Theme.cSurfaceTint
-                                        : Theme.cSurfaceTint
+                                        : Theme.cOnSecondary
                                     font.pixelSize: 18; font.family: Config.fontFamily
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text {
                                     text: WeatherPopupState.hrTemps[index] || "--"
-                                    color: isCurrentHour ? Theme.cPrimary : Theme.cPrimary
+                                    color: isCurrentHour ? Theme.cPrimary : Theme.cOnSecondary
                                     font.pixelSize: 9; font.weight: Font.Medium; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                 }
                                 Text {
                                     text: WeatherPopupState.hrPrec[index] || "0%"
-                                    color: isCurrentHour ? Theme.cPrimary : Theme.cSecondary
+                                    color: isCurrentHour ? Theme.cPrimary : Theme.cOnSecondary
                                     font.pixelSize: 8; font.family: Config.labelFont
                                     horizontalAlignment: Text.AlignHCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
@@ -402,10 +390,10 @@ Item {
                         radius: 12
                         clip: true
 
-                        // Gradient for current day, Theme.cOnSecondary for others
+                        // Gradient for current day, Theme.cSurfaceTint for others
                         color: index === 0
                             ? "transparent"
-                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+                            : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.65)
 
                         gradient: index === 0 ? fcGradient : null
 
@@ -426,7 +414,7 @@ Item {
                             spacing: 3
                             Text {
                                 text: WeatherPopupState.fcDays[index] || "--"
-                                color: index === 0 ? Theme.cSurfaceTint : Theme.cSurfaceTint
+                                color: index === 0 ? Theme.cSurfaceTint : Theme.cOnSecondary
                                 font.pixelSize: 11; font.weight: index === 0 ? Font.Bold : Font.Normal
                                 font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
@@ -434,19 +422,19 @@ Item {
                             }
                             Text {
                                 text: WeatherPopupState.fcIcons[index] || "󰖐"
-                                color: index === 0 ? Theme.cSurfaceTint : Theme.cSurfaceTint; font.pixelSize: 22; font.family: Config.fontFamily
+                                color: index === 0 ? Theme.cSurfaceTint : Theme.cOnSecondary; font.pixelSize: 22; font.family: Config.fontFamily
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: WeatherPopupState.fcHi[index] || "--"
-                                color: index === 0 ? Theme.cPrimary : Theme.cPrimary; font.pixelSize: 10; font.weight: Font.Medium; font.family: Config.labelFont
+                                color: index === 0 ? Theme.cPrimary : Theme.cOnSecondary; font.pixelSize: 10; font.weight: Font.Medium; font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
                             Text {
                                 text: WeatherPopupState.fcLo[index] || "--"
-                                color: index === 0 ? Theme.cPrimary : Theme.cSecondary; font.pixelSize: 10; font.family: Config.labelFont
+                                color: index === 0 ? Theme.cPrimary : Theme.cOnSecondary; font.pixelSize: 10; font.family: Config.labelFont
                                 horizontalAlignment: Text.AlignHCenter
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }

@@ -87,7 +87,7 @@ PanelWindow {
             
             Rectangle {
                 Layout.fillWidth: true; height: 88; radius: 12; clip: true
-                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.82)
+                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.8)
                 border.width: 2
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	// ── Row 1: user + power ────────────────────────────────────
@@ -156,7 +156,7 @@ PanelWindow {
             // ── Brightness ────────────────────────────────────────────
             Rectangle {
                 Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.82)
+                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.8)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
             	RowLayout { Layout.fillWidth: true; spacing: 10
@@ -176,7 +176,7 @@ PanelWindow {
             // ── Volume ────────────────────────────────────────────────
             Rectangle {
                     Layout.fillWidth: true; height: 25; radius: 99; clip: true
-                    color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.82)
+                    color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.8)
                     border.width: 1
         	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                     RowLayout { Layout.fillWidth: true; spacing: 10
@@ -203,7 +203,7 @@ PanelWindow {
                     radius: micInputsRow.height > 0 ? 12 : 99
                     Behavior on radius { NumberAnimation { duration: 150 } }
                     implicitHeight: micCol.implicitHeight + (micInputsRow.height > 0 ? 4 : 0)
-                    color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.82)
+                    color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.8)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
@@ -632,6 +632,22 @@ PanelWindow {
                                         visible: StartMenuState.netConnectedSSID === netDelegate.modelData.ssid
                                         opacity: StartMenuState.netConnectedSSID === netDelegate.modelData.ssid ? 1.0 : 0.0
                                         Behavior on opacity { NumberAnimation { duration: 400 } }
+                                    }
+                                    // Network traffic data rates for active connection (vertically stacked)
+                                    Column {
+                                        visible: netDelegate.modelData.active
+                                        Layout.alignment: Qt.AlignVCenter
+                                        spacing: 0
+                                        Row {
+                                            spacing: 3
+                                            Text { text: "󰁅"; color: Theme.cPrimary; font.pixelSize: 7; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
+                                            Text { text: StartMenuState.netRxRateStr; color: Theme.cOnSurfVar; font.pixelSize: 7; font.family: Config.labelFont; anchors.verticalCenter: parent.verticalCenter }
+                                        }
+                                        Row {
+                                            spacing: 3
+                                            Text { text: "󰁝"; color: Theme.cPrimary; font.pixelSize: 7; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
+                                            Text { text: StartMenuState.netTxRateStr; color: Theme.cOnSurfVar; font.pixelSize: 7; font.family: Config.labelFont; anchors.verticalCenter: parent.verticalCenter }
+                                        }
                                     }
                                     // Disconnect — active network only
                                     Rectangle {
@@ -1181,7 +1197,7 @@ PanelWindow {
             y: (parent.height - sl.trackH) / 2; width: parent.width; height: sl.trackH
             Rectangle {
                 anchors.fill: parent; radius: sl.trackH / 2
-                color: Qt.rgba(sl.track.r, sl.track.g, sl.track.b, 0.28)
+                color: Qt.rgba(sl.track.r, sl.track.g, sl.track.b, 0.4)
                 border.width: 1; border.color: Qt.rgba(sl.accent.r, sl.accent.g, sl.accent.b, 1.0)
             }
             Item {

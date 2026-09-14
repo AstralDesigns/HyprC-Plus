@@ -25,7 +25,7 @@ var DockConfig = {
     // ── Button spacing (gap between every button in the dock) ─────────────
     // Controls GtkBox spacing — applies uniformly between start↔first-app,
     // app↔app, and last-app↔trash so all gaps are edited in one place.
-    buttonSpacing: 2,              // @HCD:buttonSpacing
+    buttonSpacing: 0,              // @HCD:buttonSpacing
 
     // ── App icon size (Gtk.Image pixel_size) ─────────────────────────────
     // Controls Gtk.Image icons from the theme (e.g. Nautilus, Firefox).
@@ -70,11 +70,11 @@ var DockConfig = {
     // 'glass'    → solid @blur_background (default, matches style.css)
     // 'gradient' → vertical linear-gradient: @inverse_primary → @scrim
     rectBgStyle: 'glass',          // @HCD:rectBgStyle
-    islandBgStyle: 'gradient',         // @HCD:islandBgStyle
+    islandBgStyle: 'flat',         // @HCD:islandBgStyle
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 2,                // @HCD:borderWidth
-    borderColorVar: 'inverse_primary', // @HCD:borderColorVar  (GTK @name, matugen)
+    borderColorVar: 'color1', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
     borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
     borderTopRightRadius: 30,      // @HCD:borderTopRightRadius
@@ -82,7 +82,7 @@ var DockConfig = {
     borderBottomRightRadius: 30,   // @HCD:borderBottomRightRadius
 
     // ── Island Border (Start & Trash icon badges) ─────────────────────────
-    islandBorderWidth: 2,           // @HCD:islandBorderWidth
+    islandBorderWidth: 1,           // @HCD:islandBorderWidth
     islandBorderAlpha: 1,        // @HCD:islandBorderAlpha
     islandBorderColorVar: 'scrim', // @HCD:islandBorderColorVar
 
