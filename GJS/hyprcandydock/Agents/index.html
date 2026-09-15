@@ -1,809 +1,2327 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HyprCandy — A cohesively themed Hyprland desktop</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HyprCandy+ — Hyprland HyprCandy Shell</title>
     <meta name="description"
-        content="HyprCandy recolors your entire Hyprland desktop from one wallpaper. Free and open, with an optional Plus tier for the extras.">
+        content="HyprCandy+ is a stylish and functional Hyprland configuration cohesively themed through matugen, wallust and pywal with extra quality of life features." />
+    <meta property="og:title" content="HyprCandy+ — Hyprland HyprCandy Shell" />
+    <meta property="og:description"
+        content="HyprCandy+ is a stylish and functional Hyprland configuration cohesively themed through matugen, wallust and pywal with extra quality of life features." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Google Fonts: Geist Sans / Inter & JetBrains Mono for clean Vercel aesthetic -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
+        href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet" />
 
     <style>
+        /* --- Vercel-Grade Clean Dark Aesthetic with Pure Blacks, Deep Glass & Subtle Accents --- */
         :root {
-            --bg: #0b0d12;
-            --surface: #12151c;
-            --surface-2: #171b24;
-            --border: #23262f;
-            --border-hover: #3a3f4d;
-            --text: #d7dbe3;
-            --text-muted: #8a90a2;
-            --white: #f4f5f7;
-            --candy-1: #ff5f6d;
-            --candy-2: #ffc371;
-            --candy-3: #47d16c;
-            --candy-4: #3ea6ff;
-            --candy-5: #a56eff;
-            --candy-gradient: linear-gradient(115deg, var(--candy-1), var(--candy-2) 28%, var(--candy-3) 52%, var(--candy-4) 74%, var(--candy-5));
-            --radius-lg: 14px;
-            --radius-md: 10px;
-            --max: 1120px;
+            --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+            --bg-black: #000000;
+            --bg-surface: #0a0a0a;
+            --bg-surface-elevated: #111111;
+            --bg-surface-card: #141414;
+            --bg-subtle: #1a1a1a;
+
+            --border-subtle: rgba(255, 255, 255, 0.08);
+            --border-mid: rgba(255, 255, 255, 0.14);
+            --border-hover: rgba(255, 255, 255, 0.28);
+
+            --text-primary: #ededed;
+            --text-secondary: #a1a1a1;
+            --text-tertiary: #666666;
+
+            --accent-candy: #e2e8f0;
+            --accent-emerald: #10b981;
+            --accent-gradient: linear-gradient(180deg, #ffffff 0%, #a1a1a1 100%);
+            --candy-ring-gradient: linear-gradient(135deg, #ff4e79 0%, #ffaa40 25%, #10b981 50%, #38bdf8 75%, #a855f7 100%);
+
+            --glass-bg: rgba(10, 10, 10, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.12);
         }
 
         * {
             box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         html {
             scroll-behavior: smooth;
+            background-color: var(--bg-black);
+            color: var(--text-primary);
         }
 
         body {
-            margin: 0;
-            background: var(--bg);
-            color: var(--text);
-            font-family: 'IBM Plex Sans', system-ui, sans-serif;
-            font-size: 15px;
+            font-family: var(--font-sans);
+            font-size: 14.5px;
             line-height: 1.6;
+            background-color: var(--bg-black);
+            color: var(--text-primary);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            -webkit-font-smoothing: antialiased;
+            text-rendering: optimizeLegibility;
+            overflow-x: hidden;
         }
 
         a {
             color: inherit;
             text-decoration: none;
+            transition: color 0.15s ease, border-color 0.15s ease;
         }
 
-        img {
-            display: block;
-            max-width: 100%;
+        button {
+            font-family: inherit;
+            cursor: pointer;
+            border: none;
+            outline: none;
+            background: none;
         }
 
-        code {
-            font-family: 'IBM Plex Mono', ui-monospace, monospace;
+        code,
+        pre {
+            font-family: var(--font-mono);
         }
 
-        .wrap {
-            max-width: var(--max);
+        .container {
+            max-width: 1160px;
             margin: 0 auto;
             padding: 0 24px;
+            width: 100%;
         }
 
-        .font-display {
-            font-family: 'Space Grotesk', system-ui, sans-serif;
+        /* --- Vercel Style Floating Pill Header with Deep Blur --- */
+        .floating-header-wrapper {
+            position: fixed;
+            top: 20px;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            padding: 0 16px;
+            pointer-events: none;
         }
 
-        .font-mono {
-            font-family: 'IBM Plex Mono', ui-monospace, monospace;
-        }
-
-        .muted {
-            color: var(--text-muted);
-        }
-
-        .white {
-            color: var(--white);
-        }
-
-        .candy-text {
-            background: var(--candy-gradient);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-        }
-
-        .candy-divider {
-            height: 2px;
-            background: var(--candy-gradient);
-            border-radius: 2px;
-            margin: 0 24px;
-        }
-
-        /* ---------- nav ---------- */
-        header {
-            border-bottom: 1px solid var(--border);
-            padding: 16px 0;
-        }
-
-        .nav-row {
+        header.floating-pill {
+            pointer-events: auto;
+            width: 100%;
+            max-width: 920px;
+            height: 52px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            border-radius: 9999px;
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 16px;
+            padding: 0 18px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
-        .brand {
+        header.floating-pill:hover {
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+
+        .header-brand-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .header-brand {
             display: flex;
             align-items: center;
             gap: 10px;
-        }
-
-        .brand img {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-        }
-
-        .brand span {
+            font-size: 0.95rem;
             font-weight: 600;
-            font-size: 1.05rem;
-            color: var(--white);
+            letter-spacing: -0.01em;
+            color: #fff;
+            text-decoration: none;
         }
 
-        .nav-links {
+        .header-menu-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            width: 24px;
+            height: 24px;
+            border-radius: 9999px;
             display: flex;
-            gap: 28px;
-            font-size: 0.875rem;
-        }
-
-        .nav-links a {
-            color: var(--text-muted);
-        }
-
-        .nav-links a:hover {
-            color: var(--white);
-        }
-
-        .btn-ghost {
-            font-size: 0.875rem;
-            color: var(--white);
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            padding: 9px 16px;
-            border-radius: 8px;
-            white-space: nowrap;
-        }
-
-        .btn-ghost:hover {
-            border-color: var(--border-hover);
-        }
-
-        @media (max-width: 720px) {
-            .nav-links {
-                display: none;
-            }
-        }
-
-        /* ---------- hero ---------- */
-        main {
-            background-image:
-                radial-gradient(circle at 15% 10%, rgba(165, 110, 255, 0.10), transparent 40%),
-                radial-gradient(circle at 85% 0%, rgba(62, 166, 255, 0.08), transparent 35%);
-        }
-
-        .hero {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 56px;
             align-items: center;
-            padding: 72px 0 56px;
+            justify-content: center;
+            cursor: pointer;
+            transition: color 0.15s ease, background-color 0.15s ease;
+            padding: 0;
+            margin-left: 2px;
         }
 
-        @media (max-width: 860px) {
-            .hero {
-                grid-template-columns: 1fr;
-                padding-top: 48px;
-            }
+        .header-menu-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.1);
         }
 
-        h1 {
-            font-family: 'Space Grotesk', system-ui, sans-serif;
-            font-weight: 600;
-            font-size: 2.75rem;
-            line-height: 1.08;
-            color: var(--white);
-            margin: 0;
+        .header-menu-btn[aria-expanded="true"] {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.16);
         }
 
-        @media (max-width: 480px) {
-            h1 {
-                font-size: 2.1rem;
-            }
+        .header-menu-btn .menu-down-icon {
+            transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .hero p {
-            margin-top: 20px;
-            max-width: 440px;
-            color: var(--text-muted);
+        .header-menu-btn[aria-expanded="true"] .menu-down-icon {
+            transform: rotate(180deg);
         }
 
-        .hero p span {
-            color: var(--text);
-        }
-
-        .cta-row {
-            margin-top: 32px;
+        .header-pill-inner {
+            position: relative;
+            width: 100%;
+            max-width: 920px;
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
             align-items: center;
-            gap: 18px;
+            pointer-events: none;
         }
 
-        .btn-primary {
+        /* Floating Dropdown Panel with 30px Corner Radius */
+        .dropdown-panel {
+            pointer-events: auto;
+            position: absolute;
+            top: calc(100% + 10px);
+            left: 0;
+            width: min(520px, calc(100vw - 32px));
+            background: rgba(10, 10, 12, 0.96);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 30px;
+            padding: 22px 24px;
+            box-shadow: 0 28px 64px -12px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.05);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px) scale(0.98);
+            transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.2s;
+            z-index: 1100;
+            text-align: left;
+        }
+
+        .dropdown-panel.is-open {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0) scale(1);
+        }
+
+        .dropdown-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .dropdown-tabs-bar {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 4px;
+            border-radius: 9999px;
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .dropdown-tab-btn {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: var(--white);
-            color: var(--bg);
+            padding: 6px 16px;
+            border-radius: 9999px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.16s ease;
+        }
+
+        .dropdown-tab-btn:hover {
+            color: #ffffff;
+        }
+
+        .dropdown-tab-btn.active {
+            background: #ffffff;
+            color: #000000;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .dropdown-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-tertiary);
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: color 0.15s ease, background 0.15s ease;
+        }
+
+        .dropdown-close-btn:hover {
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        /* Collapsible Sub-Tabs */
+        .collapsible-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 52vh;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .collapsible-item {
+            background: rgba(255, 255, 255, 0.025);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 14px;
+            overflow: hidden;
+            transition: border-color 0.18s ease, background-color 0.18s ease;
+        }
+
+        .collapsible-item:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .collapsible-item.is-open {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.16);
+        }
+
+        .collapsible-trigger {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 11px 15px;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            text-align: left;
+            font-family: inherit;
+        }
+
+        .collapsible-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.84rem;
+            font-weight: 500;
+        }
+
+        .version-badge,
+        .plugin-category-badge {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            padding: 2px 7px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        .plugin-category-badge {
+            background: rgba(56, 189, 248, 0.12);
+            color: #38bdf8;
+        }
+
+        .accordion-chevron {
+            color: var(--text-tertiary);
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+        }
+
+        .collapsible-item.is-open .accordion-chevron {
+            transform: rotate(180deg);
+            color: #ffffff;
+        }
+
+        .collapsible-content {
+            display: none;
+            padding: 0 15px 13px;
+            font-size: 0.81rem;
+            color: var(--text-secondary);
+            line-height: 1.55;
+        }
+
+        .collapsible-item.is-open .collapsible-content {
+            display: block;
+        }
+
+        .changelog-list {
+            padding-left: 18px;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .changelog-list li {
+            color: var(--text-secondary);
+        }
+
+        .plugin-item {
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .plugin-item:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .plugin-name {
+            font-family: var(--font-mono);
+            font-weight: 600;
+            color: #ededed;
+            font-size: 0.8rem;
+            margin-bottom: 2px;
+        }
+
+        .plugin-desc {
+            font-size: 0.77rem;
+            color: var(--text-secondary);
+        }
+
+        .brand-icon-wrap {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid var(--border-mid);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .brand-logo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pill-link {
+            padding: 6px 14px;
+            font-size: 0.83rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            border-radius: 9999px;
+            transition: all 0.15s ease;
+        }
+
+        .pill-link:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-header-install {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #ffffff;
+            color: #000000;
+            font-weight: 600;
+            font-size: 0.8rem;
+            padding: 6px 15px;
+            border-radius: 9999px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn-header-install:hover {
+            background: #eaeaea;
+            transform: translateY(-1px);
+        }
+
+        .btn-header-ghost {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 6px 12px;
+            border-radius: 9999px;
+            border: 1px solid transparent;
+            transition: all 0.15s ease;
+        }
+
+        .btn-header-ghost:hover {
+            color: #fff;
+            border-color: var(--border-subtle);
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        /* --- Hero Section --- */
+        main {
+            padding-top: 0;
+        }
+
+        .hero-wrap {
+            position: relative;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 120px 0 120px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        /* Subtle Vercel Radial Backdrop Lights */
+        .hero-radial-light {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 780px;
+            height: 520px;
+            background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 820px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hero-logo-wrap {
+            width: 112px;
+            height: 112px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-mid);
+            box-shadow: 0 8px 36px rgba(0, 0, 0, 0.9), 0 0 40px rgba(255, 255, 255, 0.06);
+            margin-bottom: 26px;
+            overflow: hidden;
+        }
+
+        .hero-logo-img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 5px 14px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            border-radius: 9999px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            backdrop-filter: blur(8px);
+        }
+
+        .hero-badge span.dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-emerald);
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+        }
+
+        h1.hero-title {
+            font-size: 3.4rem;
+            font-weight: 800;
+            line-height: 1.08;
+            letter-spacing: -0.04em;
+            color: #ffffff;
+            margin-bottom: 18px;
+        }
+
+        h1.hero-title span.grad {
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-lead {
+            font-size: 1.12rem;
+            line-height: 1.65;
+            color: var(--text-secondary);
+            max-width: 620px;
+            margin: 0 auto;
+        }
+
+        .hero-lead strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .hero-buttons {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 32px;
+        }
+
+        .btn-cta-primary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #ffffff;
+            color: #000000;
+            font-weight: 600;
+            font-size: 0.9rem;
+            padding: 11px 22px;
+            border-radius: 8px;
+            transition: all 0.15s ease;
+            box-shadow: 0 4px 14px rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-cta-primary:hover {
+            background: #eaeaea;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-cta-secondary {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #ededed;
+            border: 1px solid var(--border-subtle);
             font-weight: 500;
             font-size: 0.9rem;
             padding: 11px 20px;
             border-radius: 8px;
+            backdrop-filter: blur(10px);
+            transition: all 0.15s ease;
         }
 
-        .btn-primary:hover {
-            background: #e9e9ee;
+        .btn-cta-secondary:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--border-hover);
         }
 
-        .link-secondary {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-            text-decoration: underline;
-            text-decoration-color: var(--border);
-            text-underline-offset: 4px;
-        }
-
-        .link-secondary:hover {
-            color: var(--white);
-        }
-
-        .fact-row {
-            margin-top: 40px;
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            font-size: 0.75rem;
-        }
-
-        .fact-dot {
-            width: 4px;
-            height: 4px;
-            border-radius: 50%;
-            background: var(--border);
-        }
-
-        /* ---------- terminal card ---------- */
-        .terminal-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
+        /* Hero Terminal Inline Box */
+        .hero-terminal-container {
+            max-width: 680px;
+            margin: 0 auto;
+            background: #0a0a0a;
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
             overflow: hidden;
+            text-align: left;
+            box-shadow: 0 24px 48px -12px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06);
         }
 
         .terminal-titlebar {
             display: flex;
             align-items: center;
-            gap: 8px;
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border);
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: #0f0f0f;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .terminal-dots {
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .tdot {
             width: 10px;
             height: 10px;
             border-radius: 50%;
+            background: #2a2a2a;
         }
 
-        .terminal-titlebar span:last-child {
-            margin-left: 8px;
+        .terminal-tag {
+            font-family: var(--font-mono);
             font-size: 0.75rem;
-            color: var(--text-muted);
+            color: var(--text-tertiary);
+        }
+
+        .btn-copy-aur {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-subtle);
+            transition: all 0.15s ease;
+        }
+
+        .btn-copy-aur:hover {
+            color: #fff;
+            border-color: var(--border-hover);
+            background: rgba(255, 255, 255, 0.08);
         }
 
         .terminal-body {
-            padding: 20px;
-            font-size: 0.8rem;
-            line-height: 1.9;
-            overflow-x: auto;
-            white-space: nowrap;
+            padding: 18px 20px;
+            font-family: var(--font-mono);
+            font-size: 0.86rem;
+            line-height: 1.8;
+            background: #050505;
         }
 
-        .terminal-body p {
-            margin: 0;
+        .cmd-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ffffff;
         }
 
-        .terminal-body .prompt {
-            color: var(--candy-3);
+        .prompt-aur {
+            color: var(--accent-emerald);
+            user-select: none;
         }
 
-        .terminal-footer {
-            padding: 12px 20px;
-            border-top: 1px solid var(--border);
+        .cmd-note {
+            color: var(--text-tertiary);
+            font-size: 0.78rem;
+            margin-top: 8px;
+        }
+
+        /* --- Section Common --- */
+        section {
+            padding: 72px 0;
+        }
+
+        #features {
+            padding-top: 32px;
+        }
+
+        .section-heading {
+            margin-bottom: 36px;
+        }
+
+        .section-eyebrow {
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-tertiary);
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            font-size: 2.1rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            color: #ffffff;
+        }
+
+        .section-desc {
+            color: var(--text-secondary);
+            font-size: 0.98rem;
+            max-width: 600px;
+            margin-top: 8px;
+        }
+
+        /* --- Screenshots Grid (From Official README Attachments) --- */
+        .screenshots-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+        }
+
+        .screenshot-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .screenshot-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.7);
+        }
+
+        .screenshot-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
+            padding: 12px 18px;
+            background: #0e0e0e;
+            border-bottom: 1px solid var(--border-subtle);
         }
 
-        .status {
+        .screenshot-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #ededed;
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 0.75rem;
         }
 
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--text-muted);
+        .screenshot-badge {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-subtle);
         }
 
-        .status-dot.online {
-            background: var(--candy-3);
-            box-shadow: 0 0 8px rgba(71, 209, 108, 0.7);
-        }
-
-        .status-dot.offline {
-            background: var(--candy-1);
-            box-shadow: 0 0 8px rgba(255, 95, 109, 0.5);
-        }
-
-        /* ---------- sections ---------- */
-        section {
-            padding: 64px 0;
-        }
-
-        section h2 {
-            font-family: 'Space Grotesk', system-ui, sans-serif;
-            font-weight: 600;
-            font-size: 1.65rem;
-            color: var(--white);
-            margin: 0;
-        }
-
-        section>.wrap>p {
-            margin-top: 8px;
-            max-width: 520px;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        /* ---------- compare table ---------- */
-        .compare-scroll {
-            margin-top: 32px;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            overflow-x: auto;
-        }
-
-        .compare-table {
-            min-width: 640px;
-        }
-
-        .compare-row {
-            display: grid;
-            grid-template-columns: 1fr 1.4fr 1.4fr;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .compare-row:last-child {
-            border-bottom: none;
-        }
-
-        .compare-row>div {
-            padding: 14px 16px;
-        }
-
-        .compare-row>div:not(:first-child) {
-            border-left: 1px solid var(--border);
-        }
-
-        .compare-head {
-            background: var(--surface-2);
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .compare-head>div {
-            padding: 12px 16px;
-        }
-
-        .compare-key {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        /* ---------- gallery ---------- */
-        .gallery-grid {
-            margin-top: 32px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-        }
-
-        @media (max-width: 860px) {
-            .gallery-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        @media (max-width: 560px) {
-            .gallery-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .bezel {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 16px;
-            padding: 10px 10px 16px;
-        }
-
-        .bezel-cam {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #3a3f4d;
-            margin: 0 auto 8px;
-        }
-
-        .bezel-screen {
-            border-radius: 8px;
+        .screenshot-media {
+            background: #050505;
+            width: 100%;
             aspect-ratio: 16 / 10;
-            overflow: hidden;
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #0b0d12;
+            overflow: hidden;
+            padding: 6px;
         }
 
-        .bezel-screen img {
-            max-height: 70%;
-            max-width: 70%;
+        .screenshot-media img {
+            width: 100%;
+            height: 100%;
             object-fit: contain;
+            display: block;
+            border-radius: 6px;
+            transition: transform 0.25s ease;
         }
 
-        .bezel-screen .pending {
-            font-family: 'IBM Plex Mono', monospace;
-            font-size: 0.7rem;
-            color: var(--text-muted);
+        .screenshot-card:hover .screenshot-media img {
+            transform: scale(1.02);
         }
 
-        .bezel-caption {
-            margin-top: 12px;
-            padding: 0 4px;
-        }
-
-        .bezel-caption .t {
-            font-size: 0.875rem;
-            color: var(--white);
-            margin: 0;
-        }
-
-        .bezel-caption .c {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            margin: 3px 0 0;
-        }
-
-        /* ---------- install / links ---------- */
-        .two-col {
+        /* --- Features Matrix Table & Highlights --- */
+        .features-container {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 32px;
+            align-items: start;
         }
 
-        @media (max-width: 720px) {
-            .two-col {
+        .feature-table-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.86rem;
+            text-align: left;
+        }
+
+        .feature-table th {
+            background: #0d0d0d;
+            padding: 14px 18px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-subtle);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .feature-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border-subtle);
+            vertical-align: middle;
+        }
+
+        .feature-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .feature-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .feat-label {
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .feat-desc {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+        }
+
+        .badge-check {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: var(--accent-emerald);
+            font-weight: 600;
+        }
+
+        /* Highlights Column */
+        .highlights-column {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .highlight-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 20px;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .highlight-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .highlight-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.96rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .highlight-body {
+            font-size: 0.84rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .highlight-body strong {
+            color: #ffffff;
+        }
+
+        /* --- Installation Section (Accurate AUR instructions) --- */
+        .install-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 14px;
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .install-grid {
+            display: grid;
+            grid-template-columns: 1.1fr 0.9fr;
+            gap: 36px;
+        }
+
+        .install-step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .install-step {
+            display: flex;
+            gap: 16px;
+        }
+
+        .step-indicator {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--bg-surface-elevated);
+            border: 1px solid var(--border-mid);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .step-details h4 {
+            color: #ffffff;
+            font-size: 0.95rem;
+            margin-bottom: 4px;
+        }
+
+        .step-details p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            line-height: 1.55;
+        }
+
+        .aur-code-block {
+            background: #050505;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-top: 10px;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .aur-code-block code {
+            color: #ededed;
+            word-break: break-all;
+        }
+
+        .copy-icon-btn {
+            color: var(--text-tertiary);
+            padding: 4px;
+            border-radius: 4px;
+            transition: color 0.15s ease;
+        }
+
+        .copy-icon-btn:hover {
+            color: #ffffff;
+        }
+
+        /* Community Links */
+        .community-box {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background: #0e0e0e;
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .comm-header {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .comm-desc {
+            color: var(--text-secondary);
+            font-size: 0.84rem;
+            margin-bottom: 20px;
+        }
+
+        .comm-pill-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .comm-link-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+            transition: all 0.15s ease;
+        }
+
+        .comm-link-row:hover {
+            color: #fff;
+            border-color: var(--border-hover);
+            background: var(--bg-subtle);
+        }
+
+        /* Support Ko-fi notice */
+        .support-banner {
+            margin-top: 24px;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+        }
+
+        .support-banner strong {
+            color: #ffffff;
+        }
+
+        .btn-support-kofi {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border: 1px solid var(--border-mid);
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        .btn-support-kofi:hover {
+            background: rgba(255, 255, 255, 0.14);
+            border-color: #fff;
+        }
+
+        /* --- Modal (Privacy Policy & Terms) --- */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-backdrop.active {
+            display: flex;
+        }
+
+        .modal-window {
+            background: #0c0c0c;
+            border: 1px solid var(--border-mid);
+            border-radius: 14px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            padding: 28px;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9);
+        }
+
+        .modal-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+
+        .modal-top h3 {
+            font-size: 1.15rem;
+            color: #ffffff;
+        }
+
+        .modal-close {
+            color: var(--text-tertiary);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .modal-close:hover {
+            color: #ffffff;
+        }
+
+        .modal-content {
+            font-size: 0.86rem;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+
+        .modal-content p {
+            margin-bottom: 14px;
+        }
+
+        .modal-content h4 {
+            color: #ffffff;
+            margin: 16px 0 6px;
+        }
+
+        /* --- Vercel-Style Footer --- */
+        footer {
+            margin-top: auto;
+            border-top: 1px solid var(--border-subtle);
+            background: #000000;
+            padding: 48px 0 36px;
+            font-size: 0.82rem;
+            color: var(--text-tertiary);
+        }
+
+        .footer-top {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 28px;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .footer-links {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 24px;
+        }
+
+        .footer-link-item {
+            color: var(--text-secondary);
+            transition: color 0.15s ease;
+        }
+
+        .footer-link-item:hover {
+            color: #ffffff;
+        }
+
+        .footer-bottom {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+            font-size: 0.78rem;
+        }
+
+        .footer-legal-links {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .legal-btn {
+            color: var(--text-tertiary);
+            font-size: 0.78rem;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+            transition: color 0.15s ease;
+        }
+
+        .legal-btn:hover {
+            color: var(--text-secondary);
+        }
+
+        /* --- Responsive --- */
+        @media (max-width: 900px) {
+            h1.hero-title {
+                font-size: 2.8rem;
+            }
+
+            .features-container {
+                grid-template-columns: 1fr;
+            }
+
+            .screenshots-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .install-grid {
                 grid-template-columns: 1fr;
             }
         }
 
-        .link-pill {
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 9px 16px;
-            font-size: 0.875rem;
-            color: var(--text-muted);
-            display: inline-block;
-        }
+        @media (max-width: 640px) {
+            .header-nav {
+                display: none;
+            }
 
-        .link-pill:hover {
-            color: var(--white);
-            border-color: var(--border-hover);
-        }
+            header.floating-pill {
+                padding: 0 12px;
+            }
 
-        .pill-row {
-            margin-top: 18px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .outline-btn {
-            margin-top: 20px;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 0.875rem;
-            color: var(--white);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 11px 18px;
-        }
-
-        .outline-btn:hover {
-            border-color: var(--border-hover);
-        }
-
-        /* ---------- footer ---------- */
-        footer {
-            border-top: 1px solid var(--border);
-            padding: 32px 0;
-        }
-
-        .footer-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            align-items: center;
-            justify-content: space-between;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            html {
-                scroll-behavior: auto;
+            h1.hero-title {
+                font-size: 2.2rem;
             }
         }
     </style>
+    <link rel="icon" type="image/svg+xml"
+        href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDEwMDAiIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPgogIDxkZWZzPgogICAgPGZpbHRlciBpZD0idGVhcmRyb3BTaGFkb3ciIHg9Ii0yMCUiIHk9Ii0yMCUiIHdpZHRoPSIxNDAlIiBoZWlnaHQ9IjE0MCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNiIgc3RkRGV2aWF0aW9uPSIxMCIgZmxvb2QtY29sb3I9IiM0YTNiNjMiIGZsb29kLW9wYWNpdHk9IjAuMzUiIC8+CiAgICA8L2ZpbHRlcj4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iY2FuZHlUZWFyZHJvcCIgeDE9IjgyJSIgeTE9IjE4JSIgeDI9IjE4JSIgeTI9IjgyJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkZmExOWIiIHN0b3Atb3BhY2l0eT0iMC44NSIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIzMCUiIHN0b3AtY29sb3I9IiNkNDllYTciIHN0b3Atb3BhY2l0eT0iMC44MCIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI2NSUiIHN0b3AtY29sb3I9IiNhYmEwZDMiIHN0b3Atb3BhY2l0eT0iMC44MCIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGM5N2NmIiBzdG9wLW9wYWNpdHk9IjAuODUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8ZyBpZD0iY2FuZHktcmluZyI+CiAgICA8cGF0aCBkPSJNIDUwMC4wMCA4NS4wMCBDIDUwOS44OSA2MC42MSwgNTQ3LjEyIDQxLjkyLCA1NjAuNDcgMTguNzgiIHN0cm9rZT0iI2ZmMGExZSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA1NDAuNjggODcuMDAgQyA1NTIuOTEgNjMuNzAsIDU5MS43OSA0OC43NCwgNjA3LjM0IDI3LjAzIiBzdHJva2U9IiNmZjBhMmQiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNTgwLjk2IDkyLjk3IEMgNTk1LjQyIDcwLjk4LCA2MzUuNTggNTkuOTEsIDY1My4xOSAzOS44MyIgc3Ryb2tlPSIjZmYwYTNkIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDYyMC40NyAxMDIuODcgQyA2MzcuMDEgODIuNDAsIDY3OC4wNiA3NS4zMiwgNjk3LjU1IDU3LjA2IiBzdHJva2U9IiNmZjBhNGMiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNjU4LjgxIDExNi41OSBDIDY3Ny4yOCA5Ny44NCwgNzE4LjgzIDk0LjgyLCA3NDAuMDIgNzguNTUiIHN0cm9rZT0iI2ZmMGE1YiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA2OTUuNjMgMTM0LjAwIEMgNzE1Ljg1IDExNy4xNSwgNzU3LjQ5IDExOC4yMiwgNzgwLjE3IDEwNC4xMSIgc3Ryb2tlPSIjZmYwYTZiIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDczMC41NiAxNTQuOTQgQyA3NTIuMzMgMTQwLjE2LCA3OTMuNjggMTQ1LjMwLCA4MTcuNjMgMTMzLjQ4IiBzdHJva2U9IiNmZjA4ODMiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNzYzLjI3IDE3OS4yMCBDIDc4Ni4zOSAxNjYuNjIsIDgyNy4wMyAxNzUuNzksIDg1Mi4wMiAxNjYuMzgiIHN0cm9rZT0iI2ZmMDdhMiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA3OTMuNDUgMjA2LjU1IEMgODE3LjY5IDE5Ni4zMCwgODU3LjIzIDIwOS40MCwgODgzLjAzIDIwMi40OSIgc3Ryb2tlPSIjZmYwNWMwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDgyMC44MCAyMzYuNzMgQyA4NDUuOTIgMjI4LjkwLCA4ODMuOTkgMjQ1LjgyLCA5MTAuMzQgMjQxLjQ2IiBzdHJva2U9IiNmZjAzZGYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODQ1LjA2IDI2OS40NCBDIDg3MC44MyAyNjQuMTEsIDkwNy4wNiAyODQuNjgsIDkzMy43MSAyODIuOTMiIHN0cm9rZT0iI2ZmMDFmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4NjYuMDAgMzA0LjM3IEMgODkyLjE3IDMwMS41OSwgOTI2LjIwIDMyNS42MiwgOTUyLjkwIDMyNi40OCIgc3Ryb2tlPSIjZTAwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg4My40MSAzNDEuMTkgQyA5MDkuNzMgMzQwLjk5LCA5NDEuMjUgMzY4LjIzLCA5NjcuNzMgMzcxLjcxIiBzdHJva2U9IiNjNDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODk3LjEzIDM3OS41MyBDIDkyMy4zNCAzODEuOTEsIDk1Mi4wNCA0MTIuMTIsIDk3OC4wNSA0MTguMTciIHN0cm9rZT0iI2E4MDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5MDcuMDMgNDE5LjA0IEMgOTMyLjg4IDQyMy45OCwgOTU4LjQ3IDQ1Ni44NSwgOTgzLjc3IDQ2NS40MiIgc3Ryb2tlPSIjOGMwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkxMy4wMCA0NTkuMzIgQyA5MzguMjQgNDY2Ljc3LCA5NjAuNTAgNTAxLjk5LCA5ODQuODMgNTEzLjAxIiBzdHJva2U9IiM3MDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gOTE1LjAwIDUwMC4wMCBDIDkzOS4zOSA1MDkuODksIDk1OC4wOCA1NDcuMTIsIDk4MS4yMiA1NjAuNDciIHN0cm9rZT0iIzU0MDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5MTMuMDAgNTQwLjY4IEMgOTM2LjMwIDU1Mi45MSwgOTUxLjI2IDU5MS43OSwgOTcyLjk3IDYwNy4zNCIgc3Ryb2tlPSIjMzkwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkwNy4wMyA1ODAuOTYgQyA5MjkuMDIgNTk1LjQyLCA5NDAuMDkgNjM1LjU4LCA5NjAuMTcgNjUzLjE5IiBzdHJva2U9IiMxZDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODk3LjEzIDYyMC40NyBDIDkxNy42MCA2MzcuMDEsIDkyNC42OCA2NzguMDYsIDk0Mi45NCA2OTcuNTUiIHN0cm9rZT0iIzAxMDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4ODMuNDEgNjU4LjgxIEMgOTAyLjE2IDY3Ny4yOCwgOTA1LjE4IDcxOC44MywgOTIxLjQ1IDc0MC4wMiIgc3Ryb2tlPSIjMDAxYWZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg2Ni4wMCA2OTUuNjMgQyA4ODIuODUgNzE1Ljg1LCA4ODEuNzggNzU3LjQ5LCA4OTUuODkgNzgwLjE3IiBzdHJva2U9IiMwMDM2ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODQ1LjA2IDczMC41NiBDIDg1OS44NCA3NTIuMzMsIDg1NC43MCA3OTMuNjgsIDg2Ni41MiA4MTcuNjMiIHN0cm9rZT0iIzAwNGZmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4MjAuODAgNzYzLjI3IEMgODMzLjM4IDc4Ni4zOSwgODI0LjIxIDgyNy4wMywgODMzLjYyIDg1Mi4wMiIgc3Ryb2tlPSIjMDA2N2ZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDc5My40NSA3OTMuNDUgQyA4MDMuNzAgODE3LjY5LCA3OTAuNjAgODU3LjIzLCA3OTcuNTEgODgzLjAzIiBzdHJva2U9IiMwMDdmZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNzYzLjI3IDgyMC44MCBDIDc3MS4xMCA4NDUuOTIsIDc1NC4xOCA4ODMuOTksIDc1OC41NCA5MTAuMzQiIHN0cm9rZT0iIzAwOTdmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA3MzAuNTYgODQ1LjA2IEMgNzM1Ljg5IDg3MC44MywgNzE1LjMyIDkwNy4wNiwgNzE3LjA3IDkzMy43MSIgc3Ryb2tlPSIjMDBhZmZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDY5NS42MyA4NjYuMDAgQyA2OTguNDEgODkyLjE3LCA2NzQuMzggOTI2LjIwLCA2NzMuNTIgOTUyLjkwIiBzdHJva2U9IiMwMGM0ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNjU4LjgxIDg4My40MSBDIDY1OS4wMSA5MDkuNzMsIDYzMS43NyA5NDEuMjUsIDYyOC4yOSA5NjcuNzMiIHN0cm9rZT0iIzAwZDRmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA2MjAuNDcgODk3LjEzIEMgNjE4LjA5IDkyMy4zNCwgNTg3Ljg4IDk1Mi4wNCwgNTgxLjgzIDk3OC4wNSIgc3Ryb2tlPSIjMDBlNGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDU4MC45NiA5MDcuMDMgQyA1NzYuMDIgOTMyLjg4LCA1NDMuMTUgOTU4LjQ3LCA1MzQuNTggOTgzLjc3IiBzdHJva2U9IiMwMGY0ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNTQwLjY4IDkxMy4wMCBDIDUzMy4yMyA5MzguMjQsIDQ5OC4wMSA5NjAuNTAsIDQ4Ni45OSA5ODQuODMiIHN0cm9rZT0iIzAwZmZmOSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA1MDAuMDAgOTE1LjAwIEMgNDkwLjExIDkzOS4zOSwgNDUyLjg4IDk1OC4wOCwgNDM5LjUzIDk4MS4yMiIgc3Ryb2tlPSIjMDBmZmU5IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDQ1OS4zMiA5MTMuMDAgQyA0NDcuMDkgOTM2LjMwLCA0MDguMjEgOTUxLjI2LCAzOTIuNjYgOTcyLjk3IiBzdHJva2U9IiMwMGZmY2QiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNDE5LjA0IDkwNy4wMyBDIDQwNC41OCA5MjkuMDIsIDM2NC40MiA5NDAuMDksIDM0Ni44MSA5NjAuMTciIHN0cm9rZT0iIzAwZmZiMSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAzNzkuNTMgODk3LjEzIEMgMzYyLjk5IDkxNy42MCwgMzIxLjk0IDkyNC42OCwgMzAyLjQ1IDk0Mi45NCIgc3Ryb2tlPSIjMDBmZjk2IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDM0MS4xOSA4ODMuNDEgQyAzMjIuNzIgOTAyLjE2LCAyODEuMTcgOTA1LjE4LCAyNTkuOTggOTIxLjQ1IiBzdHJva2U9IiMwMGZmN2EiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzA0LjM3IDg2Ni4wMCBDIDI4NC4xNSA4ODIuODUsIDI0Mi41MSA4ODEuNzgsIDIxOS44MyA4OTUuODkiIHN0cm9rZT0iIzAwZmY1ZSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAyNjkuNDQgODQ1LjA2IEMgMjQ3LjY3IDg1OS44NCwgMjA2LjMyIDg1NC43MCwgMTgyLjM3IDg2Ni41MiIgc3Ryb2tlPSIjMDBmZjNkIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDIzNi43MyA4MjAuODAgQyAyMTMuNjEgODMzLjM4LCAxNzIuOTcgODI0LjIxLCAxNDcuOTggODMzLjYyIiBzdHJva2U9IiMwMGZmMTkiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMjA2LjU1IDc5My40NSBDIDE4Mi4zMSA4MDMuNzAsIDE0Mi43NyA3OTAuNjAsIDExNi45NyA3OTcuNTEiIHN0cm9rZT0iIzBhZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxNzkuMjAgNzYzLjI3IEMgMTU0LjA4IDc3MS4xMCwgMTE2LjAxIDc1NC4xOCwgODkuNjYgNzU4LjU0IiBzdHJva2U9IiMyZWZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTU0Ljk0IDczMC41NiBDIDEyOS4xNyA3MzUuODksIDkyLjk0IDcxNS4zMiwgNjYuMjkgNzE3LjA3IiBzdHJva2U9IiM1MmZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTM0LjAwIDY5NS42MyBDIDEwNy44MyA2OTguNDEsIDczLjgwIDY3NC4zOCwgNDcuMTAgNjczLjUyIiBzdHJva2U9IiM3M2ZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTE2LjU5IDY1OC44MSBDIDkwLjI3IDY1OS4wMSwgNTguNzUgNjMxLjc3LCAzMi4yNyA2MjguMjkiIHN0cm9rZT0iIzhmZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxMDIuODcgNjIwLjQ3IEMgNzYuNjYgNjE4LjA5LCA0Ny45NiA1ODcuODgsIDIxLjk1IDU4MS44MyIgc3Ryb2tlPSIjYWJmZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkyLjk3IDU4MC45NiBDIDY3LjEyIDU3Ni4wMiwgNDEuNTMgNTQzLjE1LCAxNi4yMyA1MzQuNTgiIHN0cm9rZT0iI2M3ZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4Ny4wMCA1NDAuNjggQyA2MS43NiA1MzMuMjMsIDM5LjUwIDQ5OC4wMSwgMTUuMTcgNDg2Ljk5IiBzdHJva2U9IiNlM2ZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODUuMDAgNTAwLjAwIEMgNjAuNjEgNDkwLjExLCA0MS45MiA0NTIuODgsIDE4Ljc4IDQzOS41MyIgc3Ryb2tlPSIjZmZmZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg3LjAwIDQ1OS4zMiBDIDYzLjcwIDQ0Ny4wOSwgNDguNzQgNDA4LjIxLCAyNy4wMyAzOTIuNjYiIHN0cm9rZT0iI2ZmZjMwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5Mi45NyA0MTkuMDQgQyA3MC45OCA0MDQuNTgsIDU5LjkxIDM2NC40MiwgMzkuODMgMzQ2LjgxIiBzdHJva2U9IiNmZmU3MDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTAyLjg3IDM3OS41MyBDIDgyLjQwIDM2Mi45OSwgNzUuMzIgMzIxLjk0LCA1Ny4wNiAzMDIuNDUiIHN0cm9rZT0iI2ZmZGIwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxMTYuNTkgMzQxLjE5IEMgOTcuODQgMzIyLjcyLCA5NC44MiAyODEuMTcsIDc4LjU1IDI1OS45OCIgc3Ryb2tlPSIjZmZjZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDEzNC4wMCAzMDQuMzcgQyAxMTcuMTUgMjg0LjE1LCAxMTguMjIgMjQyLjUxLCAxMDQuMTEgMjE5LjgzIiBzdHJva2U9IiNmZmMzMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTU0Ljk0IDI2OS40NCBDIDE0MC4xNiAyNDcuNjcsIDE0NS4zMCAyMDYuMzIsIDEzMy40OCAxODIuMzciIHN0cm9rZT0iI2ZmYjQwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxNzkuMjAgMjM2LjczIEMgMTY2LjYyIDIxMy42MSwgMTc1Ljc5IDE3Mi45NywgMTY2LjM4IDE0Ny45OCIgc3Ryb2tlPSIjZmZhNDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDIwNi41NSAyMDYuNTUgQyAxOTYuMzAgMTgyLjMxLCAyMDkuNDAgMTQyLjc3LCAyMDIuNDkgMTE2Ljk3IiBzdHJva2U9IiNmZjk0MDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMjM2LjczIDE3OS4yMCBDIDIyOC45MCAxNTQuMDgsIDI0NS44MiAxMTYuMDEsIDI0MS40NiA4OS42NiIgc3Ryb2tlPSIjZmY4NDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDI2OS40NCAxNTQuOTQgQyAyNjQuMTEgMTI5LjE3LCAyODQuNjggOTIuOTQsIDI4Mi45MyA2Ni4yOSIgc3Ryb2tlPSIjZmY3NDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDMwNC4zNyAxMzQuMDAgQyAzMDEuNTkgMTA3LjgzLCAzMjUuNjIgNzMuODAsIDMyNi40OCA0Ny4xMCIgc3Ryb2tlPSIjZmY2MjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDM0MS4xOSAxMTYuNTkgQyAzNDAuOTkgOTAuMjcsIDM2OC4yMyA1OC43NSwgMzcxLjcxIDMyLjI3IiBzdHJva2U9IiNmZjRjMDIiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzc5LjUzIDEwMi44NyBDIDM4MS45MSA3Ni42NiwgNDEyLjEyIDQ3Ljk2LCA0MTguMTcgMjEuOTUiIHN0cm9rZT0iI2ZmMzYwNCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA0MTkuMDQgOTIuOTcgQyA0MjMuOTggNjcuMTIsIDQ1Ni44NSA0MS41MywgNDY1LjQyIDE2LjIzIiBzdHJva2U9IiNmZjIwMDYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNDU5LjMyIDg3LjAwIEMgNDY2Ljc3IDYxLjc2LCA1MDEuOTkgMzkuNTAsIDUxMy4wMSAxNS4xNyIgc3Ryb2tlPSIjZmYwYTA4IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgPC9nPgogIDxnIGlkPSJjYW5keS10ZWFyZHJvcCIgZmlsdGVyPSJ1cmwoI3RlYXJkcm9wU2hhZG93KSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTUsIDE0KSI+CiAgICA8cGF0aCBkPSJNIDQ2OCAxMTUgTCA0MzUgMTc4IEMgMzY1IDI5NSwgMjEyIDQ3MCwgMjEyIDYwNSBDIDIxMiA3MzUsIDMzNSA4NDIsIDUwMCA4NDIgQyA2NjUgODQyLCA3ODggNzM1LCA3ODggNjA1IEMgNzg4IDQ3MCwgNjM1IDI5NSwgNTY1IDE3OCBMIDUzMiAxMTUgQyA1OTUgMjQwLCA3MTggNDI1LCA3MTggNjAwIEMgNzE4IDcwNSwgNjIwIDc3OCwgNTAwIDc3OCBDIDM4MCA3NzgsIDI4MiA3MDUsIDI4MiA2MDAgQyAyODIgNDI1LCA0MDUgMjQwLCA0NjggMTE1IFoiIGZpbGw9InVybCgjY2FuZHlUZWFyZHJvcCkiIC8+CiAgPC9nPgo8L3N2Zz4=" />
 </head>
 
 <body>
 
-    <!-- ============ NAV ============ -->
-    <header>
-        <div class="wrap nav-row">
-            <a href="#top" class="brand">
-                <img src="assets/candy-logo.png" alt="HyprCandy logo">
-                <span class="font-display">HyprCandy</span>
-            </a>
-            <nav class="nav-links">
-                <a href="#compare">Free vs Plus</a>
-                <a href="#gallery">Screenshots</a>
-                <a href="#install">Install</a>
-                <a href="https://github.com/HyprCandy" target="_blank" rel="noopener">Repositories</a>
-            </nav>
-            <a href="https://github.com/HyprCandy" target="_blank" rel="noopener"
-                class="btn-ghost">github.com/HyprCandy</a>
-        </div>
-    </header>
+    <!-- Vercel Style Floating Pill Header with Deep Blur -->
+    <div class="floating-header-wrapper">
+        <div class="header-pill-inner">
+            <header class="floating-pill">
+                <div class="header-brand-group">
+                    <a href="#top" class="header-brand">
+                        <div class="brand-icon-wrap" title="HyprCandy+">
+                            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDEwMDAiIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPgogIDxkZWZzPgogICAgPGZpbHRlciBpZD0idGVhcmRyb3BTaGFkb3ciIHg9Ii0yMCUiIHk9Ii0yMCUiIHdpZHRoPSIxNDAlIiBoZWlnaHQ9IjE0MCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNiIgc3RkRGV2aWF0aW9uPSIxMCIgZmxvb2QtY29sb3I9IiM0YTNiNjMiIGZsb29kLW9wYWNpdHk9IjAuMzUiIC8+CiAgICA8L2ZpbHRlcj4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iY2FuZHlUZWFyZHJvcCIgeDE9IjgyJSIgeTE9IjE4JSIgeDI9IjE4JSIgeTI9IjgyJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkZmExOWIiIHN0b3Atb3BhY2l0eT0iMC44NSIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIzMCUiIHN0b3AtY29sb3I9IiNkNDllYTciIHN0b3Atb3BhY2l0eT0iMC44MCIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI2NSUiIHN0b3AtY29sb3I9IiNhYmEwZDMiIHN0b3Atb3BhY2l0eT0iMC44MCIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGM5N2NmIiBzdG9wLW9wYWNpdHk9IjAuODUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8ZyBpZD0iY2FuZHktcmluZyI+CiAgICA8cGF0aCBkPSJNIDUwMC4wMCA4NS4wMCBDIDUwOS44OSA2MC42MSwgNTQ3LjEyIDQxLjkyLCA1NjAuNDcgMTguNzgiIHN0cm9rZT0iI2ZmMGExZSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA1NDAuNjggODcuMDAgQyA1NTIuOTEgNjMuNzAsIDU5MS43OSA0OC43NCwgNjA3LjM0IDI3LjAzIiBzdHJva2U9IiNmZjBhMmQiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNTgwLjk2IDkyLjk3IEMgNTk1LjQyIDcwLjk4LCA2MzUuNTggNTkuOTEsIDY1My4xOSAzOS44MyIgc3Ryb2tlPSIjZmYwYTNkIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDYyMC40NyAxMDIuODcgQyA2MzcuMDEgODIuNDAsIDY3OC4wNiA3NS4zMiwgNjk3LjU1IDU3LjA2IiBzdHJva2U9IiNmZjBhNGMiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNjU4LjgxIDExNi41OSBDIDY3Ny4yOCA5Ny44NCwgNzE4LjgzIDk0LjgyLCA3NDAuMDIgNzguNTUiIHN0cm9rZT0iI2ZmMGE1YiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA2OTUuNjMgMTM0LjAwIEMgNzE1Ljg1IDExNy4xNSwgNzU3LjQ5IDExOC4yMiwgNzgwLjE3IDEwNC4xMSIgc3Ryb2tlPSIjZmYwYTZiIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDczMC41NiAxNTQuOTQgQyA3NTIuMzMgMTQwLjE2LCA3OTMuNjggMTQ1LjMwLCA4MTcuNjMgMTMzLjQ4IiBzdHJva2U9IiNmZjA4ODMiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNzYzLjI3IDE3OS4yMCBDIDc4Ni4zOSAxNjYuNjIsIDgyNy4wMyAxNzUuNzksIDg1Mi4wMiAxNjYuMzgiIHN0cm9rZT0iI2ZmMDdhMiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA3OTMuNDUgMjA2LjU1IEMgODE3LjY5IDE5Ni4zMCwgODU3LjIzIDIwOS40MCwgODgzLjAzIDIwMi40OSIgc3Ryb2tlPSIjZmYwNWMwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDgyMC44MCAyMzYuNzMgQyA4NDUuOTIgMjI4LjkwLCA4ODMuOTkgMjQ1LjgyLCA5MTAuMzQgMjQxLjQ2IiBzdHJva2U9IiNmZjAzZGYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODQ1LjA2IDI2OS40NCBDIDg3MC44MyAyNjQuMTEsIDkwNy4wNiAyODQuNjgsIDkzMy43MSAyODIuOTMiIHN0cm9rZT0iI2ZmMDFmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4NjYuMDAgMzA0LjM3IEMgODkyLjE3IDMwMS41OSwgOTI2LjIwIDMyNS42MiwgOTUyLjkwIDMyNi40OCIgc3Ryb2tlPSIjZTAwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg4My40MSAzNDEuMTkgQyA5MDkuNzMgMzQwLjk5LCA5NDEuMjUgMzY4LjIzLCA5NjcuNzMgMzcxLjcxIiBzdHJva2U9IiNjNDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODk3LjEzIDM3OS41MyBDIDkyMy4zNCAzODEuOTEsIDk1Mi4wNCA0MTIuMTIsIDk3OC4wNSA0MTguMTciIHN0cm9rZT0iI2E4MDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5MDcuMDMgNDE5LjA0IEMgOTMyLjg4IDQyMy45OCwgOTU4LjQ3IDQ1Ni44NSwgOTgzLjc3IDQ2NS40MiIgc3Ryb2tlPSIjOGMwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkxMy4wMCA0NTkuMzIgQyA5MzguMjQgNDY2Ljc3LCA5NjAuNTAgNTAxLjk5LCA5ODQuODMgNTEzLjAxIiBzdHJva2U9IiM3MDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gOTE1LjAwIDUwMC4wMCBDIDkzOS4zOSA1MDkuODksIDk1OC4wOCA1NDcuMTIsIDk4MS4yMiA1NjAuNDciIHN0cm9rZT0iIzU0MDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5MTMuMDAgNTQwLjY4IEMgOTM2LjMwIDU1Mi45MSwgOTUxLjI2IDU5MS43OSwgOTcyLjk3IDYwNy4zNCIgc3Ryb2tlPSIjMzkwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkwNy4wMyA1ODAuOTYgQyA5MjkuMDIgNTk1LjQyLCA5NDAuMDkgNjM1LjU4LCA5NjAuMTcgNjUzLjE5IiBzdHJva2U9IiMxZDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODk3LjEzIDYyMC40NyBDIDkxNy42MCA2MzcuMDEsIDkyNC42OCA2NzguMDYsIDk0Mi45NCA2OTcuNTUiIHN0cm9rZT0iIzAxMDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4ODMuNDEgNjU4LjgxIEMgOTAyLjE2IDY3Ny4yOCwgOTA1LjE4IDcxOC44MywgOTIxLjQ1IDc0MC4wMiIgc3Ryb2tlPSIjMDAxYWZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg2Ni4wMCA2OTUuNjMgQyA4ODIuODUgNzE1Ljg1LCA4ODEuNzggNzU3LjQ5LCA4OTUuODkgNzgwLjE3IiBzdHJva2U9IiMwMDM2ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODQ1LjA2IDczMC41NiBDIDg1OS44NCA3NTIuMzMsIDg1NC43MCA3OTMuNjgsIDg2Ni41MiA4MTcuNjMiIHN0cm9rZT0iIzAwNGZmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4MjAuODAgNzYzLjI3IEMgODMzLjM4IDc4Ni4zOSwgODI0LjIxIDgyNy4wMywgODMzLjYyIDg1Mi4wMiIgc3Ryb2tlPSIjMDA2N2ZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDc5My40NSA3OTMuNDUgQyA4MDMuNzAgODE3LjY5LCA3OTAuNjAgODU3LjIzLCA3OTcuNTEgODgzLjAzIiBzdHJva2U9IiMwMDdmZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNzYzLjI3IDgyMC44MCBDIDc3MS4xMCA4NDUuOTIsIDc1NC4xOCA4ODMuOTksIDc1OC41NCA5MTAuMzQiIHN0cm9rZT0iIzAwOTdmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA3MzAuNTYgODQ1LjA2IEMgNzM1Ljg5IDg3MC44MywgNzE1LjMyIDkwNy4wNiwgNzE3LjA3IDkzMy43MSIgc3Ryb2tlPSIjMDBhZmZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDY5NS42MyA4NjYuMDAgQyA2OTguNDEgODkyLjE3LCA2NzQuMzggOTI2LjIwLCA2NzMuNTIgOTUyLjkwIiBzdHJva2U9IiMwMGM0ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNjU4LjgxIDg4My40MSBDIDY1OS4wMSA5MDkuNzMsIDYzMS43NyA5NDEuMjUsIDYyOC4yOSA5NjcuNzMiIHN0cm9rZT0iIzAwZDRmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA2MjAuNDcgODk3LjEzIEMgNjE4LjA5IDkyMy4zNCwgNTg3Ljg4IDk1Mi4wNCwgNTgxLjgzIDk3OC4wNSIgc3Ryb2tlPSIjMDBlNGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDU4MC45NiA5MDcuMDMgQyA1NzYuMDIgOTMyLjg4LCA1NDMuMTUgOTU4LjQ3LCA1MzQuNTggOTgzLjc3IiBzdHJva2U9IiMwMGY0ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNTQwLjY4IDkxMy4wMCBDIDUzMy4yMyA5MzguMjQsIDQ5OC4wMSA5NjAuNTAsIDQ4Ni45OSA5ODQuODMiIHN0cm9rZT0iIzAwZmZmOSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA1MDAuMDAgOTE1LjAwIEMgNDkwLjExIDkzOS4zOSwgNDUyLjg4IDk1OC4wOCwgNDM5LjUzIDk4MS4yMiIgc3Ryb2tlPSIjMDBmZmU5IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDQ1OS4zMiA5MTMuMDAgQyA0NDcuMDkgOTM2LjMwLCA0MDguMjEgOTUxLjI2LCAzOTIuNjYgOTcyLjk3IiBzdHJva2U9IiMwMGZmY2QiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNDE5LjA0IDkwNy4wMyBDIDQwNC41OCA5MjkuMDIsIDM2NC40MiA5NDAuMDksIDM0Ni44MSA5NjAuMTciIHN0cm9rZT0iIzAwZmZiMSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAzNzkuNTMgODk3LjEzIEMgMzYyLjk5IDkxNy42MCwgMzIxLjk0IDkyNC42OCwgMzAyLjQ1IDk0Mi45NCIgc3Ryb2tlPSIjMDBmZjk2IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDM0MS4xOSA4ODMuNDEgQyAzMjIuNzIgOTAyLjE2LCAyODEuMTcgOTA1LjE4LCAyNTkuOTggOTIxLjQ1IiBzdHJva2U9IiMwMGZmN2EiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzA0LjM3IDg2Ni4wMCBDIDI4NC4xNSA4ODIuODUsIDI0Mi41MSA4ODEuNzgsIDIxOS44MyA4OTUuODkiIHN0cm9rZT0iIzAwZmY1ZSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAyNjkuNDQgODQ1LjA2IEMgMjQ3LjY3IDg1OS44NCwgMjA2LjMyIDg1NC43MCwgMTgyLjM3IDg2Ni41MiIgc3Ryb2tlPSIjMDBmZjNkIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDIzNi43MyA4MjAuODAgQyAyMTMuNjEgODMzLjM4LCAxNzIuOTcgODI0LjIxLCAxNDcuOTggODMzLjYyIiBzdHJva2U9IiMwMGZmMTkiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMjA2LjU1IDc5My40NSBDIDE4Mi4zMSA4MDMuNzAsIDE0Mi43NyA3OTAuNjAsIDExNi45NyA3OTcuNTEiIHN0cm9rZT0iIzBhZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxNzkuMjAgNzYzLjI3IEMgMTU0LjA4IDc3MS4xMCwgMTE2LjAxIDc1NC4xOCwgODkuNjYgNzU4LjU0IiBzdHJva2U9IiMyZWZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTU0Ljk0IDczMC41NiBDIDEyOS4xNyA3MzUuODksIDkyLjk0IDcxNS4zMiwgNjYuMjkgNzE3LjA3IiBzdHJva2U9IiM1MmZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTM0LjAwIDY5NS42MyBDIDEwNy44MyA2OTguNDEsIDczLjgwIDY3NC4zOCwgNDcuMTAgNjczLjUyIiBzdHJva2U9IiM3M2ZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTE2LjU5IDY1OC44MSBDIDkwLjI3IDY1OS4wMSwgNTguNzUgNjMxLjc3LCAzMi4yNyA2MjguMjkiIHN0cm9rZT0iIzhmZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxMDIuODcgNjIwLjQ3IEMgNzYuNjYgNjE4LjA5LCA0Ny45NiA1ODcuODgsIDIxLjk1IDU4MS44MyIgc3Ryb2tlPSIjYWJmZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkyLjk3IDU4MC45NiBDIDY3LjEyIDU3Ni4wMiwgNDEuNTMgNTQzLjE1LCAxNi4yMyA1MzQuNTgiIHN0cm9rZT0iI2M3ZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4Ny4wMCA1NDAuNjggQyA2MS43NiA1MzMuMjMsIDM5LjUwIDQ5OC4wMSwgMTUuMTcgNDg2Ljk5IiBzdHJva2U9IiNlM2ZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODUuMDAgNTAwLjAwIEMgNjAuNjEgNDkwLjExLCA0MS45MiA0NTIuODgsIDE4Ljc4IDQzOS41MyIgc3Ryb2tlPSIjZmZmZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg3LjAwIDQ1OS4zMiBDIDYzLjcwIDQ0Ny4wOSwgNDguNzQgNDA4LjIxLCAyNy4wMyAzOTIuNjYiIHN0cm9rZT0iI2ZmZjMwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5Mi45NyA0MTkuMDQgQyA3MC45OCA0MDQuNTgsIDU5LjkxIDM2NC40MiwgMzkuODMgMzQ2LjgxIiBzdHJva2U9IiNmZmU3MDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTAyLjg3IDM3OS41MyBDIDgyLjQwIDM2Mi45OSwgNzUuMzIgMzIxLjk0LCA1Ny4wNiAzMDIuNDUiIHN0cm9rZT0iI2ZmZGIwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxMTYuNTkgMzQxLjE5IEMgOTcuODQgMzIyLjcyLCA5NC44MiAyODEuMTcsIDc4LjU1IDI1OS45OCIgc3Ryb2tlPSIjZmZjZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDEzNC4wMCAzMDQuMzcgQyAxMTcuMTUgMjg0LjE1LCAxMTguMjIgMjQyLjUxLCAxMDQuMTEgMjE5LjgzIiBzdHJva2U9IiNmZmMzMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTU0Ljk0IDI2OS40NCBDIDE0MC4xNiAyNDcuNjcsIDE0NS4zMCAyMDYuMzIsIDEzMy40OCAxODIuMzciIHN0cm9rZT0iI2ZmYjQwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxNzkuMjAgMjM2LjczIEMgMTY2LjYyIDIxMy42MSwgMTc1Ljc5IDE3Mi45NywgMTY2LjM4IDE0Ny45OCIgc3Ryb2tlPSIjZmZhNDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDIwNi41NSAyMDYuNTUgQyAxOTYuMzAgMTgyLjMxLCAyMDkuNDAgMTQyLjc3LCAyMDIuNDkgMTE2Ljk3IiBzdHJva2U9IiNmZjk0MDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMjM2LjczIDE3OS4yMCBDIDIyOC45MCAxNTQuMDgsIDI0NS44MiAxMTYuMDEsIDI0MS40NiA4OS42NiIgc3Ryb2tlPSIjZmY4NDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDI2OS40NCAxNTQuOTQgQyAyNjQuMTEgMTI5LjE3LCAyODQuNjggOTIuOTQsIDI4Mi45MyA2Ni4yOSIgc3Ryb2tlPSIjZmY3NDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDMwNC4zNyAxMzQuMDAgQyAzMDEuNTkgMTA3LjgzLCAzMjUuNjIgNzMuODAsIDMyNi40OCA0Ny4xMCIgc3Ryb2tlPSIjZmY2MjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDM0MS4xOSAxMTYuNTkgQyAzNDAuOTkgOTAuMjcsIDM2OC4yMyA1OC43NSwgMzcxLjcxIDMyLjI3IiBzdHJva2U9IiNmZjRjMDIiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzc5LjUzIDEwMi44NyBDIDM4MS45MSA3Ni42NiwgNDEyLjEyIDQ3Ljk2LCA0MTguMTcgMjEuOTUiIHN0cm9rZT0iI2ZmMzYwNCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA0MTkuMDQgOTIuOTcgQyA0MjMuOTggNjcuMTIsIDQ1Ni44NSA0MS41MywgNDY1LjQyIDE2LjIzIiBzdHJva2U9IiNmZjIwMDYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNDU5LjMyIDg3LjAwIEMgNDY2Ljc3IDYxLjc2LCA1MDEuOTkgMzkuNTAsIDUxMy4wMSAxNS4xNyIgc3Ryb2tlPSIjZmYwYTA4IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgPC9nPgogIDxnIGlkPSJjYW5keS10ZWFyZHJvcCIgZmlsdGVyPSJ1cmwoI3RlYXJkcm9wU2hhZG93KSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTUsIDE0KSI+CiAgICA8cGF0aCBkPSJNIDQ2OCAxMTUgTCA0MzUgMTc4IEMgMzY1IDI5NSwgMjEyIDQ3MCwgMjEyIDYwNSBDIDIxMiA3MzUsIDMzNSA4NDIsIDUwMCA4NDIgQyA2NjUgODQyLCA3ODggNzM1LCA3ODggNjA1IEMgNzg4IDQ3MCwgNjM1IDI5NSwgNTY1IDE3OCBMIDUzMiAxMTUgQyA1OTUgMjQwLCA3MTggNDI1LCA3MTggNjAwIEMgNzE4IDcwNSwgNjIwIDc3OCwgNTAwIDc3OCBDIDM4MCA3NzgsIDI4MiA3MDUsIDI4MiA2MDAgQyAyODIgNDI1LCA0MDUgMjQwLCA0NjggMTE1IFoiIGZpbGw9InVybCgjY2FuZHlUZWFyZHJvcCkiIC8+CiAgPC9nPgo8L3N2Zz4="
+                                alt="HyprCandy+" width="26" height="26" class="brand-logo-img"
+                                referrerPolicy="no-referrer" />
+                        </div>
+                        <span>HyprCandy+</span>
+                    </a>
+                    <button type="button" class="header-menu-btn" id="headerMenuBtn" onclick="toggleHeaderMenu()"
+                        aria-label="Toggle menu" aria-expanded="false" aria-controls="headerDropdownPanel"
+                        title="Navigation menu">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" class="menu-down-icon">
+                            <polyline points="6 9 12 15 18 9"></polyline>
+                        </svg>
+                    </button>
+                </div>
 
-    <!-- ============ HERO ============ -->
+                <!-- Navigation: Features / Get HyprCandy+ / Screenshots -->
+                <nav class="header-nav">
+                    <a href="#features" class="pill-link">Features</a>
+                    <a href="#install" class="btn-header-install">Get HyprCandy+</a>
+                    <a href="#screenshots" class="pill-link">Screenshots</a>
+                </nav>
+
+                <!-- Far Right: GitHub Repository Link -->
+                <div class="header-actions">
+                    <a href="https://github.com/HyprCandy/Hyprcandy.git" target="_blank" rel="noopener"
+                        class="btn-header-ghost" title="GitHub Repository">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                            <path fill-rule="evenodd" clip-rule="evenodd"
+                                d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                        </svg>
+                        <span>GitHub</span>
+                    </a>
+                </div>
+            </header>
+
+            <!-- Floating Dropdown Panel with 30px Corner Radius -->
+            <div id="headerDropdownPanel" class="dropdown-panel" aria-hidden="true">
+                <div class="dropdown-panel-header">
+                    <div class="dropdown-tabs-bar" role="tablist">
+                        <button type="button" role="tab" class="dropdown-tab-btn active" id="tab-changelog-btn"
+                            aria-selected="true" aria-controls="tab-changelog" onclick="switchDropdownTab('changelog')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            <span>Change log</span>
+                        </button>
+                        <button type="button" role="tab" class="dropdown-tab-btn" id="tab-plugins-btn"
+                            aria-selected="false" aria-controls="tab-plugins" onclick="switchDropdownTab('plugins')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                            </svg>
+                            <span>Plugins</span>
+                        </button>
+                    </div>
+                    <button type="button" class="dropdown-close-btn" onclick="toggleHeaderMenu(false)"
+                        aria-label="Close menu" title="Close">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="dropdown-panel-body">
+                    <!-- Change Log Tab Pane -->
+                    <div id="tab-changelog" class="dropdown-tab-content" role="tabpanel"
+                        aria-labelledby="tab-changelog-btn">
+                        <div class="collapsible-group">
+                            <!-- Collapsible Sub-Tab 1 -->
+                            <div class="collapsible-item is-open">
+                                <button type="button" class="collapsible-trigger" onclick="toggleCollapsible(this)"
+                                    aria-expanded="true">
+                                    <div class="collapsible-title">
+                                        <span class="version-badge">v1.0.4</span>
+                                        <span class="collapsible-name">Matugen &amp; Dynamic Theming Update</span>
+                                    </div>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="accordion-chevron">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="collapsible-content">
+                                    <ul class="changelog-list">
+                                        <li>Zero-latency live wallpaper color palette synchronization without shell
+                                            reload.</li>
+                                        <li>Wallust &amp; Pywal color extraction fallback sequence with synchronized
+                                            accent tokens.</li>
+                                        <li>Unified GTK4 / Libadwaita accent tokens with terminal colorways.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Collapsible Sub-Tab 2 -->
+                            <div class="collapsible-item">
+                                <button type="button" class="collapsible-trigger" onclick="toggleCollapsible(this)"
+                                    aria-expanded="false">
+                                    <div class="collapsible-title">
+                                        <span class="version-badge">v1.0.3</span>
+                                        <span class="collapsible-name">Quickshell &amp; Candylock Migration</span>
+                                    </div>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="accordion-chevron">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="collapsible-content">
+                                    <ul class="changelog-list">
+                                        <li>Quickshell desktop status bar and widget dock integration.</li>
+                                        <li>Candylock PAM authentication with media control card and battery HUD.</li>
+                                        <li>Refined rofi-wayland application launcher theming with fuzzy search.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Collapsible Sub-Tab 3 -->
+                            <div class="collapsible-item">
+                                <button type="button" class="collapsible-trigger" onclick="toggleCollapsible(this)"
+                                    aria-expanded="false">
+                                    <div class="collapsible-title">
+                                        <span class="version-badge">v1.0.0</span>
+                                        <span class="collapsible-name">Initial HyprCandy+ Shell Release</span>
+                                    </div>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="accordion-chevron">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="collapsible-content">
+                                    <ul class="changelog-list">
+                                        <li>Initial production release on Arch Linux AUR repository.</li>
+                                        <li>One-command automated installer with hardware detection.</li>
+                                        <li>Out-of-the-box keybinds cheat sheet and wallpaper selector.</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Plugins Tab Pane -->
+                    <div id="tab-plugins" class="dropdown-tab-content" role="tabpanel" aria-labelledby="tab-plugins-btn"
+                        style="display: none;">
+                        <div class="collapsible-group">
+                            <!-- Collapsible Sub-Tab 1: Desktop Core Plugins -->
+                            <div class="collapsible-item is-open">
+                                <button type="button" class="collapsible-trigger" onclick="toggleCollapsible(this)"
+                                    aria-expanded="true">
+                                    <div class="collapsible-title">
+                                        <span class="plugin-category-badge">Core</span>
+                                        <span class="collapsible-name">Desktop Core Plugins</span>
+                                    </div>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="accordion-chevron">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="collapsible-content">
+                                    <div class="plugin-item">
+                                        <div class="plugin-name">hyprcandydock</div>
+                                        <div class="plugin-desc">Intelligent auto-hiding application launcher dock with
+                                            pinned task status.</div>
+                                    </div>
+                                    <div class="plugin-item">
+                                        <div class="plugin-name">matugen-daemon</div>
+                                        <div class="plugin-desc">Continuous background wallpaper monitor with dynamic
+                                            color re-extraction.</div>
+                                    </div>
+                                    <div class="plugin-item">
+                                        <div class="plugin-name">candylock-suite</div>
+                                        <div class="plugin-desc">Wayland lockscreen engine with live media metadata and
+                                            blurred lock screen.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Collapsible Sub-Tab 2: Widget & OSD Plugins -->
+                            <div class="collapsible-item">
+                                <button type="button" class="collapsible-trigger" onclick="toggleCollapsible(this)"
+                                    aria-expanded="false">
+                                    <div class="collapsible-title">
+                                        <span class="plugin-category-badge">Widgets</span>
+                                        <span class="collapsible-name">Widget &amp; OSD Plugins</span>
+                                    </div>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="accordion-chevron">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="collapsible-content">
+                                    <div class="plugin-item">
+                                        <div class="plugin-name">workspace-overview</div>
+                                        <div class="plugin-desc">Interactive visual workspace grid with live window
+                                            drag-and-drop.</div>
+                                    </div>
+                                    <div class="plugin-item">
+                                        <div class="plugin-name">candy-osd</div>
+                                        <div class="plugin-desc">Smooth animated volume, brightness, and microphone mute
+                                            overlay HUD.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Collapsible Sub-Tab 3: Ecosystem Plugins -->
+                            <div class="collapsible-item">
+                                <button type="button" class="collapsible-trigger" onclick="toggleCollapsible(this)"
+                                    aria-expanded="false">
+                                    <div class="collapsible-title">
+                                        <span class="plugin-category-badge">Ecosystem</span>
+                                        <span class="collapsible-name">Community Extensions</span>
+                                    </div>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                        class="accordion-chevron">
+                                        <polyline points="6 9 12 15 18 9"></polyline>
+                                    </svg>
+                                </button>
+                                <div class="collapsible-content">
+                                    <div class="plugin-item">
+                                        <div class="plugin-name">community-repo</div>
+                                        <div class="plugin-desc">Plugin registry architecture ready for custom community
+                                            contributions.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
     <main id="top">
-        <section style="padding-bottom:0;">
-            <div class="wrap hero">
-                <div>
-                    <h1>Hyprland, themed<br>all the way down.</h1>
-                    <p>
-                        HyprCandy recolors your bar, dock, launcher, and lockscreen from a single
-                        wallpaper, using <span>matugen</span>, <span>wallust</span> and
-                        <span>pywal</span>. Free and open at its core, with an optional Plus tier
-                        for the extras.
+        <!-- Hero Section -->
+        <section class="hero-wrap">
+            <div class="hero-radial-light"></div>
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-logo-wrap" title="HyprCandy+">
+                        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDEwMDAiIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPgogIDxkZWZzPgogICAgPGZpbHRlciBpZD0idGVhcmRyb3BTaGFkb3ciIHg9Ii0yMCUiIHk9Ii0yMCUiIHdpZHRoPSIxNDAlIiBoZWlnaHQ9IjE0MCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNiIgc3RkRGV2aWF0aW9uPSIxMCIgZmxvb2QtY29sb3I9IiM0YTNiNjMiIGZsb29kLW9wYWNpdHk9IjAuMzUiIC8+CiAgICA8L2ZpbHRlcj4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iY2FuZHlUZWFyZHJvcCIgeDE9IjgyJSIgeTE9IjE4JSIgeDI9IjE4JSIgeTI9IjgyJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkZmExOWIiIHN0b3Atb3BhY2l0eT0iMC44NSIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIzMCUiIHN0b3AtY29sb3I9IiNkNDllYTciIHN0b3Atb3BhY2l0eT0iMC44MCIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI2NSUiIHN0b3AtY29sb3I9IiNhYmEwZDMiIHN0b3Atb3BhY2l0eT0iMC44MCIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGM5N2NmIiBzdG9wLW9wYWNpdHk9IjAuODUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8ZyBpZD0iY2FuZHktcmluZyI+CiAgICA8cGF0aCBkPSJNIDUwMC4wMCA4NS4wMCBDIDUwOS44OSA2MC42MSwgNTQ3LjEyIDQxLjkyLCA1NjAuNDcgMTguNzgiIHN0cm9rZT0iI2ZmMGExZSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA1NDAuNjggODcuMDAgQyA1NTIuOTEgNjMuNzAsIDU5MS43OSA0OC43NCwgNjA3LjM0IDI3LjAzIiBzdHJva2U9IiNmZjBhMmQiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNTgwLjk2IDkyLjk3IEMgNTk1LjQyIDcwLjk4LCA2MzUuNTggNTkuOTEsIDY1My4xOSAzOS44MyIgc3Ryb2tlPSIjZmYwYTNkIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDYyMC40NyAxMDIuODcgQyA2MzcuMDEgODIuNDAsIDY3OC4wNiA3NS4zMiwgNjk3LjU1IDU3LjA2IiBzdHJva2U9IiNmZjBhNGMiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNjU4LjgxIDExNi41OSBDIDY3Ny4yOCA5Ny44NCwgNzE4LjgzIDk0LjgyLCA3NDAuMDIgNzguNTUiIHN0cm9rZT0iI2ZmMGE1YiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA2OTUuNjMgMTM0LjAwIEMgNzE1Ljg1IDExNy4xNSwgNzU3LjQ5IDExOC4yMiwgNzgwLjE3IDEwNC4xMSIgc3Ryb2tlPSIjZmYwYTZiIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDczMC41NiAxNTQuOTQgQyA3NTIuMzMgMTQwLjE2LCA3OTMuNjggMTQ1LjMwLCA4MTcuNjMgMTMzLjQ4IiBzdHJva2U9IiNmZjA4ODMiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNzYzLjI3IDE3OS4yMCBDIDc4Ni4zOSAxNjYuNjIsIDgyNy4wMyAxNzUuNzksIDg1Mi4wMiAxNjYuMzgiIHN0cm9rZT0iI2ZmMDdhMiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA3OTMuNDUgMjA2LjU1IEMgODE3LjY5IDE5Ni4zMCwgODU3LjIzIDIwOS40MCwgODgzLjAzIDIwMi40OSIgc3Ryb2tlPSIjZmYwNWMwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDgyMC44MCAyMzYuNzMgQyA4NDUuOTIgMjI4LjkwLCA4ODMuOTkgMjQ1LjgyLCA5MTAuMzQgMjQxLjQ2IiBzdHJva2U9IiNmZjAzZGYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODQ1LjA2IDI2OS40NCBDIDg3MC44MyAyNjQuMTEsIDkwNy4wNiAyODQuNjgsIDkzMy43MSAyODIuOTMiIHN0cm9rZT0iI2ZmMDFmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4NjYuMDAgMzA0LjM3IEMgODkyLjE3IDMwMS41OSwgOTI2LjIwIDMyNS42MiwgOTUyLjkwIDMyNi40OCIgc3Ryb2tlPSIjZTAwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg4My40MSAzNDEuMTkgQyA5MDkuNzMgMzQwLjk5LCA5NDEuMjUgMzY4LjIzLCA5NjcuNzMgMzcxLjcxIiBzdHJva2U9IiNjNDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODk3LjEzIDM3OS41MyBDIDkyMy4zNCAzODEuOTEsIDk1Mi4wNCA0MTIuMTIsIDk3OC4wNSA0MTguMTciIHN0cm9rZT0iI2E4MDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5MDcuMDMgNDE5LjA0IEMgOTMyLjg4IDQyMy45OCwgOTU4LjQ3IDQ1Ni44NSwgOTgzLjc3IDQ2NS40MiIgc3Ryb2tlPSIjOGMwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkxMy4wMCA0NTkuMzIgQyA5MzguMjQgNDY2Ljc3LCA5NjAuNTAgNTAxLjk5LCA5ODQuODMgNTEzLjAxIiBzdHJva2U9IiM3MDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gOTE1LjAwIDUwMC4wMCBDIDkzOS4zOSA1MDkuODksIDk1OC4wOCA1NDcuMTIsIDk4MS4yMiA1NjAuNDciIHN0cm9rZT0iIzU0MDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5MTMuMDAgNTQwLjY4IEMgOTM2LjMwIDU1Mi45MSwgOTUxLjI2IDU5MS43OSwgOTcyLjk3IDYwNy4zNCIgc3Ryb2tlPSIjMzkwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkwNy4wMyA1ODAuOTYgQyA5MjkuMDIgNTk1LjQyLCA5NDAuMDkgNjM1LjU4LCA5NjAuMTcgNjUzLjE5IiBzdHJva2U9IiMxZDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODk3LjEzIDYyMC40NyBDIDkxNy42MCA2MzcuMDEsIDkyNC42OCA2NzguMDYsIDk0Mi45NCA2OTcuNTUiIHN0cm9rZT0iIzAxMDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4ODMuNDEgNjU4LjgxIEMgOTAyLjE2IDY3Ny4yOCwgOTA1LjE4IDcxOC44MywgOTIxLjQ1IDc0MC4wMiIgc3Ryb2tlPSIjMDAxYWZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg2Ni4wMCA2OTUuNjMgQyA4ODIuODUgNzE1Ljg1LCA4ODEuNzggNzU3LjQ5LCA4OTUuODkgNzgwLjE3IiBzdHJva2U9IiMwMDM2ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODQ1LjA2IDczMC41NiBDIDg1OS44NCA3NTIuMzMsIDg1NC43MCA3OTMuNjgsIDg2Ni41MiA4MTcuNjMiIHN0cm9rZT0iIzAwNGZmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4MjAuODAgNzYzLjI3IEMgODMzLjM4IDc4Ni4zOSwgODI0LjIxIDgyNy4wMywgODMzLjYyIDg1Mi4wMiIgc3Ryb2tlPSIjMDA2N2ZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDc5My40NSA3OTMuNDUgQyA4MDMuNzAgODE3LjY5LCA3OTAuNjAgODU3LjIzLCA3OTcuNTEgODgzLjAzIiBzdHJva2U9IiMwMDdmZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNzYzLjI3IDgyMC44MCBDIDc3MS4xMCA4NDUuOTIsIDc1NC4xOCA4ODMuOTksIDc1OC41NCA5MTAuMzQiIHN0cm9rZT0iIzAwOTdmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA3MzAuNTYgODQ1LjA2IEMgNzM1Ljg5IDg3MC44MywgNzE1LjMyIDkwNy4wNiwgNzE3LjA3IDkzMy43MSIgc3Ryb2tlPSIjMDBhZmZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDY5NS42MyA4NjYuMDAgQyA2OTguNDEgODkyLjE3LCA2NzQuMzggOTI2LjIwLCA2NzMuNTIgOTUyLjkwIiBzdHJva2U9IiMwMGM0ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNjU4LjgxIDg4My40MSBDIDY1OS4wMSA5MDkuNzMsIDYzMS43NyA5NDEuMjUsIDYyOC4yOSA5NjcuNzMiIHN0cm9rZT0iIzAwZDRmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA2MjAuNDcgODk3LjEzIEMgNjE4LjA5IDkyMy4zNCwgNTg3Ljg4IDk1Mi4wNCwgNTgxLjgzIDk3OC4wNSIgc3Ryb2tlPSIjMDBlNGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDU4MC45NiA5MDcuMDMgQyA1NzYuMDIgOTMyLjg4LCA1NDMuMTUgOTU4LjQ3LCA1MzQuNTggOTgzLjc3IiBzdHJva2U9IiMwMGY0ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNTQwLjY4IDkxMy4wMCBDIDUzMy4yMyA5MzguMjQsIDQ5OC4wMSA5NjAuNTAsIDQ4Ni45OSA5ODQuODMiIHN0cm9rZT0iIzAwZmZmOSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA1MDAuMDAgOTE1LjAwIEMgNDkwLjExIDkzOS4zOSwgNDUyLjg4IDk1OC4wOCwgNDM5LjUzIDk4MS4yMiIgc3Ryb2tlPSIjMDBmZmU5IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDQ1OS4zMiA5MTMuMDAgQyA0NDcuMDkgOTM2LjMwLCA0MDguMjEgOTUxLjI2LCAzOTIuNjYgOTcyLjk3IiBzdHJva2U9IiMwMGZmY2QiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNDE5LjA0IDkwNy4wMyBDIDQwNC41OCA5MjkuMDIsIDM2NC40MiA5NDAuMDksIDM0Ni44MSA5NjAuMTciIHN0cm9rZT0iIzAwZmZiMSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAzNzkuNTMgODk3LjEzIEMgMzYyLjk5IDkxNy42MCwgMzIxLjk0IDkyNC42OCwgMzAyLjQ1IDk0Mi45NCIgc3Ryb2tlPSIjMDBmZjk2IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDM0MS4xOSA4ODMuNDEgQyAzMjIuNzIgOTAyLjE2LCAyODEuMTcgOTA1LjE4LCAyNTkuOTggOTIxLjQ1IiBzdHJva2U9IiMwMGZmN2EiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzA0LjM3IDg2Ni4wMCBDIDI4NC4xNSA4ODIuODUsIDI0Mi41MSA4ODEuNzgsIDIxOS44MyA4OTUuODkiIHN0cm9rZT0iIzAwZmY1ZSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAyNjkuNDQgODQ1LjA2IEMgMjQ3LjY3IDg1OS44NCwgMjA2LjMyIDg1NC43MCwgMTgyLjM3IDg2Ni41MiIgc3Ryb2tlPSIjMDBmZjNkIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDIzNi43MyA4MjAuODAgQyAyMTMuNjEgODMzLjM4LCAxNzIuOTcgODI0LjIxLCAxNDcuOTggODMzLjYyIiBzdHJva2U9IiMwMGZmMTkiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMjA2LjU1IDc5My40NSBDIDE4Mi4zMSA4MDMuNzAsIDE0Mi43NyA3OTAuNjAsIDExNi45NyA3OTcuNTEiIHN0cm9rZT0iIzBhZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxNzkuMjAgNzYzLjI3IEMgMTU0LjA4IDc3MS4xMCwgMTE2LjAxIDc1NC4xOCwgODkuNjYgNzU4LjU0IiBzdHJva2U9IiMyZWZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTU0Ljk0IDczMC41NiBDIDEyOS4xNyA3MzUuODksIDkyLjk0IDcxNS4zMiwgNjYuMjkgNzE3LjA3IiBzdHJva2U9IiM1MmZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTM0LjAwIDY5NS42MyBDIDEwNy44MyA2OTguNDEsIDczLjgwIDY3NC4zOCwgNDcuMTAgNjczLjUyIiBzdHJva2U9IiM3M2ZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTE2LjU5IDY1OC44MSBDIDkwLjI3IDY1OS4wMSwgNTguNzUgNjMxLjc3LCAzMi4yNyA2MjguMjkiIHN0cm9rZT0iIzhmZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxMDIuODcgNjIwLjQ3IEMgNzYuNjYgNjE4LjA5LCA0Ny45NiA1ODcuODgsIDIxLjk1IDU4MS44MyIgc3Ryb2tlPSIjYWJmZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkyLjk3IDU4MC45NiBDIDY3LjEyIDU3Ni4wMiwgNDEuNTMgNTQzLjE1LCAxNi4yMyA1MzQuNTgiIHN0cm9rZT0iI2M3ZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4Ny4wMCA1NDAuNjggQyA2MS43NiA1MzMuMjMsIDM5LjUwIDQ5OC4wMSwgMTUuMTcgNDg2Ljk5IiBzdHJva2U9IiNlM2ZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODUuMDAgNTAwLjAwIEMgNjAuNjEgNDkwLjExLCA0MS45MiA0NTIuODgsIDE4Ljc4IDQzOS41MyIgc3Ryb2tlPSIjZmZmZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg3LjAwIDQ1OS4zMiBDIDYzLjcwIDQ0Ny4wOSwgNDguNzQgNDA4LjIxLCAyNy4wMyAzOTIuNjYiIHN0cm9rZT0iI2ZmZjMwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5Mi45NyA0MTkuMDQgQyA3MC45OCA0MDQuNTgsIDU5LjkxIDM2NC40MiwgMzkuODMgMzQ2LjgxIiBzdHJva2U9IiNmZmU3MDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTAyLjg3IDM3OS41MyBDIDgyLjQwIDM2Mi45OSwgNzUuMzIgMzIxLjk0LCA1Ny4wNiAzMDIuNDUiIHN0cm9rZT0iI2ZmZGIwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxMTYuNTkgMzQxLjE5IEMgOTcuODQgMzIyLjcyLCA5NC44MiAyODEuMTcsIDc4LjU1IDI1OS45OCIgc3Ryb2tlPSIjZmZjZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDEzNC4wMCAzMDQuMzcgQyAxMTcuMTUgMjg0LjE1LCAxMTguMjIgMjQyLjUxLCAxMDQuMTEgMjE5LjgzIiBzdHJva2U9IiNmZmMzMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTU0Ljk0IDI2OS40NCBDIDE0MC4xNiAyNDcuNjcsIDE0NS4zMCAyMDYuMzIsIDEzMy40OCAxODIuMzciIHN0cm9rZT0iI2ZmYjQwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxNzkuMjAgMjM2LjczIEMgMTY2LjYyIDIxMy42MSwgMTc1Ljc5IDE3Mi45NywgMTY2LjM4IDE0Ny45OCIgc3Ryb2tlPSIjZmZhNDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDIwNi41NSAyMDYuNTUgQyAxOTYuMzAgMTgyLjMxLCAyMDkuNDAgMTQyLjc3LCAyMDIuNDkgMTE2Ljk3IiBzdHJva2U9IiNmZjk0MDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMjM2LjczIDE3OS4yMCBDIDIyOC45MCAxNTQuMDgsIDI0NS44MiAxMTYuMDEsIDI0MS40NiA4OS42NiIgc3Ryb2tlPSIjZmY4NDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDI2OS40NCAxNTQuOTQgQyAyNjQuMTEgMTI5LjE3LCAyODQuNjggOTIuOTQsIDI4Mi45MyA2Ni4yOSIgc3Ryb2tlPSIjZmY3NDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDMwNC4zNyAxMzQuMDAgQyAzMDEuNTkgMTA3LjgzLCAzMjUuNjIgNzMuODAsIDMyNi40OCA0Ny4xMCIgc3Ryb2tlPSIjZmY2MjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDM0MS4xOSAxMTYuNTkgQyAzNDAuOTkgOTAuMjcsIDM2OC4yMyA1OC43NSwgMzcxLjcxIDMyLjI3IiBzdHJva2U9IiNmZjRjMDIiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzc5LjUzIDEwMi44NyBDIDM4MS45MSA3Ni42NiwgNDEyLjEyIDQ3Ljk2LCA0MTguMTcgMjEuOTUiIHN0cm9rZT0iI2ZmMzYwNCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA0MTkuMDQgOTIuOTcgQyA0MjMuOTggNjcuMTIsIDQ1Ni44NSA0MS41MywgNDY1LjQyIDE2LjIzIiBzdHJva2U9IiNmZjIwMDYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNDU5LjMyIDg3LjAwIEMgNDY2Ljc3IDYxLjc2LCA1MDEuOTkgMzkuNTAsIDUxMy4wMSAxNS4xNyIgc3Ryb2tlPSIjZmYwYTA4IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgPC9nPgogIDxnIGlkPSJjYW5keS10ZWFyZHJvcCIgZmlsdGVyPSJ1cmwoI3RlYXJkcm9wU2hhZG93KSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTUsIDE0KSI+CiAgICA8cGF0aCBkPSJNIDQ2OCAxMTUgTCA0MzUgMTc4IEMgMzY1IDI5NSwgMjEyIDQ3MCwgMjEyIDYwNSBDIDIxMiA3MzUsIDMzNSA4NDIsIDUwMCA4NDIgQyA2NjUgODQyLCA3ODggNzM1LCA3ODggNjA1IEMgNzg4IDQ3MCwgNjM1IDI5NSwgNTY1IDE3OCBMIDUzMiAxMTUgQyA1OTUgMjQwLCA3MTggNDI1LCA3MTggNjAwIEMgNzE4IDcwNSwgNjIwIDc3OCwgNTAwIDc3OCBDIDM4MCA3NzgsIDI4MiA3MDUsIDI4MiA2MDAgQyAyODIgNDI1LCA0MDUgMjQwLCA0NjggMTE1IFoiIGZpbGw9InVybCgjY2FuZHlUZWFyZHJvcCkiIC8+CiAgPC9nPgo8L3N2Zz4="
+                            alt="HyprCandy+" width="104" height="104" class="hero-logo-img"
+                            referrerPolicy="no-referrer" />
+                    </div>
+
+                    <h1 class="hero-title">
+                        Hyprland HyprCandy Shell
+                    </h1>
+
+                    <p class="hero-lead">
+                        <strong>HyprCandy+</strong> is a stylish and functional Hyprland configuration cohesively themed
+                        through
+                        <strong>matugen</strong>, <strong>wallust</strong>, and <strong>pywal</strong> with extra
+                        quality of life features.
                     </p>
+                </div>
+            </div>
+        </section>
 
-                    <div class="cta-row">
-                        <a href="https://github.com/HyprCandy" target="_blank" rel="noopener" class="btn-primary">View
-                            the project on GitHub</a>
-                        <a href="https://mirukai.gumroad.com/l/cxsyj" target="_blank" rel="noopener"
-                            class="link-secondary">Get HyprCandy+ →</a>
-                    </div>
-
-                    <div class="fact-row font-mono muted">
-                        <span>6 repositories</span>
-                        <span class="fact-dot"></span>
-                        <span>8 stars</span>
-                        <span class="fact-dot"></span>
-                        <span>JavaScript · Shell</span>
-                    </div>
+        <!-- Exact README Features Matrix Section -->
+        <section id="features">
+            <div class="container">
+                <div class="section-heading">
+                    <h2 class="section-title">HyprCandy Features</h2>
+                    <p class="section-desc">
+                        HyprCandy+ current and planned features
+                    </p>
                 </div>
 
-                <div class="terminal-card">
-                    <div class="terminal-titlebar">
-                        <span class="tdot" style="background:#ff5f6d;"></span>
-                        <span class="tdot" style="background:#ffc371;"></span>
-                        <span class="tdot" style="background:#47d16c;"></span>
-                        <span class="font-mono">kitty — HyprCandy_Install.sh</span>
+                <div class="features-container">
+                    <!-- Table corresponding directly to README markdown table -->
+                    <div class="feature-table-card">
+                        <table class="feature-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40%;">Feature</th>
+                                    <th style="width: 60%; text-align: right;">🍬 HyprCandy+ Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">System-wide theming</div>
+                                        <div class="feat-desc">Synchronized wallpaper palette extraction</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Matugen+Pywal + Wallust ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Bar</div>
+                                        <div class="feat-desc">Modular auto-hide mode with tri-island layout</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">HyprCandy-bar (extensive config) ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Lockscreen</div>
+                                        <div class="feat-desc">Candylock</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Notifications &bull; Media &bull; SysMon &bull;
+                                            Weather ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Hyprviz settings integration</div>
+                                        <div class="feat-desc">Visual tuning &amp; window physics</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Fully integrated ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Dock</div>
+                                        <div class="feat-desc">hyprcandy-dock</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Drag-rearrange &bull; switcheroo dGPU &bull; trash
+                                            ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">App-launcher</div>
+                                        <div class="feat-desc">hyprcandy-launcher</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">SearXNG websearch &bull; agentic workspace ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Control center</div>
+                                        <div class="feat-desc">High system-wide customization</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Extensive control panel ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">System monitor widget</div>
+                                        <div class="feat-desc">Battery telemetry on mobile devices</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Enabled ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Media player widget</div>
+                                        <div class="feat-desc">Active MPRIS track control</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Enabled ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Desktop icons</div>
+                                        <div class="feat-desc">Drag-to-rearrange &bull; workspace dispatch</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Rearrangeable &bull; Hideable ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Weather widget</div>
+                                        <div class="feat-desc">Real-time local meteorological forecast</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Enabled ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Quickshell overview</div>
+                                        <div class="feat-desc">All window layouts supported</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">scrolling / dwindle / master / monocle ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Live GTK4 &amp; QT color reloads</div>
+                                        <div class="feat-desc">Zero relaunching when wallpaper changes</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Real-time update ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">SDDM live-background support</div>
+                                        <div class="feat-desc">Synchronized display manager screen</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Enabled ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Wallpaper picker</div>
+                                        <div class="feat-desc">Instant selection interface</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Integrated ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">DE-Updates</div>
+                                        <div class="feat-desc">Authorized backend update</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span class="badge-check">Preserves user settings ✅</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <div class="feat-label">Screen &amp; Projection</div>
+                                        <div class="feat-desc">Currently configured via nwg-displays</div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <span
+                                            style="color: #f43f5e; font-family: var(--font-mono); font-size: 0.78rem; font-weight: 600; background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.25); padding: 3px 10px; border-radius: 9999px;">HC+
+                                            native implementation ❌</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
-                    <div class="terminal-body font-mono">
-                        <p><span class="prompt">$</span> paru -S git hyprland kitty</p>
-                        <p><span class="prompt">$</span> git clone https://github.com/HyprCandy/hyprcandyinstall.git</p>
-                        <p><span class="prompt">$</span> cd hyprcandyinstall &amp;&amp; bash HyprCandy_Install.sh</p>
-                        <p class="muted" style="margin-top:12px;"># Have a product key? Run <span
-                                class="white">hc-install</span> instead for HyprCandy+</p>
-                    </div>
-                    <div class="terminal-footer">
-                        <div class="status font-mono">
-                            <span id="status-dot" class="status-dot"></span>
-                            <span id="status-text" class="muted">checking backend…</span>
+
+                    <!-- Detailed README Highlights -->
+                    <div class="highlights-column">
+                        <div class="highlight-card">
+                            <div class="highlight-head">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                                <span>Dock &amp; App-launcher with SearXNG</span>
+                            </div>
+                            <div class="highlight-body">
+                                Features <strong>SearXNG web-search</strong> preventing tracking and profiling, plus a
+                                coding workspace.
+                                Icons can be rearranged and pinned/unpinned natively without editing config files, as
+                                desktop icons, the dock, and launcher are fully linked.
+                            </div>
                         </div>
-                        <span class="font-mono muted">/api</span>
+
+                        <div class="highlight-card">
+                            <div class="highlight-head">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="2" y="2" width="20" height="20" rx="4"></rect>
+                                    <path d="M12 6v12M6 12h12"></path>
+                                </svg>
+                                <span>Switcheroo Discrete GPU Launch</span>
+                            </div>
+                            <div class="highlight-body">
+                                Integrated <strong>switcheroo-control</strong> for discrete GPU execution on hybrid
+                                graphics laptops.
+                                Both dock and launcher offer right-click actions and application minimization to a
+                                hidden special workspace.
+                            </div>
+                        </div>
+
+                        <div class="highlight-card">
+                            <div class="highlight-head">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                                <span>Candylock Screen</span>
+                            </div>
+                            <div class="highlight-body">
+                                Custom advanced lock-screen supporting notification toasts, live background video, MPRIS
+                                media playback controls, weather telemetry, and hardware system monitors.
+                            </div>
+                        </div>
+
+                        <div class="highlight-card">
+                            <div class="highlight-head">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+                                </svg>
+                                <span>Bluetooth &amp; Native File Sharing</span>
+                            </div>
+                            <div class="highlight-body">
+                                Startmenu Bluetooth integration featuring native file sharing support and automated
+                                device pairing directly from the desktop panel.
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
 
-        <div class="wrap">
-            <div class="candy-divider"></div>
-        </div>
-
-        <!-- ============ FREE VS PLUS ============ -->
-        <section id="compare">
-            <div class="wrap">
-                <h2>Free vs Plus</h2>
-                <p>Both versions share the same matugen-driven theming core. Plus swaps the
-                    standard tools for HyprCandy's own, more configurable, replacements.</p>
-
-                <div class="compare-scroll">
-                    <div class="compare-table">
-                        <div class="compare-row compare-head">
-                            <div>component</div>
-                            <div>🍬 HyprCandy</div>
-                            <div>🍬✨ HyprCandy+</div>
-                        </div>
-                        <div class="compare-row">
-                            <div class="compare-key">bar</div>
-                            <div>Waybar / Hyprpanel</div>
-                            <div>Modular tri-island bar with auto-hide</div>
-                        </div>
-                        <div class="compare-row">
-                            <div class="compare-key">lockscreen</div>
-                            <div>Hyprlock</div>
-                            <div>Candylock — media, weather, system monitor</div>
-                        </div>
-                        <div class="compare-row">
-                            <div class="compare-key">dock</div>
-                            <div>nwg-dock-hyprland</div>
-                            <div>Drag-to-rearrange, dGPU launch, minimize, trash</div>
-                        </div>
-                        <div class="compare-row">
-                            <div class="compare-key">launcher</div>
-                            <div>rofi</div>
-                            <div>Favorites, groups, clipboard, web search</div>
-                        </div>
-                        <div class="compare-row">
-                            <div class="compare-key">updates</div>
-                            <div>Manual, via frontend script</div>
-                            <div>Authorized backend update, settings preserved</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- ============ GALLERY ============ -->
-        <section id="gallery" style="padding-top:0;">
-            <div class="wrap">
-                <h2>Screenshots</h2>
-                <p>The tiles below are wired up to display real captures once they're added.
-                    Drop images into <code class="white">Agents/assets/</code> and update the
-                    <code class="white">GALLERY</code> array near the bottom of this file —
-                    each placeholder becomes a real screenshot automatically.
-                </p>
-
-                <div id="gallery-grid" class="gallery-grid"></div>
-            </div>
-        </section>
-
-        <div class="wrap">
-            <div class="candy-divider"></div>
-        </div>
-
-        <!-- ============ INSTALL / LINKS ============ -->
+        <!-- Accurate AUR Installation Section per current README -->
         <section id="install">
-            <div class="wrap two-col">
-                <div>
-                    <h2>Get it running</h2>
-                    <p style="margin-top:8px;">
-                        Needs <code class="white">git</code>, <code class="white">hyprland</code> and
-                        <code class="white">kitty</code>. Run the installer from inside a Hyprland
-                        session for best results — it also works from other desktops or the TTY.
+            <div class="container">
+                <div class="section-heading">
+                    <div class="section-eyebrow">Official Setup</div>
+                    <h2 class="section-title">Installation</h2>
+                    <p class="section-desc">
+                        Recommended to run the HyprCandyPlus installer from Hyprland, though it works from other DEs or
+                        the TTY. Install using an AUR helper such as <code style="color:#fff;">paru</code> or <code
+                            style="color:#fff;">yay</code>.
                     </p>
-                    <a href="https://github.com/HyprCandy/hyprcandyinstall" target="_blank" rel="noopener"
-                        class="outline-btn">hyprcandyinstall on GitHub</a>
                 </div>
-                <div>
-                    <h2>Follow along</h2>
-                    <p style="margin-top:8px;">Screenshots, changelogs and support all happen in the community first.
+
+                <div class="install-card">
+                    <div class="install-grid">
+                        <!-- Left: Step-by-Step Instructions -->
+                        <div class="install-step-list">
+                            <div class="install-step">
+                                <div class="step-indicator">1</div>
+                                <div class="step-details">
+                                    <h4>Install Required Packages via AUR Helper</h4>
+                                    <p>Needed packages via your AUR helper (e.g. <code style="color:#fff;">paru</code>
+                                        or <code style="color:#fff;">yay</code>): <code style="color:#fff;">git</code>,
+                                        <code style="color:#fff;">hyprland</code>, <code
+                                            style="color:#fff;">kitty</code>, and <code
+                                            style="color:#fff;">hyprcandy-install</code>.</p>
+
+                                    <div class="aur-code-block">
+                                        <code
+                                            id="aur-install-snippet">$AUR_HELPER -S git hyprland hyprcandy-install kitty</code>
+                                        <button type="button" class="copy-icon-btn"
+                                            onclick="copySnippet('aur-install-snippet')" title="Copy snippet">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1">
+                                                </path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="install-step">
+                                <div class="step-indicator">2</div>
+                                <div class="step-details">
+                                    <h4>Launch Hyprland Session &amp; Terminal</h4>
+                                    <p>Start your Hyprland session and open the kitty terminal with <code
+                                            style="color:#fff;">SUPER + Q</code>.</p>
+                                </div>
+                            </div>
+
+                            <div class="install-step">
+                                <div class="step-indicator">3</div>
+                                <div class="step-details">
+                                    <h4>Run the Installer Command</h4>
+                                    <p>Execute the installed binary directly in your terminal:</p>
+
+                                    <div class="aur-code-block">
+                                        <code id="hc-snippet">hc-install</code>
+                                        <button type="button" class="copy-icon-btn" onclick="copySnippet('hc-snippet')"
+                                            title="Copy snippet">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                                stroke="currentColor" stroke-width="2">
+                                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1">
+                                                </path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right: Community Links directly from README -->
+                        <div class="community-box">
+                            <div>
+                                <div class="comm-header">Connect &amp; Community</div>
+                                <p class="comm-desc">Official channels for support, user rices, questions, and releases:
+                                </p>
+
+                                <div class="comm-pill-group">
+                                    <a href="https://discord.gg/6rjN8DfyDn" target="_blank" rel="noopener"
+                                        class="comm-link-row">
+                                        <span>Discord Server</span>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                            <polyline points="15 3 21 3 21 9"></polyline>
+                                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                                        </svg>
+                                    </a>
+
+                                    <a href="https://www.reddit.com/u/I-miruka/s/TOeCgRpby6" target="_blank"
+                                        rel="noopener" class="comm-link-row">
+                                        <span>Reddit Profile &amp; Updates</span>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                            <polyline points="15 3 21 3 21 9"></polyline>
+                                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                                        </svg>
+                                    </a>
+
+                                    <a href="https://youtube.com/@i.miruka?si=_kfocBTJ0ROm4JCD" target="_blank"
+                                        rel="noopener" class="comm-link-row">
+                                        <span>YouTube Channel</span>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                            <polyline points="15 3 21 3 21 9"></polyline>
+                                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div class="support-banner">
+                                <div>
+                                    ❣️ <strong>Project Support:</strong> Grab bits and bops from the main repo or donate
+                                    via Ko-fi.
+                                </div>
+                                <a href="https://ko-fi.com/ianmking" target="_blank" rel="noopener"
+                                    class="btn-support-kofi">
+                                    <span>Ko-fi</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Real Screenshots Section (Using Exact URLs from README.md) -->
+        <section id="screenshots">
+            <div class="container">
+                <div class="section-heading">
+                    <div class="section-eyebrow">HyprCandy+ Latest</div>
+                    <h2 class="section-title">Screenshots</h2>
+                    <p class="section-desc">
+                        Direct captures of HyprCandy+ in action, highlighting the SearXNG web search, agentic workspace,
+                        synchronized lockscreen, and modular control center.
                     </p>
-                    <div class="pill-row">
-                        <a href="https://bit.ly/Candy-Discord-Server" target="_blank" rel="noopener"
-                            class="link-pill">Discord</a>
-                        <a href="https://bit.ly/Reddit-IM" target="_blank" rel="noopener" class="link-pill">Reddit</a>
-                        <a href="https://bit.ly/YouTube-IM" target="_blank" rel="noopener" class="link-pill">YouTube</a>
-                        <a href="https://ko-fi.com/ianmking" target="_blank" rel="noopener" class="link-pill">Ko-fi</a>
+                </div>
+
+                <div class="screenshots-grid">
+                    <!-- Row 1: SearXNG Web-Search & Workspace -->
+                    <div class="screenshot-card">
+                        <div class="screenshot-header">
+                            <div class="screenshot-title">
+                                <span>SearXNG powered web-search</span>
+                            </div>
+                            <span class="screenshot-badge">Launcher</span>
+                        </div>
+                        <div class="screenshot-media">
+                            <img src="https://github.com/user-attachments/assets/2c4be4e9-c38d-4e8a-999a-1e0c2e91ae63"
+                                alt="SearXNG powered web-search" loading="lazy" referrerpolicy="no-referrer" />
+                        </div>
+                    </div>
+
+                    <div class="screenshot-card">
+                        <div class="screenshot-header">
+                            <div class="screenshot-title">
+                                <span>HyprCandy workspace</span>
+                            </div>
+                            <span class="screenshot-badge">Agentic Workspace</span>
+                        </div>
+                        <div class="screenshot-media">
+                            <img src="https://github.com/user-attachments/assets/e7c8edac-e457-456d-94f3-25ac089135bd"
+                                alt="HyprCandy workspace" loading="lazy" referrerpolicy="no-referrer" />
+                        </div>
+                    </div>
+
+                    <!-- Row 2: Stylish advanced widgets & HC+ lock-screen -->
+                    <div class="screenshot-card">
+                        <div class="screenshot-header">
+                            <div class="screenshot-title">
+                                <span>Stylish advanced widgets and panel</span>
+                            </div>
+                            <span class="screenshot-badge">Widgets</span>
+                        </div>
+                        <div class="screenshot-media">
+                            <img src="https://github.com/user-attachments/assets/7cd1d302-ff9d-4fbf-b894-c2369ef0aafb"
+                                alt="Stylish advanced widgets and panel" loading="lazy" referrerpolicy="no-referrer" />
+                        </div>
+                    </div>
+
+                    <div class="screenshot-card">
+                        <div class="screenshot-header">
+                            <div class="screenshot-title">
+                                <span>HC+ lock-screen</span>
+                            </div>
+                            <span class="screenshot-badge">Candylock</span>
+                        </div>
+                        <div class="screenshot-media">
+                            <img src="https://github.com/user-attachments/assets/1da27cf8-3c9a-44bc-9e17-a350ae607a04"
+                                alt="HC+ lock-screen" loading="lazy" referrerpolicy="no-referrer" />
+                        </div>
+                    </div>
+
+                    <!-- Row 3: Synched SDDM greeter & Control-Center -->
+                    <div class="screenshot-card">
+                        <div class="screenshot-header">
+                            <div class="screenshot-title">
+                                <span>Synched SDDM greeter</span>
+                            </div>
+                            <span class="screenshot-badge">Display Manager</span>
+                        </div>
+                        <div class="screenshot-media">
+                            <img src="https://github.com/user-attachments/assets/cc66525f-d14e-4f84-ad2b-306cd3d05bfa"
+                                alt="Synched SDDM greeter" loading="lazy" referrerpolicy="no-referrer" />
+                        </div>
+                    </div>
+
+                    <div class="screenshot-card">
+                        <div class="screenshot-header">
+                            <div class="screenshot-title">
+                                <span>Control-Center</span>
+                            </div>
+                            <span class="screenshot-badge">System Settings</span>
+                        </div>
+                        <div class="screenshot-media">
+                            <img src="https://github.com/user-attachments/assets/51336cea-eef3-4474-9e83-e7c86c0771b8"
+                                alt="Control-Center" loading="lazy" referrerpolicy="no-referrer" />
+                        </div>
+                    </div>
+
+                    <!-- Row 4: Wallpaper picker & Workspace overview -->
+                    <div class="screenshot-card">
+                        <div class="screenshot-header">
+                            <div class="screenshot-title">
+                                <span>Wallpaper picker</span>
+                            </div>
+                            <span class="screenshot-badge">Theming</span>
+                        </div>
+                        <div class="screenshot-media">
+                            <img src="https://github.com/user-attachments/assets/55f025e3-4d4f-4819-aed1-a91c209e9ef3"
+                                alt="Wallpaper picker" loading="lazy" referrerpolicy="no-referrer" />
+                        </div>
+                    </div>
+
+                    <div class="screenshot-card">
+                        <div class="screenshot-header">
+                            <div class="screenshot-title">
+                                <span>Workspace overview</span>
+                            </div>
+                            <span class="screenshot-badge">Quickshell</span>
+                        </div>
+                        <div class="screenshot-media">
+                            <img src="https://github.com/user-attachments/assets/47e5e6a3-3668-4a60-82ac-089c947f0820"
+                                alt="Workspace overview" loading="lazy" referrerpolicy="no-referrer" />
+                        </div>
                     </div>
                 </div>
             </div>
         </section>
     </main>
 
-    <!-- ============ FOOTER ============ -->
+    <!-- Modals for Privacy Policy and Terms and Conditions -->
+    <div id="privacy-modal" class="modal-backdrop" onclick="closeModalOnBackdrop(event, 'privacy-modal')">
+        <div class="modal-window">
+            <div class="modal-top">
+                <h3>Privacy Policy</h3>
+                <span class="modal-close" onclick="closeModal('privacy-modal')">&times;</span>
+            </div>
+            <div class="modal-content">
+                <p><strong>Effective Date:</strong> 2026</p>
+                <p>
+                    HyprCandy+ and the static website hosted at <code>hypr-c-plus.vercel.app</code> are committed to
+                    privacy and open source transparency.
+                </p>
+                <h4>No Telemetry or Profiling</h4>
+                <p>
+                    The HyprCandy+ configuration integrates SearXNG for web searches to explicitly prevent tracking, ad
+                    targeting, and user profiling. We do not collect, store, or sell any personal browsing data or
+                    desktop analytics.
+                </p>
+                <h4>Local Data Storage</h4>
+                <p>
+                    All custom configurations, user wallpapers, and lock-screen preferences are stored strictly on your
+                    local Arch Linux filesystem in <code>~/.config</code>.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="terms-modal" class="modal-backdrop" onclick="closeModalOnBackdrop(event, 'terms-modal')">
+        <div class="modal-window">
+            <div class="modal-top">
+                <h3>Terms and Conditions</h3>
+                <span class="modal-close" onclick="closeModal('terms-modal')">&times;</span>
+            </div>
+            <div class="modal-content">
+                <p><strong>Last Updated:</strong> 2026</p>
+                <h4>Open Source License</h4>
+                <p>
+                    HyprCandy+ is provided "as-is", without warranties of any kind, express or implied. By downloading,
+                    cloning, or installing the dotfiles and AUR packages, you acknowledge that you are responsible for
+                    managing your Arch Linux package dependencies and desktop compositor configurations.
+                </p>
+                <h4>Community Conduct</h4>
+                <p>
+                    When interacting in the official HyprCandy Discord server, Reddit forums, or YouTube channels, users
+                    are expected to treat contributors and fellow community members with mutual respect.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vercel-Style Deep Black Footer with Copyright, Privacy, and Terms -->
     <footer>
-        <div class="wrap footer-row">
-            <p style="margin:0;">© 2026 HyprCandy. The HyprCandy+ engine is developed and hosted
-                privately — this page shows only the project's public face.</p>
-            <p class="font-mono" style="margin:0;">github.com/HyprCandy</p>
+        <div class="container">
+            <div class="footer-top">
+                <div class="footer-brand">
+                    <div class="brand-icon-wrap" style="width: 26px; height: 26px;" title="HyprCandy+">
+                        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAwIDEwMDAiIHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiPgogIDxkZWZzPgogICAgPGZpbHRlciBpZD0idGVhcmRyb3BTaGFkb3ciIHg9Ii0yMCUiIHk9Ii0yMCUiIHdpZHRoPSIxNDAlIiBoZWlnaHQ9IjE0MCUiPgogICAgICA8ZmVEcm9wU2hhZG93IGR4PSIwIiBkeT0iNiIgc3RkRGV2aWF0aW9uPSIxMCIgZmxvb2QtY29sb3I9IiM0YTNiNjMiIGZsb29kLW9wYWNpdHk9IjAuMzUiIC8+CiAgICA8L2ZpbHRlcj4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iY2FuZHlUZWFyZHJvcCIgeDE9IjgyJSIgeTE9IjE4JSIgeDI9IjE4JSIgeTI9IjgyJSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNkZmExOWIiIHN0b3Atb3BhY2l0eT0iMC44NSIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIzMCUiIHN0b3AtY29sb3I9IiNkNDllYTciIHN0b3Atb3BhY2l0eT0iMC44MCIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSI2NSUiIHN0b3AtY29sb3I9IiNhYmEwZDMiIHN0b3Atb3BhY2l0eT0iMC44MCIgLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGM5N2NmIiBzdG9wLW9wYWNpdHk9IjAuODUiIC8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8ZyBpZD0iY2FuZHktcmluZyI+CiAgICA8cGF0aCBkPSJNIDUwMC4wMCA4NS4wMCBDIDUwOS44OSA2MC42MSwgNTQ3LjEyIDQxLjkyLCA1NjAuNDcgMTguNzgiIHN0cm9rZT0iI2ZmMGExZSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA1NDAuNjggODcuMDAgQyA1NTIuOTEgNjMuNzAsIDU5MS43OSA0OC43NCwgNjA3LjM0IDI3LjAzIiBzdHJva2U9IiNmZjBhMmQiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNTgwLjk2IDkyLjk3IEMgNTk1LjQyIDcwLjk4LCA2MzUuNTggNTkuOTEsIDY1My4xOSAzOS44MyIgc3Ryb2tlPSIjZmYwYTNkIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDYyMC40NyAxMDIuODcgQyA2MzcuMDEgODIuNDAsIDY3OC4wNiA3NS4zMiwgNjk3LjU1IDU3LjA2IiBzdHJva2U9IiNmZjBhNGMiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNjU4LjgxIDExNi41OSBDIDY3Ny4yOCA5Ny44NCwgNzE4LjgzIDk0LjgyLCA3NDAuMDIgNzguNTUiIHN0cm9rZT0iI2ZmMGE1YiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA2OTUuNjMgMTM0LjAwIEMgNzE1Ljg1IDExNy4xNSwgNzU3LjQ5IDExOC4yMiwgNzgwLjE3IDEwNC4xMSIgc3Ryb2tlPSIjZmYwYTZiIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDczMC41NiAxNTQuOTQgQyA3NTIuMzMgMTQwLjE2LCA3OTMuNjggMTQ1LjMwLCA4MTcuNjMgMTMzLjQ4IiBzdHJva2U9IiNmZjA4ODMiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNzYzLjI3IDE3OS4yMCBDIDc4Ni4zOSAxNjYuNjIsIDgyNy4wMyAxNzUuNzksIDg1Mi4wMiAxNjYuMzgiIHN0cm9rZT0iI2ZmMDdhMiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA3OTMuNDUgMjA2LjU1IEMgODE3LjY5IDE5Ni4zMCwgODU3LjIzIDIwOS40MCwgODgzLjAzIDIwMi40OSIgc3Ryb2tlPSIjZmYwNWMwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDgyMC44MCAyMzYuNzMgQyA4NDUuOTIgMjI4LjkwLCA4ODMuOTkgMjQ1LjgyLCA5MTAuMzQgMjQxLjQ2IiBzdHJva2U9IiNmZjAzZGYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODQ1LjA2IDI2OS40NCBDIDg3MC44MyAyNjQuMTEsIDkwNy4wNiAyODQuNjgsIDkzMy43MSAyODIuOTMiIHN0cm9rZT0iI2ZmMDFmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4NjYuMDAgMzA0LjM3IEMgODkyLjE3IDMwMS41OSwgOTI2LjIwIDMyNS42MiwgOTUyLjkwIDMyNi40OCIgc3Ryb2tlPSIjZTAwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg4My40MSAzNDEuMTkgQyA5MDkuNzMgMzQwLjk5LCA5NDEuMjUgMzY4LjIzLCA5NjcuNzMgMzcxLjcxIiBzdHJva2U9IiNjNDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODk3LjEzIDM3OS41MyBDIDkyMy4zNCAzODEuOTEsIDk1Mi4wNCA0MTIuMTIsIDk3OC4wNSA0MTguMTciIHN0cm9rZT0iI2E4MDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5MDcuMDMgNDE5LjA0IEMgOTMyLjg4IDQyMy45OCwgOTU4LjQ3IDQ1Ni44NSwgOTgzLjc3IDQ2NS40MiIgc3Ryb2tlPSIjOGMwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkxMy4wMCA0NTkuMzIgQyA5MzguMjQgNDY2Ljc3LCA5NjAuNTAgNTAxLjk5LCA5ODQuODMgNTEzLjAxIiBzdHJva2U9IiM3MDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gOTE1LjAwIDUwMC4wMCBDIDkzOS4zOSA1MDkuODksIDk1OC4wOCA1NDcuMTIsIDk4MS4yMiA1NjAuNDciIHN0cm9rZT0iIzU0MDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5MTMuMDAgNTQwLjY4IEMgOTM2LjMwIDU1Mi45MSwgOTUxLjI2IDU5MS43OSwgOTcyLjk3IDYwNy4zNCIgc3Ryb2tlPSIjMzkwMGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkwNy4wMyA1ODAuOTYgQyA5MjkuMDIgNTk1LjQyLCA5NDAuMDkgNjM1LjU4LCA5NjAuMTcgNjUzLjE5IiBzdHJva2U9IiMxZDAwZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODk3LjEzIDYyMC40NyBDIDkxNy42MCA2MzcuMDEsIDkyNC42OCA2NzguMDYsIDk0Mi45NCA2OTcuNTUiIHN0cm9rZT0iIzAxMDBmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4ODMuNDEgNjU4LjgxIEMgOTAyLjE2IDY3Ny4yOCwgOTA1LjE4IDcxOC44MywgOTIxLjQ1IDc0MC4wMiIgc3Ryb2tlPSIjMDAxYWZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg2Ni4wMCA2OTUuNjMgQyA4ODIuODUgNzE1Ljg1LCA4ODEuNzggNzU3LjQ5LCA4OTUuODkgNzgwLjE3IiBzdHJva2U9IiMwMDM2ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODQ1LjA2IDczMC41NiBDIDg1OS44NCA3NTIuMzMsIDg1NC43MCA3OTMuNjgsIDg2Ni41MiA4MTcuNjMiIHN0cm9rZT0iIzAwNGZmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4MjAuODAgNzYzLjI3IEMgODMzLjM4IDc4Ni4zOSwgODI0LjIxIDgyNy4wMywgODMzLjYyIDg1Mi4wMiIgc3Ryb2tlPSIjMDA2N2ZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDc5My40NSA3OTMuNDUgQyA4MDMuNzAgODE3LjY5LCA3OTAuNjAgODU3LjIzLCA3OTcuNTEgODgzLjAzIiBzdHJva2U9IiMwMDdmZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNzYzLjI3IDgyMC44MCBDIDc3MS4xMCA4NDUuOTIsIDc1NC4xOCA4ODMuOTksIDc1OC41NCA5MTAuMzQiIHN0cm9rZT0iIzAwOTdmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA3MzAuNTYgODQ1LjA2IEMgNzM1Ljg5IDg3MC44MywgNzE1LjMyIDkwNy4wNiwgNzE3LjA3IDkzMy43MSIgc3Ryb2tlPSIjMDBhZmZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDY5NS42MyA4NjYuMDAgQyA2OTguNDEgODkyLjE3LCA2NzQuMzggOTI2LjIwLCA2NzMuNTIgOTUyLjkwIiBzdHJva2U9IiMwMGM0ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNjU4LjgxIDg4My40MSBDIDY1OS4wMSA5MDkuNzMsIDYzMS43NyA5NDEuMjUsIDYyOC4yOSA5NjcuNzMiIHN0cm9rZT0iIzAwZDRmZiIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA2MjAuNDcgODk3LjEzIEMgNjE4LjA5IDkyMy4zNCwgNTg3Ljg4IDk1Mi4wNCwgNTgxLjgzIDk3OC4wNSIgc3Ryb2tlPSIjMDBlNGZmIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDU4MC45NiA5MDcuMDMgQyA1NzYuMDIgOTMyLjg4LCA1NDMuMTUgOTU4LjQ3LCA1MzQuNTggOTgzLjc3IiBzdHJva2U9IiMwMGY0ZmYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNTQwLjY4IDkxMy4wMCBDIDUzMy4yMyA5MzguMjQsIDQ5OC4wMSA5NjAuNTAsIDQ4Ni45OSA5ODQuODMiIHN0cm9rZT0iIzAwZmZmOSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA1MDAuMDAgOTE1LjAwIEMgNDkwLjExIDkzOS4zOSwgNDUyLjg4IDk1OC4wOCwgNDM5LjUzIDk4MS4yMiIgc3Ryb2tlPSIjMDBmZmU5IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDQ1OS4zMiA5MTMuMDAgQyA0NDcuMDkgOTM2LjMwLCA0MDguMjEgOTUxLjI2LCAzOTIuNjYgOTcyLjk3IiBzdHJva2U9IiMwMGZmY2QiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNDE5LjA0IDkwNy4wMyBDIDQwNC41OCA5MjkuMDIsIDM2NC40MiA5NDAuMDksIDM0Ni44MSA5NjAuMTciIHN0cm9rZT0iIzAwZmZiMSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAzNzkuNTMgODk3LjEzIEMgMzYyLjk5IDkxNy42MCwgMzIxLjk0IDkyNC42OCwgMzAyLjQ1IDk0Mi45NCIgc3Ryb2tlPSIjMDBmZjk2IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDM0MS4xOSA4ODMuNDEgQyAzMjIuNzIgOTAyLjE2LCAyODEuMTcgOTA1LjE4LCAyNTkuOTggOTIxLjQ1IiBzdHJva2U9IiMwMGZmN2EiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzA0LjM3IDg2Ni4wMCBDIDI4NC4xNSA4ODIuODUsIDI0Mi41MSA4ODEuNzgsIDIxOS44MyA4OTUuODkiIHN0cm9rZT0iIzAwZmY1ZSIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAyNjkuNDQgODQ1LjA2IEMgMjQ3LjY3IDg1OS44NCwgMjA2LjMyIDg1NC43MCwgMTgyLjM3IDg2Ni41MiIgc3Ryb2tlPSIjMDBmZjNkIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDIzNi43MyA4MjAuODAgQyAyMTMuNjEgODMzLjM4LCAxNzIuOTcgODI0LjIxLCAxNDcuOTggODMzLjYyIiBzdHJva2U9IiMwMGZmMTkiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMjA2LjU1IDc5My40NSBDIDE4Mi4zMSA4MDMuNzAsIDE0Mi43NyA3OTAuNjAsIDExNi45NyA3OTcuNTEiIHN0cm9rZT0iIzBhZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxNzkuMjAgNzYzLjI3IEMgMTU0LjA4IDc3MS4xMCwgMTE2LjAxIDc1NC4xOCwgODkuNjYgNzU4LjU0IiBzdHJva2U9IiMyZWZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTU0Ljk0IDczMC41NiBDIDEyOS4xNyA3MzUuODksIDkyLjk0IDcxNS4zMiwgNjYuMjkgNzE3LjA3IiBzdHJva2U9IiM1MmZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTM0LjAwIDY5NS42MyBDIDEwNy44MyA2OTguNDEsIDczLjgwIDY3NC4zOCwgNDcuMTAgNjczLjUyIiBzdHJva2U9IiM3M2ZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTE2LjU5IDY1OC44MSBDIDkwLjI3IDY1OS4wMSwgNTguNzUgNjMxLjc3LCAzMi4yNyA2MjguMjkiIHN0cm9rZT0iIzhmZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxMDIuODcgNjIwLjQ3IEMgNzYuNjYgNjE4LjA5LCA0Ny45NiA1ODcuODgsIDIxLjk1IDU4MS44MyIgc3Ryb2tlPSIjYWJmZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDkyLjk3IDU4MC45NiBDIDY3LjEyIDU3Ni4wMiwgNDEuNTMgNTQzLjE1LCAxNi4yMyA1MzQuNTgiIHN0cm9rZT0iI2M3ZmYwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA4Ny4wMCA1NDAuNjggQyA2MS43NiA1MzMuMjMsIDM5LjUwIDQ5OC4wMSwgMTUuMTcgNDg2Ljk5IiBzdHJva2U9IiNlM2ZmMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gODUuMDAgNTAwLjAwIEMgNjAuNjEgNDkwLjExLCA0MS45MiA0NTIuODgsIDE4Ljc4IDQzOS41MyIgc3Ryb2tlPSIjZmZmZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDg3LjAwIDQ1OS4zMiBDIDYzLjcwIDQ0Ny4wOSwgNDguNzQgNDA4LjIxLCAyNy4wMyAzOTIuNjYiIHN0cm9rZT0iI2ZmZjMwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA5Mi45NyA0MTkuMDQgQyA3MC45OCA0MDQuNTgsIDU5LjkxIDM2NC40MiwgMzkuODMgMzQ2LjgxIiBzdHJva2U9IiNmZmU3MDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTAyLjg3IDM3OS41MyBDIDgyLjQwIDM2Mi45OSwgNzUuMzIgMzIxLjk0LCA1Ny4wNiAzMDIuNDUiIHN0cm9rZT0iI2ZmZGIwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxMTYuNTkgMzQxLjE5IEMgOTcuODQgMzIyLjcyLCA5NC44MiAyODEuMTcsIDc4LjU1IDI1OS45OCIgc3Ryb2tlPSIjZmZjZjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDEzNC4wMCAzMDQuMzcgQyAxMTcuMTUgMjg0LjE1LCAxMTguMjIgMjQyLjUxLCAxMDQuMTEgMjE5LjgzIiBzdHJva2U9IiNmZmMzMDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMTU0Ljk0IDI2OS40NCBDIDE0MC4xNiAyNDcuNjcsIDE0NS4zMCAyMDYuMzIsIDEzMy40OCAxODIuMzciIHN0cm9rZT0iI2ZmYjQwMCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSAxNzkuMjAgMjM2LjczIEMgMTY2LjYyIDIxMy42MSwgMTc1Ljc5IDE3Mi45NywgMTY2LjM4IDE0Ny45OCIgc3Ryb2tlPSIjZmZhNDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDIwNi41NSAyMDYuNTUgQyAxOTYuMzAgMTgyLjMxLCAyMDkuNDAgMTQyLjc3LCAyMDIuNDkgMTE2Ljk3IiBzdHJva2U9IiNmZjk0MDAiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMjM2LjczIDE3OS4yMCBDIDIyOC45MCAxNTQuMDgsIDI0NS44MiAxMTYuMDEsIDI0MS40NiA4OS42NiIgc3Ryb2tlPSIjZmY4NDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDI2OS40NCAxNTQuOTQgQyAyNjQuMTEgMTI5LjE3LCAyODQuNjggOTIuOTQsIDI4Mi45MyA2Ni4yOSIgc3Ryb2tlPSIjZmY3NDAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDMwNC4zNyAxMzQuMDAgQyAzMDEuNTkgMTA3LjgzLCAzMjUuNjIgNzMuODAsIDMyNi40OCA0Ny4xMCIgc3Ryb2tlPSIjZmY2MjAwIiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgICA8cGF0aCBkPSJNIDM0MS4xOSAxMTYuNTkgQyAzNDAuOTkgOTAuMjcsIDM2OC4yMyA1OC43NSwgMzcxLjcxIDMyLjI3IiBzdHJva2U9IiNmZjRjMDIiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gMzc5LjUzIDEwMi44NyBDIDM4MS45MSA3Ni42NiwgNDEyLjEyIDQ3Ljk2LCA0MTguMTcgMjEuOTUiIHN0cm9rZT0iI2ZmMzYwNCIgc3Ryb2tlLXdpZHRoPSIxMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBmaWxsPSJub25lIiAvPgogICAgPHBhdGggZD0iTSA0MTkuMDQgOTIuOTcgQyA0MjMuOTggNjcuMTIsIDQ1Ni44NSA0MS41MywgNDY1LjQyIDE2LjIzIiBzdHJva2U9IiNmZjIwMDYiIHN0cm9rZS13aWR0aD0iMTMiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgZmlsbD0ibm9uZSIgLz4KICAgIDxwYXRoIGQ9Ik0gNDU5LjMyIDg3LjAwIEMgNDY2Ljc3IDYxLjc2LCA1MDEuOTkgMzkuNTAsIDUxMy4wMSAxNS4xNyIgc3Ryb2tlPSIjZmYwYTA4IiBzdHJva2Utd2lkdGg9IjEzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIGZpbGw9Im5vbmUiIC8+CiAgPC9nPgogIDxnIGlkPSJjYW5keS10ZWFyZHJvcCIgZmlsdGVyPSJ1cmwoI3RlYXJkcm9wU2hhZG93KSIgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoMTUsIDE0KSI+CiAgICA8cGF0aCBkPSJNIDQ2OCAxMTUgTCA0MzUgMTc4IEMgMzY1IDI5NSwgMjEyIDQ3MCwgMjEyIDYwNSBDIDIxMiA3MzUsIDMzNSA4NDIsIDUwMCA4NDIgQyA2NjUgODQyLCA3ODggNzM1LCA3ODggNjA1IEMgNzg4IDQ3MCwgNjM1IDI5NSwgNTY1IDE3OCBMIDUzMiAxMTUgQyA1OTUgMjQwLCA3MTggNDI1LCA3MTggNjAwIEMgNzE4IDcwNSwgNjIwIDc3OCwgNTAwIDc3OCBDIDM4MCA3NzgsIDI4MiA3MDUsIDI4MiA2MDAgQyAyODIgNDI1LCA0MDUgMjQwLCA0NjggMTE1IFoiIGZpbGw9InVybCgjY2FuZHlUZWFyZHJvcCkiIC8+CiAgPC9nPgo8L3N2Zz4="
+                            alt="HyprCandy+" width="22" height="22" class="brand-logo-img"
+                            referrerPolicy="no-referrer" />
+                    </div>
+                    <span>HyprCandy+</span>
+                </div>
+
+                <div class="footer-links">
+                    <a href="mailto:hyprcandy@proton.me" class="footer-link-item footer-support-link"
+                        style="display: inline-flex; align-items: center; gap: 6px; color: #ededed;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                            <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path>
+                        </svg>
+                        <span>Contact Support: hyprcandy@proton.me</span>
+                    </a>
+                    <a href="https://github.com/HyprCandy/Hyprcandy.git" target="_blank" rel="noopener"
+                        class="footer-link-item">GitHub</a>
+                    <a href="https://discord.gg/6rjN8DfyDn" target="_blank" rel="noopener"
+                        class="footer-link-item">Discord</a>
+                    <a href="https://ko-fi.com/ianmking" target="_blank" rel="noopener"
+                        class="footer-link-item">Ko-fi</a>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <!-- Retained Copyright -->
+                <div>
+                    &copy; 2026 HyprCandy &bull; All rights reserved. Cohesively themed for Hyprland.
+                </div>
+
+                <!-- Retained Privacy Policy & Terms and Conditions -->
+                <div class="footer-legal-links">
+                    <span class="legal-btn" onclick="openModal('privacy-modal')">Privacy Policy</span>
+                    <span>&bull;</span>
+                    <span class="legal-btn" onclick="openModal('terms-modal')">Terms and Conditions</span>
+                </div>
+            </div>
         </div>
     </footer>
 
+    <!-- Inlined Script for Modal Handling and Clipboard Commands -->
     <script>
-        // ---- Live backend status, calls this deployment's own api/index.py ----
-        (async () => {
-            const dot = document.getElementById('status-dot');
-            const label = document.getElementById('status-text');
-            try {
-                const res = await fetch('/api', { method: 'GET' });
-                if (res.ok) {
-                    dot.classList.add('online');
-                    label.textContent = 'backend online';
-                } else {
-                    dot.classList.add('offline');
-                    label.textContent = 'backend unreachable';
-                }
-            } catch (err) {
-                dot.classList.add('offline');
-                label.textContent = 'backend unreachable';
+        function copyAurQuick() {
+            const text = 'paru -S git hyprland hyprcandy-install kitty && hc-install';
+            navigator.clipboard.writeText(text).then(() => {
+                const btnText = document.getElementById('quick-copy-text');
+                btnText.textContent = 'Copied!';
+                setTimeout(() => {
+                    btnText.textContent = 'Copy';
+                }, 2000);
+            });
+        }
+
+        function copySnippet(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            const text = el.textContent || el.innerText;
+            navigator.clipboard.writeText(text.trim()).then(() => {
+                // visual feedback
+                const orig = el.style.color;
+                el.style.color = '#10b981';
+                setTimeout(() => {
+                    el.style.color = orig;
+                }, 1500);
+            });
+        }
+
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.add('active');
             }
-        })();
+        }
 
-        // ---- Screenshot gallery -------------------------------------------
-        // Add an entry with an `image` path once you've exported it from the
-        // project's README.md into Agents/assets/. Entries without `image`
-        // render as labeled placeholders instead.
-        const GALLERY = [
-            { label: 'HyprCandy logo', caption: 'Rainbow candy-ring mark', image: 'assets/candy-logo.png' },
-            { label: 'Dock & app launcher', caption: 'Drag-to-rearrange, right-click popups' },
-            { label: 'Candylock', caption: 'Media, weather, system monitor on the lockscreen' },
-            { label: 'Control center', caption: 'Advanced widgets, wifi, bluetooth' },
-            { label: 'Workspaces overview', caption: 'Scrolling / dwindle / master / monocle' },
-            { label: 'SDDM live background', caption: 'Login screen synced to your wallpaper' },
-        ];
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) {
+                modal.classList.remove('active');
+            }
+        }
 
-        const grid = document.getElementById('gallery-grid');
-        GALLERY.forEach((item, i) => {
-            const tile = document.createElement('div');
-            tile.className = 'bezel';
+        function closeModalOnBackdrop(e, id) {
+            if (e.target && e.target.id === id) {
+                closeModal(id);
+            }
+        }
 
-            const cam = document.createElement('div');
-            cam.className = 'bezel-cam';
-
-            const screen = document.createElement('div');
-            screen.className = 'bezel-screen';
-
-            if (item.image) {
-                const img = document.createElement('img');
-                img.src = item.image;
-                img.alt = item.label;
-                screen.appendChild(img);
+        function toggleHeaderMenu(forceState) {
+            const btn = document.getElementById('headerMenuBtn');
+            const panel = document.getElementById('headerDropdownPanel');
+            if (!btn || !panel) return;
+            const isOpen = forceState !== undefined ? forceState : !panel.classList.contains('is-open');
+            if (isOpen) {
+                panel.classList.add('is-open');
+                btn.setAttribute('aria-expanded', 'true');
+                panel.setAttribute('aria-hidden', 'false');
             } else {
-                const angle = 100 + (i * 35) % 360;
-                screen.style.background =
-                    `linear-gradient(${angle}deg, rgba(255,95,109,0.18), rgba(165,110,255,0.18))`;
-                const label = document.createElement('span');
-                label.textContent = 'screenshot pending';
-                label.className = 'pending';
-                screen.appendChild(label);
+                panel.classList.remove('is-open');
+                btn.setAttribute('aria-expanded', 'false');
+                panel.setAttribute('aria-hidden', 'true');
             }
+        }
 
-            const caption = document.createElement('div');
-            caption.className = 'bezel-caption';
-            caption.innerHTML = `<p class="t">${item.label}</p><p class="c">${item.caption}</p>`;
+        function switchDropdownTab(tabName) {
+            const changelogTab = document.getElementById('tab-changelog');
+            const pluginsTab = document.getElementById('tab-plugins');
+            const changelogBtn = document.getElementById('tab-changelog-btn');
+            const pluginsBtn = document.getElementById('tab-plugins-btn');
+            if (!changelogTab || !pluginsTab || !changelogBtn || !pluginsBtn) return;
 
-            tile.appendChild(cam);
-            tile.appendChild(screen);
-            tile.appendChild(caption);
-            grid.appendChild(tile);
+            if (tabName === 'changelog') {
+                changelogTab.style.display = 'block';
+                pluginsTab.style.display = 'none';
+                changelogBtn.classList.add('active');
+                changelogBtn.setAttribute('aria-selected', 'true');
+                pluginsBtn.classList.remove('active');
+                pluginsBtn.setAttribute('aria-selected', 'false');
+            } else {
+                changelogTab.style.display = 'none';
+                pluginsTab.style.display = 'block';
+                pluginsBtn.classList.add('active');
+                pluginsBtn.setAttribute('aria-selected', 'true');
+                changelogBtn.classList.remove('active');
+                changelogBtn.setAttribute('aria-selected', 'false');
+            }
+        }
+
+        function toggleCollapsible(btn) {
+            const item = btn.closest('.collapsible-item');
+            if (!item) return;
+            const isOpen = item.classList.contains('is-open');
+            if (isOpen) {
+                item.classList.remove('is-open');
+                btn.setAttribute('aria-expanded', 'false');
+            } else {
+                item.classList.add('is-open');
+                btn.setAttribute('aria-expanded', 'true');
+            }
+        }
+
+        document.addEventListener('click', function (e) {
+            const panel = document.getElementById('headerDropdownPanel');
+            const btn = document.getElementById('headerMenuBtn');
+            if (!panel || !btn) return;
+            if (panel.classList.contains('is-open') && !panel.contains(e.target) && !btn.contains(e.target)) {
+                toggleHeaderMenu(false);
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                toggleHeaderMenu(false);
+                document.querySelectorAll('.modal-backdrop.active').forEach(function (m) {
+                    m.classList.remove('active');
+                });
+            }
         });
     </script>
 </body>
