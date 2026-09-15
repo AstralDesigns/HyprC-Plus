@@ -1154,6 +1154,261 @@
         border-color: #fff;
       }
 
+      /* --- HyprCandy Workspace Section --- */
+      #workspace {
+        scroll-margin-top: 70px;
+      }
+
+      .workspace-card {
+        background: var(--bg-surface);
+        border: 1px solid var(--border-subtle);
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+        transition: border-color 0.2s ease;
+      }
+
+      .workspace-card:hover {
+        border-color: var(--border-hover);
+      }
+
+      .workspace-grid {
+        display: grid;
+        grid-template-columns: 440px 1fr;
+        gap: 36px;
+        align-items: center;
+      }
+
+      .workspace-preview-box {
+        background: #09090b;
+        border: 1px solid var(--border-subtle);
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 16px 36px -10px rgba(0, 0, 0, 0.8);
+        transition: border-color 0.2s ease, transform 0.2s ease;
+      }
+
+      .workspace-preview-box:hover {
+        border-color: rgba(255, 255, 255, 0.18);
+        transform: translateY(-2px);
+      }
+
+      .workspace-preview-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 9px 14px;
+        background: #0d0d10;
+        border-bottom: 1px solid var(--border-subtle);
+      }
+
+      .workspace-preview-dots {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .workspace-preview-dots span {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.18);
+      }
+
+      .workspace-preview-title {
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        color: var(--text-tertiary);
+        font-weight: 500;
+      }
+
+      .workspace-preview-badge {
+        font-family: var(--font-mono);
+        font-size: 0.68rem;
+        padding: 1px 7px;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-subtle);
+      }
+
+      .workspace-preview-media {
+        background: #040405;
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px;
+        overflow: hidden;
+      }
+
+      .workspace-preview-media img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+        border-radius: 6px;
+        transition: transform 0.25s ease;
+      }
+
+      .workspace-preview-box:hover .workspace-preview-media img {
+        transform: scale(1.02);
+      }
+
+      .workspace-details {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .workspace-tags-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .workspace-tag {
+        font-family: var(--font-mono);
+        font-size: 0.74rem;
+        font-weight: 500;
+        padding: 3px 10px;
+        border-radius: 9999px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-secondary);
+        border: 1px solid var(--border-subtle);
+      }
+
+      .workspace-tag.accent {
+        color: #ffffff;
+        border-color: rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .workspace-desc {
+        font-size: 0.96rem;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        margin: 0;
+      }
+
+      .workspace-desc strong {
+        color: #ffffff;
+        font-weight: 600;
+      }
+
+      .workspace-tiers {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-top: 2px;
+      }
+
+      .tier-card {
+        padding: 12px 14px;
+        background: rgba(255, 255, 255, 0.025);
+        border: 1px solid var(--border-subtle);
+        border-radius: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .tier-card.tier-pro {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.14);
+      }
+
+      .tier-card-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.84rem;
+        font-weight: 600;
+        color: #ffffff;
+      }
+
+      .tier-indicator {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--text-tertiary);
+      }
+
+      .tier-pro .tier-indicator {
+        background: #ffffff;
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+      }
+
+      .tier-card-desc {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        line-height: 1.45;
+      }
+
+      .workspace-actions {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-top: 4px;
+      }
+
+      .btn-workspace-pro {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        background: #ffffff;
+        color: #000000;
+        font-weight: 600;
+        font-size: 0.9rem;
+        padding: 9px 20px;
+        border-radius: 9999px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 4px 16px rgba(255, 255, 255, 0.18);
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .btn-workspace-pro:hover {
+        background: #eaeaea;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 22px rgba(255, 255, 255, 0.28);
+      }
+
+      .btn-workspace-pro:active {
+        transform: translateY(0);
+      }
+
+      .btn-workspace-pro svg {
+        flex-shrink: 0;
+      }
+
+      @media (max-width: 992px) {
+        .workspace-grid {
+          grid-template-columns: 1fr;
+          gap: 28px;
+        }
+
+        .workspace-preview-box {
+          max-width: 520px;
+          margin: 0 auto;
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .workspace-card {
+          padding: 22px 18px;
+        }
+
+        .workspace-tiers {
+          grid-template-columns: 1fr;
+        }
+      }
+
       /* --- Modal (Privacy Policy & Terms) --- */
       .modal-backdrop {
         position: fixed;
@@ -1348,10 +1603,11 @@
             </button>
           </div>
 
-          <!-- Navigation: Features / Get HyprCandy+ / Screenshots -->
+          <!-- Navigation: Features / HC+ Install / HC+ Editor / Screenshots -->
           <nav class="header-nav">
             <a href="#features" class="pill-link">Features</a>
-            <a href="#install" class="btn-header-install">Get HyprCandy+</a>
+            <a href="#install" class="btn-header-install">HC+ Install</a>
+            <a href="#workspace" class="btn-header-install">HC+ Editor</a>
             <a href="#screenshots" class="pill-link">Screenshots</a>
           </nav>
 
@@ -1797,6 +2053,89 @@
                   <a href="https://ko-fi.com/ianmking" target="_blank" rel="noopener" class="btn-support-kofi">
                     <span>Ko-fi</span>
                   </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HyprCandy Workspace Section -->
+      <section id="workspace">
+        <div class="container">
+          <div class="section-heading">
+            <div class="section-eyebrow">Integrated Development</div>
+            <h2 class="section-title">HyprCandy Workspace</h2>
+            <p class="section-desc">
+              Custom HC+ editor seamlessly integrated into the overlay launcher with multi-tier agentic acceleration.
+            </p>
+          </div>
+
+          <div class="workspace-card">
+            <div class="workspace-grid">
+              <!-- Smaller preview box reusing repository workspace screenshot -->
+              <div class="workspace-preview-box">
+                <div class="workspace-preview-header">
+                  <div class="workspace-preview-dots" aria-hidden="true">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                  <span class="workspace-preview-title">workspace.preview</span>
+                  <span class="workspace-preview-badge">Overlay Layer</span>
+                </div>
+                <div class="workspace-preview-media">
+                  <img
+                    src="https://github.com/user-attachments/assets/e7c8edac-e457-456d-94f3-25ac089135bd"
+                    alt="HyprCandy Workspace"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                  />
+                </div>
+              </div>
+
+              <!-- Information & Pro Action -->
+              <div class="workspace-details">
+                <div class="workspace-tags-row">
+                  <span class="workspace-tag accent">HC+ Editor</span>
+                  <span class="workspace-tag">Overlay Layered Launcher</span>
+                  <span class="workspace-tag">Vercel AI Gateway</span>
+                </div>
+
+                <p class="workspace-desc">
+                  <strong>HyprCandy Workspace</strong> is a custom HC+ editor themed to match the desktop theme and directly integrated into the overlay layered launcher hence it can be invoked over any window. It contains a <strong>Free</strong> tier with limited requests per day through the default <strong>Candy Agent</strong> and a <strong>Pro</strong> tier that has access to hundreds of models through <strong>Vercel AI Gateway</strong>.
+                </p>
+
+                <div class="workspace-tiers">
+                  <div class="tier-card">
+                    <div class="tier-card-header">
+                      <span class="tier-indicator"></span>
+                      <span>Free Tier</span>
+                    </div>
+                    <div class="tier-card-desc">
+                      Limited requests per day powered by the default built-in Candy Agent.
+                    </div>
+                  </div>
+                  <div class="tier-card tier-pro">
+                    <div class="tier-card-header">
+                      <span class="tier-indicator"></span>
+                      <span>Pro Tier</span>
+                    </div>
+                    <div class="tier-card-desc">
+                      Access to hundreds of models and high-throughput agentic workflows via Vercel AI Gateway.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="workspace-actions">
+                  <button type="button" class="btn-workspace-pro" id="btnWorkspacePro" aria-label="HC+ Workspace Pro">
+                    <span>HC+ Workspace Pro</span>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <circle cx="9" cy="21" r="1"></circle>
+                      <circle cx="20" cy="21" r="1"></circle>
+                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                  </button>
                 </div>
               </div>
             </div>
