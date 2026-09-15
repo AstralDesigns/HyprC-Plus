@@ -1,75 +1,147 @@
 import os
+import hmac
+import hashlib
+import json
+import httpx
+from datetime import datetime, timezone
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse # <--- ADDED
+from fastapi.responses import StreamingResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 
 app = FastAPI()
 
-# Connect to MongoDB using an environment variable (We will set this up in Vercel)
 MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI)
 db = client.ai_platform
 
-# Schema for the requests your desktop app will send to query the AI
-class PromptRequest(BaseModel):
-    license_key: str
+# Schema matching the client-side payloads emitted by your app-launcher dashboard
+class AgentPayload(BaseModel):
+    client_id: str          # Free Tier Linux machine hash OR Paid Tier Lemon Squeezy License
     prompt: str
-
-# 0. ROOT LANDING PAGE: Serves your compliance site for Stripe/Paddle auditors
-@app.get("/", response_class=HTMLResponse)
-async def read_root():
-    # Targets index.html sitting one level above this script in the Agents folder
-    path_to_html = os.path.join(os.path.dirname(__file__), "../index.html")
-    try:
-        with open(path_to_html, "r", encoding="utf-8") as file:
-            return file.read()
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Landing page file missing on server root")
+    model_choice: str       # OpenRouter engine or Vercel Gateway target
 
 @app.get("/api")
 def hello_world():
-    return {"message": "HyprCandy Workspace Backend API is Online"}
+    return {"status": "online", "project": "HyprCandy Workspace Gateway Pipeline"}
 
-# 1. GUMROAD WEBHOOK: Pinned from your Gumroad Advanced Dashboard
-@app.post("/api/gumroad")
-async def gumroad_webhook(request: Request):
-    # Gumroad sends webhooks as Form Data by default
-    form_data = await request.form()
-    
-    email = form_data.get("email")
-    license_key = form_data.get("license_key")
-    
-    if not email or not license_key:
-        raise HTTPException(status_code=400, detail="Malformed webhook data")
+# 🛒 1. LEMON SQUEEZY SUBSCRIPTION EVENT INTERCEPTOR
+@app.post("/api/lemonsqueezy")
+async def lemonsqueezy_webhook(request: Request):
+    # Enforce strict webhook provenance validation via HMAC-SHA256 handshake verification
+    webhook_secret = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET")
+    if not webhook_secret:
+        raise HTTPException(status_code=500, detail="Cloud environment signature secret unmapped.")
         
-    # Save the buyer to your MongoDB cluster
-    await db.users.update_one(
-        {"license_key": license_key},
-        {
-            "$set": {
-                "email": email,
-                "has_active_subscription": True
+    body = await request.body()
+    signature = request.headers.get("X-Signature")
+    
+    if not signature:
+        raise HTTPException(status_code=401, detail="Security validation header absent.")
+        
+    local_hash = hmac.new(webhook_secret.encode(), body, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(local_hash, signature):
+        raise HTTPException(status_code=401, detail="Cryptographic token mismatch. Forbidden payload signature.")
+
+    payload = json.loads(body.decode())
+    event_name = payload.get("meta", {}).get("event_name")
+    attributes = payload.get("data", {}).get("attributes", {})
+    
+    user_email = attributes.get("user_email")
+    license_key = attributes.get("license_key", user_email) 
+    
+    if event_name == "subscription_created":
+        # Initialize paid customer row profile and grant a 2.5 million token pool allowance
+        await db.users.update_one(
+            {"email": user_email},
+            {
+                "$set": {
+                    "license_key": license_key,
+                    "has_active_subscription": True,
+                    "tier": "pro",
+                    "updated_at": datetime.now(timezone.utc)
+                },
+                "$inc": {"credits": 2500000}
             },
-            "$inc": {"credits": 50000} # Gift 50,000 tokens on purchase
-        },
-        upsert=True
-    )
-    return {"status": "verified_and_saved"}
+            upsert=True
+        )
+        
+    elif event_name in ["subscription_cancelled", "subscription_expired"]:
+        # Block future requests instantly if subscription is explicitly closed or dropped
+        await db.users.update_one(
+            {"email": user_email},
+            {"$set": {"has_active_subscription": False}}
+        )
 
-# 2. DESKTOP INTERACTION: Called by your Hyprland workspace configuration
+    return {"status": "event_processed_successfully"}
+
+# ⚡ 2. DYNAMIC TEXT-STREAM COMPLETIONS AND AGENTIC PROXY
 @app.post("/api/chat")
-async def chat_proxy(payload: PromptRequest):
-    # Verify the user exists in your database
-    user = await db.users.find_one({"license_key": payload.license_key})
-    
-    if not user or not user.get("has_active_subscription"):
-        raise HTTPException(status_code=403, detail="Invalid License Key or Inactive Account")
+async def universal_agent_proxy(payload: AgentPayload):
+    today_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # 🟢 PROTOCOL A: THE FREE CONSUMER HUB (Identified via hardware execution hash)
+    if payload.client_id.startswith("machine_"):
+        target_url = "https://openrouter.ai"
         
-    if user.get("credits", 0) <= 0:
-        raise HTTPException(status_code=402, detail="Out of AI credits")
+        # Load OpenRouter credential mapping arrays from database collections
+        key_doc = await db.api_keys.find_one({"provider": "openrouter", "isActive": True})
+        if not key_doc: raise HTTPException(status_code=500, detail="Missing baseline provider configuration keys.")
         
-    # TODO: Connect to Groq/Google AI Studio here, get response, 
-    # deduct credits, and return response back to the desktop launcher.
-    
-    return {"response": f"Backend verified key! Processing prompt: {payload.prompt}"}
+        headers = {"Authorization": f"Bearer {key_doc['apiKey']}", "Content-Type": "application/json"}
+        
+        # Enforce rate-limit counters against unique hardware ID rows inside MongoDB Atlas
+        usage = await db.free_usage.find_one_and_update(
+            {"machine_id": payload.client_id, "date": today_date},
+            {"$inc": {"count": 1}}, upsert=True, return_document=True
+        )
+        if usage.get("count", 0) > 50:
+            raise HTTPException(status_code=429, detail="Daily threshold achieved! Upgrade to Pro via Lemon Squeezy.")
+
+        gateway_payload = {
+            "model": "openrouter/free", # Global high-availability multi-model route
+            "messages": [{"role": "user", "content": payload.prompt}],
+            "stream": True
+        }
+
+    # 💎 PROTOCOL B: THE PAID CORE SUBSYSTEM (Validated via Lemon Squeezy Identity key)
+    else:
+        # Cross-reference database rows to confirm active subscription tokens
+        user = await db.users.find_one({"license_key": payload.client_id, "has_active_subscription": True})
+        if not user:
+            raise HTTPException(status_code=403, detail="Access Forbidden: Inactive or malformed execution key block.")
+            
+        if user.get("credits", 0) <= 0:
+            raise HTTPException(status_code=402, detail="Payment Required: Premium token credits exhausted.")
+
+        target_url = "https://vercel.ai"
+        
+        key_doc = await db.api_keys.find_one({"provider": "vercel_gateway", "isActive": True})
+        if not key_doc: raise HTTPException(status_code=500, detail="Cloud environment proxy keys unmapped.")
+        
+        headers = {
+            "Authorization": f"Bearer {key_doc['apiKey']}",
+            "Content-Type": "application/json"
+        }
+        
+        # Deduct credits uniformly on every text generation request thread loop execution
+        await db.users.update_one({"license_key": payload.client_id}, {"$inc": {"credits": -1000}})
+
+        gateway_payload = {
+            "model": payload.model_choice, # Pass premium requested namespace dynamically
+            "messages": [{"role": "user", "content": payload.prompt}],
+            "stream": True
+        }
+
+    # Universal asynchronous SSE byte chunk forwarding array stream loop
+    async def sse_stream_generator():
+        async with httpx.AsyncClient(timeout=60.0) as client_connection:
+            async with client_connection.stream("POST", target_url, json=gateway_payload, headers=headers) as response:
+                if response.status_code != 200:
+                    yield b"Error: Target processing node returned a processing error exception."
+                    return
+                async for stream_byte_chunk in response.aiter_bytes():
+                    yield stream_byte_chunk
+
+    return StreamingResponse(sse_stream_generator(), media_type="text/event-stream")
+
