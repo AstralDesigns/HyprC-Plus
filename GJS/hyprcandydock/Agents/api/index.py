@@ -1,5 +1,6 @@
 import os
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import HTMLResponse # <--- ADDED
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 
@@ -14,6 +15,17 @@ db = client.ai_platform
 class PromptRequest(BaseModel):
     license_key: str
     prompt: str
+
+# 0. ROOT LANDING PAGE: Serves your compliance site for Stripe/Paddle auditors
+@app.get("/", response_class=HTMLResponse)
+async def read_root():
+    # Targets index.html sitting one level above this script in the Agents folder
+    path_to_html = os.path.join(os.path.dirname(__file__), "../index.html")
+    try:
+        with open(path_to_html, "r", encoding="utf-8") as file:
+            return file.read()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Landing page file missing on server root")
 
 @app.get("/api")
 def hello_world():

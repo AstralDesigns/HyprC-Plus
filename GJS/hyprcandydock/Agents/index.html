@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HyprC-Plus — Premium AI App-Launcher & IDE</title>
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body { background-color: #0d1117; color: #c9d1d9; font-family: system-ui, -apple-system, sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+    <!-- Header / Navigation -->
+    <header class="border-b border-gray-800 bg-[#161b22] px-6 py-4 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <span class="text-2xl">🍬✨</span>
+            <span class="text-xl font-bold text-white tracking-wide">HyprC-Plus</span>
+        </div>
+        <a href="https://github.com" target="_blank" class="text-sm bg-gray-800 text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-700 transition">View GitHub</a>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto px-6 py-12 flex-grow">
+        
+        <!-- Hero Section -->
+        <section class="text-center my-10">
+            <h1 class="text-4xl font-extrabold text-white sm:text-5xl mb-4">The Smart AI App-Launcher & IDE</h1>
+            <p class="text-lg text-gray-400 max-w-2xl mx-auto">
+                A highly customizable, cohesive environment powered by Vercel AI Gateway. Run complex developer workflows directly from your desktop interface.
+            </p>
+        </section>
+
+        <!-- Pricing Section (Critical for Stripe Compliance) -->
+        <section class="bg-[#161b22] border border-gray-800 rounded-2xl p-8 max-w-md mx-auto my-12 shadow-xl">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-white">Developer Tier</h2>
+                <p class="text-gray-400 mt-1">Perfect for individual programmers</p>
+                <div class="mt-4 flex items-center justify-center text-white">
+                    <span class="text-5xl font-extrabold tracking-tight">$15</span>
+                    <span class="text-xl font-semibold ml-1">/month</span>
+                </div>
+                <p class="text-xs text-amber-400 mt-2 font-medium">Includes standard baseline credits + dynamic metered overcharges</p>
+            </div>
+
+            <ul class="space-y-3 text-sm text-gray-300 border-t border-b border-gray-800 py-6 mb-6">
+                <li class="flex items-center"><span class="text-emerald-500 mr-2">✓</span> Unlimited local IDE functionality</li>
+                <li class="flex items-center"><span class="text-emerald-500 mr-2">✓</span> Vercel AI Gateway integration</li>
+                <li class="flex items-center"><span class="text-emerald-500 mr-2">✓</span> Automated token overcharges capped by you</li>
+            </ul>
+
+            <!-- Stripe Button Placeholder -->
+            <button class="w-full bg-blue-600 text-white font-semibold py-3 px-4 rounded-xl hover:bg-blue-500 transition shadow-lg cursor-pointer">
+                Subscribe via Stripe
+            </button>
+        </section>
+
+        <!-- Dynamic Compliance Blocks (Stripe Audits These) -->
+        <section class="grid md:grid-cols-3 gap-6 text-xs text-gray-400 border-t border-gray-800 pt-10">
+            <div>
+                <h3 class="font-bold text-gray-200 mb-2 uppercase tracking-wider">Terms of Service</h3>
+                <p>Subscriptions automatically renew every month. Usage-based overcharges are calculated through token metrics processed by our AI gateway and applied seamlessly at the end of your billing cycle.</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-gray-200 mb-2 uppercase tracking-wider">Privacy Policy</h3>
+                <p>We respect your code. All codebase context routed via our platform is transient, encrypted, and governed strictly by standard API provider agreements. We never train public models on your code.</p>
+            </div>
+            <div>
+                <h3 class="font-bold text-gray-200 mb-2 uppercase tracking-wider">Refunds & Fulfillment</h3>
+                <p>Digital access is provisioned immediately upon account authorization. Subscription cancellations can be requested anytime via the support email, taking effect at the next statement cycle.</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-800 bg-[#0d1117] px-6 py-6 text-center text-xs text-gray-500">
+        <p>© 2026 HyprCandy Project. For technical support or payment inquiries, reach out via our repository issues or email.</p>
+    </footer>
+
+</body>
+</html>
