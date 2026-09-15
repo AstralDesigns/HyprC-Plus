@@ -5,9 +5,9 @@ import json
 import httpx
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse
-from motor.motor_asyncio import AsyncIOMotorClient
+from fastapi.responses import StreamingResponse, FileResponse # Added FileResponse
 from pydantic import BaseModel
+from motor.motor_asyncio import AsyncIOMotorClient
 
 app = FastAPI()
 
@@ -15,11 +15,25 @@ MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI)
 db = client.ai_platform
 
-# Schema matching the client-side payloads emitted by your app-launcher dashboard
 class AgentPayload(BaseModel):
-    client_id: str          # Free Tier Linux machine hash OR Paid Tier Lemon Squeezy License
+    client_id: str
     prompt: str
-    model_choice: str       # OpenRouter engine or Vercel Gateway target
+    model_choice: str
+
+# 🌐 NATIVE STATIC LANDING PAGE ROUTER
+@app.get("/")
+def serve_index_page():
+    # Looks for index.html sitting right next to index.py or in the parent folder root
+    possible_paths = [
+        "index.html",
+        "../index.html",
+        os.path.join(os.path.dirname(__file__), "index.html"),
+        os.path.join(os.path.dirname(__file__), "../index.html")
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            return FileResponse(path)
+    raise HTTPException(status_code=404, detail="index.html structural asset not found.")
 
 @app.get("/api")
 def hello_world():
