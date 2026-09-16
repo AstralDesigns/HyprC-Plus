@@ -892,7 +892,7 @@ Item {
                         radius: width / 2
                         color: "transparent"
                         border.width: 1
-                        border.color: Theme.cWc9
+                        border.color: Theme.cWc11
                     }
                     RotationAnimator on rotation {
                         from: 0; to: 360; duration: 16000

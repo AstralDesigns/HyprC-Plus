@@ -1065,7 +1065,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "󰫢  󰫢"; color: root.cWc12
+                                                text: "󰫢  󰫢"; color: root.cWc13
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
                                                 topPadding: 6; bottomPadding: 6
                                             }
@@ -1135,8 +1135,8 @@ ShellRoot {
                                                     border.width: 2
                                                     border.color: root.authFailed ? root.cErr
                                                         : (root.authChecking
-                                                            ? root.cWc5
-                                                            : root.cWc12)
+                                                            ? root.cWc12
+                                                            : root.cWc13)
                                                     Behavior on border.color { ColorAnimation { duration: 250 } }
                                                 }
                                                 RowLayout {
@@ -1147,13 +1147,13 @@ ShellRoot {
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; visible: root.authChecking
-                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc10
+                                                    text: "󰶘"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 18; color: root.cWc12
                                                     RotationAnimator on rotation { from: 0; to: 360; duration: 900; loops: Animation.Infinite; running: root.authChecking }
                                                 }
                                                 Row {
                                                     anchors.centerIn: parent; spacing: 5
                                                     visible: root.pinEntry.length > 0 && !root.authChecking && !root.pinVisible
-                                                    Repeater { model: root.pinEntry.length; delegate: Rectangle { width: 8; height: 8; radius: 99; color: root.cWc5; opacity: 1.0 } }
+                                                    Repeater { model: root.pinEntry.length; delegate: Rectangle { width: 8; height: 8; radius: 99; color: root.cWc12; opacity: 1.0 } }
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; width: parent.width - 24
@@ -1204,7 +1204,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDateNum; color: root.cWc12
+                                                text: root.clockDateNum; color: root.cWc13
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.DemiBold
                                                 lineHeight: 0.88
@@ -1261,7 +1261,7 @@ ShellRoot {
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: root.weatherTemp
-                                                color: root.cWc10
+                                                color: root.cWc13
                                                 font.pixelSize: 18
                                                 font.weight: Font.Bold
                                                 font.family: "C059"
@@ -1308,7 +1308,7 @@ ShellRoot {
 
                                                     Text {
                                                         text: modelData.glyph
-                                                        color: root.cWc13
+                                                        color: root.cWc10
                                                         font.pixelSize: 14
                                                         font.family: "Symbols Nerd Font Mono"
                                                     }
@@ -1760,7 +1760,7 @@ ShellRoot {
                                                 radius: width / 2
                                                 color: "transparent"
                                                 border.width: 1
-                                                border.color: root.cWc9
+                                                border.color: root.cWc11
                                             }
                                             RotationAnimator on rotation {
                                                 from:0; to:360; duration:16000
