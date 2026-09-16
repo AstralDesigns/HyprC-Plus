@@ -3,17 +3,28 @@ import hmac
 import hashlib
 import json
 import httpx
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse # Added FileResponse
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 
-app = FastAPI()
-
 MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI)
 db = client.ai_platform
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # create_index is idempotent — safe to run on every cold start, not just once.
+    # sparse=True matters here specifically: subscription_created intentionally
+    # leaves license_key unset until license_key_created arrives separately, so
+    # a plain (non-sparse) unique index would reject the second such user for
+    # colliding on a duplicate null. Sparse excludes docs missing the field.
+    await db.users.create_index("license_key", unique=True, sparse=True)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 class AgentPayload(BaseModel):
     client_id: str
