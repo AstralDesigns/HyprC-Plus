@@ -5,7 +5,7 @@ import json
 import httpx
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse # Added FileResponse
 from pydantic import BaseModel
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -15,15 +15,15 @@ MONGO_URI = os.getenv("MONGO_URI")
 client = AsyncIOMotorClient(MONGO_URI)
 db = client.ai_platform
 
-# Optimized schema exclusively for Paid Workspace users
 class AgentPayload(BaseModel):
-    license_key: str        # The user's active Lemon Squeezy license key
-    prompt: str             # Context buffer sent from Monaco Editor
-    model_choice: str       # Premium model id chosen via the UI selector
+    client_id: str
+    prompt: str
+    model_choice: str
 
 # 🌐 NATIVE STATIC LANDING PAGE ROUTER
 @app.get("/")
 def serve_index_page():
+    # Looks for index.html sitting right next to index.py or in the parent folder root
     possible_paths = [
         "index.html",
         "../index.html",
@@ -37,11 +37,12 @@ def serve_index_page():
 
 @app.get("/api")
 def hello_world():
-    return {"status": "online", "project": "HyprCandy Premium Workspace Gateway"}
+    return {"status": "online", "project": "HyprCandy Workspace Gateway Pipeline"}
 
 # 🛒 1. LEMON SQUEEZY SUBSCRIPTION EVENT INTERCEPTOR
 @app.post("/api/lemonsqueezy")
 async def lemonsqueezy_webhook(request: Request):
+    # Enforce strict webhook provenance validation via HMAC-SHA256 handshake verification
     webhook_secret = os.getenv("LEMON_SQUEEZY_WEBHOOK_SECRET")
     if not webhook_secret:
         raise HTTPException(status_code=500, detail="Cloud environment signature secret unmapped.")
@@ -62,6 +63,11 @@ async def lemonsqueezy_webhook(request: Request):
     user_email = attributes.get("user_email")
 
     if event_name == "subscription_created":
+        # Initialize paid customer row profile and grant a 2.5 million token pool allowance.
+        # No license_key here on purpose — until "Generate license keys" is enabled on the
+        # product, subscription payloads don't carry one, and we don't want to fall back to
+        # storing the buyer's email as their auth key. The license_key_created handler below
+        # fills license_key in separately once that's turned on.
         await db.users.update_one(
             {"email": user_email},
             {
@@ -70,12 +76,15 @@ async def lemonsqueezy_webhook(request: Request):
                     "tier": "pro",
                     "updated_at": datetime.now(timezone.utc)
                 },
-                "$inc": {"credits": 2500000}  # Allocate 2.5M baseline tokens
+                "$inc": {"credits": 2500000}
             },
             upsert=True
         )
 
     elif event_name == "license_key_created":
+        # Fires once "Generate license keys" is enabled on the product. Lemon Squeezy
+        # generates the key and emails it to the buyer directly — this just links that
+        # key to the same user row subscription_created already created/updated.
         license_key = attributes.get("key")
         if user_email and license_key:
             await db.users.update_one(
@@ -90,6 +99,7 @@ async def lemonsqueezy_webhook(request: Request):
             )
 
     elif event_name in ["subscription_cancelled", "subscription_expired"]:
+        # Block future requests instantly if subscription is explicitly closed or dropped
         await db.users.update_one(
             {"email": user_email},
             {"$set": {"has_active_subscription": False}}
@@ -97,48 +107,48 @@ async def lemonsqueezy_webhook(request: Request):
 
     return {"status": "event_processed_successfully"}
 
-# 💎 2. DYNAMIC PREMIUM TEXT-STREAM COMPLETIONS GATEWAY
+# ⚡ 2. DYNAMIC TEXT-STREAM COMPLETIONS AND AGENTIC PROXY (Pro-only)
 @app.post("/api/chat")
-async def premium_agent_proxy(payload: AgentPayload):
-    # Cross-reference MongoDB collections to confirm an active premium license row matches
-    user = await db.users.find_one({"license_key": payload.license_key, "has_active_subscription": True})
+async def universal_agent_proxy(payload: AgentPayload):
+    # Cloud tier is Pro-only. Free/offline inference runs entirely on-device via
+    # llama.cpp and never calls this endpoint, so client_id here must always be
+    # a validated Lemon Squeezy license key — no machine_ fallback anymore.
+    user = await db.users.find_one({"license_key": payload.client_id, "has_active_subscription": True})
     if not user:
-        raise HTTPException(status_code=403, detail="Access Forbidden: Inactive or malformed workspace key.")
-        
-    if user.get("credits", 0) <= 0:
-        raise HTTPException(status_code=402, detail="Payment Required: Premium token credits completely exhausted.")
+        raise HTTPException(status_code=403, detail="Access Forbidden: Inactive or malformed execution key block.")
 
-    # Your Vercel AI Gateway endpoint route
-    target_url = "https://vercel.ai"
-    
-    # Load Vercel master proxy credential from database documents
+    if user.get("credits", 0) <= 0:
+        raise HTTPException(status_code=402, detail="Payment Required: Premium token credits exhausted.")
+
     key_doc = await db.api_keys.find_one({"provider": "vercel_gateway", "isActive": True})
-    if not key_doc: 
-        raise HTTPException(status_code=500, detail="Cloud environment gateway configuration keys unmapped.")
-    
+    if not key_doc:
+        raise HTTPException(status_code=500, detail="Cloud environment proxy keys unmapped.")
+
     headers = {
         "Authorization": f"Bearer {key_doc['apiKey']}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
     }
-    
-    # Deduct credits from user profile balance uniformly on successful transaction handshakes
-    await db.users.update_one({"license_key": payload.license_key}, {"$inc": {"credits": -1000}})
 
+    # Deduct credits uniformly on every text generation request thread loop execution
+    await db.users.update_one({"license_key": payload.client_id}, {"$inc": {"credits": -1000}})
+
+    # Real AI Gateway completions endpoint — NOT the https://vercel.ai homepage.
+    # Base is https://ai-gateway.vercel.sh/v1, path is /chat/completions.
+    target_url = "https://ai-gateway.vercel.sh/v1/chat/completions"
     gateway_payload = {
-        "model": payload.model_choice,  # Pass premium requested namespace dynamically (e.g., gpt-4o)
+        "model": payload.model_choice,  # e.g. "anthropic/claude-sonnet-4.5"
         "messages": [{"role": "user", "content": payload.prompt}],
         "stream": True
     }
 
-    # Asynchronous Server-Sent Events (SSE) byte chunk forwarding streaming loop
+    # Universal asynchronous SSE byte chunk forwarding array stream loop
     async def sse_stream_generator():
         async with httpx.AsyncClient(timeout=60.0) as client_connection:
             async with client_connection.stream("POST", target_url, json=gateway_payload, headers=headers) as response:
                 if response.status_code != 200:
-                    yield b"Error: Upstream endpoint node returned a text generation handling exception."
+                    yield b"Error: Target processing node returned a processing error exception."
                     return
                 async for stream_byte_chunk in response.aiter_bytes():
                     yield stream_byte_chunk
 
     return StreamingResponse(sse_stream_generator(), media_type="text/event-stream")
-
