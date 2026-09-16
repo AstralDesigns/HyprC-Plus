@@ -74,7 +74,7 @@ var DockConfig = {
 
     // ── Border ────────────────────────────────────────────────────────────
     borderWidth: 2,                // @HCD:borderWidth
-    borderColorVar: 'color1', // @HCD:borderColorVar  (GTK @name, matugen)
+    borderColorVar: 'inverse_primary', // @HCD:borderColorVar  (GTK @name, matugen)
     borderRadius: 30,              // @HCD:borderRadius  (legacy uniform fallback)
     borderTopLeftRadius: 30,       // @HCD:borderTopLeftRadius
     borderTopRightRadius: 30,      // @HCD:borderTopRightRadius
@@ -84,7 +84,7 @@ var DockConfig = {
     // ── Island Border (Start & Trash icon badges) ─────────────────────────
     islandBorderWidth: 1,           // @HCD:islandBorderWidth
     islandBorderAlpha: 1,        // @HCD:islandBorderAlpha
-    islandBorderColorVar: 'scrim', // @HCD:islandBorderColorVar
+    islandBorderColorVar: 'primary_container', // @HCD:islandBorderColorVar
 
     // ── External margins (dock edge ↔ screen / window edge) ──────────────
     // The exclusive zone is auto-calculated from the rendered content height:
