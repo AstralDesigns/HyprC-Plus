@@ -60,17 +60,18 @@ async def lemonsqueezy_webhook(request: Request):
     payload = json.loads(body.decode())
     event_name = payload.get("meta", {}).get("event_name")
     attributes = payload.get("data", {}).get("attributes", {})
-    
     user_email = attributes.get("user_email")
-    license_key = attributes.get("license_key", user_email) 
-    
+
     if event_name == "subscription_created":
-        # Initialize paid customer row profile and grant a 2.5 million token pool allowance
+        # Initialize paid customer row profile and grant a 2.5 million token pool allowance.
+        # No license_key here on purpose — until "Generate license keys" is enabled on the
+        # product, subscription payloads don't carry one, and we don't want to fall back to
+        # storing the buyer's email as their auth key. The license_key_created handler below
+        # fills license_key in separately once that's turned on.
         await db.users.update_one(
             {"email": user_email},
             {
                 "$set": {
-                    "license_key": license_key,
                     "has_active_subscription": True,
                     "tier": "pro",
                     "updated_at": datetime.now(timezone.utc)
@@ -79,7 +80,24 @@ async def lemonsqueezy_webhook(request: Request):
             },
             upsert=True
         )
-        
+
+    elif event_name == "license_key_created":
+        # Fires once "Generate license keys" is enabled on the product. Lemon Squeezy
+        # generates the key and emails it to the buyer directly — this just links that
+        # key to the same user row subscription_created already created/updated.
+        license_key = attributes.get("key")
+        if user_email and license_key:
+            await db.users.update_one(
+                {"email": user_email},
+                {
+                    "$set": {
+                        "license_key": license_key,
+                        "updated_at": datetime.now(timezone.utc)
+                    }
+                },
+                upsert=True
+            )
+
     elif event_name in ["subscription_cancelled", "subscription_expired"]:
         # Block future requests instantly if subscription is explicitly closed or dropped
         await db.users.update_one(
@@ -158,4 +176,3 @@ async def universal_agent_proxy(payload: AgentPayload):
                     yield stream_byte_chunk
 
     return StreamingResponse(sse_stream_generator(), media_type="text/event-stream")
-
