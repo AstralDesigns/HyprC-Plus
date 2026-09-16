@@ -1159,6 +1159,47 @@
         scroll-margin-top: 70px;
       }
 
+      .workspace-title-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+
+      .btn-workspace-title-pro {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: #ffffff;
+        color: #000000;
+        font-weight: 600;
+        font-size: 0.84rem;
+        letter-spacing: -0.01em;
+        padding: 5px 14px;
+        border-radius: 9999px;
+        border: none;
+        cursor: pointer;
+        transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 3px 12px rgba(255, 255, 255, 0.16);
+        text-decoration: none;
+        white-space: nowrap;
+        vertical-align: middle;
+      }
+
+      .btn-workspace-title-pro:hover {
+        background: #eaeaea;
+        transform: translateY(-1px);
+        box-shadow: 0 5px 18px rgba(255, 255, 255, 0.26);
+      }
+
+      .btn-workspace-title-pro:active {
+        transform: translateY(0);
+      }
+
+      .btn-workspace-title-pro svg {
+        flex-shrink: 0;
+      }
+
       .workspace-card {
         background: var(--bg-surface);
         border: 1px solid var(--border-subtle);
@@ -2065,7 +2106,17 @@
         <div class="container">
           <div class="section-heading">
             <div class="section-eyebrow">Integrated Development</div>
-            <h2 class="section-title">HyprCandy Workspace</h2>
+            <h2 class="section-title workspace-title-row">
+              <span>HyprCandy Workspace</span>
+              <button type="button" class="btn-workspace-title-pro" id="btnWorkspaceTitlePro" aria-label="Pro">
+                <span>Pro</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="9" cy="21" r="1"></circle>
+                  <circle cx="20" cy="21" r="1"></circle>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+              </button>
+            </h2>
             <p class="section-desc">
               Custom HC+ editor seamlessly integrated into the overlay launcher with multi-tier agentic acceleration.
             </p>
