@@ -471,7 +471,7 @@ Item {
             Rectangle {
                 anchors.fill: parent
                 radius: 16
-                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.3)
+                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.35)
             }
         }
 
@@ -627,7 +627,7 @@ Item {
 
                         Rectangle {
                             anchors.fill: parent; radius: 99
-                            color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.5)
+                            color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.4)
                             border.width: 1
                             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
                         }
@@ -648,8 +648,8 @@ Item {
 
                         Text {
                             text: "󰟃"
-                            font.family: "Symbols Nerd Font Mono"; font.pixelSize: 10
-                            color: Theme.cWc4
+                            font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13
+                            color: Theme.cPrimary
                             style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.25)
                             x: {
                                 const tw = trough.width - 6
@@ -723,8 +723,8 @@ Item {
 
                         Text {
                             text: "󰟃"
-                            font.family: "Symbols Nerd Font Mono"; font.pixelSize: 10
-                            color: Theme.cWc4
+                            font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13
+                            color: Theme.cPrimary
                             style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.25)
                             x: {
                                 const tw = volBarItem.width - 6

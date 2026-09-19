@@ -3,13 +3,15 @@ import ReactDOM from 'react-dom/client';
 import { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
 import { App } from './App';
+import { configureMonacoWorkers } from './monacoWorkers';
 import { storeActions, getStore, setStore } from './store';
 import { agentEngine } from './engine/agent-engine';
-import { webllmService } from './engine/webllm.service';
 import './theme.css';
 
-// Configure Monaco to use locally bundled package rather than CDN
+// Configure Monaco to use locally bundled package and dedicated Vite workers.
+// This prevents Monaco worker code from falling back to the UI thread.
 loader.config({ monaco });
+configureMonacoWorkers();
 
 // Clear any stale theme selection — app is matugen-only now.
 try { localStorage.removeItem('hyprcandy_monaco_theme'); } catch (_) {}
@@ -20,14 +22,7 @@ if (typeof window !== 'undefined') {
     setStore,
     actions: storeActions,
   };
-
-  // Expose the engine singletons for executeJavaScript-injected worker scripts.
-  // Do this unconditionally: contextBridge/preload feature detection can be
-  // observed a few milliseconds late on startup, while the hidden Electron
-  // worker already accepts its first model-load request. In WebKitGTK this is
-  // harmless; AgentEngine still delegates inference through the bridge.
-  (window as any).__hyprcandyEngine  = agentEngine;
-  (window as any).__webllmService    = webllmService;
+  (window as any).__hyprcandyEngine = agentEngine;
 }
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(

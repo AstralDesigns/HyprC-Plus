@@ -12,16 +12,16 @@
 @define-color accent_color {{colors.primary.default.hex}};
 @define-color accent_fg_color {{colors.background.default.hex}};
 @define-color accent_bg_color {{colors.primary.default.hex}};
-@define-color window_bg_color alpha(@on_secondary, 1.00);
+@define-color window_bg_color alpha(@on_secondary, 0.95);
 @define-color window_fg_color @primary;
 @define-color view_bg_color @window_bg_color;
 @define-color view_fg_color @primary;
-@define-color headerbar_bg_color @window_bg_color;
+@define-color headerbar_bg_color alpha(@on_secondary, 0.50);
 @define-color headerbar_fg_color @primary;
 @define-color headerbar_border_color @primary;
-@define-color headerbar_backdrop_color @window_bg_color;
-@define-color headerbar_shade_color rgba(0, 0, 6, 0.36);
-@define-color headerbar_darker_shade_color rgba(0, 0, 12, 0.9);
+@define-color headerbar_backdrop_color alpha(@on_secondary, 0.75);
+@define-color headerbar_shade_color alpha(@on_secondary, 0.85);
+@define-color headerbar_darker_shade_color alpha(@on_secondary, 0.90);
 @define-color sidebar_bg_color @window_bg_color;
 @define-color sidebar_fg_color @window_fg_color;
 @define-color sidebar_backdrop_color @window_bg_color;
@@ -53,31 +53,30 @@ windowcontrols>button>image { /* GTK4 */
   min-height: 1px;
   border-radius: 100%;
   padding: 0;
-  margin: 0 5px;
   opacity: 1;
 }
 
 button.titlebutton { /* GTK3 */
-  color: transparent;
+  color: @inverse_primary;
   min-width: 1px;
   min-height: 1px;
   border-radius: 100%;
   padding: 0;
-  margin: 0 5px;
   opacity: 1;
 }
 
 button.titlebutton.close,
   windowcontrols > button.close > image {
-  color: @background;
-  background: @color11;
+  color: @inverse_primary;
+  background: @primary;
+  opacity: 1;
 }
 
 button.titlebutton.close:hover,
   windowcontrols > button.close:hover > image {
   color: @inverse_primary;
   background: @primary;
-  opacity: 0.5;
+  opacity: 0.70;
 }
 
 button.titlebutton.maximize,

@@ -58,7 +58,7 @@ window.background {
     margin: 0px;*/
     border-width: 1px;
     border-style: solid;
-    border-color: @primary_container;
+    border-color: @scrim;
     /* CC island border color picker → dock-island-border.sh writes @gtk_name here */
 }
 

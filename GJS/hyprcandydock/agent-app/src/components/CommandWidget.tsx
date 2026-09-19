@@ -44,8 +44,8 @@ export const CommandWidget: React.FC<CommandWidgetProps> = ({ sessionId, message
     <div style={{
       margin: '12px 0',
       borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--border-glass)',
-      background: 'var(--bg-card)',
+      border: '1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 24%, transparent)',
+      background: 'color-mix(in srgb, var(--matugen-surface, #0c1014) 75%, transparent)',
       overflow: 'hidden',
       boxShadow: '0 4px 18px rgba(0, 0, 0, 0.3)',
       transition: 'all 0.2s ease',
@@ -56,8 +56,8 @@ export const CommandWidget: React.FC<CommandWidgetProps> = ({ sessionId, message
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '8px 14px',
-        background: 'rgba(255, 255, 255, 0.04)',
-        borderBottom: collapsed ? 'none' : '1px solid var(--border-subtle)',
+        background: 'color-mix(in srgb, var(--matugen-surface-variant, #40484c) 15%, transparent)',
+        borderBottom: collapsed ? 'none' : '1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 16%, transparent)',
       }}>
         <div 
           onClick={() => setCollapsed(!collapsed)}
@@ -69,13 +69,13 @@ export const CommandWidget: React.FC<CommandWidgetProps> = ({ sessionId, message
             userSelect: 'none',
           }}
         >
-          {collapsed ? <ChevronRight size={15} color="var(--text-muted)" /> : <ChevronDown size={15} color="var(--text-muted)" />}
-          <Terminal size={15} color="var(--accent-yellow)" />
+          {collapsed ? <ChevronRight size={15} color="var(--matugen-secondary, #b2cbd6)" /> : <ChevronDown size={15} color="var(--matugen-secondary, #b2cbd6)" />}
+          <Terminal size={15} color="var(--matugen-primary, #a0c9dc)" />
           <span style={{ fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)' }}>
             Terminal Command
           </span>
           {command.cwd && (
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+            <span style={{ fontSize: '11px', color: 'var(--matugen-secondary, #b2cbd6)' }}>
               in {command.cwd}
             </span>
           )}
@@ -88,17 +88,17 @@ export const CommandWidget: React.FC<CommandWidgetProps> = ({ sessionId, message
               display: 'flex',
               alignItems: 'center',
               gap: '5px',
-              color: command.exitCode === 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+              color: command.exitCode === 0 ? '#4ade80' : '#f87171',
               fontSize: '12px',
               fontWeight: 600,
             }}>
-              {command.exitCode === 0 ? <CheckCircle size={15} /> : <AlertCircle size={15} />}
+              {command.exitCode === 0 ? <CheckCircle size={15} color="#4ade80" /> : <AlertCircle size={15} color="#f87171" />}
               <span>{command.exitCode === 0 ? 'Success' : `Exit ${command.exitCode}`}</span>
             </div>
           ) : command.status === 'rejected' ? (
-            <span style={{ color: 'var(--accent-red)', fontSize: '12px', fontWeight: 600 }}>Rejected</span>
+            <span style={{ color: '#f87171', fontSize: '12px', fontWeight: 600 }}>Rejected</span>
           ) : isRunning || command.status === 'running' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-cyan)', fontSize: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--matugen-primary, #a0c9dc)', fontSize: '12px' }}>
               <Loader2 size={14} className="pulse-glow" style={{ animation: 'spin 1s linear infinite' }} />
               <span>Running...</span>
             </div>
@@ -112,13 +112,16 @@ export const CommandWidget: React.FC<CommandWidgetProps> = ({ sessionId, message
                   gap: '4px',
                   padding: '4px 10px',
                   borderRadius: 'var(--radius-sm)',
-                  border: '1px solid rgba(255, 142, 142, 0.3)',
-                  background: 'rgba(255, 142, 142, 0.1)',
-                  color: 'var(--accent-red)',
+                  border: '1px solid rgba(239, 68, 68, 0.45)',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: '#f87171',
                   cursor: 'pointer',
                   fontSize: '11px',
                   fontWeight: 600,
+                  transition: 'all 0.15s ease',
                 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
               >
                 <X size={13} />
                 Cancel
@@ -132,15 +135,18 @@ export const CommandWidget: React.FC<CommandWidgetProps> = ({ sessionId, message
                   gap: '5px',
                   padding: '4px 12px',
                   borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  background: 'var(--accent-yellow)',
-                  color: '#1a1900',
+                  border: '1px solid rgba(34, 197, 94, 0.55)',
+                  background: 'rgba(34, 197, 94, 0.22)',
+                  color: '#4ade80',
                   cursor: 'pointer',
                   fontSize: '11px',
                   fontWeight: 600,
+                  transition: 'all 0.15s ease',
                 }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.35)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.22)'}
               >
-                <Play size={12} fill="#1a1900" />
+                <Play size={12} fill="#4ade80" />
                 Run Command
               </button>
             </>

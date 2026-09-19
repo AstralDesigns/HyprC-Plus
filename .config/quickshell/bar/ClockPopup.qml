@@ -70,7 +70,7 @@ Item {
 
                 Text {
                     text: root._greeting
-                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
+                    color: Theme.cOnSurf
                     font.family: Config.labelFont
                     font.pixelSize: 13
                     font.weight: Font.Medium
@@ -80,7 +80,7 @@ Item {
                     spacing: 2
                     Text {
                         text: Qt.formatDateTime(root._now, "HH")
-                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
+                        color: Theme.cOnSurf
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
@@ -89,7 +89,7 @@ Item {
                     }
                     Text {
                         text: ":"
-                        color: Theme.cWc3
+                        color: Theme.cPrimary
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
@@ -99,7 +99,7 @@ Item {
                     }
                     Text {
                         text: Qt.formatDateTime(root._now, "mm")
-                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
+                        color:Theme.cOnSurf
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
@@ -118,7 +118,7 @@ Item {
                         Text {
                             anchors.centerIn: parent
                             text: root._secStr
-                            color: Theme.cWc6
+                            color: Theme.cPrimary
                             font.family: Config.labelFont
                             font.pixelSize: 11
                             font.weight: Font.Bold
@@ -128,7 +128,7 @@ Item {
 
                 Text {
                     text: root._dateStr
-                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
+                    color: Theme.cOnSurf
                     font.family: Config.labelFont
                     font.pixelSize: 12
                 }
@@ -142,8 +142,8 @@ Item {
                 Rectangle {
                     anchors.fill: parent
                     radius: 99
-                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.45)
+                    color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+			   	   Theme.cSurfaceTint.b, 0.45)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.45)
                 }
@@ -165,7 +165,7 @@ Item {
                         ctx.beginPath()
                         ctx.arc(cx, cy, r, 0, 2 * Math.PI)
                         ctx.stroke()
-                        ctx.fillStyle = Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80).toString()
+                        ctx.fillStyle = Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 1).toString()
                         for (let i = 0; i < 12; i++) {
                             const angle = (i * 30) * Math.PI / 180
                             const mx = cx + (r - 6) * Math.sin(angle)
@@ -198,7 +198,7 @@ Item {
                         ctx.rotate(minAngle)
                         ctx.lineWidth = 2.5
                         ctx.lineCap = "round"
-                        ctx.strokeStyle = Theme.cWc5.toString()
+                        ctx.strokeStyle = Theme.cInversePrimary.toString()
                         ctx.beginPath()
                         ctx.moveTo(0, 10)
                         ctx.lineTo(0, -(r - 10))
@@ -213,7 +213,7 @@ Item {
                         ctx.moveTo(0, 12)
                         ctx.lineTo(0, -(r - 6))
                         ctx.stroke()
-                        ctx.fillStyle = Theme.cWc3.toString()
+                        ctx.fillStyle = Theme.cOnSecondary.toString()
                         ctx.beginPath()
                         ctx.arc(0, -(r - 16), 3, 0, 2 * Math.PI)
                         ctx.fill()
@@ -249,8 +249,8 @@ Item {
             width: 110
             height: 110
             radius: 55
-            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                           Theme.cInversePrimary.b, 0.45)
+            color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+			   Theme.cSurfaceTint.b, 0.45)
             border.width: 1
             border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.45)
         }
@@ -277,7 +277,7 @@ Item {
                 ctx.stroke()
 
                 // Hour markers (12 dots)
-                ctx.fillStyle = Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80).toString()
+                ctx.fillStyle = Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 1).toString()
                 for (let i = 0; i < 12; i++) {
                     const angle = (i * 30) * Math.PI / 180
                     const mx = cx + (r - 6) * Math.sin(angle)
@@ -315,7 +315,7 @@ Item {
                 ctx.rotate(minAngle)
                 ctx.lineWidth = 2.5
                 ctx.lineCap = "round"
-                ctx.strokeStyle = Theme.cWc5.toString()
+                ctx.strokeStyle = Theme.cInversePrimary.toString()
                 ctx.beginPath()
                 ctx.moveTo(0, 10)
                 ctx.lineTo(0, -(r - 10))
@@ -327,7 +327,7 @@ Item {
                 ctx.save()
                 ctx.translate(cx, cy)
                 ctx.rotate(secAngle)
-                ctx.fillStyle = Theme.cWc3.toString()
+                ctx.fillStyle = Theme.cOnSecondary.toString()
                 ctx.beginPath()
                 ctx.arc(0, -(r - 16), 3, 0, 2 * Math.PI)
                 ctx.fill()

@@ -10,16 +10,10 @@
     "llama:pull:1.5b": "node ./scripts/llama-pull.cjs Qwen2.5-Coder-1.5B-Instruct",
     "llama:pull:0.5b": "node ./scripts/llama-pull.cjs Qwen2.5-Coder-0.5B-Instruct",
     "llama:test": "node ./scripts/llama-chat-test.cjs",
-    "preview": "vite preview",
-    "electron": "node node_modules/electron/cli.js electron/main.cjs",
-    "electron:debug": "HYPRCANDY_ELECTRON_DEVTOOLS=1 node node_modules/electron/cli.js electron/main.cjs"
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@mlc-ai/web-llm": "^0.2.79",
     "@monaco-editor/react": "^4.7.0",
-    "@wllama/wllama": "^3.6.1",
-    "@wllama/wllama-compat": "3.6.1",
-    "electron": "^44.2.0",
     "lucide-react": "^0.447.0",
     "monaco-editor": "^0.55.1",
     "react": "^18.3.1",
@@ -55,7 +49,6 @@
     }
   },
   "allowScripts": {
-    "electron@44.2.0": true,
     "esbuild": true
   }
 }

@@ -1,0 +1,722 @@
+
+[2026-09-14T01:33:13+03:00] starting standalone app-launcher
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
+Gjs-Console-Message: 01:33:14.198: [launcher] Hybrid graphics detected — routing WebKit/GL rendering to discrete GPU 0000:01:00.0 (DRI_PRIME=pci-0000_01_00_0); leaving hardware acceleration enabled.
+Gjs-Console-Message: 01:33:15.767: [launcher:workspace] Workspace startup policy is OFF; Agent UI shell is present but WebKit process/Electron/llama stack is dormant.
+Gjs-Console-Message: 01:33:15.807: [launcher:workspace] Workspace startup policy is OFF; skipping workspace shell warm-up.
+
+[2026-09-14T01:33:34+03:00] starting standalone app-launcher
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
+Gjs-Console-Message: 01:33:35.201: [launcher] Hybrid graphics detected — routing WebKit/GL rendering to discrete GPU 0000:01:00.0 (DRI_PRIME=pci-0000_01_00_0); leaving hardware acceleration enabled.
+Gjs-Console-Message: 01:33:35.801: [launcher:workspace] Workspace startup policy is OFF; Agent UI shell is present but WebKit process/Electron/llama stack is dormant.
+Gjs-Console-Message: 01:33:35.877: [launcher:workspace] Workspace startup policy is OFF; skipping workspace shell warm-up.
+MESA-INTEL: warning: Ivy Bridge Vulkan support is incomplete
+MESA-INTEL: warning: Ivy Bridge Vulkan support is incomplete
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 01:39:50.980: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c6b55540' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 01:49:51.163: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c7a57b60' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 01:49:59.862: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c927a730' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 01:50:01.928: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c87cd8e0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:00:48.995: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c8bf5af0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:00:58.262: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580cae6e200' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:10:55.048: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c981b9a0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:10:57.217: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c9a29fd0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:14:23.629: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c679b610' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:14:29.396: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c89abb20' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:44:54.169: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580cad36570' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:45:02.489: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580ca5dbb30' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:54:26.279: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c9611390' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 02:54:28.750: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580ca313f80' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:04:13.658: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c8f09b50' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:04:23.748: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580caca7aa0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:11:17.768: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580ca5dbb30' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:11:21.989: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580ca060500' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:18:28.990: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580ca313f80' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:18:39.076: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c85afea0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:23:58.148: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c8417e40' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:24:02.620: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c9bdd1b0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:31:49.598: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c6032bb0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:31:59.681: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c6a5eb30' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:36:40.302: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c6032bb0' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 03:36:42.104: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580ca77f7b0' has no probe with id `1'
+
+** (WebKitWebProcess:2): WARNING **: 04:06:39.539: Calling org.freedesktop.portal.Request.Close failed: GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod: Object does not exist at path “/org/freedesktop/portal/desktop/request/1_7583/t/TOfcHgpD9fZdkQT3E_KZLw”
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 04:06:40.187: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580c4df3c90' has no probe with id `1'
+
+(WebKitWebProcess:2): GStreamer-WARNING **: 04:22:16.925: ../gstreamer/subprojects/gstreamer/gst/gstpad.c:1605: pad `0x5580ca121140' has no probe with id `1'
+
+(HC-launcher:275161): Gjs-Console-WARNING **: 04:30:53.932: [launcher] WebProcess terminated: tab-tab_1789338944726_y89c reason: 2
+
+[2026-09-16T23:59:20+03:00] starting standalone app-launcher
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
+Gjs-Console-Message: 23:59:20.594: [launcher] Hybrid graphics detected — routing WebKit/GL rendering to discrete GPU 0000:01:00.0 (DRI_PRIME=pci-0000_01_00_0); leaving hardware acceleration enabled.
+Gjs-Console-Message: 23:59:21.982: [launcher] Agent WebLLM loopback origin: http://127.0.0.1:17842/
+Gjs-Console-Message: 23:59:22.144: [launcher:electron] (Re)starting headless Electron inference worker...
+Gjs-Console-Message: 23:59:22.157: [launcher:electron] Spawned headless inference worker (Chromium WebGPU)
+Gjs-Console-Message: 23:59:22.158: [launcher:workspace] Warmed workspace shell without starting llama-server.
+Gjs-Console-Message: 23:59:22.165: [launcher:runtime] Python runtime already running at :17900
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:22.369: [launcher:electron:raw] [hyprcandy-electron-agent] starting without LD_PRELOAD; url=http://127.0.0.1:17842/index.html
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:22.704: [launcher:electron:raw] [2530216:0916/235922.702814:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wl_shm version 1 but version 2 is available.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:22.709: [launcher:electron:raw] [2530216:0916/235922.703050:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_cursor_shape_manager_v1 version 1 but version 2 is available.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:22.709: [launcher:electron:raw] [2530216:0916/235922.703189:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_pointer_gestures_v1 version 1 but version 3 is available.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:22.710: [launcher:electron:raw] [2530216:0916/235922.703561:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_color_manager_v1 version 1 but version 3 is available.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:22.711: [launcher:electron:raw] [2530216:0916/235922.703629:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_linux_dmabuf_v1 version 4 but version 5 is available.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:23.199: [launcher:electron:raw] [2530216:0916/235923.198599:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:170] Server doesn't support zcr_alpha_compositing_v1.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:23.200: [launcher:electron:raw] [2530216:0916/235923.198632:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:185] Server doesn't support overlay_prioritizer.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:23.301: [launcher:electron:raw] libva error: /usr/lib/dri/iHD_drv_video.so init failed
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:23.393: [launcher:electron:raw] [2530216:0916/235923.391667:WARNING:components/dbus/xdg/portal.cc:126] Failed to register with org.freedesktop.host.portal.Registry
+Gjs-Console-Message: 23:59:24.191: [launcher:electron] Inference worker ready (Chromium WebGPU enabled; embedded headless mode)
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.336: [launcher:electron:raw] (electron) 'console-message' arguments are deprecated and will be removed. Please use Event<WebContentsConsoleMessageEventParams> object instead.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.336: [agent-react-electron] %cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+  exposes users of this app to severe security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.337: [launcher:electron:raw] [2530216:0916/235924.334646:INFO:CONSOLE:2] "%cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.338: [launcher:electron:raw] exposes users of this app to severe security risks.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.339: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.339: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.340: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.341: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.342: [agent-react-electron] %cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+  enabled. This exposes users of this app to severe security risks.
+
+  
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.342: [launcher:electron:raw] [2530216:0916/235924.334808:INFO:CONSOLE:2] "%cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.343: [launcher:electron:raw] enabled. This exposes users of this app to severe security risks.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.344: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.344: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.345: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.345: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.349: [agent-react-electron] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.350: [launcher:electron:raw] [2530216:0916/235924.334953:INFO:CONSOLE:2] "%cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.350: [launcher:electron:raw] Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.351: [launcher:electron:raw] this app to unnecessary security risks.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.352: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.353: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.354: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.355: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.862: [agent-react] Could not create web worker(s). Falling back to loading web worker code in main thread, which might cause UI freezes. Please see https://github.com/microsoft/monaco-editor#faq
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 23:59:24.863: [agent-react] You must define a function MonacoEnvironment.getWorkerUrl or MonacoEnvironment.getWorker
+Gjs-Console-Message: 23:59:25.168: [launcher agent DOM after 2s]: {"title":"HyprCandy Agent","href":"http://127.0.0.1:17842/index.html","origin":"http://127.0.0.1:17842","isSecureContext":true,"navigatorGpu":"undefined","hasRequestAdapter":"undefined","userAgent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15","rootHTML":"<div class=\"app-container\"><header class=\"app-top-header\"><div class=\"header-left\"><button type=\"button\" class=\"header-icon-btn \" title=\"Show explorer panel\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-l","children":1,"bodyText":"\n"}
+MESA-INTEL: warning: Ivy Bridge Vulkan support is incomplete
+
+(HC-launcher:2530131): Gjs-Console-WARNING **: 00:00:24.649: [launcher:llama] No cached GGUF model found; llama-server remains OFF.
+
+(process:2): GLib-GIO-WARNING **: 00:03:22.662: Error releasing name org.hyprcandy.HC-launcher.Sandboxed.WebProcess-373b098a-5feb-4687-b7f4-c24f86b4383c: The connection is closed
+
+[2026-09-17T00:46:29+03:00] starting standalone app-launcher
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
+Gjs-Console-Message: 00:46:29.810: [launcher] Hybrid graphics detected — routing WebKit/GL rendering to discrete GPU 0000:01:00.0 (DRI_PRIME=pci-0000_01_00_0); leaving hardware acceleration enabled.
+Gjs-Console-Message: 00:46:31.233: [launcher] Agent WebLLM loopback origin: http://127.0.0.1:17842/
+Gjs-Console-Message: 00:46:31.399: [launcher:electron] (Re)starting headless Electron inference worker...
+Gjs-Console-Message: 00:46:31.412: [launcher:electron] Spawned headless inference worker (Chromium WebGPU)
+Gjs-Console-Message: 00:46:31.412: [launcher:workspace] Warmed workspace shell without starting llama-server.
+Gjs-Console-Message: 00:46:31.417: [launcher:runtime] Python runtime already running at :17900
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:31.651: [launcher:electron:raw] [hyprcandy-electron-agent] starting without LD_PRELOAD; url=http://127.0.0.1:17842/index.html
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.017: [launcher:electron:raw] [2568716:0917/004632.016073:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wl_shm version 1 but version 2 is available.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.018: [launcher:electron:raw] [2568716:0917/004632.016293:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_cursor_shape_manager_v1 version 1 but version 2 is available.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.019: [launcher:electron:raw] [2568716:0917/004632.016447:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_pointer_gestures_v1 version 1 but version 3 is available.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.020: [launcher:electron:raw] [2568716:0917/004632.017005:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_color_manager_v1 version 1 but version 3 is available.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.022: [launcher:electron:raw] [2568716:0917/004632.017235:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_linux_dmabuf_v1 version 4 but version 5 is available.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.634: [launcher:electron:raw] [2568716:0917/004632.633701:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:170] Server doesn't support zcr_alpha_compositing_v1.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.635: [launcher:electron:raw] [2568716:0917/004632.633748:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:185] Server doesn't support overlay_prioritizer.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.763: [launcher:electron:raw] libva error: /usr/lib/dri/iHD_drv_video.so init failed
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:32.853: [launcher:electron:raw] [2568716:0917/004632.851445:WARNING:components/dbus/xdg/portal.cc:126] Failed to register with org.freedesktop.host.portal.Registry
+Gjs-Console-Message: 00:46:33.677: [launcher:electron] Inference worker ready (Chromium WebGPU enabled; embedded headless mode)
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.847: [launcher:electron:raw] (electron) 'console-message' arguments are deprecated and will be removed. Please use Event<WebContentsConsoleMessageEventParams> object instead.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.848: [agent-react-electron] %cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+  exposes users of this app to severe security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.849: [launcher:electron:raw] [2568716:0917/004633.847107:INFO:CONSOLE:2] "%cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.849: [launcher:electron:raw] exposes users of this app to severe security risks.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.850: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.851: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.852: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.852: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.853: [agent-react-electron] %cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+  enabled. This exposes users of this app to severe security risks.
+
+  
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.854: [launcher:electron:raw] [2568716:0917/004633.847324:INFO:CONSOLE:2] "%cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.854: [launcher:electron:raw] enabled. This exposes users of this app to severe security risks.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.855: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.855: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.855: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.856: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.856: [agent-react-electron] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.857: [launcher:electron:raw] [2568716:0917/004633.847466:INFO:CONSOLE:2] "%cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.857: [launcher:electron:raw] Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.858: [launcher:electron:raw] this app to unnecessary security risks.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.858: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.859: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.859: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:33.860: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:34.522: [agent-react] Could not create web worker(s). Falling back to loading web worker code in main thread, which might cause UI freezes. Please see https://github.com/microsoft/monaco-editor#faq
+
+(HC-launcher:2568645): Gjs-Console-WARNING **: 00:46:34.523: [agent-react] You must define a function MonacoEnvironment.getWorkerUrl or MonacoEnvironment.getWorker
+Gjs-Console-Message: 00:46:34.741: [launcher agent DOM after 2s]: {"title":"HyprCandy Agent","href":"http://127.0.0.1:17842/index.html","origin":"http://127.0.0.1:17842","isSecureContext":true,"navigatorGpu":"undefined","hasRequestAdapter":"undefined","userAgent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15","rootHTML":"<div class=\"app-container\"><header class=\"app-top-header\"><div class=\"header-left\"><button type=\"button\" class=\"header-icon-btn active\" title=\"Hide explorer panel\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" st","children":1,"bodyText":"\n"}
+MESA-INTEL: warning: Ivy Bridge Vulkan support is incomplete
+
+** (WebKitWebProcess:2): WARNING **: 00:52:30.368: Calling org.freedesktop.portal.Inhibit.Inhibit failed: GDBus.Error:org.freedesktop.DBus.Error.AccessDenied: Portal operation not allowed: Could not to open '/proc/pid/2568720': No such file or directory
+
+** (WebKitWebProcess:2): WARNING **: 00:52:39.894: Calling org.freedesktop.portal.Inhibit.Inhibit failed: GDBus.Error:org.freedesktop.DBus.Error.AccessDenied: Portal operation not allowed: Could not to open '/proc/pid/2568720': No such file or directory
+
+** (WebKitWebProcess:2): WARNING **: 00:54:04.431: Calling org.freedesktop.portal.Inhibit.Inhibit failed: GDBus.Error:org.freedesktop.DBus.Error.AccessDenied: Portal operation not allowed: Could not to open '/proc/pid/2568720': No such file or directory
+
+** (WebKitWebProcess:2): WARNING **: 00:54:22.927: Calling org.freedesktop.portal.Inhibit.Inhibit failed: GDBus.Error:org.freedesktop.DBus.Error.AccessDenied: Portal operation not allowed: Could not to open '/proc/pid/2568720': No such file or directory
+
+[2026-09-17T06:07:34+03:00] starting standalone app-launcher
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
+Gjs-Console-Message: 06:07:34.517: [launcher] Hybrid graphics detected — routing WebKit/GL rendering to discrete GPU 0000:01:00.0 (DRI_PRIME=pci-0000_01_00_0); leaving hardware acceleration enabled.
+Gjs-Console-Message: 06:07:35.060: [launcher] Agent WebLLM loopback origin: http://127.0.0.1:17842/
+Gjs-Console-Message: 06:07:35.250: [launcher:electron] (Re)starting headless Electron inference worker...
+Gjs-Console-Message: 06:07:35.268: [launcher:electron] Spawned headless inference worker (Chromium WebGPU)
+Gjs-Console-Message: 06:07:35.269: [launcher:workspace] Warmed workspace shell without starting llama-server.
+Gjs-Console-Message: 06:07:35.281: [launcher:runtime] Python runtime already running at :17900
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:35.472: [launcher:electron:raw] [hyprcandy-electron-agent] starting without LD_PRELOAD; url=http://127.0.0.1:17842/index.html
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:35.748: [launcher:electron:raw] [2848747:0917/060735.747589:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wl_shm version 1 but version 2 is available.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:35.750: [launcher:electron:raw] [2848747:0917/060735.747787:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_cursor_shape_manager_v1 version 1 but version 2 is available.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:35.750: [launcher:electron:raw] [2848747:0917/060735.747871:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_pointer_gestures_v1 version 1 but version 3 is available.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:35.751: [launcher:electron:raw] [2848747:0917/060735.748061:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_color_manager_v1 version 1 but version 3 is available.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:35.752: [launcher:electron:raw] [2848747:0917/060735.748110:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_linux_dmabuf_v1 version 4 but version 5 is available.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:36.256: [launcher:electron:raw] [2848747:0917/060736.253982:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:170] Server doesn't support zcr_alpha_compositing_v1.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:36.256: [launcher:electron:raw] [2848747:0917/060736.254009:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:185] Server doesn't support overlay_prioritizer.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:36.524: [launcher:electron:raw] [2848747:0917/060736.523543:WARNING:components/dbus/xdg/portal.cc:126] Failed to register with org.freedesktop.host.portal.Registry
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:36.688: [launcher:electron:raw] libva error: /usr/lib/dri/iHD_drv_video.so init failed
+Gjs-Console-Message: 06:07:38.226: [launcher:electron] Inference worker ready (Chromium WebGPU enabled; embedded headless mode)
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.420: [launcher:electron:raw] (electron) 'console-message' arguments are deprecated and will be removed. Please use Event<WebContentsConsoleMessageEventParams> object instead.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.421: [agent-react-electron] %cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+  exposes users of this app to severe security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.422: [launcher:electron:raw] [2848747:0917/060738.420134:INFO:CONSOLE:2] "%cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.423: [launcher:electron:raw] exposes users of this app to severe security risks.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.423: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.424: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.425: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.426: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.427: [agent-react-electron] %cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+  enabled. This exposes users of this app to severe security risks.
+
+  
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.428: [launcher:electron:raw] [2848747:0917/060738.420353:INFO:CONSOLE:2] "%cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.428: [launcher:electron:raw] enabled. This exposes users of this app to severe security risks.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.430: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.431: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.431: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.432: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.432: [agent-react-electron] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.433: [launcher:electron:raw] [2848747:0917/060738.420532:INFO:CONSOLE:2] "%cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.433: [launcher:electron:raw] Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.434: [launcher:electron:raw] this app to unnecessary security risks.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.434: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.435: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.435: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:38.436: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+Gjs-Console-Message: 06:07:38.452: [launcher agent DOM after 2s]: {"title":"HyprCandy Agent","href":"http://127.0.0.1:17842/index.html","origin":"http://127.0.0.1:17842","isSecureContext":true,"navigatorGpu":"undefined","hasRequestAdapter":"undefined","userAgent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.5 Safari/605.1.15","rootHTML":"","children":0,"bodyText":""}
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:39.111: [agent-react] Could not create web worker(s). Falling back to loading web worker code in main thread, which might cause UI freezes. Please see https://github.com/microsoft/monaco-editor#faq
+
+(HC-launcher:2848684): Gjs-Console-WARNING **: 06:07:39.112: [agent-react] You must define a function MonacoEnvironment.getWorkerUrl or MonacoEnvironment.getWorker
+
+(HC-launcher:2848684): Gdk-WARNING **: 06:08:17.522: Vulkan: ../mesa-26.2.2/src/amd/vulkan/radv_physical_device.c:2534: Could not open device /dev/dri/renderD129: Invalid argument (VK_ERROR_INCOMPATIBLE_DRIVER)
+
+(HC-launcher:2848684): Gdk-WARNING **: 06:08:17.523: Vulkan: ../mesa-26.2.2/src/intel/vulkan/anv_physical_device.c:2836: Unable to open device /dev/dri/renderD129: Invalid argument (VK_ERROR_INCOMPATIBLE_DRIVER)
+MESA-INTEL: warning: Ivy Bridge Vulkan support is incomplete
+MESA-INTEL: warning: ../mesa-26.2.2/src/intel/vulkan_hasvk/anv_formats.c:792: FINISHME: support more multi-planar formats with DRM modifiers
+MESA-INTEL: warning: ../mesa-26.2.2/src/intel/vulkan_hasvk/anv_formats.c:761: FINISHME: support YUV colorspace with DRM format modifiers
+++ date --iso-8601=seconds
++ printf '\n[%s] starting standalone app-launcher\n' 2026-09-17T21:32:59+03:00
+
+[2026-09-17T21:32:59+03:00] starting standalone app-launcher
++ printf '[launcher-wrapper] script_dir=%s\n' /home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
++ printf '[launcher-wrapper] launcher=%s\n' /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
++ printf '[launcher-wrapper] WAYLAND_DISPLAY=%s\n' wayland-1
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
++ printf '[launcher-wrapper] XDG_RUNTIME_DIR=%s\n' /run/user/1000
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
++ [[ ! -f /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js ]]
++ pgrep -f 'gjs.*app-launcher\.js'
++ [[ -f /usr/lib/libgtk4-layer-shell.so ]]
++ export LD_PRELOAD=/usr/lib/libgtk4-layer-shell.so
++ LD_PRELOAD=/usr/lib/libgtk4-layer-shell.so
++ export GDK_BACKEND=wayland
++ GDK_BACKEND=wayland
++ export G_MESSAGES_DEBUG=none
++ G_MESSAGES_DEBUG=none
++ [[ 0 == 1 ]]
++ cd /home/king/.hyprcandy/GJS/hyprcandydock
++ printf '[launcher-wrapper] exec: gjs %s %s\n' /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js ''
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
++ exec gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+Gjs-Console-Message: 21:32:59.397: [launcher] Hybrid graphics detected — routing WebKit/GL rendering to discrete GPU 0000:01:00.0 (DRI_PRIME=pci-0000_01_00_0); leaving hardware acceleration enabled.
+Gjs-Console-Message: 21:32:59.398: [launcher] Known-problematic GPU detected — configuring safe WebKit and VA-API parameters.
+Gjs-Console-Message: 21:32:59.931: [launcher] Agent WebLLM loopback origin: http://127.0.0.1:17842/
+Gjs-Console-Message: 21:33:00.259: [launcher:electron] (Re)starting headless Electron inference worker...
+Gjs-Console-Message: 21:33:00.278: [launcher:electron] Spawned headless inference worker (Chromium WebGPU)
+Gjs-Console-Message: 21:33:00.278: [launcher:workspace] Warmed workspace shell without starting llama-server.
+Gjs-Console-Message: 21:33:00.282: [launcher:runtime] Python runtime already running at :17900
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:00.490: [launcher:electron:raw] [hyprcandy-electron-agent] starting without LD_PRELOAD; url=http://127.0.0.1:17842/index.html
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:01.117: [launcher:electron:raw] [3068476:0917/213301.115769:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wl_shm version 1 but version 2 is available.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:01.118: [launcher:electron:raw] [3068476:0917/213301.115900:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_cursor_shape_manager_v1 version 1 but version 2 is available.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:01.119: [launcher:electron:raw] [3068476:0917/213301.115949:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_pointer_gestures_v1 version 1 but version 3 is available.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:01.123: [launcher:electron:raw] [3068476:0917/213301.116148:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_color_manager_v1 version 1 but version 3 is available.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:01.124: [launcher:electron:raw] [3068476:0917/213301.116193:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_linux_dmabuf_v1 version 4 but version 5 is available.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:01.943: [launcher:electron:raw] [3068476:0917/213301.942404:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:170] Server doesn't support zcr_alpha_compositing_v1.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:01.943: [launcher:electron:raw] [3068476:0917/213301.942436:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:185] Server doesn't support overlay_prioritizer.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:02.221: [launcher:electron:raw] [3068476:0917/213302.220658:WARNING:components/dbus/xdg/portal.cc:126] Failed to register with org.freedesktop.host.portal.Registry
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.085: [agent-react] Could not create web worker(s). Falling back to loading web worker code in main thread, which might cause UI freezes. Please see https://github.com/microsoft/monaco-editor#faq
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.086: [agent-react] You must define a function MonacoEnvironment.getWorkerUrl or MonacoEnvironment.getWorker
+Gjs-Console-Message: 21:33:04.104: [launcher:electron] Inference worker ready (Chromium WebGPU enabled; embedded headless mode)
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.255: [launcher:electron:raw] (electron) 'console-message' arguments are deprecated and will be removed. Please use Event<WebContentsConsoleMessageEventParams> object instead.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.256: [agent-react-electron] %cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+  exposes users of this app to severe security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.257: [launcher:electron:raw] [3068476:0917/213304.255294:INFO:CONSOLE:2] "%cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.257: [launcher:electron:raw] exposes users of this app to severe security risks.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.258: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.259: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.259: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.260: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.261: [agent-react-electron] %cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+  enabled. This exposes users of this app to severe security risks.
+
+  
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.261: [launcher:electron:raw] [3068476:0917/213304.255526:INFO:CONSOLE:2] "%cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.262: [launcher:electron:raw] enabled. This exposes users of this app to severe security risks.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.263: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.263: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.263: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.264: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.264: [agent-react-electron] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.265: [launcher:electron:raw] [3068476:0917/213304.255695:INFO:CONSOLE:2] "%cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.266: [launcher:electron:raw] Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.266: [launcher:electron:raw] this app to unnecessary security risks.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.267: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.267: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.268: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:3068417): Gjs-Console-WARNING **: 21:33:04.268: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(process:2): GLib-GIO-WARNING **: 21:38:01.138: Error releasing name org.hyprcandy.HC-launcher.Sandboxed.WebProcess-f075a731-cbc9-4a92-8264-40b23173fb32: The connection is closed
+
+[2026-09-17T21:53:34+03:00] starting standalone app-launcher
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
+Gjs-Console-Message: 21:53:34.446: [launcher] Hybrid graphics detected — routing WebKit/GL rendering to discrete GPU 0000:01:00.0 (DRI_PRIME=pci-0000_01_00_0); leaving hardware acceleration enabled.
+Gjs-Console-Message: 21:53:34.446: [launcher] Known-problematic GPU detected — configuring safe WebKit and VA-API parameters.
+Gjs-Console-Message: 21:53:35.212: [launcher] Agent WebLLM loopback origin: http://127.0.0.1:17842/
+Gjs-Console-Message: 21:53:35.429: [launcher:electron] (Re)starting headless Electron inference worker...
+Gjs-Console-Message: 21:53:35.448: [launcher:electron] Spawned headless inference worker (Chromium WebGPU)
+Gjs-Console-Message: 21:53:35.449: [launcher:workspace] Warmed workspace shell without starting llama-server.
+Gjs-Console-Message: 21:53:35.456: [launcher:runtime] Python runtime already running at :17900
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:35.828: [launcher:electron:raw] [hyprcandy-electron-agent] starting without LD_PRELOAD; url=http://127.0.0.1:17842/index.html
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:36.385: [launcher:electron:raw] [3085093:0917/215336.383369:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wl_shm version 1 but version 2 is available.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:36.386: [launcher:electron:raw] [3085093:0917/215336.383637:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_cursor_shape_manager_v1 version 1 but version 2 is available.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:36.388: [launcher:electron:raw] [3085093:0917/215336.383795:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_pointer_gestures_v1 version 1 but version 3 is available.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:36.390: [launcher:electron:raw] [3085093:0917/215336.385523:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_color_manager_v1 version 1 but version 3 is available.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:36.391: [launcher:electron:raw] [3085093:0917/215336.385598:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_linux_dmabuf_v1 version 4 but version 5 is available.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:37.500: [launcher:electron:raw] [3085093:0917/215337.498873:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:170] Server doesn't support zcr_alpha_compositing_v1.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:37.501: [launcher:electron:raw] [3085093:0917/215337.498909:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:185] Server doesn't support overlay_prioritizer.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:37.753: [launcher:electron:raw] [3085093:0917/215337.752306:WARNING:components/dbus/xdg/portal.cc:126] Failed to register with org.freedesktop.host.portal.Registry
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:40.516: [agent-react] Could not create web worker(s). Falling back to loading web worker code in main thread, which might cause UI freezes. Please see https://github.com/microsoft/monaco-editor#faq
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:40.517: [agent-react] You must define a function MonacoEnvironment.getWorkerUrl or MonacoEnvironment.getWorker
+Gjs-Console-Message: 21:53:41.082: [launcher:electron] Inference worker ready (Chromium WebGPU enabled; embedded headless mode)
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.368: [launcher:electron:raw] (electron) 'console-message' arguments are deprecated and will be removed. Please use Event<WebContentsConsoleMessageEventParams> object instead.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.369: [agent-react-electron] %cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+  exposes users of this app to severe security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.370: [launcher:electron:raw] [3085093:0917/215341.366867:INFO:CONSOLE:2] "%cElectron Security Warning (Disabled webSecurity) font-weight: bold; This renderer process has "webSecurity" disabled. This
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.371: [launcher:electron:raw] exposes users of this app to severe security risks.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.371: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.372: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.373: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.374: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.375: [agent-react-electron] %cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+  enabled. This exposes users of this app to severe security risks.
+
+  
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.376: [launcher:electron:raw] [3085093:0917/215341.367144:INFO:CONSOLE:2] "%cElectron Security Warning (allowRunningInsecureContent) font-weight: bold; This renderer process has "allowRunningInsecureContent"
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.377: [launcher:electron:raw] enabled. This exposes users of this app to severe security risks.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.379: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.380: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.381: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.382: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.383: [agent-react-electron] %cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+  Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+  this app to unnecessary security risks.
+
+For more information and help, consult
+https://electronjs.org/docs/tutorial/security.
+This warning will not show up
+once the app is packaged.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.384: [launcher:electron:raw] [3085093:0917/215341.367327:INFO:CONSOLE:2] "%cElectron Security Warning (Insecure Content-Security-Policy) font-weight: bold; This renderer process has either no Content Security
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.384: [launcher:electron:raw] Policy set or a policy with "unsafe-eval" enabled. This exposes users of
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.385: [launcher:electron:raw] this app to unnecessary security risks.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.385: [launcher:electron:raw] For more information and help, consult
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.385: [launcher:electron:raw] https://electronjs.org/docs/tutorial/security.
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.386: [launcher:electron:raw] This warning will not show up
+
+(HC-launcher:3085021): Gjs-Console-WARNING **: 21:53:41.386: [launcher:electron:raw] once the app is packaged.", source: node:electron/js2c/renderer_init (2)
+
+(process:2): GLib-GIO-WARNING **: 21:58:37.065: Error releasing name org.hyprcandy.HC-launcher.Sandboxed.WebProcess-57e275c3-04d6-417b-9c76-72151888fe19: The connection is closed
+
+[2026-09-18T00:49:08+03:00] starting standalone app-launcher
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
+Gjs-Console-Message: 00:49:08.894: [launcher] CPU-only or problematic legacy iGPU detected — configuring safe WebKit parameters.
+Gjs-Console-Message: 00:49:10.225: [launcher:workspace] Workspace startup policy is OFF; Agent UI shell is present but WebKit process/Electron/llama stack is dormant.
+Gjs-Console-Message: 00:49:10.458: [launcher:workspace] Workspace startup policy is OFF; skipping workspace shell warm-up.
+
+(HC-launcher:3242982): Gdk-WARNING **: 00:49:23.871: Vulkan: ../mesa-26.2.2/src/amd/vulkan/radv_physical_device.c:2534: Could not open device /dev/dri/renderD129: Invalid argument (VK_ERROR_INCOMPATIBLE_DRIVER)
+
+(HC-launcher:3242982): Gdk-WARNING **: 00:49:23.873: Vulkan: ../mesa-26.2.2/src/intel/vulkan/anv_physical_device.c:2836: Unable to open device /dev/dri/renderD129: Invalid argument (VK_ERROR_INCOMPATIBLE_DRIVER)
+MESA-INTEL: warning: Ivy Bridge Vulkan support is incomplete
+MESA-INTEL: warning: ../mesa-26.2.2/src/intel/vulkan_hasvk/anv_formats.c:792: FINISHME: support more multi-planar formats with DRM modifiers
+MESA-INTEL: warning: ../mesa-26.2.2/src/intel/vulkan_hasvk/anv_formats.c:761: FINISHME: support YUV colorspace with DRM format modifiers
+Gjs-Console-Message: 01:00:19.378: [launcher] Agent WebLLM loopback origin: http://127.0.0.1:17842/
+Gjs-Console-Message: 01:00:19.380: [launcher:electron] (Re)starting headless Electron inference worker...
+Gjs-Console-Message: 01:00:19.391: [launcher:electron] Spawned headless inference worker (Chromium WebGPU)
+Gjs-Console-Message: 01:00:19.597: [launcher:runtime] Python runtime already running at :17900
+[hyprcandy-electron-agent] starting without LD_PRELOAD; url=http://127.0.0.1:17842/index.html
+[3256825:0918/010020.545486:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wl_shm version 1 but version 2 is available.
+[3256825:0918/010020.545666:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_cursor_shape_manager_v1 version 1 but version 2 is available.
+[3256825:0918/010020.545716:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_pointer_gestures_v1 version 1 but version 3 is available.
+[3256825:0918/010020.545915:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_color_manager_v1 version 1 but version 3 is available.
+[3256825:0918/010020.545990:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_linux_dmabuf_v1 version 4 but version 5 is available.
+[3256825:0918/010021.443150:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:170] Server doesn't support zcr_alpha_compositing_v1.
+[3256825:0918/010021.443192:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:185] Server doesn't support overlay_prioritizer.
+[3256825:0918/010021.728134:WARNING:components/dbus/xdg/portal.cc:126] Failed to register with org.freedesktop.host.portal.Registry
+Gjs-Console-Message: 01:00:23.453: [launcher:electron] Inference worker ready (Chromium WebGPU enabled; embedded headless mode)
+
+(HC-launcher:3242982): Gjs-Console-WARNING **: 01:00:24.681: [agent-react] Could not create web worker(s). Falling back to loading web worker code in main thread, which might cause UI freezes. Please see https://github.com/microsoft/monaco-editor#faq
+
+(HC-launcher:3242982): Gjs-Console-WARNING **: 01:00:24.683: [agent-react] You must define a function MonacoEnvironment.getWorkerUrl or MonacoEnvironment.getWorker
+
+(process:2): GLib-GIO-WARNING **: 01:01:42.065: Error releasing name org.hyprcandy.HC-launcher.Sandboxed.WebProcess-9a1619cc-518d-4051-af02-b7155a0adc31: The connection is closed
+
+(WebKitWebProcess:2): GLib-GIO-WARNING **: 01:01:42.531: Error releasing name org.hyprcandy.HC-launcher.Sandboxed.WebProcess-a1d875d5-a744-4893-8ecf-a382de7a48c6: The connection is closed
+
+[2026-09-18T01:31:37+03:00] starting standalone app-launcher
+[launcher-wrapper] script_dir=/home/king/.hyprcandy/GJS/hyprcandydock
+[launcher-wrapper] launcher=/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js
+[launcher-wrapper] WAYLAND_DISPLAY=wayland-1
+[launcher-wrapper] XDG_RUNTIME_DIR=/run/user/1000
+[launcher-wrapper] exec: gjs /home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js 
+Gjs-Console-Message: 01:31:37.653: [launcher] CPU-only or problematic legacy iGPU detected — configuring safe WebKit parameters.
+Gjs-Console-Message: 01:31:38.091: [launcher] Agent WebLLM loopback origin: http://127.0.0.1:17842/
+Gjs-Console-Message: 01:31:38.380: [launcher:electron] (Re)starting headless Electron inference worker...
+Gjs-Console-Message: 01:31:38.394: [launcher:electron] Spawned headless inference worker (Chromium WebGPU)
+Gjs-Console-Message: 01:31:38.394: [launcher:workspace] Warmed workspace shell without starting llama-server.
+Gjs-Console-Message: 01:31:38.410: [launcher:runtime] Python runtime spawned from /home/king/.hyprcandy/GJS/hyprcandydock/Agents/local_runtime/start.sh
+[hyprcandy-electron-agent] starting without LD_PRELOAD; url=http://127.0.0.1:17842/index.html
+[3271479:0918/013139.031458:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wl_shm version 1 but version 2 is available.
+[3271479:0918/013139.031603:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_cursor_shape_manager_v1 version 1 but version 2 is available.
+[3271479:0918/013139.031669:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_pointer_gestures_v1 version 1 but version 3 is available.
+[3271479:0918/013139.031880:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to wp_color_manager_v1 version 1 but version 3 is available.
+[3271479:0918/013139.031932:WARNING:ui/ozone/platform/wayland/common/wayland_object.cc:119] Binding to zwp_linux_dmabuf_v1 version 4 but version 5 is available.
+[3271479:0918/013139.646904:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:170] Server doesn't support zcr_alpha_compositing_v1.
+[3271479:0918/013139.646951:WARNING:ui/ozone/platform/wayland/host/wayland_surface.cc:185] Server doesn't support overlay_prioritizer.
+[3271479:0918/013139.854454:WARNING:components/dbus/xdg/portal.cc:126] Failed to register with org.freedesktop.host.portal.Registry
+Gjs-Console-Message: 01:31:40.806: [launcher:electron] Inference worker ready (Chromium WebGPU enabled; embedded headless mode)
+
+(HC-launcher:3271429): Gjs-Console-WARNING **: 01:31:41.880: [agent-react] Could not create web worker(s). Falling back to loading web worker code in main thread, which might cause UI freezes. Please see https://github.com/microsoft/monaco-editor#faq
+
+(HC-launcher:3271429): Gjs-Console-WARNING **: 01:31:41.881: [agent-react] You must define a function MonacoEnvironment.getWorkerUrl or MonacoEnvironment.getWorker
+
+(HC-launcher:3271429): Gdk-WARNING **: 01:32:43.047: Vulkan: ../mesa-26.2.2/src/amd/vulkan/radv_physical_device.c:2534: Could not open device /dev/dri/renderD129: Invalid argument (VK_ERROR_INCOMPATIBLE_DRIVER)
+
+(HC-launcher:3271429): Gdk-WARNING **: 01:32:43.048: Vulkan: ../mesa-26.2.2/src/intel/vulkan/anv_physical_device.c:2836: Unable to open device /dev/dri/renderD129: Invalid argument (VK_ERROR_INCOMPATIBLE_DRIVER)
+MESA-INTEL: warning: Ivy Bridge Vulkan support is incomplete
+MESA-INTEL: warning: ../mesa-26.2.2/src/intel/vulkan_hasvk/anv_formats.c:792: FINISHME: support more multi-planar formats with DRM modifiers
+MESA-INTEL: warning: ../mesa-26.2.2/src/intel/vulkan_hasvk/anv_formats.c:761: FINISHME: support YUV colorspace with DRM format modifiers
+
+(process:2): GLib-GIO-WARNING **: 01:36:39.330: Error releasing name org.hyprcandy.HC-launcher.Sandboxed.WebProcess-35cf31da-f827-4db9-832e-9124bcd29b0c: The connection is closed

@@ -175,6 +175,40 @@ export class AgentEngine {
     }
     const requestGeneration = ++this.modelRequestGeneration;
 
+    // ── Python runtime path (local llama-server OR cloud via Vercel AI Gateway) ──
+    const currentStore = getStore();
+    const runtimeMode = currentStore.inferenceMode;
+    if (runtimeMode === 'cloud') {
+      this.currentModelId = requestedModelId;
+      setStore({ activeModel: requestedModelId, modelStatus: 'ready' });
+      return;
+    }
+    if (runtimeMode === 'local' || currentStore.runtimeServerReady) {
+      setStore({
+        activeModel: requestedModelId,
+        modelStatus: 'loading',
+        downloadProgress: { progress: 50, text: `Starting local runtime for ${requestedModelId}…` },
+      });
+      try {
+        const res = await bridge.runtimeRequest('/api/server/start', {
+          model_path: requestedModelId,
+          ctx_size: 0,
+          max_tokens: 2048,
+        });
+        const modelName = res?.model_name || requestedModelId.split('/').pop()?.replace('.gguf', '') || requestedModelId;
+        this.currentModelId = modelName;
+        setStore({
+          activeModel: modelName,
+          modelStatus: 'ready',
+          downloadProgress: { progress: 100, text: 'Ready' },
+        });
+        return;
+      } catch (err: any) {
+        setStore({ modelStatus: 'error', downloadProgress: { progress: 0, text: err?.message || 'Failed to start local server' } });
+        throw err;
+      }
+    }
+
     if (llamaCppService.isEnabled()) {
       if (!(window as any).__hyprcandyLlamaEnabled) {
         throw new Error('Local llama-server is OFF. Use the launcher Llama toggle before loading a local model.');
@@ -547,6 +581,198 @@ export class AgentEngine {
     this.abortController = new AbortController();
     setStore({ agentRunning: true });
 
+    // ── Python runtime path (local llama-server, BYOK, or Vercel cloud) ─────────
+    // Uses bridge.runtimeRequest with a polling loop to avoid WebKitGTK SSE hangs.
+    const runtimeMode = getStore().inferenceMode;
+    if (runtimeMode === 'local' || runtimeMode === 'byok' || runtimeMode === 'cloud' || getStore().runtimeServerReady) {
+      const assistantMsgId = 'msg_' + Date.now() + '_runtime';
+      storeActions.addMessage(sessionId, {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        tools: [],
+      });
+
+      const streamUi = createStreamUpdateScheduler((content, tools) =>
+        storeActions.updateMessage(sessionId, assistantMsgId, { content, tools: tools || [] })
+      );
+
+      let fullText = '';
+      let currentTools: ToolCallData[] = [];
+      let runtimeTaskId: string | null = null;
+      const settlePythonConversation = () => {
+        resolveConversation();
+        if (this.activeConversationSettled === conversationSettled)
+          this.activeConversationSettled = null;
+      };
+
+      try {
+        const liveStore = getStore();
+        const projectContext = [
+          '[HyprCandy project context]',
+          `Project root: ${liveStore.projectPath || '(unknown)'}`,
+          `Selected file: ${liveStore.selectedFile || '(none)'}`,
+          liveStore.projectFiles?.slice(0, 80)
+            .map(f => `${f.isDir ? '[dir]' : '[file]'} ${f.path || f.name}`)
+            .join('\n') || '',
+          '[End HyprCandy project context]',
+        ].join('\n');
+
+        const payload: any = {
+          messages: [
+            ...history.map(m => ({ role: m.role, content: m.content })),
+            { role: 'user', content: userPrompt },
+          ],
+          project_context: projectContext,
+        };
+
+        payload.inference_mode = runtimeMode;
+        // Route based on inference mode
+        if (runtimeMode === 'byok' && liveStore.byokProvider) {
+          payload.byok_provider = liveStore.byokProvider;
+          payload.byok_key = liveStore.byokKeys[liveStore.byokProvider] || '';
+          payload.byok_model = liveStore.byokModel || '';
+        } else if (runtimeMode === 'cloud') {
+          payload.model_choice = liveStore.cloudModel || 'google/gemini-2.5-flash';
+          payload.license_key = liveStore.licenseKey || undefined;
+        }
+
+        // Fire-and-forget: get task_id immediately
+        const startResult = await bridge.runtimeRequest('/api/chat/start', payload);
+        if (!startResult?.task_id) throw new Error('Runtime did not return a task_id');
+
+        const taskId: string = startResult.task_id;
+        runtimeTaskId = taskId;
+        let since = 0;
+        const POLL_MS = 150;
+        // 5-minute max poll timeout to prevent GJS CPU spike on crashed server
+        const POLL_TIMEOUT_MS = 5 * 60 * 1000;
+        const pollStartTime = Date.now();
+
+        // Poll until done
+        await new Promise<void>((resolve, reject) => {
+          const poll = async () => {
+            if (!isCurrentConversation() || this.abortController?.signal.aborted) {
+              if (runtimeTaskId) {
+                bridge.runtimeRequest(`/api/chat/cancel/${runtimeTaskId}`, {}).catch(() => undefined);
+                runtimeTaskId = null;
+              }
+              return resolve();
+            }
+            // Timeout guard — stop polling if stuck too long
+            if (Date.now() - pollStartTime > POLL_TIMEOUT_MS) {
+              streamUi.cancel();
+              const prev = getStore().sessions.find(s => s.id === sessionId)
+                ?.messages.find(m => m.id === assistantMsgId)?.content || '';
+              storeActions.updateMessage(sessionId, assistantMsgId, {
+                content: (prev || '') + '\n\n⚠️ **Agent timed out** — the runtime server may have crashed. Please restart it from the model manager.',
+              });
+              setStore({ agentRunning: false });
+              this.abortController = null;
+              settlePythonConversation();
+              return resolve();
+            }
+
+            try {
+              const resp = await bridge.runtimeRequest(
+                `/api/chat/poll/${taskId}?since=${since}`, {}, 'GET'
+              );
+              const events: any[] = resp.events || [];
+              since = resp.total ?? since;
+
+              for (const event of events) {
+                if (!isCurrentConversation()) break;
+                const type: string = event.type;
+                // data is the nested payload — agent_loop yields {type, data}
+                const data: any = event.data ?? event;
+
+                if (type === 'token') {
+                  // data is the token string directly (agent_loop yields the token as data)
+                  const token: string = typeof data === 'string' ? data : (data?.data ?? data ?? '');
+                  fullText += token;
+                  streamUi.schedule(fullText, currentTools.length ? currentTools : undefined);
+
+                } else if (type === 'tool_start') {
+                  const tc: ToolCallData = {
+                    id: data.id ?? `tool_${Date.now()}`,
+                    name: data.name ?? 'unknown',
+                    arguments: typeof data.arguments === 'string'
+                      ? (() => { try { return JSON.parse(data.arguments || '{}'); } catch { return {}; } })()
+                      : (data.arguments ?? {}),
+                    status: 'running',
+                  };
+                  currentTools = [...currentTools, tc];
+                  streamUi.schedule(fullText, currentTools);
+
+                } else if (type === 'tool_result') {
+                  currentTools = currentTools.map(t =>
+                    t.id === data.id ? { ...t, status: 'completed', result: data.result } : t
+                  );
+                  streamUi.schedule(fullText, currentTools);
+
+                } else if (type === 'tool_error') {
+                  currentTools = currentTools.map(t =>
+                    t.id === data.id ? { ...t, status: 'error', result: data.error } : t
+                  );
+                  streamUi.schedule(fullText, currentTools);
+
+                } else if (type === 'done') {
+                  // Use the final content from done event if available
+                  if (data?.content && !fullText) {
+                    fullText = data.content;
+                    streamUi.schedule(fullText, currentTools.length ? currentTools : undefined);
+                  }
+                  streamUi.flush();
+                  setStore({ agentRunning: false });
+                  this.abortController = null;
+                  settlePythonConversation();
+                  return resolve();
+
+                } else if (type === 'error') {
+                  const errMsg = typeof data === 'string' ? data : (data?.message || 'Unknown runtime error');
+                  streamUi.cancel();
+                  const prev = getStore().sessions.find(s => s.id === sessionId)
+                    ?.messages.find(m => m.id === assistantMsgId)?.content || '';
+                  storeActions.updateMessage(sessionId, assistantMsgId, {
+                    content: (prev || '') + `\n\n⚠️ **Runtime error**: ${errMsg}`,
+                  });
+                  setStore({ agentRunning: false });
+                  this.abortController = null;
+                  settlePythonConversation();
+                  return resolve();
+                }
+              }
+
+              if (resp.done) {
+                streamUi.flush();
+                setStore({ agentRunning: false });
+                this.abortController = null;
+                settlePythonConversation();
+                return resolve();
+              }
+
+              setTimeout(poll, POLL_MS);
+            } catch (err: any) {
+              reject(err);
+            }
+          };
+          setTimeout(poll, POLL_MS);
+        });
+      } catch (err: any) {
+        streamUi.cancel();
+        const prev = getStore().sessions.find(s => s.id === sessionId)
+          ?.messages.find(m => m.id === assistantMsgId)?.content || '';
+        storeActions.updateMessage(sessionId, assistantMsgId, {
+          content: prev + `\n\n⚠️ **Runtime error**: ${err?.message || String(err)}`,
+        });
+        this.abortController = null;
+        setStore({ agentRunning: false });
+        settlePythonConversation();
+      }
+      return;
+    }
+
     if (llamaCppService.isEnabled()) {
       try {
         await this.runLlamaConversation(sessionId, userPrompt, history, onToken, conversationGeneration);
@@ -559,7 +785,6 @@ export class AgentEngine {
       }
       return;
     }
-
     // ── WebKit UI mode: delegate inference to Electron worker via GJS bridge ────
     if (!isElectronMode()) {
       const assistantMsgId = 'msg_' + Date.now() + '_worker';
@@ -1321,6 +1546,14 @@ export class AgentEngine {
 
   public async clearCache(): Promise<void> {
     this.syncCustomModels();
+    const currentStore = getStore();
+    if (currentStore.inferenceMode === 'local' || currentStore.runtimeServerReady) {
+      try {
+        await bridge.runtimeRequest('/api/models/clear');
+      } catch (_) {}
+      setStore({ modelStatus: 'idle', activeModel: '', downloadProgress: { progress: 0, text: 'Model cache cleared' } });
+      return;
+    }
     if (llamaCppService.isEnabled()) {
       await llamaCppService.unload();
       setStore({ modelStatus: 'idle', downloadProgress: { progress: 0, text: 'llama-server stopped; downloaded model files remain cached' } });

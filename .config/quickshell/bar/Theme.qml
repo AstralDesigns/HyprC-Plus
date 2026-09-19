@@ -109,13 +109,13 @@ QtObject {
     // ── Semantic composites ────────────────────────────────────────────────
     // blur_background: matches waybar colors.css  alpha(rgba(bg), 0.30)
     readonly property color blurBackground: Qt.rgba(
-        Qt.color(_onSecondary).r, Qt.color(_onSecondary).g, Qt.color(_onSecondary).b, 0.30)
+        Qt.color(_inversePrimary).r, Qt.color(_inversePrimary).g, Qt.color(_inversePrimary).b, 0.30)
 
-    // Desktop icon label background — onSecondary @ 0.35 opacity.
+    // Desktop icon label inversePrimary — onSecondary @ 0.35 opacity.
     // Blurred by Hyprland layerrule on quickshell:desktop so labels stay
     // readable against any wallpaper color.
     readonly property color cPanelBg: Qt.rgba(
-        Qt.color(_onSecondary).r, Qt.color(_onSecondary).g, Qt.color(_onSecondary).b, 0.30)
+        Qt.color(_inversePrimary).r, Qt.color(_inversePrimary).g, Qt.color(_inversePrimary).b, 0.30)
 
     // Island gradient: inverse_primary → scrim  (matches waybar island CSS)
     // Use in ShaderEffect or as gradient stops in a LinearGradient

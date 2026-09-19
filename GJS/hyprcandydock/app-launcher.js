@@ -323,7 +323,13 @@ function _detectGpuTopology() {
                 const driverLink = GLib.file_read_link(GLib.build_filenamev([devDir, 'driver']));
                 driver = driverLink ? driverLink.split('/').pop() : null;
             } catch (_) { }
-            gpus.push({ pciAddr, vendor, device, bootVga, driver });
+            // Do not probe the render node with Gio.File.read(): on some
+            // Mesa/Vulkan stacks that probe itself returns EINVAL even though
+            // the node is usable by the child process. Check existence and
+            // permissions instead, then let the selected backend validate it.
+            const renderPath = GLib.build_filenamev(['/dev/dri', name]);
+            let isAccessible = GLib.file_test(renderPath, GLib.FileTest.EXISTS);
+            gpus.push({ pciAddr, vendor, device, bootVga, driver, renderNode: name, isAccessible });
         }
     } catch (e) {
         console.warn('[launcher] GPU detection failed:', e.message);
@@ -343,57 +349,60 @@ const _KNOWN_PROBLEMATIC_INTEL_DEVICE_IDS = new Set([
 
 const _gpus = _detectGpuTopology();
 const _bootGpu = _gpus.find(g => g.bootVga) || _gpus[0] || null;
+const _accessibleGpus = _gpus.filter(g => g.isAccessible);
+console.log(`[launcher] GPU topology: ${_gpus.map(g => `${g.renderNode}:${g.vendor || '?'}:${g.device || '?'}:${g.driver || '?'}:boot=${g.bootVga}:exists=${g.isAccessible}`).join(', ') || 'none'}`);
+// boot_vga is not a reliable discrete-vs-integrated signal on laptops: the
+// dGPU can be the boot GPU while the Intel adapter remains available. Prefer
+// any accessible non-Intel adapter first, then a non-boot adapter.
 const _discreteGpu = _gpus.length > 1
-    ? (_gpus.find(g => !g.bootVga) || _gpus.find(g => g.vendor !== '0x8086'))
+    ? (_accessibleGpus.find(g => g.vendor && g.vendor !== '0x8086')
+        || _accessibleGpus.find(g => !g.bootVga))
     : null;
 
+const _isProblematicIntelGpu = (g) => g && g.vendor === '0x8086' && _KNOWN_PROBLEMATIC_INTEL_DEVICE_IDS.has(g.device);
+
+// ── Hybrid Graphics Configuration ─────────────────────────────────────────
 if (_discreteGpu) {
     if (_discreteGpu.driver === 'nvidia') {
-        // Mesa's DRI_PRIME has no effect on the proprietary NVIDIA driver —
-        // it only understands render-node offload for Mesa-based drivers
-        // (i965/iris/anv, radeonsi/RADV, nouveau). NVIDIA's own PRIME
-        // render-offload mechanism is a different set of variables.
-        // https://wiki.archlinux.org/title/PRIME#NVIDIA_Optimus
+        // Proprietary NVIDIA driver: route via NVIDIA PRIME render-offload
         GLib.setenv('__NV_PRIME_RENDER_OFFLOAD', '1', true);
         GLib.setenv('__GLX_VENDOR_LIBRARY_NAME', 'nvidia', true);
         try { GLib.setenv('__VK_LAYER_NV_optimus', 'NVIDIA_only', true); } catch (_) { }
-        console.log(`[launcher] Hybrid graphics detected — discrete NVIDIA GPU ${_discreteGpu.pciAddr} using proprietary driver; routing via __NV_PRIME_RENDER_OFFLOAD instead of DRI_PRIME. Leaving hardware acceleration enabled.`);
+        GLib.setenv('HYPRCANDY_LLAMA_GPU_PCI', _discreteGpu.pciAddr, true);
+        console.log(`[launcher] Hybrid graphics detected — discrete NVIDIA GPU ${_discreteGpu.pciAddr}; routing via __NV_PRIME_RENDER_OFFLOAD.`);
     } else {
-        // Mesa-based discrete GPU (AMD/nouveau/another Intel part) — DRI_PRIME
-        // accepts a "pci-<domain>_<bus>_<dev>_<func>" selector built from the
-        // sysfs PCI address (e.g. "0000:01:00.0" -> "pci-0000_01_00_0").
+        // Mesa-based discrete GPU (AMD Radeon, Intel Arc/dGPU, nouveau, etc.)
         const driPrimeId = 'pci-' + _discreteGpu.pciAddr.replace(/[:.]/g, '_');
         GLib.setenv('DRI_PRIME', driPrimeId, true);
-        console.log(`[launcher] Hybrid graphics detected — routing WebKit/GL rendering to discrete GPU ${_discreteGpu.pciAddr} (DRI_PRIME=${driPrimeId}); leaving hardware acceleration enabled.`);
+        GLib.setenv('HYPRCANDY_LLAMA_DRI_PRIME', driPrimeId, true);
+        GLib.setenv('HYPRCANDY_LLAMA_GPU_PCI', _discreteGpu.pciAddr, true);
+        console.log(`[launcher] Hybrid graphics detected — discrete GPU ${_discreteGpu.pciAddr}; routing via DRI_PRIME=${driPrimeId}.`);
     }
 }
 
-// Only fall back to disabling GPU acceleration when the GPU that will
-// actually be used (the discrete one if we just routed to it, otherwise
-// the sole/boot GPU) is a *specifically known* problem generation — not
-// merely because the machine happens to have only one GPU.
+// ── Hardware Capability & Acceleration Policy ──────────────────────────────
+// Topology breakdown:
+// 1. CPU-only: _gpus.length === 0 -> disable hardware acceleration.
+// 2. Hybrid: _discreteGpu present & accessible -> discrete GPU handles rendering; healthy hardware acceleration.
+// 3. iGPU-only: if _bootGpu is an older problematic Intel part, use i965 for VA-API and disable WebProcess DMA-BUF compositing.
+const _isCpuOnly = _gpus.length === 0;
 const _activeGpu = _discreteGpu || _bootGpu;
-const _activeGpuIsKnownProblematic = !!(_activeGpu &&
-    _activeGpu.vendor === '0x8086' &&
-    _KNOWN_PROBLEMATIC_INTEL_DEVICE_IDS.has(_activeGpu.device));
+const _activeGpuIsKnownProblematic = _isCpuOnly || (!_discreteGpu && _isProblematicIntelGpu(_bootGpu));
 
-// WebKit 6.0 — used for embedded web content preview in the web search tab.
-// IMPORTANT: Disable DMA-BUF renderer before WebKit initialises — but only
-// for the specific old-Intel-iGPU case above. On Sandy/Ivy Bridge (and
-// similar GPUs without full Vulkan/VA-API support), WebKitGTK's DMA-BUF/
-// GPU-buffer sharing with the Wayland compositor produces a completely
-// black (transparent) surface, or in some driver combinations crashes the
-// WebProcess outright, even though the DOM is fully rendered. Setting this
-// env var forces WebKit to fall back to the shm/pixmap path which always
-// composites correctly — at the cost of GPU acceleration, which is why
-// this now only applies to the narrow set of GPUs actually known to need
-// it, instead of every single-GPU machine.
+// Always ensure legacy Intel Sandy/Ivy Bridge boot iGPU uses the stable i965 driver
+// instead of failing on the default iHD_drv_video.so driver
+if (_bootGpu && _isProblematicIntelGpu(_bootGpu)) {
+    GLib.setenv('LIBVA_DRIVER_NAME', 'i965', true);
+}
+
 if (_activeGpuIsKnownProblematic) {
-    console.log(`[launcher] Known-problematic Intel GPU detected (${_activeGpu.device}) — disabling DMA-BUF/GPU compositing as a stability workaround.`);
+    console.log(`[launcher] CPU-only or problematic legacy iGPU detected — configuring safe WebKit parameters.`);
     GLib.setenv('WEBKIT_DISABLE_DMABUF_RENDERER', '1', true);
     GLib.setenv('WEBKIT_FORCE_COMPOSITING_MODE', '0', true);
     try { GLib.setenv('WEBKIT_ENABLE_WEBGPU', '0', true); } catch (_) { }
     GLib.setenv('WEBKIT_GL_DISABLE_DMABUF', '1', true);
+} else {
+    console.log(`[launcher] Hardware accelerated GPU configuration active (${_activeGpu ? _activeGpu.vendor + ':' + _activeGpu.device : 'GPU'}).`);
 }
 imports.gi.versions.WebKit = '6.0';
 const WebKit = imports.gi.WebKit;
@@ -844,7 +853,6 @@ const GLYPH_INDICATOR = '\u{F09DF}';  //  active-window dot (same glyph as dock)
 function widgetContains(parent, child) {
     if (!parent || !child) return false;
     if (parent === child) return true;
-    if (typeof parent.contains === 'function' && parent.contains(child)) return true;
     let cur = child;
     while (cur) {
         if (cur === parent) return true;
@@ -1101,7 +1109,7 @@ window.hyprcandy-launcher {
    No padding here — the border sits flush against the SearchEntry.       */
 
 .search-frame {
-    background-color: alpha(@inverse_primary, 0.85);
+    background-color: @blur_background8;/*alpha(@on_secondary, 0.85);*/
     border-radius: ${sr}px;
     border-style: solid;
     border-width: 0px;
@@ -1421,7 +1429,7 @@ window.hyprcandy-group-dialog {
 /* Glyph label — same fixed size as button so it never widens the circle. */
 .tab-glyph {
     font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', 'Symbols Nerd Font Mono', monospace;
-    color: @color3;
+    color: @primary;
     font-size: 30px;
     min-width: 36px;
     min-height: 36px;
@@ -1957,6 +1965,11 @@ webview.agent-webview,
     border-color: alpha(@error, 0.60);
     color: @error;
 }
+.searx-nav-circle-btn:disabled {
+    opacity: 0.35;
+    background-color: transparent;
+    border-color: alpha(@primary, 0.12);
+}
 .searx-nav-info-btn {
     background: transparent;
     background-color: transparent;
@@ -2250,6 +2263,17 @@ const AppLauncherWindow = GObject.registerClass({
 
     constructor(application) {
         super({ title: 'HyprCandy Launcher', decorated: false, application });
+        this._app = application;
+
+        // Keep the daemon window alive when this.close() is called (Esc, app launch, etc.)
+        this.connect('close-request', () => {
+            if (this._app && typeof this._app._hideLauncherWindow === 'function') {
+                this._app._hideLauncherWindow();
+            } else {
+                this.set_visible(false);
+            }
+            return true; // Cancel destruction
+        });
 
         this._dockPos = readDockPos();
         this._isVert = (this._dockPos === 'left' || this._dockPos === 'right');
@@ -2279,15 +2303,8 @@ const AppLauncherWindow = GObject.registerClass({
         // ── SearXNG search tab state ────────────────────────────────────
         const savedState = readLauncherWebState();
         // Cold start (fresh process — Hyprland session startup, or after a
-        // hard-kill) always opens on the Launcher tab, regardless of which
-        // tab was active before the process died. This only runs once, in
-        // the constructor, when a brand-new process boots — it does NOT
-        // affect SIGUSR1 show/hide toggles while this daemon process keeps
-        // running (those correctly read the in-memory this._win._lastTab
-        // set by _switchTab(), further down, and are unaffected by this).
-        this._lastTab = 'launcher';
-        this._searxDockerRunning = false;  // last known Docker container state
-        this._searxDockerStarting = false; // true while searxng-control.sh start is in flight
+        // hard-kill) opens on the Launcher tab by default or HYPRCANDY_LAUNCHER_TAB if set.
+        this._lastTab = GLib.getenv('HYPRCANDY_LAUNCHER_TAB') || 'launcher';
         this._searxSearchTimer = 0;      // debounce GLib source ID for queries
         this._soupSession = null;   // lazy-initialised Soup.Session
         this._searxLastQuery = savedState.searxLastQuery || '';
@@ -2568,6 +2585,15 @@ const AppLauncherWindow = GObject.registerClass({
         }
     }
 
+    vfunc_close_request() {
+        if (this._app && typeof this._app._hideLauncherWindow === 'function') {
+            this._app._hideLauncherWindow();
+        } else {
+            this.set_visible(false);
+        }
+        return true;
+    }
+
     // ─── Build UI ────────────────────────────────────────────────────────
 
     _buildUI() {
@@ -2663,26 +2689,7 @@ const AppLauncherWindow = GObject.registerClass({
         searchRightSlot.set_valign(Gtk.Align.CENTER);
         searchRow.set_end_widget(searchRightSlot);
         this._searchRightSlot = searchRightSlot;
-        // Explicit llama-server control, immediately after the Ask the agent… input.
-        const agentLlamaBtn = Gtk.Button.new();
-        agentLlamaBtn.add_css_class('agent-llama-btn');
-        agentLlamaBtn.add_css_class('agent-llama-off');
-        agentLlamaBtn.set_can_focus(false);
-        agentLlamaBtn.set_valign(Gtk.Align.CENTER);
-        agentLlamaBtn.set_visible(false);
-        const agentLlamaBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 4);
-        const agentLlamaGlyph = Gtk.Label.new('󰒏');
-        agentLlamaGlyph.add_css_class('agent-llama-glyph');
-        const agentLlamaLabel = Gtk.Label.new('Llama OFF');
-        agentLlamaLabel.add_css_class('agent-llama-label');
-        agentLlamaBox.append(agentLlamaGlyph);
-        agentLlamaBox.append(agentLlamaLabel);
-        agentLlamaBtn.set_child(agentLlamaBox);
-        agentLlamaBtn.connect('clicked', () => this._agentToggleLlama());
-        searchRightSlot.append(agentLlamaBtn);
-        this._agentLlamaBtn = agentLlamaBtn;
-        this._agentLlamaGlyph = agentLlamaGlyph;
-        this._agentLlamaLabel = agentLlamaLabel;
+        // (Llama server activation toggle is now managed directly inside the ModelManager modal)
         const webHeaderRightSlot = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 6);
         webHeaderRightSlot.set_halign(Gtk.Align.END);
         webHeaderRightSlot.set_valign(Gtk.Align.CENTER);
@@ -2915,11 +2922,22 @@ const AppLauncherWindow = GObject.registerClass({
                 }
             } else if (this._activeTab === 'websearch') {
                 if (rawQ) {
-                    this._performWebSearch(rawQ, true);
+                    const isUrl = /^(https?:\/\/|file:\/\/)/i.test(rawQ) ||
+                                  (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/i.test(rawQ) && !rawQ.includes(' '));
+                    if (isUrl) {
+                        const targetUrl = /^(https?:\/\/|file:\/\/)/i.test(rawQ) ? rawQ : 'https://' + rawQ;
+                        this._searxOpenUrl(targetUrl, targetUrl);
+                    } else {
+                        this._performWebSearch(rawQ, true);
+                    }
                 }
             } else if (this._activeTab === 'agent') {
                 if (rawQ) {
-                    this._agentPostMessage({ type: 'user_prompt', payload: rawQ });
+                    if (rawQ === '/model' || rawQ === '/models') {
+                        this._agentPostMessage({ type: 'toggle_model_manager' });
+                    } else {
+                        this._agentPostMessage({ type: 'user_prompt', payload: rawQ });
+                    }
                     this._searchEntry.set_text('');
                 }
             }
@@ -2952,13 +2970,7 @@ const AppLauncherWindow = GObject.registerClass({
         if (this._emojiModeSlot) this._emojiModeSlot.set_visible(id === 'emoji');
         if (this._clipClearSlot) this._clipClearSlot.set_visible(id === 'clipboard');
         if (this._agentWorkspaceBtn) this._agentWorkspaceBtn.set_visible(id === 'agent');
-        if (this._agentLlamaBtn) this._agentLlamaBtn.set_visible(id === 'agent');
         this._agentUpdateWorkspaceBtn();
-        this._agentUpdateLlamaBtn();
-        if (id === 'agent') this._agentCheckLlamaStatus((running) => {
-            this._agentLlamaRunning = !!running;
-            this._agentUpdateLlamaBtn();
-        });
 
         // ── websearch tab
         if (id === 'websearch') {
@@ -2983,14 +2995,6 @@ const AppLauncherWindow = GObject.registerClass({
                 this._searxShowIdle();
             }
 
-            // Probe Docker just to update the Docker button indicator
-            this._searxCheckDockerStatus((running) => {
-                this._searxDockerRunning = running;
-                if (!running && !this._searxWebBoxOpen) {
-                    this._searxShowStatus('󰡨', 'Docker stopped',
-                        'Click Start SearXNG or the Docker button to launch.', false, true);
-                }
-            });
         } else if (id === 'agent') {
             this._searchEntry.set_placeholder_text(' Ask the agent…');
             this._searchEntry.set_text('');
@@ -4831,15 +4835,7 @@ const AppLauncherWindow = GObject.registerClass({
             // "ghosting" over other workspaces when the launcher is hidden.
             try {
                 if (this._agentElectronProc && !this._agentElectronExited && this._agentUsingElectron) {
-                    const msgType = this.get_visible()
-                        ? JSON.stringify({ type: 'show' }) + '\n'
-                        : JSON.stringify({ type: 'hide' }) + '\n';
-                    if (this._agentElectronStdin) {
-                        try {
-                            const b = new TextEncoder().encode(msgType);
-                            this._agentElectronStdin.write_all(b, null);
-                        } catch (_) { }
-                    }
+                    this._agentElectronWriteStdin({ type: this.get_visible() ? 'show' : 'hide' });
                 }
             } catch (_) { }
             // Write launcher state so dock-main.js can suppress autohide
@@ -5033,42 +5029,22 @@ const AppLauncherWindow = GObject.registerClass({
         newTabBtn.connect('clicked', () => this._searxCreateNewTab());
         if (this._webHeaderRightSlot) this._webHeaderRightSlot.append(newTabBtn);
 
-        // Docker toggle button
-        const dockerBtn = Gtk.Button.new();
-        dockerBtn.add_css_class('searx-docker-btn');
-        dockerBtn.set_can_focus(false);
-        dockerBtn.set_valign(Gtk.Align.CENTER);
-        const dockerBtnBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 0);
-        dockerBtnBox.set_valign(Gtk.Align.CENTER);
-        const dockerGlyph = Gtk.Label.new('󰡨');
-        dockerGlyph.add_css_class('searx-docker-glyph');
-        this._searxDockerGlyph = dockerGlyph;
-        dockerBtnBox.append(dockerGlyph);
-        const dockerLbl = Gtk.Label.new('Docker');
-        dockerLbl.add_css_class('searx-docker-label');
-        this._searxDockerLbl = dockerLbl;
-        dockerBtnBox.append(dockerLbl);
-        dockerBtn.set_child(dockerBtnBox);
-        this._searxDockerBtn = dockerBtn;
-        dockerBtn.connect('clicked', () => this._searxToggleDocker());
-        if (this._webHeaderRightSlot) this._webHeaderRightSlot.append(dockerBtn);
-
         // ── Status card (offline / loading / empty) ───────────────────────
         const statusCard = Gtk.Box.new(Gtk.Orientation.VERTICAL, 4);
         statusCard.add_css_class('searx-status-card');
         statusCard.set_halign(Gtk.Align.FILL);
         statusCard.set_valign(Gtk.Align.START);
-        statusCard.set_visible(true);
+        statusCard.set_visible(false);
         this._searxStatusCard = statusCard;
         page.append(statusCard);
 
-        const statusGlyph = Gtk.Label.new('󰡨');
+        const statusGlyph = Gtk.Label.new('󱎸');
         statusGlyph.add_css_class('searx-status-glyph');
         statusGlyph.set_halign(Gtk.Align.CENTER);
         this._searxStatusGlyph = statusGlyph;
         statusCard.append(statusGlyph);
 
-        const statusTitle = Gtk.Label.new('Docker stopped');
+        const statusTitle = Gtk.Label.new('SearXNG');
         statusTitle.add_css_class('searx-status-title');
         statusTitle.set_halign(Gtk.Align.CENTER);
         statusTitle.set_wrap(true);
@@ -5076,7 +5052,7 @@ const AppLauncherWindow = GObject.registerClass({
         this._searxStatusTitle = statusTitle;
         statusCard.append(statusTitle);
 
-        const statusBody = Gtk.Label.new('Click Start SearXNG or the Docker button above to launch.');
+        const statusBody = Gtk.Label.new('Search the web privately with SearXNG.');
         statusBody.add_css_class('searx-status-body');
         statusBody.set_halign(Gtk.Align.CENTER);
         statusBody.set_wrap(true);
@@ -5084,13 +5060,20 @@ const AppLauncherWindow = GObject.registerClass({
         this._searxStatusBody = statusBody;
         statusCard.append(statusBody);
 
-        // Action button (Start SearXNG / Retry)
-        const actionBtn = Gtk.Button.new_with_label('󰡨  Start SearXNG');
+        // Action button (Retry search)
+        const actionBtn = Gtk.Button.new_with_label('󰑐  Retry');
         actionBtn.add_css_class('searx-action-btn');
         actionBtn.set_halign(Gtk.Align.CENTER);
-        actionBtn.set_visible(true);
+        actionBtn.set_visible(false);
         this._searxActionBtn = actionBtn;
-        actionBtn.connect('clicked', () => this._searxToggleDocker());
+        actionBtn.connect('clicked', () => {
+            const q = this._searchEntry.get_text().trim() || this._searxLastQuery;
+            if (q) {
+                this._performWebSearch(q, true);
+            } else {
+                this._checkSearxHealth();
+            }
+        });
         statusCard.append(actionBtn);
 
         // Fallback: open in browser
@@ -5157,6 +5140,21 @@ const AppLauncherWindow = GObject.registerClass({
         backBtn.connect('clicked', () => this._searxCloseWebView());
         webBar.append(backBtn);
 
+        // History Back button (left of URL/title field)
+        const navBackBtn = Gtk.Button.new_with_label('󰁞');
+        navBackBtn.add_css_class('searx-nav-circle-btn');
+        navBackBtn.set_valign(Gtk.Align.CENTER);
+        navBackBtn.set_size_request(26, 26);
+        navBackBtn.set_tooltip_text('Back');
+        navBackBtn.set_sensitive(false);
+        navBackBtn.connect('clicked', () => {
+            if (this._searxWebView && this._searxWebView.can_go_back()) {
+                this._searxWebView.go_back();
+            }
+        });
+        webBar.append(navBackBtn);
+        this._searxNavBackBtn = navBackBtn;
+
         // Interactive Title + URL section (triggers tabs popover)
         const infoBtn = Gtk.Button.new();
         infoBtn.add_css_class('searx-nav-info-btn');
@@ -5203,6 +5201,21 @@ const AppLauncherWindow = GObject.registerClass({
         infoBtn.set_child(infoBtnBox);
         infoBtn.connect('clicked', () => this._searxShowTabsPopover(infoBtn));
         webBar.append(infoBtn);
+
+        // History Forward button (right of URL/title field)
+        const navFwdBtn = Gtk.Button.new_with_label('󰁝');
+        navFwdBtn.add_css_class('searx-nav-circle-btn');
+        navFwdBtn.set_valign(Gtk.Align.CENTER);
+        navFwdBtn.set_size_request(26, 26);
+        navFwdBtn.set_tooltip_text('Forward');
+        navFwdBtn.set_sensitive(false);
+        navFwdBtn.connect('clicked', () => {
+            if (this._searxWebView && this._searxWebView.can_go_forward()) {
+                this._searxWebView.go_forward();
+            }
+        });
+        webBar.append(navFwdBtn);
+        this._searxNavFwdBtn = navFwdBtn;
 
         const reloadBtn = Gtk.Button.new_with_label('󰑐');
         reloadBtn.add_css_class('searx-nav-circle-btn');
@@ -5263,13 +5276,13 @@ const AppLauncherWindow = GObject.registerClass({
         });
         webBar.append(closeTabBtn);
 
-        // Multi-tab view container (Gtk.Stack)
+        // Multi-tab view container (Gtk.Stack) — use NONE for instant, crash-free tab switching
         const webStack = new Gtk.Stack();
         webStack.add_css_class('searx-webview-wrap');
         webStack.set_overflow(Gtk.Overflow.HIDDEN);
         webStack.set_vexpand(true);
         webStack.set_hexpand(true);
-        webStack.set_transition_type(Gtk.StackTransitionType.CROSSFADE);
+        webStack.set_transition_type(Gtk.StackTransitionType.NONE);
         this._searxWebStack = webStack;
         webBox.append(webStack);
 
@@ -5288,14 +5301,11 @@ const AppLauncherWindow = GObject.registerClass({
             this._searxOpenUrl(this._searxCurrentWebUrl, this._searxNavTitleText);
         }
 
-        // Probe Docker state immediately so the button shows correct status
-        this._searxCheckDockerStatus();
     }
 
     // ── SearXNG: persist web tab state ────────────────────────────────────
     _persistWebState() {
         saveLauncherWebState({
-            lastTab: this._lastTab || this._activeTab || 'launcher',
             searxLastQuery: this._searxLastQuery || '',
             searxCurrentWebUrl: this._searxCurrentWebUrl || '',
             searxNavTitle: (this._searxNavTitle && this._searxNavTitle.get_text()) || this._searxNavTitleText || '',
@@ -5492,7 +5502,6 @@ const AppLauncherWindow = GObject.registerClass({
                 clickBtn.connect('clicked', () => {
                     pop.popdown();
                     this._searxOpenUrl(bm.url, bm.title || bm.url);
-                    this._searxEnsureDockerRunning();
                 });
 
                 const fullRowBox = Gtk.Box.new(Gtk.Orientation.HORIZONTAL, 2);
@@ -6085,15 +6094,23 @@ const AppLauncherWindow = GObject.registerClass({
     // next time load_uri() is called on the WebView) instead of leaving it
     // in a zombie state.
     _recoverCrashedWebView(webView, label) {
+        if (!webView || webView._hcClosed) return;
+        const isTracked = (this._searxTabs && this._searxTabs.some(t => t.webView === webView))
+            || this._agentWebView === webView;
+        if (!isTracked) return;
         try {
             let target = 'about:blank';
             try {
                 const current = webView.get_uri && webView.get_uri();
-                if (current) target = current;
+                if (current && current !== 'about:blank') target = current;
             } catch (_) { }
             // Give the sandbox/D-Bus teardown from the old WebProcess a
             // moment to finish before spawning a new one for the same view.
             GLib.timeout_add(GLib.PRIORITY_DEFAULT, 300, () => {
+                if (webView._hcClosed) return GLib.SOURCE_REMOVE;
+                const stillTracked = (this._searxTabs && this._searxTabs.some(t => t.webView === webView))
+                    || this._agentWebView === webView;
+                if (!stillTracked) return GLib.SOURCE_REMOVE;
                 try {
                     if (webView && typeof webView.load_uri === 'function') {
                         webView.load_uri(target);
@@ -6108,24 +6125,26 @@ const AppLauncherWindow = GObject.registerClass({
         }
     }
 
-    _attachWebViewCrashHandlers(webView, label) {
+    _attachWebViewCrashHandlers(webView, label, handlerIds) {
         if (!webView) return;
         try {
             if (typeof webView.connect === 'function') {
                 try {
-                    webView.connect('web-process-crashed', (wv) => {
+                    const id1 = webView.connect('web-process-crashed', (wv) => {
                         console.warn('[launcher] WebProcess crashed:', label || 'unknown');
                         try { wv.stop_loading(); } catch (_) { }
                         this._recoverCrashedWebView(wv, label);
                         return true;
                     });
+                    if (handlerIds) handlerIds.push({ obj: webView, id: id1 });
                 } catch (_) { }
                 try {
-                    webView.connect('web-process-terminated', (wv, reason) => {
+                    const id2 = webView.connect('web-process-terminated', (wv, reason) => {
                         console.warn('[launcher] WebProcess terminated:', label || 'unknown', 'reason:', reason);
                         this._recoverCrashedWebView(wv, label);
                         return true;
                     });
+                    if (handlerIds) handlerIds.push({ obj: webView, id: id2 });
                 } catch (_) { }
             }
         } catch (e) {
@@ -6162,27 +6181,20 @@ const AppLauncherWindow = GObject.registerClass({
             settings.set_enable_back_forward_navigation_gestures(true);
             settings.set_enable_javascript(true);
             settings.set_enable_smooth_scrolling(true);
-            settings.set_enable_media_stream(false); // Avoid WebRTC background polling
+            settings.set_enable_media_stream(true);
             settings.set_enable_dns_prefetching(false);
             settings.set_enable_developer_extras(false);
+            settings.set_enable_webgl(!_activeGpuIsKnownProblematic);
+            try { settings.set_enable_mediasource(true); } catch (_) { }
+            try { settings.set_enable_encrypted_media(true); } catch (_) { }
+            try { settings.set_enable_webaudio(true); } catch (_) { }
+            try { settings.set_enable_accelerated_2d_canvas(!_activeGpuIsKnownProblematic); } catch (_) { }
             try {
-                // ALWAYS forces every tab's WebProcess to bring up a GPU
-                // context even when the driver stack can't actually serve
-                // one. This machine's log shows the VA-API driver failing
-                // to initialize ("iHD_drv_video.so init failed") and
-                // incomplete Vulkan support on this Intel GPU generation —
-                // exactly the conditions under which forced GPU compositing
-                // crashes the WebProcess on video-heavy pages like YouTube.
-                // ON_DEMAND lets WebKit request acceleration only when a
-                // page actually needs it and fall back to software
-                // rendering when the driver can't provide it, instead of
-                // hard-failing. On a hybrid-graphics machine where we
-                // detected and offloaded to a discrete GPU (see
-                // _detectGpuTopology near the top of this file),
-                // ON_DEMAND still applies cleanly — WebKit will now request
-                // acceleration from the healthier dGPU via DRI_PRIME instead
-                // of the broken iGPU, so there's no need to force ALWAYS.
-                settings.set_hardware_acceleration_policy(WebKit.HardwareAccelerationPolicy.ON_DEMAND);
+                settings.set_hardware_acceleration_policy(
+                    _activeGpuIsKnownProblematic
+                        ? WebKit.HardwareAccelerationPolicy.NEVER
+                        : WebKit.HardwareAccelerationPolicy.ALWAYS
+                );
             } catch (_) { }
         }
 
@@ -6202,15 +6214,22 @@ const AppLauncherWindow = GObject.registerClass({
             console.warn('[launcher] _createTabWebView ucm setup error:', ucmErr.message);
         }
 
+        // Collect all signal handler IDs on the tab so they can be explicitly
+        // disconnected during teardown — this is what actually allows WebKit
+        // to free the WebView instead of leaking it.
+        const _handlers = [];
+
         const tab = {
             id: tabId,
             url: url || '',
             title: title || url || 'New Tab',
             webView: webView,
-            webWrap: tabWrap
+            webWrap: tabWrap,
+            _handlers  // [{obj, id}, …] — disconnected on close
         };
 
-        webView.connect('notify::title', () => {
+        const h1 = webView.connect('notify::title', () => {
+            if (tab._isClosing) return;
             const t = webView.get_title();
             if (t) {
                 tab.title = t;
@@ -6220,8 +6239,10 @@ const AppLauncherWindow = GObject.registerClass({
                 this._persistWebState();
             }
         });
+        _handlers.push({ obj: webView, id: h1 });
 
-        webView.connect('notify::uri', () => {
+        const h2 = webView.connect('notify::uri', () => {
+            if (tab._isClosing) return;
             const u = webView.get_uri();
             if (u) {
                 tab.url = u;
@@ -6229,23 +6250,27 @@ const AppLauncherWindow = GObject.registerClass({
                     this._searxCurrentWebUrl = u;
                     if (this._searxNavUrl) this._searxNavUrl.set_text(u);
                     this._searxUpdateNavBmBtn();
+                    this._searxUpdateNavHistoryBtns();
                 }
                 this._persistWebState();
             }
         });
+        _handlers.push({ obj: webView, id: h2 });
 
-        webView.connect('load-failed', (wv, loadEvent, failingUri, error) => {
+        const h3 = webView.connect('load-failed', (wv, loadEvent, failingUri, error) => {
             console.warn('[launcher] WebKit load-failed:', failingUri, error.message);
             // Otherwise a failed load leaves the tab permanently dimmed at
             // the "page-loading" opacity, since LoadEvent.FINISHED never
             // fires for a load that errored out instead of completing.
             try { tabWrap.remove_css_class('page-loading'); } catch (_) { }
         });
+        _handlers.push({ obj: webView, id: h3 });
 
-        webView.connect('run-file-chooser', (wv, request) => {
+        const h4 = webView.connect('run-file-chooser', (wv, request) => {
             this._handleWebKitFileChooser(request);
             return true;
         });
+        _handlers.push({ obj: webView, id: h4 });
 
         // ── Popup / close / fullscreen / permission hardening ────────────
         // Ads very commonly try to open popups or pop-unders (`create`),
@@ -6258,44 +6283,56 @@ const AppLauncherWindow = GObject.registerClass({
         // churn. Handling all of them explicitly, and marking the launcher
         // "WebView busy" while they resolve, keeps ad interactions scoped to
         // the tab instead of ever reaching the launcher window itself.
-        webView.connect('create', (wv) => {
+        const h5 = webView.connect('create', (wv) => {
             // Never spawn a real top-level GTK window for a popup — this is
             // almost always an ad/pop-under. Block it outright, like a
             // browser's popup blocker. Returning null refuses the request.
             console.warn('[launcher] WebKit blocked a popup/window.open() in tab:', tabId);
             return null;
         });
+        _handlers.push({ obj: webView, id: h5 });
 
-        webView.connect('close', (wv) => {
+        const h6 = webView.connect('close', (wv) => {
             // A page (most often an ad/interstitial) asked to close itself.
             // Only ever close *this tab*, and only if it isn't the last one —
             // this must never cascade to the launcher window.
+            if (wv._hcClosed || tab._isClosing) return;
             console.warn('[launcher] WebKit tab requested self-close:', tabId);
             this._markWebviewBusy();
-            try {
-                if (this._searxTabs && this._searxTabs.length > 1 && typeof this._searxCloseTab === 'function') {
-                    this._searxCloseTab(tabId);
-                } else {
-                    wv.stop_loading();
-                    wv.load_uri('about:blank');
-                }
-            } catch (_) { }
+            GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                try {
+                    if (this._searxTabs && this._searxTabs.length > 1 && typeof this._searxCloseTab === 'function') {
+                        this._searxCloseTab(tabId);
+                    } else if (wv && !wv._hcClosed) {
+                        // Last tab: just halt loading — no navigation to about:blank
+                        // which would trigger a new decode cycle on a dying widget.
+                        wv.stop_loading();
+                    }
+                } catch (_) { }
+                return GLib.SOURCE_REMOVE;
+            });
         });
+        _handlers.push({ obj: webView, id: h6 });
 
-        webView.connect('permission-request', (wv, request) => {
-            // Deny everything by default (autoplay-with-sound, EME/DRM,
-            // notifications, geolocation, etc.). Ads are the overwhelming
-            // source of unsolicited permission prompts; legitimate sites the
-            // user actually wants audio/video from are rare enough in this
-            // launcher's embedded browser that "deny by default" is the safe
-            // choice, and it prevents a native permission popover from
-            // interacting with the focus/click-to-close logic.
+        const h7 = webView.connect('permission-request', (wv, request) => {
             this._markWebviewBusy();
-            try { request.deny(); } catch (_) { }
+            try {
+                const reqType = request ? (request.constructor ? request.constructor.name : '') : '';
+                // Allow media playback DRM (EME) and website data access so YouTube / media sites
+                // do not crash or stall when playing or transitioning between media streams.
+                if (reqType.includes('MediaKey') || reqType.includes('WebsiteData') ||
+                    (WebKit.MediaKeySystemPermissionRequest && request instanceof WebKit.MediaKeySystemPermissionRequest) ||
+                    (WebKit.WebsiteDataAccessPermissionRequest && request instanceof WebKit.WebsiteDataAccessPermissionRequest)) {
+                    request.allow();
+                    return true;
+                }
+                request.deny();
+            } catch (_) { }
             return true;
         });
+        _handlers.push({ obj: webView, id: h7 });
 
-        webView.connect('enter-fullscreen', () => {
+        const h8 = webView.connect('enter-fullscreen', () => {
             this._markWebviewBusy(1200);
             // Fade the toolbar (back/reload/bookmark row) out smoothly
             // instead of it just vanishing the instant the page's video/
@@ -6305,12 +6342,14 @@ const AppLauncherWindow = GObject.registerClass({
             try { if (this._searxWebBar) this._searxWebBar.add_css_class('fullscreen-hidden'); } catch (_) { }
             return false; // allow the fullscreen request to proceed
         });
+        _handlers.push({ obj: webView, id: h8 });
 
-        webView.connect('leave-fullscreen', () => {
+        const h9 = webView.connect('leave-fullscreen', () => {
             this._markWebviewBusy();
             try { if (this._searxWebBar) this._searxWebBar.remove_css_class('fullscreen-hidden'); } catch (_) { }
             return false;
         });
+        _handlers.push({ obj: webView, id: h9 });
 
         // Smooth cross-fade during navigation/refresh instead of an abrupt
         // blank-then-painted pop: dim this tab's wrapper slightly the moment
@@ -6320,22 +6359,31 @@ const AppLauncherWindow = GObject.registerClass({
         // dim level (CSS ".page-loading" -> opacity 0.55) is deliberately
         // subtle so the previous frame stays legible throughout rather than
         // flashing to a blank/white page.
-        webView.connect('load-changed', (wv, loadEvent) => {
+        const h10 = webView.connect('load-changed', (wv, loadEvent) => {
+            if (tab._isClosing) return;
             try {
                 if (loadEvent === WebKit.LoadEvent.STARTED) {
                     tabWrap.add_css_class('page-loading');
                 } else if (loadEvent === WebKit.LoadEvent.FINISHED) {
                     tabWrap.remove_css_class('page-loading');
                 }
+                if (this._searxActiveTabId === tabId) {
+                    this._searxUpdateNavHistoryBtns();
+                }
             } catch (_) { }
         });
+        _handlers.push({ obj: webView, id: h10 });
 
-        webView.connect('script-dialog', (wv, dialog) => {
+        const h11 = webView.connect('script-dialog', (wv, dialog) => {
             // alert()/confirm()/prompt() triggered from within a page (often
             // an ad) — same busy-guard treatment as a permission popover.
             this._markWebviewBusy();
             return false; // let WebKit show its default dialog
         });
+        _handlers.push({ obj: webView, id: h11 });
+
+        // Crash handlers also track their IDs so they get disconnected too
+        this._attachWebViewCrashHandlers(webView, 'tab-' + tabId, _handlers);
 
         this._searxWebStack.add_named(tabWrap, tabId);
         this._searxTabs.push(tab);
@@ -6424,6 +6472,20 @@ const AppLauncherWindow = GObject.registerClass({
         this._searxUpdateTabsBadge();
     }
 
+    _searxUpdateNavHistoryBtns() {
+        if (!this._searxWebView) {
+            if (this._searxNavBackBtn) this._searxNavBackBtn.set_sensitive(false);
+            if (this._searxNavFwdBtn) this._searxNavFwdBtn.set_sensitive(false);
+            return;
+        }
+        try {
+            const canBack = typeof this._searxWebView.can_go_back === 'function' && this._searxWebView.can_go_back();
+            const canFwd = typeof this._searxWebView.can_go_forward === 'function' && this._searxWebView.can_go_forward();
+            if (this._searxNavBackBtn) this._searxNavBackBtn.set_sensitive(!!canBack);
+            if (this._searxNavFwdBtn) this._searxNavFwdBtn.set_sensitive(!!canFwd);
+        } catch (_) { }
+    }
+
     // ── SearXNG: switch to a specific tab ────────────────────────────────
     _searxSwitchToTab(tabId) {
         if (!this._searxTabs) return;
@@ -6448,58 +6510,79 @@ const AppLauncherWindow = GObject.registerClass({
         }
         this._searxUpdateTabsBadge();
         this._searxUpdateNavBmBtn();
+        this._searxUpdateNavHistoryBtns();
         this._persistWebState();
     }
 
     // ── SearXNG: close a specific tab ────────────────────────────────────
     _searxCloseTab(tabId) {
-        if (!this._searxTabs) return;
+        if (!this._searxTabs || this._searxTabs.length === 0) return;
         const idx = this._searxTabs.findIndex(t => t.id === tabId);
         if (idx === -1) return;
 
-        const [removed] = this._searxTabs.splice(idx, 1);
-        if (removed) {
-            if (removed.webView) {
-                try {
-                    removed.webView.stop_loading();
-                    removed.webView.load_plain_text('');
-                    if (typeof removed.webView.try_close === 'function') {
-                        removed.webView.try_close();
-                    }
-                    if (typeof removed.webView.terminate_web_process === 'function') {
-                        removed.webView.terminate_web_process();
-                    }
-                } catch (e) {
-                    console.warn('[launcher] Failed to terminate webView process:', e.message);
-                }
-            }
-            if (removed.webWrap) {
-                try {
-                    if (removed.webView) {
-                        removed.webWrap.remove(removed.webView);
-                    }
-                    this._searxWebStack.remove(removed.webWrap);
-                } catch (_) { }
-            }
-            removed.webView = null;
-            removed.webWrap = null;
-        }
+        const targetTab = this._searxTabs[idx];
+        if (targetTab._isClosing) return;
+        targetTab._isClosing = true;
 
-        if (this._searxTabs.length === 0) {
-            this._searxActiveTabId = null;
-            this._searxWebView = null;
-            this._searxCloseWebView();
-        } else {
-            if (this._searxActiveTabId === tabId) {
+        const isCurrentActive = (this._searxActiveTabId === tabId);
+
+        // 1. Remove from tabs array immediately so state is consistent
+        this._searxTabs.splice(idx, 1);
+
+        // 2. Switch the stack's visible child BEFORE touching targetTab's widget,
+        //    so GTK is never asked to render a widget we're about to remove.
+        if (isCurrentActive) {
+            if (this._searxTabs.length > 0) {
                 const nextTab = this._searxTabs[Math.min(idx, this._searxTabs.length - 1)];
                 this._searxSwitchToTab(nextTab.id);
+            } else {
+                this._searxActiveTabId = null;
+                this._searxWebView = null;
+                this._searxCloseWebView();
             }
         }
+
+        // 3. Synchronously detach widget from the Gtk.Stack — safe now because
+        //    the visible child was already switched away in step 2.
+        if (targetTab.webWrap && this._searxWebStack) {
+            try {
+                this._searxWebStack.remove(targetTab.webWrap);
+            } catch (e) {
+                console.warn('[launcher] Stack remove error:', e.message);
+            }
+        }
+
+        // 4. Disconnect all signal handlers so the WebView object is actually
+        //    freed by GJS's GC rather than being kept alive by signal closures.
+        if (targetTab._handlers && targetTab._handlers.length > 0) {
+            for (const { obj, id } of targetTab._handlers) {
+                try { obj.disconnect(id); } catch (_) {}
+            }
+            targetTab._handlers = [];
+        }
+
+        // 5. Update badges and persist state
         this._searxUpdateTabsBadge();
         this._persistWebState();
-        try {
-            imports.system.gc();
-        } catch (_) { }
+
+        // 6. Defer WebKit process teardown to the next idle tick so we never
+        //    call stop_loading() while still inside an event-dispatch cycle
+        //    (e.g., a GTK click handler on the close button).
+        //    NOTE: No load_uri('about:blank') here — stop_loading() alone halts
+        //    all network activity; navigating to about:blank would trigger a new
+        //    decode cycle on a widget that's already been detached and whose
+        //    signal handlers are gone, which is exactly what causes the crash.
+        const webViewRef = targetTab.webView;
+        targetTab.webView = null;
+        targetTab.webWrap = null;
+
+        GLib.idle_add(GLib.PRIORITY_LOW, () => {
+            if (webViewRef && !webViewRef._hcClosed) {
+                webViewRef._hcClosed = true;
+                try { webViewRef.stop_loading(); } catch (_) {}
+            }
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     // ── SearXNG: close all open tabs ──────────────────────────────────────
@@ -6651,10 +6734,15 @@ const AppLauncherWindow = GObject.registerClass({
             closeBtn.set_valign(Gtk.Align.CENTER);
             closeBtn.set_tooltip_text('Close tab');
             closeBtn.connect('clicked', () => {
-                this._searxCloseTab(tab.id);
                 pop.popdown();
+                this._searxCloseTab(tab.id);
                 if (this._searxTabs && this._searxTabs.length > 0 && this._searxWebBoxOpen) {
-                    this._searxShowTabsPopover(parentBtn);
+                    GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+                        if (this._searxTabs && this._searxTabs.length > 0 && this._searxWebBoxOpen) {
+                            this._searxShowTabsPopover(parentBtn);
+                        }
+                        return GLib.SOURCE_REMOVE;
+                    });
                 }
             });
             fullRowBox.append(closeBtn);
@@ -6715,6 +6803,7 @@ const AppLauncherWindow = GObject.registerClass({
 
         this._searxUpdateTabsBadge();
         this._searxUpdateNavBmBtn();
+        this._searxUpdateNavHistoryBtns();
         this._persistWebState();
     }
 
@@ -6726,154 +6815,37 @@ const AppLauncherWindow = GObject.registerClass({
         this._persistWebState();
     }
 
-    // ── SearXNG: check if Docker container is running ─────────────────────
-    _searxCheckDockerStatus(onDone) {
-        try {
-            const proc = new Gio.Subprocess({
-                argv: [SCRIPT_DIR + '/searxng-control.sh', 'status'],
-                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE,
-            });
-            proc.init(null);
-            proc.communicate_utf8_async(null, null, (p, res) => {
-                try {
-                    const [, stdout] = p.communicate_utf8_finish(res);
-                    const running = !!(stdout && stdout.trim() === 'running');
-                    this._searxDockerRunning = running;
-                    this._searxUpdateDockerBtn(running);
-                    if (onDone) onDone(running);
-                } catch (_) {
-                    this._searxDockerRunning = false;
-                    this._searxUpdateDockerBtn(false);
-                    if (onDone) onDone(false);
-                }
-            });
-        } catch (_) {
-            this._searxDockerRunning = false;
-            this._searxUpdateDockerBtn(false);
-            if (onDone) onDone(false);
+    // ── SearXNG: check if local SearXNG service is reachable ──────────────
+    _checkSearxHealth(onDone) {
+        if (!this._soupSession) {
+            this._soupSession = new Soup.Session();
+            this._soupSession.timeout = 4;
         }
-    }
-
-    // ── SearXNG: update Docker toggle button appearance ───────────────────
-    _searxUpdateDockerBtn(running) {
-        if (!this._searxDockerBtn) return;
-        if (running) {
-            this._searxDockerBtn.remove_css_class('docker-off');
-            this._searxDockerBtn.add_css_class('docker-on');
-            if (this._searxDockerGlyph) this._searxDockerGlyph.set_text('󰡨');
-            if (this._searxDockerLbl) this._searxDockerLbl.set_text('Docker 󰓛');
-        } else {
-            this._searxDockerBtn.remove_css_class('docker-on');
-            this._searxDockerBtn.add_css_class('docker-off');
-            if (this._searxDockerGlyph) this._searxDockerGlyph.set_text('󰡨');
-            if (this._searxDockerLbl) this._searxDockerLbl.set_text('Docker ▶');
-        }
-    }
-
-    // ── SearXNG: toggle Docker container on/off ───────────────────────────
-    _searxToggleDocker() {
-        if (this._searxDockerRunning) {
-            this._searxShowStatus('󰡨', 'Stopping SearXNG…', 'Stopping container...', false, false);
-            this._searxUpdateDockerBtn(false);
-
-            try {
-                const proc = new Gio.Subprocess({
-                    argv: [SCRIPT_DIR + '/searxng-control.sh', 'stop'],
-                    flags: Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE,
-                });
-                proc.init(null);
-                proc.wait_async(null, () => {
-                    this._searxDockerRunning = false;
-                    this._searxUpdateDockerBtn(false);
-                    this._searxShowStatus('󰡨', 'Docker stopped', 'SearXNG is stopped to save CPU & memory.', false, true);
-                });
-            } catch (_) {
-                this._searxDockerRunning = false;
-                this._searxUpdateDockerBtn(false);
-                this._searxShowStatus('󰡨', 'Docker stopped', 'SearXNG is stopped.', false, true);
-            }
-        } else {
-            this._searxStartDocker();
-        }
-    }
-
-    // ── SearXNG: auto-start Docker if a bookmark is opened and it isn't running ──
-    _searxEnsureDockerRunning() {
-        if (this._searxDockerStarting) return;
-        this._searxCheckDockerStatus((running) => {
-            if (!running) this._searxStartDocker({ background: true });
+        const msg = new Soup.Message({
+            method: 'GET',
+            uri: GLib.Uri.parse('http://127.0.0.1:8080/search?q=ping&format=json', GLib.UriFlags.NONE)
         });
-    }
-
-    // ── SearXNG: start Docker container (idempotent — safe to call speculatively) ──
-    // opts.background: start without the status card (bookmark open keeps the WebKit view).
-    _searxStartDocker(opts) {
-        const background = !!(opts && opts.background);
-        if (this._searxDockerRunning || this._searxDockerStarting) return;
-        this._searxDockerStarting = true;
-
-        if (!background) {
-            this._searxShowStatus('󰡨', 'Starting Docker & SearXNG…', 'Starting service and container (authenticate if prompted)...', false, false);
-        }
-
-        let settled = false;
-        const onStarted = () => {
-            if (settled) return;
-            settled = true;
-            this._searxDockerStarting = false;
-            if (background) return;
-            this._searxShowIdle();
-            const q = this._searchEntry.get_text().trim() || this._searxLastQuery;
-            if (q) this._doSearxQuery(q);
-        };
-
-        const onFailed = (title, body, showFallback) => {
-            if (settled) return;
-            settled = true;
-            this._searxDockerStarting = false;
-            if (background) return;
-            this._searxShowStatus('󰡨', title, body, showFallback, true);
-        };
-
-        try {
-            const proc = new Gio.Subprocess({
-                argv: [SCRIPT_DIR + '/searxng-control.sh', 'start'],
-                flags: Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
-            });
-            proc.init(null);
-
-            let pollCount = 0;
-            let pollSource = 0;
-            pollSource = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
-                pollCount++;
-                this._searxCheckDockerStatus((running) => {
-                    if (running) {
-                        if (pollSource) { GLib.source_remove(pollSource); pollSource = 0; }
-                        onStarted();
-                    }
-                });
-                if (pollCount > 60) return GLib.SOURCE_REMOVE;
-                return GLib.SOURCE_CONTINUE;
-            });
-
-            proc.wait_async(null, (p, res) => {
-                if (pollSource) { try { GLib.source_remove(pollSource); pollSource = 0; } catch (_) { } }
-                try {
-                    p.wait_finish(res);
-                    this._searxCheckDockerStatus((running) => {
-                        if (running) {
-                            onStarted();
-                        } else {
-                            onFailed('Could not start Docker', 'Authentication was cancelled or Docker service failed to start.', true);
-                        }
-                    });
-                } catch (err) {
-                    onFailed('Could not start Docker', 'Error: ' + (err.message || 'Unknown error'), true);
+        this._soupSession.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (session, res) => {
+            let ok = false;
+            try {
+                const bytes = session.send_and_read_finish(res);
+                if (bytes && msg.get_status() === Soup.Status.OK) {
+                    ok = true;
                 }
-            });
-        } catch (e) {
-            onFailed('Docker error', 'Could not execute ' + SCRIPT_DIR + '/searxng-control.sh', false);
-        }
+            } catch (_) { }
+            if (ok) {
+                this._searxShowIdle();
+            } else {
+                this._searxShowStatus(
+                    '󱎸',
+                    'SearXNG offline',
+                    'SearXNG service is not responding on 127.0.0.1:8080.\nPlease ensure SearXNG is running.',
+                    true,
+                    true
+                );
+            }
+            if (onDone) onDone(ok);
+        });
     }
 
     // ── SearXNG: show the status card (hides result list & webview) ──────
@@ -6916,6 +6888,17 @@ const AppLauncherWindow = GObject.registerClass({
 
         const trimmed = (query || '').trim();
 
+        // Direct URL navigation when immediate (e.g. from Enter key or action button)
+        if (immediate && trimmed.length > 0) {
+            const isUrl = /^(https?:\/\/|file:\/\/)/i.test(trimmed) ||
+                          (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/i.test(trimmed) && !trimmed.includes(' '));
+            if (isUrl) {
+                const targetUrl = /^(https?:\/\/|file:\/\/)/i.test(trimmed) ? trimmed : 'https://' + trimmed;
+                this._searxOpenUrl(targetUrl, targetUrl);
+                return;
+            }
+        }
+
         // If WebKit view is open and user typed a non-empty query — leave webkit and search
         if (this._searxWebBoxOpen && this._searxCurrentWebUrl) {
             if (trimmed.length > 0) {
@@ -6932,12 +6915,7 @@ const AppLauncherWindow = GObject.registerClass({
         if (!trimmed) {
             this._searxLastQuery = '';
             this._searxClearList();
-            if (this._searxDockerRunning) {
-                this._searxShowIdle();
-            } else {
-                this._searxShowStatus('󰡨', 'Docker stopped',
-                    'Click Start SearXNG or the Docker button to launch.', false, true);
-            }
+            this._searxShowIdle();
             return;
         }
 
@@ -6945,13 +6923,6 @@ const AppLauncherWindow = GObject.registerClass({
         if (trimmed === this._searxLastQuery && this._searxList && this._searxList.get_first_child()) {
             if (this._searxStatusCard) this._searxStatusCard.set_visible(false);
             if (this._searxResultScroll) this._searxResultScroll.set_visible(true);
-            return;
-        }
-
-        // Use cached Docker status for instant per-keystroke feedback.
-        if (!this._searxDockerRunning) {
-            this._searxShowStatus('󰡨', 'Docker stopped',
-                'Click Start SearXNG or the Docker button to launch.', false, true);
             return;
         }
 
@@ -7005,10 +6976,11 @@ const AppLauncherWindow = GObject.registerClass({
                     if (this._searxLastQuery !== trimmed) return;
                     console.warn('[launcher] SearXNG query failed:', e.message);
                     this._searxShowStatus(
-                        '󰖟',
-                        'SearXNG unreachable',
-                        'Make sure Docker is running:\n  docker compose up -d',
-                        true  // show browser fallback button
+                        '󱎸',
+                        'SearXNG offline',
+                        'Could not connect to SearXNG on 127.0.0.1:8080.\nPlease ensure SearXNG service is running.',
+                        true,
+                        true
                     );
                 }
             }
@@ -7264,11 +7236,9 @@ const AppLauncherWindow = GObject.registerClass({
         // Build argv
         const argv = [launcherScript, agentUrl];
         const envv = GLib.get_environ();
-        // Disable GPU sandbox for Mesa/DRI fd permissions issue on some kernels
+        // Separate stdout from stderr so noisy Chromium stderr logs do not flood the JSON reader
         const flags = Gio.SubprocessFlags.STDIN_PIPE
-            | Gio.SubprocessFlags.STDOUT_PIPE
-            | Gio.SubprocessFlags.STDERR_MERGE
-            | Gio.SubprocessFlags.NONE;
+            | Gio.SubprocessFlags.STDOUT_PIPE;
         const proc = new Gio.Subprocess({
             argv: argv,
             flags: flags,
@@ -7285,7 +7255,9 @@ const AppLauncherWindow = GObject.registerClass({
             dataIn.set_newline_type(Gio.DataStreamNewlineType.ANY);
             this._agentElectronStdin = proc.get_stdin_pipe();
             const readOne = () => {
+                if (this._agentElectronExited) return;
                 dataIn.read_line_async(GLib.PRIORITY_DEFAULT, null, (s, res) => {
+                    if (this._agentElectronExited) return;
                     try {
                         const [line, len] = s.read_line_finish_utf8(res);
                         if (line === null) {
@@ -7298,16 +7270,8 @@ const AppLauncherWindow = GObject.registerClass({
                         }
                         readOne();
                     } catch (err) {
-                        // If error is IOError (EOF-ish), stop; fallback
-                        if (err.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CLOSED)
-                            || err.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.CONNECTION_CLOSED)
-                            || err.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.BROKEN_PIPE)) {
-                            console.warn('[launcher:electron] Read EOF; falling back to WebKit');
-                            this._agentOnElectronDead(proc);
-                            return;
-                        }
-                        console.warn('[launcher:electron] Stdout read error:', err.message);
-                        try { readOne(); } catch (_) { }
+                        console.warn('[launcher:electron] Stdout read error or EOF:', err.message);
+                        this._agentOnElectronDead(proc);
                     }
                 });
             };
@@ -7329,7 +7293,7 @@ const AppLauncherWindow = GObject.registerClass({
         // the Electron BrowserWindow is never shown, so there is no foreign window
         // to reposition. Bounds messages are no longer sent.
 
-        console.log('[launcher:electron] Spawned headless inference worker (Chromium WebGPU)');
+        console.log('[launcher:electron] Spawned native llama bridge worker (GPU inference disabled)');
     }
 
     _agentElectronSyncBounds(_wrapWidget) {
@@ -7342,7 +7306,14 @@ const AppLauncherWindow = GObject.registerClass({
             const str = typeof lineOrMsg === 'string' ? lineOrMsg : JSON.stringify(lineOrMsg);
             const line = str.endsWith('\n') ? str : (str + '\n');
             const bytes = new TextEncoder().encode(line);
-            this._agentElectronStdin.write_all(bytes, null);
+            const gbytes = GLib.Bytes.new(bytes);
+            this._agentElectronStdin.write_bytes_async(gbytes, GLib.PRIORITY_DEFAULT, null, (stream, res) => {
+                try {
+                    stream.write_bytes_finish(res);
+                } catch (err) {
+                    console.warn('[launcher:electron] write_bytes_async error:', err.message);
+                }
+            });
         } catch (e) {
             console.warn('[launcher:electron] stdin write error:', e.message);
         }
@@ -7365,7 +7336,7 @@ const AppLauncherWindow = GObject.registerClass({
             // In the new headless-Electron architecture the WebKitGTK view IS the
             // UI — keep it visible. The 'ready' signal just means the Chromium
             // inference engine has fully booted and WebLLM is available.
-            console.log('[launcher:electron] Inference worker ready (Chromium WebGPU enabled; embedded headless mode)');
+            console.log('[launcher:electron] Native llama bridge worker ready (Chromium/WebGPU disabled)');
             try {
                 // Push current theme + user prompt state into the hidden renderer.
                 // Even though the renderer window is not shown, the React app inside
@@ -7527,7 +7498,9 @@ const AppLauncherWindow = GObject.registerClass({
         const type = payload?.type || '';
         const isLlamaRequest = type === 'llama_request' || action.startsWith('llama_');
         const isLlamaStop = isLlamaRequest && action === 'llama_stop';
-        const allowed = isLlamaRequest ? (this._agentLlamaEnabled || isLlamaStop) : this._workspaceStartupEnabled;
+        // Native llama.cpp is the only supported inference backend. Workspace
+        // UI/runtime messages must never boot the obsolete WebLLM worker.
+        const allowed = isLlamaRequest ? (this._agentLlamaEnabled || isLlamaStop) : false;
         if (!allowed) {
             console.log(`[launcher:${isLlamaRequest ? 'llama' : 'workspace'}] Dispatch suppressed while its independent toggle is OFF.`);
             return;
@@ -7545,24 +7518,16 @@ const AppLauncherWindow = GObject.registerClass({
         }
         if (!this._agentElectronQueue) this._agentElectronQueue = [];
         this._agentElectronQueue.push(payload);
-        this._ensureElectronWorker();
+        if (isLlamaRequest) this._ensureElectronWorker();
     }
 
     _ensureElectronWorker() {
-        if (!this._workspaceStartupEnabled && !this._agentLlamaEnabled) {
-            console.log('[launcher] Workspace and llama toggles are OFF; refusing to start the hidden Electron worker.');
-            return;
-        }
-        if (this._agentElectronProc) return;
-        const electronLauncher = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'start-electron-agent.sh']);
-        const agentUrl = this._startAgentLoopbackServer();
-        if (GLib.file_test(electronLauncher, GLib.FileTest.IS_REGULAR) && agentUrl) {
-            console.log('[launcher:electron] (Re)starting headless Electron inference worker...');
-            try {
-                this._startAgentElectronProc(electronLauncher, agentUrl, this._agentWrap || this._appView);
-                this._agentUsingElectron = true;
-            } catch (err) {
-                console.warn('[launcher:electron] Failed to start Electron worker:', err.message);
+        // Compatibility entrypoint for stale callers. Electron was removed;
+        // the only worker that may be started here is the Python runtime.
+        if (!this._pythonRuntimeStarted) {
+            this._pythonRuntimeStarted = true;
+            try { this._agentStartPythonRuntime(); } catch (e) {
+                console.warn('[launcher:runtime] Could not start Python runtime:', e.message);
             }
         }
     }
@@ -7571,10 +7536,9 @@ const AppLauncherWindow = GObject.registerClass({
         if (!this._workspaceStartupEnabled) return;
         const agentUrl = this._startAgentLoopbackServer();
         if (!agentUrl) return;
-        // Workspace startup only warms the WebKit/Electron shell. It must never
-        // start llama-server; the model server is an explicit user choice.
-        this._ensureElectronWorker();
-        console.log('[launcher:workspace] Warmed workspace shell without starting llama-server.');
+        // Workspace startup only warms the visible WebKit shell. Do not start
+        // the obsolete Chromium/WebLLM worker or llama-server here.
+        console.log('[launcher:workspace] Warmed WebKit workspace shell without starting inference.');
     }
 
     _agentCheckLlamaStatus(onDone) {
@@ -7650,8 +7614,7 @@ const AppLauncherWindow = GObject.registerClass({
 
     _agentStopNativeLlamaServer() {
         try {
-            const [ok, stdout, stderr] = GLib.spawn_command_line_sync('pkill -9 -f "llama-server" || true');
-            if (!ok) console.warn('[launcher:workspace] llama-server stop probe failed:', stderr?.toString?.() || '');
+            GLib.spawn_command_line_async('pkill -9 -f "llama-server"');
         } catch (_) { }
     }
 
@@ -7660,16 +7623,13 @@ const AppLauncherWindow = GObject.registerClass({
             // Harden the shutdown path: the launcher has a single worker script
             // and a single Electron main file, so the kill scope stays narrow.
             const cleanup = [
-                'pkill -9 -f "start-electron-agent.sh" || true',
-                'pkill -9 -f "agent-app/electron/main.cjs" || true',
-                'pkill -9 -f "electron/dist/electron" || true',
+                'pkill -9 -f "start-electron-agent.sh"',
+                'pkill -9 -f "agent-app/electron/main.cjs"',
+                'pkill -9 -f "electron/dist/electron"',
             ];
             for (const cmd of cleanup) {
                 try {
-                    const [ok, stdout, stderr] = GLib.spawn_command_line_sync(cmd);
-                    if (!ok) {
-                        console.warn('[launcher:workspace] cleanup command failed:', stderr?.toString?.() || cmd);
-                    }
+                    GLib.spawn_command_line_async(cmd);
                 } catch (_) { }
             }
         } catch (_) { }
@@ -7708,7 +7668,8 @@ const AppLauncherWindow = GObject.registerClass({
     }
 
     _agentMaybeStopElectronWorker() {
-        if (!this._workspaceStartupEnabled && !this._agentLlamaEnabled) this._agentStopElectronWorker();
+        // Workspace visibility is independent from the native inference worker.
+        if (!this._agentLlamaEnabled) this._agentStopElectronWorker();
     }
 
     _agentToggleWorkspace() {
@@ -7718,7 +7679,6 @@ const AppLauncherWindow = GObject.registerClass({
         this._agentUpdateWorkspaceBtn();
         if (next) {
             this._agentRevealWorkspace();
-            this._ensureElectronWorker();
             this._switchTab('agent', true);
         } else {
             if (this._agentWebView) try { this._agentWebView.set_visible(false); } catch (_) { }
@@ -7731,29 +7691,28 @@ const AppLauncherWindow = GObject.registerClass({
         if (this._agentLlamaRunning || this._agentLlamaEnabled) {
             this._agentLlamaEnabled = false;
             this._agentPostMessage({ type: 'llama_state', payload: { enabled: false } });
-            this._sendOrQueueElectronDispatch({ type: 'llama_request', requestId: `agent_llama_stop_${Date.now()}`, action: 'llama_stop', payload: {} });
             this._agentStopNativeLlamaServer();
             this._agentLlamaRunning = false;
             this._agentUpdateLlamaBtn();
             this._agentMaybeStopElectronWorker();
             return;
         }
-        const model = readCachedLlamaModel();
-        if (!model) {
-            console.warn('[launcher:llama] No cached GGUF model found; llama-server remains OFF.');
-            return;
-        }
         this._agentLlamaEnabled = true;
         this._agentPostMessage({ type: 'llama_state', payload: { enabled: true } });
-        this._ensureElectronWorker();
-        this._sendOrQueueElectronDispatch({
-            type: 'llama_request', requestId: `agent_llama_start_${Date.now()}`,
-            action: 'llama_start', payload: { model, options: { context: 0, maxTokens: 2048 } }
-        });
-        this._agentConfirmLlamaHealth();
+        this._agentLlamaRunning = false;
+        this._agentUpdateLlamaBtn();
     }
 
     _buildAgentTab(ip) {
+        // The WebKit UI now uses the Python runtime for every provider and
+        // native model operation. Start it here rather than from the removed
+        // Electron worker path.
+        if (!this._pythonRuntimeStarted) {
+            this._pythonRuntimeStarted = true;
+            try { this._agentStartPythonRuntime(); } catch (e) {
+                console.warn('[launcher:runtime] Could not start Python runtime:', e.message);
+            }
+        }
         const agentPage = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
         agentPage.set_hexpand(true);
         agentPage.set_vexpand(true);
@@ -7787,7 +7746,13 @@ const AppLauncherWindow = GObject.registerClass({
         const settings = webView.get_settings();
         if (settings) {
             settings.set_enable_javascript(true);
-            settings.set_enable_webgl(false);
+            // Enable WebGL and GPU acceleration on capable hardware.
+            // Only fall back to software rendering on the narrow set of known-
+            // problematic old Intel iGPUs (Sandy/Ivy Bridge) — the same condition
+            // already used for the web-search tab. On any other GPU (including
+            // single-GPU AMD, modern Intel Iris Xe/Arc, NVIDIA, hybrid dGPU via
+            // DRI_PRIME) the agent UI gets full hardware acceleration.
+            settings.set_enable_webgl(!_activeGpuIsKnownProblematic);
             settings.set_enable_developer_extras(false);
             settings.set_allow_file_access_from_file_urls(true);
             settings.set_allow_universal_access_from_file_urls(true);
@@ -7795,8 +7760,16 @@ const AppLauncherWindow = GObject.registerClass({
             try { settings.set_enable_html5_database(true); } catch (_) { }
             try { settings.set_enable_html5_local_storage(true); } catch (_) { }
             try { settings.set_write_console_messages_to_stdout(false); } catch (_) { }
-            try { settings.set_hardware_acceleration_policy(WebKit.HardwareAccelerationPolicy.NEVER); } catch (_) { }
-            try { settings.set_enable_accelerated_2d_canvas(false); } catch (_) { }
+            try {
+                // Mirror web-search tab: ALWAYS on healthy GPUs so WebKit
+                // can use GPU compositing for React/Monaco. NEVER for CPU-only or known-broken iGPUs.
+                settings.set_hardware_acceleration_policy(
+                    _activeGpuIsKnownProblematic
+                        ? WebKit.HardwareAccelerationPolicy.NEVER
+                        : WebKit.HardwareAccelerationPolicy.ALWAYS
+                );
+            } catch (_) { }
+            try { settings.set_enable_accelerated_2d_canvas(!_activeGpuIsKnownProblematic); } catch (_) { }
         }
 
         const ucm = webView.get_user_content_manager();
@@ -7875,22 +7848,9 @@ const AppLauncherWindow = GObject.registerClass({
         // preserves the renderer's IndexedDB/cache origin.
         const electronAgentUrl = agentUrl;
 
-        // ── 2) Launch Electron as a headless WebLLM inference co-process.
-        // HYPRCANDY_ELECTRON_EMBEDDED=1 (set by start-electron-agent.sh) means
-        // the Electron BrowserWindow is never shown. The React/WebLLM engine runs
-        // inside that hidden Chromium renderer (real WebGPU), streaming tokens back
-        // to GJS via stdout JSONL. GJS injects them into the WebKitGTK view below
-        // via evaluate_javascript / __hyprcandy_agent_dispatch. ──────────────────
-        const electronLauncher = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'start-electron-agent.sh']);
-        this._agentElectronActive = false;
-        this._agentUsingElectron = false;
-
-        // ── 2) WebKitGTK WebView: THE primary visible UI surface.
-        // In the new headless-Electron architecture this view always shows the
-        // full React agent app. Electron runs as an invisible inference worker
-        // (HYPRCANDY_ELECTRON_EMBEDDED=1) and posts tokens back via stdout JSONL;
-        // GJS injects them here via evaluate_javascript → __hyprcandy_agent_dispatch.
-        // If Electron is unavailable WebKit handles both UI and (limited) WebGPU. ──
+        // ── 2) WebKitGTK WebView: the only visible UI and inference surface.
+        // The visible React app runs in WebKitGTK. Native llama.cpp requests are
+        // relayed by GJS; no WebLLM/WebGPU inference worker is required. ──
 
         // 
 
@@ -7907,34 +7867,6 @@ const AppLauncherWindow = GObject.registerClass({
         webView.connect('load-changed', (wv, loadEvent) => {
             if (loadEvent === WebKit.LoadEvent.FINISHED) {
                 this._agentInjectTheme();
-                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2000, () => {
-                    webView.evaluate_javascript(
-                        `(() => {
-                            return JSON.stringify({
-                                title: document.title,
-                                href: location.href,
-                                origin: location.origin,
-                                isSecureContext: window.isSecureContext,
-                                navigatorGpu: typeof navigator.gpu,
-                                hasRequestAdapter: typeof navigator.gpu?.requestAdapter,
-                                userAgent: navigator.userAgent,
-                                rootHTML: document.getElementById('root')?.innerHTML?.substring(0, 300),
-                                children: document.getElementById('root')?.children?.length,
-                                bodyText: document.body?.innerText?.substring(0, 200)
-                            });
-                        })()`,
-                        -1, null, null, null,
-                        (wv, res) => {
-                            try {
-                                const val = wv.evaluate_javascript_finish(res);
-                                console.log('[launcher agent DOM after 2s]:', val.to_string());
-                            } catch (e) {
-                                console.warn('[launcher agent eval error]:', e.message);
-                            }
-                        }
-                    );
-                    return GLib.SOURCE_REMOVE;
-                });
             }
         });
 
@@ -7954,12 +7886,8 @@ const AppLauncherWindow = GObject.registerClass({
         if (payload?.id && payload?.type === 'response') this._agentReplyTargets.delete(payload.id);
 
         if (target === 'electron') {
-            if (this._agentElectronActive && this._agentElectronStdin) {
-                this._agentElectronWriteStdin({ type: 'dispatch', payload });
-            } else {
-                this._sendOrQueueElectronDispatch(payload);
-            }
-            return;
+            // Electron was removed; always deliver host responses to WebKit.
+            if (payload?.id && payload?.type === 'response') this._agentReplyTargets.delete(payload.id);
         }
 
         if (!this._agentWebView) return;
@@ -8000,7 +7928,7 @@ const AppLauncherWindow = GObject.registerClass({
                     inferenceProvider: GLib.getenv('HYPRCANDY_INFERENCE_PROVIDER') || 'llama.cpp',
                     llamaEnabled: !!this._agentLlamaEnabled,
                     homeDir: HOME,
-                    defaultProjectRoot: HOME,
+                    defaultProjectRoot: GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock']),
                 }
             });
             this._agentPostMessage({ type: 'theme_update', payload: map });
@@ -8038,7 +7966,6 @@ const AppLauncherWindow = GObject.registerClass({
 
         if (action === 'web_search') {
             const query = payload.query || '';
-            this._searxEnsureDockerRunning();
             if (!this._soupSession) {
                 this._soupSession = new Soup.Session();
                 this._soupSession.timeout = 10;
@@ -8056,12 +7983,13 @@ const AppLauncherWindow = GObject.registerClass({
                 }
             });
         } else if (action === 'searxng_status') {
-            this._searxCheckDockerStatus((running) => {
+            this._checkSearxHealth((running) => {
                 this._agentPostMessage({ id, type: 'response', payload: { running } });
             });
         } else if (action === 'searxng_start') {
-            this._searxStartDocker({ background: true });
-            this._agentPostMessage({ id, type: 'response', payload: { success: true } });
+            this._checkSearxHealth((running) => {
+                this._agentPostMessage({ id, type: 'response', payload: { success: running } });
+            });
         } else if (action === 'read_file') {
             try {
                 const [ok, bytes] = GLib.file_get_contents(payload.path);
@@ -8163,15 +8091,70 @@ const AppLauncherWindow = GObject.registerClass({
             try {
                 const cmd = payload.command;
                 const cwd = payload.cwd || HOME;
-                const [ok, stdout, stderr, exitStatus] = GLib.spawn_command_line_sync(
-                    `/bin/bash -c "cd ${GLib.shell_quote(cwd)} && ${cmd}"`
+                const proc = Gio.Subprocess.new(
+                    ['/bin/bash', '-c', `cd ${GLib.shell_quote(cwd)} && ${cmd}`],
+                    Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
                 );
-                const outStr = stdout ? new TextDecoder().decode(stdout) : '';
-                const errStr = stderr ? new TextDecoder().decode(stderr) : '';
-                this._agentPostMessage({
-                    id,
-                    type: 'response',
-                    payload: { exitCode: exitStatus, stdout: outStr, stderr: errStr }
+                proc.communicate_utf8_async(null, null, (p, res) => {
+                    try {
+                        const [ok, stdout, stderr] = p.communicate_utf8_finish(res);
+                        const exitCode = p.get_exit_status();
+                        this._agentPostMessage({
+                            id,
+                            type: 'response',
+                            payload: {
+                                exitCode: exitCode,
+                                stdout: stdout || '',
+                                stderr: stderr || ''
+                            }
+                        });
+                    } catch (err) {
+                        this._agentPostMessage({ id, type: 'response', error: err.message });
+                    }
+                });
+            } catch (e) {
+                this._agentPostMessage({ id, type: 'response', error: e.message });
+            }
+        } else if (action === 'take_screenshot') {
+            try {
+                const shotDir = GLib.build_filenamev([GLib.get_home_dir(), 'Pictures', 'Screenshots']);
+                GLib.mkdir_with_parents(shotDir, 0o755);
+                const now = new Date();
+                const pad = (n) => String(n).padStart(2, '0');
+                const ts = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+                const filename = `screenshot_${ts}.png`;
+                const filePath = GLib.build_filenamev([shotDir, filename]);
+
+                const args = ['grim'];
+                if (payload.region && typeof payload.region === 'string' && payload.region.trim()) {
+                    args.push('-g', payload.region.trim());
+                }
+                args.push(filePath);
+
+                const proc = Gio.Subprocess.new(
+                    args,
+                    Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
+                );
+                proc.communicate_utf8_async(null, null, (p, res) => {
+                    try {
+                        const [ok, stdout, stderr] = p.communicate_utf8_finish(res);
+                        const exitCode = p.get_exit_status();
+                        if (exitCode === 0 && GLib.file_test(filePath, GLib.FileTest.EXISTS)) {
+                            this._agentPostMessage({
+                                id,
+                                type: 'response',
+                                payload: { path: filePath, filename }
+                            });
+                        } else {
+                            this._agentPostMessage({
+                                id,
+                                type: 'response',
+                                error: (stderr && stderr.trim()) || `grim exited with code ${exitCode}`
+                            });
+                        }
+                    } catch (err) {
+                        this._agentPostMessage({ id, type: 'response', error: err.message });
+                    }
                 });
             } catch (e) {
                 this._agentPostMessage({ id, type: 'response', error: e.message });
@@ -8220,43 +8203,158 @@ const AppLauncherWindow = GObject.registerClass({
             if (action === 'llama_start') {
                 this._agentLlamaEnabled = true;
                 this._agentPostMessage({ type: 'llama_state', payload: { enabled: true } });
-                this._ensureElectronWorker();
             } else if (action === 'llama_stop') {
                 this._agentLlamaEnabled = false;
                 this._agentPostMessage({ type: 'llama_state', payload: { enabled: false } });
             }
-            this._sendOrQueueElectronDispatch({ type: 'llama_request', requestId: id, action, payload });
-            if (action === 'llama_start') this._agentConfirmLlamaHealth();
             if (action === 'llama_stop') {
                 this._agentStopNativeLlamaServer();
                 this._agentLlamaRunning = false;
                 this._agentUpdateLlamaBtn();
-                this._agentMaybeStopElectronWorker();
             }
+            this._agentPostMessage({ id, type: 'response', payload: { enabled: action === 'llama_start' } });
         } else if (action === 'worker_load_model') {
-            // Forward inference delegation to the Electron co-process via stdin.
-            // Automatically ensures Electron is running and queues if booting.
-            this._sendOrQueueElectronDispatch({
-                type: 'worker_load_model',
-                ...payload,
-            });
+            this._agentPostMessage({ id, type: 'response', error: 'Legacy worker inference was removed; use the Python runtime.' });
         } else if (action === 'worker_chat') {
-            // Forward chat inference to Electron.
-            this._sendOrQueueElectronDispatch({
-                type: 'worker_chat',
-                ...payload,
-            });
+            this._agentPostMessage({ id, type: 'response', error: 'Legacy worker inference was removed; use the Python runtime.' });
         } else if (action === 'worker_cancel_model') {
-            this._sendOrQueueElectronDispatch({
-                type: 'worker_cancel_model',
-                ...payload,
-            });
+            this._agentPostMessage({ id, type: 'response', payload: { cancelled: true } });
+        } else if (action === 'runtime_request') {
+            // Proxy HTTP calls to the local Python runtime server at :17900.
+            // The React UI sends {url, method, payload}; we relay via Soup and
+            // return the parsed JSON response.
+            try {
+                const reqUrl = payload?.url || `http://127.0.0.1:17900/health`;
+                const method = (payload?.method || 'POST').toUpperCase();
+                const body = method === 'GET' ? null : JSON.stringify(payload?.payload || {});
+
+                if (!this._runtimeSoupSession) {
+                    this._runtimeSoupSession = new Soup.Session();
+                    this._runtimeSoupSession.timeout = 30;
+                }
+                const session = this._runtimeSoupSession;
+                const msg = Soup.Message.new(method, reqUrl);
+                if (body) {
+                    const bodyBytes = new TextEncoder().encode(body);
+                    msg.set_request_body_from_bytes(
+                        'application/json',
+                        GLib.Bytes.new(bodyBytes)
+                    );
+                }
+
+                session.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (sess, res) => {
+                    try {
+                        const bytes = sess.send_and_read_finish(res);
+                        const text = bytes ? new TextDecoder().decode(bytes.get_data()) : '{}';
+                        const status = msg.get_status();
+                        if (status >= 200 && status < 300) {
+                            let parsed;
+                            try { parsed = JSON.parse(text); } catch { parsed = { text }; }
+                            this._agentPostMessage({ id, type: 'response', payload: parsed });
+                        } else {
+                            this._agentPostMessage({ id, type: 'response', error: `Runtime HTTP ${status}: ${text.slice(0, 200)}` });
+                        }
+                    } catch (e) {
+                        this._agentPostMessage({ id, type: 'response', error: `Runtime request error: ${e.message}` });
+                    }
+                });
+            } catch (e) {
+                this._agentPostMessage({ id, type: 'response', error: `Runtime request failed: ${e.message}` });
+            }
+        } else if (action === 'open_external_url') {
+            // Open a URL in the system default browser via xdg-open.
+            try {
+                const url = String(payload?.url || '');
+                if (url.startsWith('http://') || url.startsWith('https://')) {
+                    Gio.Subprocess.new(['xdg-open', url], Gio.SubprocessFlags.NONE);
+                }
+                this._agentPostMessage({ id, type: 'response', payload: { ok: true } });
+            } catch (e) {
+                this._agentPostMessage({ id, type: 'response', error: e.message });
+            }
+        } else if (action === 'model_status_update') {
+            // Fired by the React ModelManager after delete/stop so the GJS
+            // header badge syncs immediately — no poll cycle delay.
+            const running = !!payload?.running;
+            const modelName = String(payload?.modelName || '').trim();
+            this._agentLlamaRunning = running;
+            if (this._agentLlamaLabel) {
+                if (running && modelName) {
+                    this._agentLlamaLabel.set_text(modelName);
+                } else {
+                    this._agentLlamaLabel.set_text(running ? 'Llama ON' : 'Llama OFF');
+                }
+            }
+            this._agentUpdateLlamaBtn();
+            // Proactively stop the native server if React reports it stopped
+            if (!running) {
+                this._agentLlamaEnabled = false;
+                this._agentLlamaRunning = false;
+            }
+        } else if (action === 'secret_store') {
+            const ok = CredentialsManager.store(
+                payload?.service || 'hyprcandy_byok',
+                payload?.account || '',
+                payload?.secret || ''
+            );
+            this._agentPostMessage({ id, type: 'response', payload: { ok: !!ok } });
+        } else if (action === 'secret_lookup') {
+            const secret = CredentialsManager.lookup(
+                payload?.service || 'hyprcandy_byok',
+                payload?.account || ''
+            );
+            this._agentPostMessage({ id, type: 'response', payload: { secret: secret || null } });
+        } else if (action === 'secret_clear') {
+            const ok = CredentialsManager.clear(
+                payload?.service || 'hyprcandy_byok',
+                payload?.account || ''
+            );
+            this._agentPostMessage({ id, type: 'response', payload: { ok: !!ok } });
         } else {
             this._agentPostMessage({ id, type: 'response', payload: { ok: true } });
         }
     }
 
+    // ── Python local runtime auto-spawn ─────────────────────────────────────
+    // Launched once on first agent window open. The start.sh script creates
+    // its own venv if needed, kills stale instances, and daemonizes uvicorn.
+    _agentStartPythonRuntime() {
+        const RUNTIME_DIR = GLib.build_filenamev([
+            GLib.get_home_dir(), '.hyprcandy', 'GJS', 'hyprcandydock', 'Agents', 'local_runtime'
+        ]);
+        const startScript = GLib.build_filenamev([RUNTIME_DIR, 'start.sh']);
+        if (!GLib.file_test(startScript, GLib.FileTest.EXISTS)) {
+            console.warn('[launcher:runtime] start.sh not found at', startScript);
+            return;
+        }
+
+        // Health-check first — don't restart if already running
+        const session = new Soup.Session();
+        session.timeout = 2;
+        const msg = Soup.Message.new('GET', 'http://127.0.0.1:17900/health');
+        session.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (sess, res) => {
+            try {
+                sess.send_and_read_finish(res);
+                if (msg.get_status() === 200) {
+                    console.log('[launcher:runtime] Python runtime already running at :17900');
+                    return;
+                }
+            } catch { /* not running — fall through to spawn */ }
+
+            try {
+                Gio.Subprocess.new(
+                    ['bash', startScript],
+                    Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_MERGE
+                );
+                console.log('[launcher:runtime] Python runtime spawned from', startScript);
+            } catch (spawnErr) {
+                console.warn('[launcher:runtime] Failed to spawn Python runtime:', spawnErr.message);
+            }
+        });
+    }
+
 }); // end GObject.registerClass(AppLauncherWindow)
+
 
 // ── Daemon Application (Fix 4) ─────────────────────────────────────────────
 // Runs as a persistent daemon. SIGUSR1 (10) toggles visibility.
@@ -8317,11 +8415,64 @@ const LauncherApp = GObject.registerClass({
         });
     }
 
+    _showLauncherWindow() {
+        if (!this._win) return;
+        try {
+            // Re-anchor to the current dock edge (user may have cycled
+            // positions since the launcher daemon last showed).
+            this._win._refreshLayerShell();
+            // Refresh app list and running apps from disk on each show
+            this._win._allApps = (this._win._appsDirty || this._win._allApps.length === 0) ? getAllApps() : this._win._allApps;
+            this._win._appsDirty = false;
+            this._win._runningApps = getRunningApps();
+            // Reset collapse state — favorites and groups start collapsed
+            // on every fresh open; the user expands what they want.
+            this._win._favCollapsed = true;
+            this._win._favFlow.set_visible(false);
+            this._win._favSep.set_visible(false);
+            this._win._favChevron.set_text(CHEV_UP);
+            this._win._groupCollapsed = {};
+            // Restore last active tab (or 'launcher' if none was saved, or env var override).
+            // Launcher tab always resets scroll position to the top.
+            const tabToOpen = GLib.getenv('HYPRCANDY_LAUNCHER_TAB') || this._win._lastTab || 'launcher';
+            this._win._switchTab(tabToOpen, true);
+            // Show with fade-in
+            this._laFadeIn(this._win, () => {
+                this._win.present();
+                GLib.idle_add(GLib.PRIORITY_HIGH, () => {
+                    // Only restore search text when NOT in webkit view
+                    // to avoid spurious search-changed that hijacks the view
+                    if (tabToOpen !== 'websearch') {
+                        this._win._searchEntry.set_text('');
+                    }
+                    this._win._searchEntry.grab_focus();
+                    return GLib.SOURCE_REMOVE;
+                });
+            });
+        } catch (e) {
+            console.error('[launcher:show] Error in _showLauncherWindow:', e.message, e.stack);
+        }
+    }
+
+    _hideLauncherWindow() {
+        if (!this._win || !this._win.get_visible()) return;
+        this._laCancelFade();
+        this._laFadeOut(this._win, () => {
+            this._win.set_visible(false);
+        });
+    }
+
     vfunc_activate() {
         this._win = new AppLauncherWindow(this);
         this.add_window(this._win);
-        // Start hidden; SIGUSR1 will show it on first toggle
-        this._win.set_visible(false);
+
+        const shouldShow = GLib.getenv('HYPRCANDY_LAUNCHER_START_OPEN') === '1';
+        if (shouldShow) {
+            this._showLauncherWindow();
+        } else {
+            this._win.set_visible(false);
+        }
+
         // Warm only the workspace shell when its startup policy is enabled.
         // Never start llama-server automatically.
         GLib.idle_add(GLib.PRIORITY_LOW, () => {
@@ -8343,43 +8494,9 @@ const LauncherApp = GObject.registerClass({
         try {
             GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, 10, () => {
                 if (this._win.get_visible()) {
-                    // Hide with fade-out
-                    this._laCancelFade();
-                    this._laFadeOut(this._win, () => {
-                        this._win.set_visible(false);
-                    });
+                    this._hideLauncherWindow();
                 } else {
-                    // Re-anchor to the current dock edge (user may have cycled
-                    // positions since the launcher daemon last showed).
-                    this._win._refreshLayerShell();
-                    // Refresh app list and running apps from disk on each show
-                    this._win._allApps = (this._win._appsDirty || this._win._allApps.length === 0) ? getAllApps() : this._win._allApps;
-                    this._win._appsDirty = false;
-                    this._win._runningApps = getRunningApps();
-                    // Reset collapse state — favorites and groups start collapsed
-                    // on every fresh open; the user expands what they want.
-                    this._win._favCollapsed = true;
-                    this._win._favFlow.set_visible(false);
-                    this._win._favSep.set_visible(false);
-                    this._win._favChevron.set_text(CHEV_UP);
-                    this._win._groupCollapsed = {};
-                    // Restore last active tab (or 'launcher' if none was saved).
-                    // Launcher tab always resets scroll position to the top.
-                    const tabToOpen = this._win._lastTab || 'launcher';
-                    this._win._switchTab(tabToOpen, true);
-                    // Show with fade-in
-                    this._laFadeIn(this._win, () => {
-                        this._win.present();
-                        GLib.idle_add(GLib.PRIORITY_HIGH, () => {
-                            // Only restore search text when NOT in webkit view
-                            // to avoid spurious search-changed that hijacks the view
-                            if (tabToOpen !== 'websearch') {
-                                this._win._searchEntry.set_text('');
-                            }
-                            this._win._searchEntry.grab_focus();
-                            return GLib.SOURCE_REMOVE;
-                        });
-                    });
+                    this._showLauncherWindow();
                 }
                 return GLib.SOURCE_CONTINUE;
             });

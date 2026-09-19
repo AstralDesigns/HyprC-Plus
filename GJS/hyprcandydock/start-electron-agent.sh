@@ -47,6 +47,7 @@ unset LD_PRELOAD
 # Keep the Electron agent quiet and on the same warning/error-only policy as
 # the GJS/WebKit launcher; background renderer chatter is not useful here.
 export ELECTRON_ENABLE_LOGGING=0
+export ELECTRON_DISABLE_SECURITY_WARNINGS=true
 
 echo "[hyprcandy-electron-agent] starting without LD_PRELOAD; url=$HYPRCANDY_AGENT_URL" >&2
 

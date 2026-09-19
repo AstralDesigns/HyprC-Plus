@@ -351,28 +351,28 @@ PanelWindow {
             Rectangle { Layout.fillWidth: true; height: 1; color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16) }
 
             RowLayout {
-                Layout.fillWidth: true; height: 25; spacing: 10
+                Layout.fillWidth: true; height: 25; spacing: 8
                 Text {
-                	text: " 󰖔"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc6
+                	text: "󰖔"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc6
                 }
                 Text {
-                	text: "Night light"; color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
+                	text: "Night light"; color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 12
                 	Layout.fillWidth: true
                 }
                 // iOS-style pill toggle
                 Rectangle {
                     	id: _nlPill
-                    	width: 40; height: 22; radius: 11
+                    	width: 40; height: 22; radius: 99
                     	color: StartMenuState.nightLightOn
                         	? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.82)
-                        	: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
+                        	: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.3)
                     	border.width: 1
                     	border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
                     	Behavior on color { ColorAnimation { duration: 150 } }
 
                     	Rectangle {
-                        	width: 16; height: 16; radius: 8
-                        	color: StartMenuState.nightLightOn ? Theme.cWc6 : Theme.cWc5
+                        	width: 16; height: 16; radius: 99
+                        	color: StartMenuState.nightLightOn ? Theme.cPrimary : Theme.cPrimary
                         	anchors.verticalCenter: parent.verticalCenter
                         	x: StartMenuState.nightLightOn ? parent.width - width - 3 : 3
                         	Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
@@ -1097,7 +1097,7 @@ PanelWindow {
                 implicitWidth: pwrRow.implicitWidth + 12
                 implicitHeight: 52
                 radius: 99
-                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.75)
+                color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.75)
                 border.width: 1
                 border.color: Theme.cScrim
                 Row {
@@ -1121,7 +1121,7 @@ PanelWindow {
                                 radius: 99
                                 color: ph.containsMouse
                                     ? Theme.cOnSecondary
-                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.75)
+                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.90)
                                 border.width: 1
                                 border.color: ph.containsMouse
                                     ? Qt.rgba(modelData.c.r, modelData.c.g, modelData.c.b, 0.65)
@@ -1212,11 +1212,11 @@ PanelWindow {
                 }
             }
             Text {
-                text: "󰟃\u2009"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: sl.innerH + 2
-                color: Theme.cWc4; style: Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.25)
+                text: "󰟃\u2009"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: sl.innerH + 5
+                color: Theme.cPrimary; style: Text.Outline; styleColor: Qt.rgba(0, 0, 0, 0.25)
                 x: { const tw = parent.width - sl.pad * 2; const cx = sl.pad + tw * sl.value - implicitWidth / 2
                      return Math.max(sl.pad - implicitWidth/2 + 1, Math.min(parent.width - sl.pad - implicitWidth/2 - 1, cx)) }
-                y: (sl.trackH - implicitHeight) / 2
+                y: (sl.trackH - implicitHeight) / 1.25
             }
         }
         MouseArea {

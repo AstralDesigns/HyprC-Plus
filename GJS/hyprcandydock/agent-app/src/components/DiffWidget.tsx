@@ -36,8 +36,8 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
     <div style={{
       margin: '12px 0',
       borderRadius: 'var(--radius-md)',
-      border: '1px solid var(--border-glass)',
-      background: 'var(--bg-card)',
+      border: '1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 24%, transparent)',
+      background: 'color-mix(in srgb, var(--matugen-surface, #0c1014) 75%, transparent)',
       overflow: 'hidden',
       boxShadow: '0 4px 20px rgba(0, 0, 0, 0.25)',
       transition: 'all 0.2s ease',
@@ -48,8 +48,8 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '8px 14px',
-        background: 'rgba(255, 255, 255, 0.04)',
-        borderBottom: collapsed ? 'none' : '1px solid var(--border-subtle)',
+        background: 'color-mix(in srgb, var(--matugen-surface-variant, #40484c) 15%, transparent)',
+        borderBottom: collapsed ? 'none' : '1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 16%, transparent)',
       }}>
         <div 
           onClick={() => setCollapsed(!collapsed)}
@@ -61,12 +61,12 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
             userSelect: 'none',
           }}
         >
-          {collapsed ? <ChevronRight size={15} color="var(--text-muted)" /> : <ChevronDown size={15} color="var(--text-muted)" />}
-          <FileCode size={16} color="var(--accent-cyan)" />
+          {collapsed ? <ChevronRight size={15} color="var(--matugen-secondary, #b2cbd6)" /> : <ChevronDown size={15} color="var(--matugen-secondary, #b2cbd6)" />}
+          <FileCode size={16} color="var(--matugen-primary, #a0c9dc)" />
           <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--text-primary)' }}>
             {filename}
           </span>
-          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: '11px', color: 'var(--matugen-secondary, #b2cbd6)' }}>
             {diff.filePath}
           </span>
         </div>
@@ -74,13 +74,13 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
         {/* Action badges / buttons */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {diff.status === 'accepted' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--accent-green)', fontSize: '12px', fontWeight: 600 }}>
-              <CheckCircle2 size={15} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#4ade80', fontSize: '12px', fontWeight: 600 }}>
+              <CheckCircle2 size={15} color="#4ade80" />
               <span>Accepted</span>
             </div>
           ) : diff.status === 'rejected' ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--accent-red)', fontSize: '12px', fontWeight: 600 }}>
-              <XCircle size={15} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', color: '#f87171', fontSize: '12px', fontWeight: 600 }}>
+              <XCircle size={15} color="#f87171" />
               <span>Rejected</span>
             </div>
           ) : (
@@ -94,16 +94,16 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
                   gap: '5px',
                   padding: '4px 10px',
                   borderRadius: 'var(--radius-sm)',
-                  border: '1px solid rgba(255, 142, 142, 0.3)',
-                  background: 'rgba(255, 142, 142, 0.1)',
-                  color: 'var(--accent-red)',
+                  border: '1px solid rgba(239, 68, 68, 0.45)',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: '#f87171',
                   cursor: 'pointer',
                   fontSize: '11px',
                   fontWeight: 600,
-                  transition: 'background 0.15s ease',
+                  transition: 'all 0.15s ease',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 142, 142, 0.2)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 142, 142, 0.1)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
               >
                 <X size={13} />
                 Reject
@@ -118,16 +118,16 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
                   gap: '5px',
                   padding: '4px 12px',
                   borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  background: 'var(--accent-cyan)',
-                  color: 'var(--matugen-on-primary, #003544)',
+                  border: '1px solid rgba(34, 197, 94, 0.55)',
+                  background: 'rgba(34, 197, 94, 0.22)',
+                  color: '#4ade80',
                   cursor: 'pointer',
                   fontSize: '11px',
                   fontWeight: 600,
-                  transition: 'opacity 0.15s ease',
+                  transition: 'all 0.15s ease',
                 }}
-                onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.35)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(34, 197, 94, 0.22)'}
               >
                 <Check size={13} />
                 {isApplying ? 'Applying...' : 'Accept & Save'}

@@ -84,7 +84,7 @@ var DockConfig = {
     // ── Island Border (Start & Trash icon badges) ─────────────────────────
     islandBorderWidth: 1,           // @HCD:islandBorderWidth
     islandBorderAlpha: 1,        // @HCD:islandBorderAlpha
-    islandBorderColorVar: 'primary_container', // @HCD:islandBorderColorVar
+    islandBorderColorVar: 'scrim', // @HCD:islandBorderColorVar
 
     // ── External margins (dock edge ↔ screen / window edge) ──────────────
     // The exclusive zone is auto-calculated from the rendered content height:

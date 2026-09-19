@@ -1143,7 +1143,7 @@ ShellRoot {
                                                     anchors.centerIn: parent; spacing: 6
                                                     visible: root.pinEntry.length === 0 && !root.authChecking
                                                     Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc6 }
-                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc10; opacity: 1.00 }
+                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc13; opacity: 1.00 }
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; visible: root.authChecking
@@ -1415,7 +1415,7 @@ ShellRoot {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: 16
-                                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.3)
+                                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.35)
                                     }
                                 }
 
@@ -1491,8 +1491,8 @@ ShellRoot {
                                                 height: 14
 
                                                 Rectangle {
-                                                    anchors.fill: parent; radius: 7
-                                                    color: Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.5)
+                                                    anchors.fill: parent; radius: 99
+                                                    color: Qt.rgba(root.cScrim.r,root.cScrim.g,root.cScrim.b,0.4)
                                                     border.width: 1
                                                     border.color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45)
                                                 }
@@ -1517,8 +1517,8 @@ ShellRoot {
                                                 // Thumb
                                                 Text {
                                                     text: "󰟃"
-                                                    font.family: "Symbols Nerd Font Mono"; font.pixelSize: 10
-                                                    color: root.cWc4
+                                                    font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13
+                                                    color: root.cPrimary
                                                     style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.25)
                                                     x: {
                                                         const tw = trough.width - 6
@@ -1595,8 +1595,8 @@ ShellRoot {
                                                 Text {
                                                     text: "󰟃"
                                                     font.family: "Symbols Nerd Font Mono"
-                                                    font.pixelSize: 10
-                                                    color: root.cWc4
+                                                    font.pixelSize: 13
+                                                    color: root.cPrimary
                                                     style: Text.Outline
                                                     styleColor: Qt.rgba(0, 0, 0, 0.25)
                                                     x: {

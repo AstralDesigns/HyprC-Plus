@@ -63,10 +63,10 @@ _hide_launcher_window() {
     # Only send if window is currently shown (launcher.state == open).
     local state_path="$HOME/.cache/hyprcandy/launcher.state"
     if [ -f "$state_path" ] && grep -q "^open" "$state_path" 2>/dev/null; then
-        pkill -10 -f "gjs.*app-launcher\.js" 2>/dev/null
+        pkill -f "gjs.*app-launcher\.js" 2>/dev/null
     else
         # Send anyway if state file is missing/stale — no harm if window is hidden
-        pkill -10 -f "gjs.*app-launcher\.js" 2>/dev/null || true
+        pkill -f "gjs.*app-launcher\.js" 2>/dev/null || true
     fi
 }
 

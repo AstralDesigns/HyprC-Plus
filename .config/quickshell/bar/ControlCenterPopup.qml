@@ -1575,7 +1575,7 @@ PanelWindow {
                                             ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
                                                       Theme.cSurfaceTint.b, 0.8)
                                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, 
-                                            	      Theme.cOnSecondary.b, 0.15)
+                                            	      Theme.cOnSecondary.b, 0.3)
                                         border.width: _subIdx === index ? 1 : 0
                                         border.color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                       Theme.cInversePrimary.b, 0.42)
@@ -1625,9 +1625,9 @@ PanelWindow {
                                                     ? ("󰍎 " + ccWin._weatherPinnedName)
                                                     : "󰇢 Auto (IP geolocation)"
                                                 color: ccWin._weatherPinned
-                                                    ? Theme.cPrimary
-                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                              Theme.cPrimary.b, 0.5)
+                                                    ? Theme.cOnSurf
+                                                    : Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g,
+                                                              Theme.cOnSurf.b, 0.75)
                                                 font.family: Config.labelFont; font.pixelSize: 12
                                                 font.weight: ccWin._weatherPinned ? Font.Medium : Font.Normal
                                                 Layout.fillWidth: true; elide: Text.ElideRight
@@ -1752,10 +1752,10 @@ PanelWindow {
                                                 required property int index
                                                 Layout.fillWidth: true; height: 38; radius: 8
                                                 color: _resHov.containsMouse
-                                                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                              Theme.cInversePrimary.b, 0.28)
-                                                    : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                              Theme.cInversePrimary.b, 0.10)
+                                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                              Theme.cOnSecondary.b, 0.15)
+                                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                              Theme.cOnSecondary.b, 0.35)
                                                 Behavior on color { ColorAnimation { duration: 100 } }
                                                 ColumnLayout {
                                                     anchors { fill: parent; leftMargin: 10; rightMargin: 8
@@ -1811,9 +1811,9 @@ PanelWindow {
                                         Text {
                                             visible: ccWin._weatherGeoResults.length === 0
                                                   && !ccWin._weatherGeoSearching
-                                            text: "Type a city, town or district and press Enter"
-                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                           Theme.cPrimary.b, 0.35)
+                                            text: "Type a city, town or district and press Enter/Return"
+                                	    color: Theme.cOnSurf
+            				    opacity: 0.65
                                             font.family: Config.labelFont; font.pixelSize: 10
                                             wrapMode: Text.Wrap; Layout.fillWidth: true
                                         }
@@ -2425,10 +2425,10 @@ PanelWindow {
                                                             width: parent.width; height: 28
                                                             radius: 7
                                                             color: Config.cavaStyle === modelData
-                                                                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                                          Theme.cInversePrimary.b, 0.30)
-                                                                : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                                          Theme.cInversePrimary.b, 0.09)
+                                                                ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                                          Theme.cOnSecondary.b, 0.65)
+                                                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                                          Theme.cOnSecondary.b, 0.45)
                                                             Behavior on color { ColorAnimation { duration: 120 } }
                                                             Text {
                                                                 anchors.centerIn: parent
@@ -2449,9 +2449,9 @@ PanelWindow {
                                                             radius: 6
                                                             color: Config.cavaStyle === modelData
                                                                 ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                                          Theme.cPrimary.b, 0.72)
+                                                                          Theme.cPrimary.b, 0.75)
                                                                 : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                                                                          Theme.cOnSecondary.b, 0.15)
+                                                                          Theme.cOnSecondary.b, 0.45)
                                                             border.width: Config.cavaStyle === modelData ? 1 : 0
                                                             border.color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                           Theme.cInversePrimary.b, 0.5)
@@ -2492,7 +2492,7 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             Text {
                                                 text: Config.cavaGradientEnabled ? "Start Color" : "Bar Color"
-                                                color: Theme.cPrimary
+                                                color: Theme.cOnSurf
                                                 font.family: Config.labelFont; font.pixelSize: 13
                                                 Layout.preferredWidth: 90
                                             }
@@ -2660,7 +2660,7 @@ PanelWindow {
                                             opacity: Config.cavaGradientEnabled ? 1.0 : 0.4
                                             Text {
                                                 text: "End Color"
-                                                color: Theme.cPrimary
+                                                color: Theme.cOnSurf
                                                 font.family: Config.labelFont; font.pixelSize: 13
                                                 Layout.preferredWidth: 90
                                             }
@@ -2852,8 +2852,8 @@ PanelWindow {
                                         Text {
                                             Layout.fillWidth: true
                                             text: "Background fill style → glass vs gradient tint"
-                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                           Theme.cPrimary.b, 0.48)
+                                	    color: Theme.cOnSurf
+            				    opacity: 0.65
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             wrapMode: Text.Wrap
                                         }
@@ -2877,8 +2877,8 @@ PanelWindow {
                                         Text {
                                             Layout.fillWidth: true
                                             text: "Background fill style for the outer bar strip in 'bar' mode and 'tri'-island mode + dock."
-                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                           Theme.cPrimary.b, 0.48)
+                                	    color: Theme.cOnSurf
+            				    opacity: 0.65
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             wrapMode: Text.Wrap
                                         }
@@ -2926,8 +2926,8 @@ PanelWindow {
                                         Text {
                                             Layout.fillWidth: true
                                             text: "0.05 = lowest transparency maintaining blur  •  1 = fully opaque"
-                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                           Theme.cPrimary.b, 0.48)
+                                	    color: Theme.cOnSurf
+            				    opacity: 0.65
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             wrapMode: Text.Wrap
                                         }
@@ -3101,7 +3101,7 @@ PanelWindow {
                                 Layout.fillWidth: true; spacing: 8
                                 Text {
                                     text: "Keyboard"
-                                    color: Theme.cPrimary
+                                    color: Theme.cOnSurf
                                     font.family: Config.labelFont; font.pixelSize: 13
                                     Layout.preferredWidth: 100
                                 }
@@ -3349,7 +3349,8 @@ PanelWindow {
                             Text {
                                 Layout.fillWidth: true
                                 text: "Matugen: follows matugen themes  •  Pywal: follows wal palette"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
+                                color: Theme.cOnSurf
+            			opacity: 0.65
                                 font.family: Config.labelFont; font.pixelSize: 11
                                 wrapMode: Text.Wrap
                             }
@@ -3359,7 +3360,7 @@ PanelWindow {
                                 Layout.fillWidth: true; spacing: 8
                                 Text {
                                     text: "Active"
-                                    color: Theme.cPrimary
+                                    color: Theme.cOnSurf
                                     font.family: Config.labelFont; font.pixelSize: 13
                                     Layout.preferredWidth: 100
                                 }
@@ -3524,7 +3525,7 @@ PanelWindow {
                                 Layout.fillWidth: true; spacing: 8
                                 Text {
                                     text: "Inactive"
-                                    color: Theme.cPrimary
+                                    color: Theme.cOnSurf
                                     font.family: Config.labelFont; font.pixelSize: 13
                                     Layout.preferredWidth: 100
                                 }
@@ -3701,7 +3702,7 @@ PanelWindow {
 
                                 Text {
                                     text: "Apply matugen color palette from themes listed below?"
-                                    color: Theme.cPrimary
+                                    color: Theme.cOnSurf
                                     font.family: Config.labelFont
                                     font.pixelSize: 13
                                     Layout.fillWidth: true
@@ -3770,8 +3771,8 @@ PanelWindow {
                                 Layout.topMargin: 2
                                 visible: _colorRegenPill.regenEnabled
                                 text: " All color palette engines will be reloaded on all theme and background changes"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                               Theme.cPrimary.b, 0.55)
+			 	color: Theme.cOnSurf
+				opacity: 0.65
                                 font.family: Config.labelFont
                                 font.pixelSize: 11
                                 wrapMode: Text.Wrap
@@ -3783,8 +3784,8 @@ PanelWindow {
                                 Layout.topMargin: 2
                                 visible: !_colorRegenPill.regenEnabled
                                 text: " Only wallust and pywal accent colors will be reloaded - matugen is disabled"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                               Theme.cPrimary.b, 0.55)
+			 	color: Theme.cOnSurf
+				opacity: 0.65
                                 font.family: Config.labelFont
                                 font.pixelSize: 11
                                 wrapMode: Text.Wrap
@@ -3879,8 +3880,8 @@ PanelWindow {
                             Text {
                                 Layout.fillWidth: true
                                 text: "Matugen automatically determines which scheme and mode to apply based on the wallpaper"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                               Theme.cPrimary.b, 0.55)
+			 	color: Theme.cOnSurf
+				opacity: 0.85
                                 font.family: Config.labelFont; font.pixelSize: 11
                                 wrapMode: Text.Wrap
                             }
@@ -3907,8 +3908,8 @@ PanelWindow {
                             Text {
                                 Layout.fillWidth: true
                                 text: "GTK app window background color opacity independent from Hyprland opacity setting. Wait around 5 seconds before the next value change"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                               Theme.cPrimary.b, 0.55)
+			 	color: Theme.cOnSurf
+				opacity: 0.85
                                 font.family: Config.labelFont; font.pixelSize: 11
                                 wrapMode: Text.Wrap
                             }
@@ -3926,7 +3927,7 @@ PanelWindow {
                                         " \"$HOME/.config/matugen/templates/gtk3.css\"" +
                                         " \"$HOME/.config/matugen/templates/gtk4.css\"; do" +
                                         "  [ -f \"$f\" ] && sed -i -E" +
-                                        "    \"s/alpha\\\\(@on_secondary, [0-9]+(\\\\.[0-9]+)?\\\\)/alpha(@on_secondary, " + a + ")/g\"" +
+                                        "    \"15s/alpha\\\\(@on_secondary, [0-9]+(\\\\.[0-9]+)?\\\\)/alpha(@on_secondary, " + a + ")/g\"" +
                                         "  \"$f\";" +
                                         "done;" +
                                         // ── Trigger GTK color rebuild ─────────────────────────
@@ -4590,7 +4591,7 @@ PanelWindow {
                                 Layout.fillWidth: true; spacing: 8
                                 Text {
                                     text: "Form Pos"
-                                    color: Theme.cPrimary
+                                    color: Theme.cOnSurf
                                     font.family: Config.labelFont; font.pixelSize: 13
                                     Layout.preferredWidth: 100
                                 }
@@ -4983,7 +4984,7 @@ PanelWindow {
                                             ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
                                                       Theme.cSurfaceTint.b, 0.8)
                                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, 
-                                            	      Theme.cOnSecondary, 0.15)
+                                            	      Theme.cOnSecondary, 0.3)
                                         border.width: _subIdx === index ? 1 : 0
                                         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                               Theme.cPrimary.b, 0.42)
@@ -5104,7 +5105,7 @@ PanelWindow {
                                                 }
                                                 Text {
                                                     text: "read-only"
-                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.42)
+                                                    color: Theme.cOnSurf
                                                     font.family: Config.labelFont; font.pixelSize: 10
                                                 }
                                             }
@@ -5145,7 +5146,7 @@ PanelWindow {
                                                                 id: _kbKeyLbl
                                                                 anchors.centerIn: parent
                                                                 text: modelData.keys
-                                                                color: Theme.cPrimary
+                                                                color: Theme.cOnSurf
                                                                 font.family: Config.labelFont
                                                                 font.pixelSize: 11; font.weight: Font.Medium
                                                             }
@@ -5154,7 +5155,7 @@ PanelWindow {
                                                         Text {
                                                             Layout.fillWidth: true
                                                             text: modelData.desc !== "" ? modelData.desc : modelData.cmd
-                                                            color: Theme.cPrimary
+                                                            color: Theme.cOnSurf
                                                             font.family: Config.labelFont; font.pixelSize: 12
                                                             elide: Text.ElideRight
                                                             opacity: 0.85
@@ -5181,7 +5182,7 @@ PanelWindow {
                                                 }
                                                 Text {
                                                     text: "editable"
-                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.42)
+                                                    color: Theme.cOnSurf
                                                     font.family: Config.labelFont; font.pixelSize: 10
                                                 }
                                             }
@@ -5233,7 +5234,7 @@ PanelWindow {
                                                                 id: _ckbKeyLbl
                                                                 anchors.centerIn: parent
                                                                 text: modelData.keys
-                                                                color: Theme.cPrimary
+                                                                color: Theme.cOnSurf
                                                                 font.family: Config.labelFont
                                                                 font.pixelSize: 11; font.weight: Font.Medium
                                                             }
@@ -5242,7 +5243,7 @@ PanelWindow {
                                                         Text {
                                                             Layout.fillWidth: true
                                                             text: modelData.desc !== "" ? modelData.desc : modelData.cmd
-                                                            color: Theme.cPrimary
+                                                            color: Theme.cOnSurf
                                                             font.family: Config.labelFont; font.pixelSize: 12
                                                             elide: Text.ElideRight
                                                             opacity: 0.85
@@ -5295,8 +5296,8 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             Layout.preferredHeight: 180
                                             radius: 11
-                                            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                           Theme.cInversePrimary.b, 0.10)
+                                            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                           Theme.cOnSecondary.b, 0.45)
                                             border.width: 1
                                             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                                   Theme.cPrimary.b, 0.16)
@@ -5426,7 +5427,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             Text {
                                                 text: kbTabRoot.editingIdx >= 0 ? "Editing #" + (kbTabRoot.editingIdx + 1) : "New Bind"
-                                                color: Theme.cPrimary
+                                                color: Theme.cOnSurf
                                                 font.family: Config.labelFont; font.pixelSize: 12
                                                 font.weight: Font.Bold
                                             }
@@ -5466,7 +5467,7 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             Text {
                                                 text: "Keys"
-                                                color: Theme.cPrimary
+                                                color: Theme.cOnSurf
                                                 font.family: Config.labelFont; font.pixelSize: 12
                                                 Layout.preferredWidth: 64
                                             }
@@ -5506,7 +5507,7 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             Text {
                                                 text: "Command"
-                                                color: Theme.cPrimary
+                                                color: Theme.cOnSurf
                                                 font.family: Config.labelFont; font.pixelSize: 12
                                                 Layout.preferredWidth: 64
                                             }
@@ -5546,7 +5547,7 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 8
                                             Text {
                                                 text: "Describe"
-                                                color: Theme.cPrimary
+                                                color: Theme.cOnSurf
                                                 font.family: Config.labelFont; font.pixelSize: 12
                                                 Layout.preferredWidth: 64
                                             }
@@ -5795,8 +5796,8 @@ PanelWindow {
                             Text {
                                 Layout.fillWidth: true
                                 text: animationsTabRoot.statusText
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                               Theme.cPrimary.b, 0.55)
+				color: Theme.cOnSurf
+				opacity: 0.65
                                 font.family: Config.labelFont
                                 font.pixelSize: 11
                                 wrapMode: Text.Wrap
@@ -5887,7 +5888,7 @@ PanelWindow {
                                                             id: _animNameLbl
                                                             anchors.centerIn: parent
                                                             text: modelData.label
-                                                            color: Theme.cPrimary
+                                                            color: Theme.cOnSurf
                                                             font.family: Config.labelFont
                                                             font.pixelSize: 11
                                                             font.weight: Font.Medium
@@ -5897,7 +5898,7 @@ PanelWindow {
                                                     Text {
                                                         Layout.fillWidth: true
                                                         text: modelData.desc
-                                                        color: Theme.cPrimary
+                                                        color: Theme.cOnSurf
                                                         font.family: Config.labelFont
                                                         font.pixelSize: 12
                                                         elide: Text.ElideRight
@@ -5907,7 +5908,7 @@ PanelWindow {
                                                     Text {
                                                         visible: animationsTabRoot.applyingAnimation === modelData.file
                                                         text: "󰔟"
-                                                        color: Theme.cPrimary
+                                                        color: Theme.cOnSurf
                                                         font.family: Config.fontFamily
                                                         font.pixelSize: 14
                                                         opacity: 0.7
@@ -5917,7 +5918,7 @@ PanelWindow {
                                                         visible: modelData.current && animationsTabRoot.applyingAnimation !== modelData.file
                                                         text: "current"
                                                         color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                                       Theme.cPrimary.b, 0.50)
+                                                                       Theme.cPrimary.b, 0.75)
                                                         font.family: Config.labelFont
                                                         font.pixelSize: 10
                                                     }
@@ -6107,8 +6108,8 @@ PanelWindow {
                                 Layout.preferredHeight: 92
                                 radius: 18
                                 clip: true
-                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                               Theme.cInversePrimary.b, 0.25)
+                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                               Theme.cOnSecondary.b, 0.35)
                                 border.width: 1
                                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
 
@@ -6200,8 +6201,8 @@ PanelWindow {
                                         Layout.alignment: Qt.AlignVCenter
                                         implicitWidth: upRow.implicitWidth + 24
                                         implicitHeight: 32
-                                        radius: 16
-                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                                        radius: 99
+                                        color: Theme.cOnSecondary
                                         RowLayout {
                                             id: upRow
                                             anchors.centerIn: parent
@@ -6226,10 +6227,10 @@ PanelWindow {
                                     Rectangle {
                                         Layout.alignment: Qt.AlignVCenter
                                         implicitWidth: 32; implicitHeight: 32
-                                        radius: 16
+                                        radius: 99
                                         color: refreshHov.containsMouse
-                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
-                                            : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.90)
+                                            : Theme.cPrimary
                                         Behavior on color { ColorAnimation { duration: 120 } }
                                         Text {
                                             id: refreshGlyph
@@ -6237,7 +6238,7 @@ PanelWindow {
                                             text: "󰑐"
                                             font.family: Config.fontFamily
                                             font.pixelSize: 15
-                                            color: Theme.cWc6
+                                            color: Theme.cOnSecondary
                                             RotationAnimator {
                                                 target: refreshGlyph
                                                 from: 0; to: 360
@@ -7449,8 +7450,8 @@ PanelWindow {
 
         implicitWidth: _chipRow.implicitWidth + 24
         implicitHeight: 34
-        radius: 12
-        color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.2)
+        radius: 99
+        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
         border.width: 1
         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
 
@@ -7520,7 +7521,7 @@ PanelWindow {
         Text {
             id: _lbl
             Layout.preferredWidth: 100
-            color: Theme.cPrimary
+            color: Theme.cOnSurf
             font.family: Config.labelFont; font.pixelSize: 13
             elide: Text.ElideRight
         }
@@ -7545,7 +7546,7 @@ PanelWindow {
                 // Trough background
                 Rectangle {
                     anchors.fill: parent; radius: _trough.tH / 2
-                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.5)
+                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.3)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                 }
@@ -7572,8 +7573,8 @@ PanelWindow {
                 Text {
                     text: "󰟃"
                     font.family: "Symbols Nerd Font Mono"
-                    font.pixelSize: _trough.iH + 2
-                    color: Theme.cWc4
+                    font.pixelSize: _trough.iH + 5
+                    color: Theme.cPrimary
                     style: Text.Outline; styleColor: Qt.rgba(0,0,0,0.25)
                     x: {
                         const tw = parent.width - _trough.pad * 2
@@ -7613,7 +7614,7 @@ PanelWindow {
             text: _ccsl.decimals > 0
                 ? _ccsl.value.toFixed(_ccsl.decimals)
                 : Math.round(_ccsl.value).toString()
-            color: Theme.cPrimary
+            color: Theme.cOnSurf
             font.family: Config.labelFont; font.pixelSize: 12
             horizontalAlignment: Text.AlignRight
         }
@@ -7630,7 +7631,7 @@ PanelWindow {
         Text {
             id: _tl
             Layout.preferredWidth: 130
-            color: Theme.cPrimary
+            color: Theme.cOnSurf
             font.family: Config.labelFont; font.pixelSize: 13
             elide: Text.ElideRight
         }
@@ -7644,14 +7645,14 @@ PanelWindow {
             color: value
                 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                       Theme.cInversePrimary.b, 0.82)
-                : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.15)
+                : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.3)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                   Theme.cPrimary.b, value ? 0.6 : 0.6)
 
             Rectangle {
                 width: 20; height: 20; radius: 10
-                color: value ? Theme.cWc6 : Theme.cWc5
+                color: value ? Theme.cPrimary : Theme.cPrimary
                 anchors.verticalCenter: parent.verticalCenter
                 x: value ? parent.width - width - 3 : 3
                 Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
@@ -7679,7 +7680,7 @@ PanelWindow {
         Text {
             id: _sgl
             Layout.preferredWidth: 100
-            color: Theme.cPrimary
+            color: Theme.cOnSurf
             font.family: Config.labelFont; font.pixelSize: 13
             elide: Text.ElideRight
         }
@@ -7778,7 +7779,7 @@ PanelWindow {
         Text {
             id: _iel
             Layout.preferredWidth: 100
-            color: Theme.cPrimary
+            color: Theme.cOnSurf
             font.family: Config.labelFont; font.pixelSize: 13
             elide: Text.ElideRight
         }
@@ -7819,7 +7820,7 @@ PanelWindow {
         Text {
             id: _erl
             Layout.preferredWidth: 100
-            color: Theme.cPrimary
+            color: Theme.cOnSurf
             font.family: Config.labelFont; font.pixelSize: 13
             elide: Text.ElideRight
         }

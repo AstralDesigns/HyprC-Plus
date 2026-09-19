@@ -81,18 +81,10 @@ export const ChatPanel: React.FC = () => {
       {/* Left resize handle */}
       <div className="resize-handle resize-handle-left" onMouseDown={startResize} />
 
-      {/* Header with status and sessions dropdown popup */}
+      {/* Header: sessions dropdown (left) + clear button (right) */}
       <div className="chat-panel-header">
-        <div className="chat-header-title-wrap">
-          <div className="chat-status-pulse" />
-          <span className="chat-header-title">Candy Agent</span>
-          {store.modelStatus === 'ready' && (
-            <span className="chat-ready-badge">Ready</span>
-          )}
-        </div>
-
-        <div className="chat-header-actions">
-          {/* Sessions Dropdown Popup (CandyCode style) */}
+        <div className="chat-header-actions" style={{ flex: 1 }}>
+          {/* Sessions Dropdown Popup */}
           <div className="relative-wrap" ref={dropdownRef}>
             <button
               type="button"
@@ -152,17 +144,19 @@ export const ChatPanel: React.FC = () => {
               </div>
             )}
           </div>
-
-          <button
-            type="button"
-            className="chat-header-btn"
-            onClick={() => storeActions.clearCurrentMessages()}
-            title="Clear conversation"
-          >
-            <Trash2 size={13} />
-          </button>
-
         </div>
+
+        {/* Clear button — far right */}
+        <button
+          type="button"
+          className="chat-header-btn"
+          onClick={() => storeActions.clearCurrentMessages()}
+          title="Clear conversation"
+          style={{ marginLeft: 'auto', flexShrink: 0 }}
+        >
+          <Trash2 size={13} />
+        </button>
+
       </div>
 
       {/* Chat Messages Stream */}

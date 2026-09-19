@@ -33,6 +33,7 @@ ShellRoot {
     property string _m3onSurfaceVariant:        ""
     property string _m3outline:                 ""
     property string _m3outlineVariant:          ""
+    property string _m3inversePrimary:          ""
 
     // Derived semantic colors
     readonly property color cBg:        Qt.color(_m3background)
@@ -46,10 +47,11 @@ ShellRoot {
     readonly property color cOnSecCont: Qt.color(_m3onSecondaryContainer)
     readonly property color cOutline:   Qt.color(_m3outline)
     readonly property color cOutlineVar:Qt.color(_m3outlineVariant)
+    readonly property color cInvPrimary:Qt.color(_m3inversePrimary)
     readonly property color cPanelBg: Qt.rgba(
-        Qt.color(_m3onSecondary).r,
-        Qt.color(_m3onSecondary).g,
-        Qt.color(_m3onSecondary).b, 0.4)
+        Qt.color(_m3inversePrimary).r,
+        Qt.color(_m3inversePrimary).g,
+        Qt.color(_m3inversePrimary).b, 0.3)
     readonly property color cScrim: Qt.rgba(
         Qt.color(_m3onSecondary).r,
         Qt.color(_m3onSecondary).g,
@@ -73,6 +75,7 @@ ShellRoot {
                 case "m3onSurfaceVariant":    root._m3onSurfaceVariant = val; break
                 case "m3outline":             root._m3outline = val; break
                 case "m3outlineVariant":      root._m3outlineVariant = val; break
+                case "m3inversePrimary":      root._m3inversePrimary = val; break
             }
         }
     }

@@ -1,5 +1,5 @@
 import React, { Component, useEffect, useRef, ReactNode } from 'react';
-import { useStore, setStore, storeActions, PRESET_MODELS, persistStoreNow } from './store';
+import { useStore, setStore, getStore, storeActions, PRESET_MODELS, persistStoreNow } from './store';
 import { bridge } from './bridge';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -147,9 +147,58 @@ export const App: React.FC = () => {
     window.addEventListener('error', onUncaughtError);
     window.addEventListener('beforeunload', onBeforeUnload);
 
-    // Do not preload the persisted/default model here. This effect runs again
-    // when the launcher agent surface is recreated or reactivated, and native
-    // llama-server must remain OFF until the explicit header toggle is used.
+    // Auto-activate last active Cloud tab model/provider if saved from previous session.
+    // The Local tab model is intentionally NOT auto-activated on next workspace session (llama-server stays OFF).
+    if (!isElectronWorker) {
+      const autoActivateCloudModel = async () => {
+        const current = getStore();
+        if (current.inferenceMode === 'byok' && current.byokProvider) {
+          const providerId = current.byokProvider;
+          const modelId = current.byokModel || '';
+          try {
+            let key = current.byokKeys[providerId];
+            if (!key) {
+              key = await bridge.lookupSecret(providerId);
+            }
+            if (key) {
+              for (let attempt = 0; attempt < 5; attempt++) {
+                try {
+                  await bridge.runtimeRequest('/api/byok/set', {
+                    provider: providerId,
+                    api_key: key,
+                    set_active: true,
+                  });
+                  await bridge.runtimeRequest(`/api/byok/activate/${providerId}`);
+                  break;
+                } catch {
+                  await new Promise(r => setTimeout(r, 600));
+                }
+              }
+              setStore({
+                inferenceMode: 'byok',
+                byokProvider: providerId,
+                byokModel: modelId,
+                activeModel: modelId,
+                modelStatus: 'ready',
+                byokKeys: { ...current.byokKeys, [providerId]: key },
+              });
+              bridge.notifyModelStatus(true, modelId);
+              console.log(`[agent-app] Auto-activated last cloud provider ${providerId} (${modelId})`);
+            }
+          } catch (err: any) {
+            console.warn('[agent-app] Could not auto-activate cloud model:', err?.message || err);
+          }
+        } else if (current.inferenceMode === 'cloud' && current.cloudModel) {
+          setStore({
+            inferenceMode: 'cloud',
+            modelStatus: 'ready',
+            activeModel: current.cloudModel,
+          });
+          bridge.notifyModelStatus(true, current.cloudModel);
+        }
+      };
+      autoActivateCloudModel();
+    }
 
     return () => {
       window.removeEventListener('agent_toggle_sidebar', onToggleSidebar);

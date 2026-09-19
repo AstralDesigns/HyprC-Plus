@@ -47,7 +47,7 @@ export const PendingFilesBar: React.FC = () => {
     <div className="pending-files-bar" role="region" aria-label="Pending file changes">
       <div className="pending-files-header">
         <div className="pending-files-title">
-          <AlertTriangle size={12} color="var(--accent-yellow)" />
+          <AlertTriangle size={12} color="var(--matugen-primary, #a0c9dc)" />
           <strong>{pending.length} pending file{pending.length === 1 ? '' : 's'}</strong>
         </div>
         <div className="pending-files-actions">
@@ -64,7 +64,7 @@ export const PendingFilesBar: React.FC = () => {
           const filename = item.diff.filePath.split('/').pop() || item.diff.filePath;
           return (
             <div className="pending-file-row" key={item.messageId}>
-              <FileCode size={12} color="var(--accent-cyan)" />
+              <FileCode size={12} color="var(--matugen-secondary, #b2cbd6)" />
               <span className="pending-file-path" title={item.diff.filePath}>{filename}</span>
               <button type="button" className="pending-file-accept" onClick={() => void apply(item)} disabled={busy !== null} title="Accept and save this file">
                 <Check size={11} />

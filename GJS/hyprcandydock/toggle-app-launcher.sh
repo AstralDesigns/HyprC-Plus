@@ -37,4 +37,5 @@ fi
 
 # Run from the dock directory so imports.searchPath picks up config.js etc.
 cd "$SCRIPT_DIR"
-setsid gjs "$LAUNCHER" </dev/null >/dev/null 2>&1 &
+HYPRCANDY_LAUNCHER_START_OPEN=1 setsid gjs "$LAUNCHER" </dev/null >/dev/null 2>&1 &
+

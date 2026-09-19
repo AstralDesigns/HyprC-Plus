@@ -414,7 +414,7 @@ function _injectGlyphSizeCSS(display) {
             min-height: calc(${appPx}px + (${padPx}px * 2));
         }
         #indicator-dots {
-            color: @surface_tint;
+            color: white;
         }
         /* Separator length = 60% of icon size so it looks short and decorative */
         separator.dock-sep-v {
@@ -1224,7 +1224,7 @@ const HyprCandyDock = GObject.registerClass({
             const dlgCss = new Gtk.CssProvider();
             dlgCss.load_from_data(`
                 window.hc-trash-dialog {
-                    background-color: alpha(@on_secondary, 0.60);
+                    background-color: @on_secondary;
                     border-radius: 20px;
                     border: 1px solid alpha(@primary, 0.15);
                     box-shadow: none;
@@ -1232,7 +1232,7 @@ const HyprCandyDock = GObject.registerClass({
                 .dlg-title {
                     font-size: 13px;
                     font-weight: bold;
-                    color: @primary;
+                    color: white;
                 }
                 .dlg-body {
                     font-size: 12px;
@@ -1246,7 +1246,7 @@ const HyprCandyDock = GObject.registerClass({
                 }
                 .dlg-btn-cancel {
                     background-color: alpha(@on_secondary, 0.65);
-                    color: @primary;
+                    color: white;
                 }
                 .dlg-btn-cancel:hover { background-color: alpha(@on-secondary, 0.85); }
                 .dlg-btn-confirm {

@@ -290,7 +290,7 @@ Item {
                             width:  Math.min(nameLabel.implicitWidth + 10, parent.width)
                             height: nameLabel.implicitHeight + 6
                             radius: Config.desktopLabelRadius
-                            color:  Theme.cPanelBg // Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,Theme.cInversePrimary.b, 0.50)
+                            color:  Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,Theme.cInversePrimary.b, 0.50) // Theme.cPanelBg 
                             border.width: 1
        			    border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       			  Config.barBorderColor.b, Config.barBorderAlpha)
@@ -302,7 +302,7 @@ Item {
                                 text:             iconItem._name
                                 font.pixelSize:   Config.desktopLabelSize
                                 font.weight: 	  Font.Bold
-                                color:            Theme.cSurfaceTint
+                                color:            Theme.cOnSurf
                                 elide:            Text.ElideRight
                                 maximumLineCount: 1
                                 horizontalAlignment: Text.AlignHCenter

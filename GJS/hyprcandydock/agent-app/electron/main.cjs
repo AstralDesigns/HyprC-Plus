@@ -1,8 +1,8 @@
 // HyprCandy Launcher — Electron Embedded Agent Renderer
-// Chromium/Electron host for the agent React app (WebLLM + native tools).
+// Chromium/Electron host for the native llama bridge and legacy fallback tools.
 // Loads the same dist/index.html that GJS serves via Soup3 loopback server
 // on http://127.0.0.1:17842/index.html — identical JS code, but now with real
-// mature Chromium WebGPU (not the upstream-incomplete WebKitGTK stub).
+// Native llama.cpp owns inference; this process is not an inference GPU host.
 //
 // IPC with GJS launcher host uses NEWLINE-DELIMITED JSON on stdin/stdout so
 // the existing GJS Gio.Subprocess stdin/stdout pipes work without any HTTP.
@@ -39,7 +39,7 @@ ipcMain.handle('llama:start', async (_event, modelId, options) => llamaServer.st
 ipcMain.handle('llama:stop', () => llamaServer.stop());
 process.once('exit', () => { try { void llamaServer.stop(); } catch (_) {} });
 
-// ─── Chromium GPU / WebGPU flags — keep the hidden Electron worker off the
+// ─── Chromium GPU flags — keep the legacy hidden bridge off the
 // WebGPU/WebGL path entirely because GGUF inference is handled by llama-server.
 const softwareRender = process.env.HYPRCANDY_SOFTWARE_RENDER === '1';
 if (softwareRender) {

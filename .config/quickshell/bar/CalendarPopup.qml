@@ -216,8 +216,8 @@ PanelWindow {
                     font.family: Config.fontFamily
                     font.pixelSize: 16
                     color: prevHov.containsMouse
-                        ? Theme.cWc5
-                        : Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, 0.55)
+                        ? Theme.cOnSurf
+                        : Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.55)
                     Behavior on color { ColorAnimation { duration: 100 } }
                     MouseArea {
                         id: prevHov; anchors.fill: parent
@@ -268,8 +268,8 @@ PanelWindow {
                     font.family: Config.fontFamily
                     font.pixelSize: 16
                     color: nextHov.containsMouse
-                        ? Theme.cWc5
-                        : Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, 0.55)
+                        ? Theme.cOnSurf
+                        : Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.55)
                     Behavior on color { ColorAnimation { duration: 100 } }
                     MouseArea {
                         id: nextHov; anchors.fill: parent

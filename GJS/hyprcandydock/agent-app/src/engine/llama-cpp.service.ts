@@ -42,26 +42,24 @@ export class LlamaCppService {
   }
 
   private get bridge(): LlamaBridge {
-    const electronBridge = typeof window !== 'undefined' ? window.__llamaServer : undefined;
-    if (electronBridge?.enabled) return electronBridge;
-    const provider = typeof window !== 'undefined' ? (window as any).__hyprcandyNativeProvider : '';
-    if (provider === 'llama.cpp') {
-      return {
-        enabled: true,
-        catalog: () => hostBridge.llamaRequest('llama_catalog'),
-        search: (query) => hostBridge.llamaRequest('llama_search', { query }),
-        inspect: (repo) => hostBridge.llamaRequest('llama_inspect', { repo }),
-        hasModel: (model) => hostBridge.llamaRequest('llama_has_model', { model }),
-        status: () => hostBridge.llamaRequest('llama_status'),
-        pull: (model) => hostBridge.llamaRequest('llama_pull', { model }),
-        start: (model, options) => hostBridge.llamaRequest('llama_start', { model, options }),
-        stop: () => hostBridge.llamaRequest('llama_stop'),
-      };
-    }
-    throw new Error('llama.cpp provider is not enabled; set HYPRCANDY_INFERENCE_PROVIDER=llama.cpp');
+    return {
+      enabled: true,
+      catalog: async () => (await hostBridge.runtimeRequest('/api/models', {}, 'GET'))?.models || [],
+      search: async (query) => (await hostBridge.runtimeRequest(`/api/models/search?q=${encodeURIComponent(query)}`, {}, 'GET'))?.models || [],
+      inspect: (repo) => hostBridge.runtimeRequest(`/api/models/inspect?repo=${encodeURIComponent(repo)}`, {}, 'GET'),
+      hasModel: async (model) => {
+        const rows = (await hostBridge.runtimeRequest('/api/models', {}, 'GET'))?.models || [];
+        const id = typeof model === 'string' ? model : model.id;
+        return rows.some((row: any) => row.id === id || row.filename === id || row.path === id);
+      },
+      status: () => hostBridge.runtimeRequest('/api/server/status', {}, 'GET'),
+      pull: (model) => hostBridge.runtimeRequest('/api/models/pull/start', { url: typeof model === 'string' ? model : `https://huggingface.co/${model.repo}/resolve/main/${model.file}` }),
+      start: (model, options) => hostBridge.runtimeRequest('/api/server/start', { model_path: typeof model === 'string' ? model : model.file, ctx_size: options?.context || 0, max_tokens: options?.maxTokens || 2048 }),
+      stop: () => hostBridge.runtimeRequest('/api/server/stop'),
+    };
   }
 
-  isEnabled(): boolean { return Boolean(typeof window !== 'undefined' && (window.__llamaServer?.enabled || (window as any).__hyprcandyNativeProvider === 'llama.cpp')); }
+  isEnabled(): boolean { return true; }
   async searchModels(query: string) { return this.bridge.search(query); }
   async inspectModel(repo: string) { return this.bridge.inspect(repo); }
   async hasModel(model: string | { id: string; repo: string; file: string }) { return Boolean(await this.bridge.hasModel(model)); }

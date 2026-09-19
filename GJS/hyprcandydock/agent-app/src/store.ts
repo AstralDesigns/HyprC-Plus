@@ -146,7 +146,7 @@ export interface AppState {
   selectedFileContent: string | null;
   agentRunning: boolean;
   workspaceStartupEnabled: boolean;
-  
+
   // Floating panel layout
   sidebarVisible: boolean;
   sidebarWidth: number;
@@ -181,6 +181,32 @@ export interface AppState {
 
   // Monaco editor theme
   monacoTheme: string;
+
+  // ── Hybrid inference ─────────────────────────────────────────────────────
+  /** 'local' = llama-server, 'byok' = user's own API key, 'cloud' = Vercel AI Gateway (Pro) */
+  inferenceMode: 'local' | 'byok' | 'cloud';
+  /** Validated Lemon Squeezy license key — stored via GJS libsecret on save */
+  licenseKey: string;
+  /** Selected cloud model id (e.g. 'google/gemini-2.5-flash') */
+  cloudModel: string;
+  /** Remaining token allowance shown in Cloud tab */
+  cloudCredits: number;
+  /** True once the local Python runtime server at :17900 responds to /health */
+  runtimeServerReady: boolean;
+  /** Active tab inside ModelManager: 'local' | 'cloud' */
+  modelManagerTab: 'local' | 'cloud';
+
+  // ── BYOK (Bring Your Own Key) ─────────────────────────────────────────────
+  /** Active BYOK provider: 'google' | 'openai' | 'anthropic' | 'xai' | null */
+  byokProvider: string | null;
+  /** Per-provider API keys saved in browser (synced to Python runtime on use) */
+  byokKeys: Record<string, string>;
+  /** Selected model id for the active BYOK provider */
+  byokModel: string;
+  /** Lemon Squeezy license key for BYOK subscription ($5/mo) — validated against LS License API directly */
+  byokLicenseKey: string;
+  /** Lemon Squeezy instance_id returned on first activation — stored for periodic re-validation */
+  byokLicenseInstanceId: string;
 }
 
 const STORAGE_KEY = 'hyprcandy_agent_state_v2';
@@ -281,6 +307,21 @@ function loadInitialState(): AppState {
     contextImages: [],
 
     monacoTheme: 'matugen',
+
+    // Hybrid inference defaults
+    inferenceMode: 'local' as const,
+    licenseKey: '',
+    cloudModel: 'google/gemini-2.5-flash',
+    cloudCredits: 0,
+    runtimeServerReady: false,
+    modelManagerTab: 'local' as const,
+
+    // BYOK defaults
+    byokProvider: null,
+    byokKeys: {},
+    byokModel: '',
+    byokLicenseKey: '',
+    byokLicenseInstanceId: '',
   };
 
   try {

@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
-  Bot, User, Globe, FileText, Terminal, FileDiff,
+  Globe, FileText, Terminal, FileDiff,
   ChevronDown, ChevronRight, CheckCircle, Clock, Sparkles,
-  Search, FileCode, Folder, Copy, Check, Edit2, RotateCcw,
-  Brain, Zap, Eye, Shield, ListChecks,
+  Folder, Copy, Check, Edit2, RotateCcw,
+  Brain, Zap, Eye, ListChecks,
   X,
 } from 'lucide-react';
 import { useStore, Message, ToolCallData, storeActions, setStore } from '../store';
@@ -25,22 +25,22 @@ const EmptyChatScreen: React.FC = () => (
   </div>
 );
 
-/* ── Inline thinking / agentic phase indicator ─────────────────────── */
+/* ── Inline agentic phase indicator ────────────────────────────────── */
 interface AgentPhase {
-  kind: 'thinking' | 'searching' | 'reading' | 'writing' | 'running' | 'planning';
+  kind: 'thinking' | 'searching' | 'reading' | 'writing' | 'running' | 'planning' | 'todo';
   label?: string;
 }
 
 const PHASE_META: Record<string, { icon: React.ReactNode; label: string; color: string }> = {
-  thinking: { icon: <Brain size={12} />, label: 'Thinking…', color: 'var(--accent-purple)' },
-  searching: { icon: <Globe size={12} />, label: 'Searching the web…', color: 'var(--accent-cyan)' },
-  reading:   { icon: <Eye size={12} />, label: 'Reading files…', color: 'var(--accent-yellow)' },
-  writing:   { icon: <FileCode size={12} />, label: 'Writing file…', color: 'var(--accent-green)' },
-  running:   { icon: <Terminal size={12} />, label: 'Running command…', color: 'var(--accent-red)' },
-  planning:  { icon: <Zap size={12} />, label: 'Planning…', color: 'var(--accent-gold)' },
+  thinking: { icon: <Brain size={12} />, label: 'Thinking…', color: 'var(--matugen-primary, #a0c9dc)' },
+  searching: { icon: <Globe size={12} />, label: 'Searching the web…', color: 'var(--matugen-primary, #a0c9dc)' },
+  reading:   { icon: <Eye size={12} />, label: 'Reading files…', color: 'var(--matugen-secondary, #b2cbd6)' },
+  writing:   { icon: <FileDiff size={12} />, label: 'Writing file…', color: 'var(--matugen-primary, #a0c9dc)' },
+  running:   { icon: <Terminal size={12} />, label: 'Running command…', color: 'var(--matugen-secondary, #b2cbd6)' },
+  planning:  { icon: <Zap size={12} />, label: 'Planning…', color: 'var(--matugen-primary, #a0c9dc)' },
+  todo:      { icon: <ListChecks size={12} />, label: 'Updating plan…', color: 'var(--matugen-secondary, #b2cbd6)' },
 };
 
-/** Derives what the agent is doing based on the last running tool */
 function deriveAgentPhase(tools?: ToolCallData[]): AgentPhase | null {
   if (!tools || tools.length === 0) return { kind: 'thinking' };
   const running = [...tools].reverse().find(t => t.status === 'running');
@@ -49,8 +49,11 @@ function deriveAgentPhase(tools?: ToolCallData[]): AgentPhase | null {
   if (running.name === 'read_file') return { kind: 'reading', label: `Reading ${running.arguments?.path?.split('/').pop() || ''}` };
   if (running.name === 'write_file') return { kind: 'writing', label: `Writing ${running.arguments?.path?.split('/').pop() || ''}` };
   if (running.name === 'list_directory') return { kind: 'reading', label: `Listing ${running.arguments?.path || ''}` };
-  if (running.name === 'run_command' || running.name === 'exec_command') return { kind: 'running', label: `$ ${running.arguments?.command || ''}` };
-  if (running.name === 'plan_update') return { kind: 'planning', label: 'Updating plan…' };
+  if (running.name === 'exec_command') return { kind: 'running', label: `$ ${running.arguments?.command || ''}` };
+  if (running.name === 'run_command') return { kind: 'running', label: `$ ${running.arguments?.command || ''}` };
+  if (['todo_add', 'todo_start', 'todo_done', 'todo_skip', 'todo_list'].includes(running.name)) {
+    return { kind: 'todo', label: 'Updating plan…' };
+  }
   if (running.name === 'task_complete') return { kind: 'planning', label: 'Completing task…' };
   return { kind: 'thinking' };
 }
@@ -67,27 +70,20 @@ const AgentPhaseIndicator: React.FC<{ phase: AgentPhase; label?: string }> = ({ 
   );
 };
 
-const PlanWidget: React.FC<{ tasks: NonNullable<Message['plan']>['tasks'] }> = ({ tasks }) => (
-  <div style={{ margin: '7px 0', padding: '9px 11px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', background: 'rgba(255,255,255,0.035)' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-gold)', fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>
-      <ListChecks size={13} /> Agent plan
-    </div>
-    <div style={{ display: 'grid', gap: '4px' }}>
-      {tasks.map((task) => {
-        const color = task.status === 'completed' ? 'var(--accent-green)' : task.status === 'blocked' ? 'var(--accent-red)' : task.status === 'in_progress' ? 'var(--accent-cyan)' : 'var(--text-muted)';
-        return <div key={task.id} style={{ display: 'flex', gap: '7px', alignItems: 'flex-start', fontSize: '11px', color }}>
-          <span>{task.status === 'completed' ? '✓' : task.status === 'in_progress' ? '●' : task.status === 'blocked' ? '!' : '○'}</span>
-          <span><strong>{task.title}</strong>{task.detail ? <span style={{ display: 'block', color: 'var(--text-muted)', marginTop: '2px' }}>{task.detail}</span> : null}</span>
-        </div>;
-      })}
-    </div>
-  </div>
-);
-
 const TaskCompleteWidget: React.FC<{ summary: string; remaining?: string }> = ({ summary, remaining }) => (
-  <div style={{ margin: '7px 0', padding: '10px 11px', border: '1px solid color-mix(in srgb, var(--accent-green) 45%, transparent)', borderRadius: 'var(--radius-sm)', background: 'color-mix(in srgb, var(--accent-green) 8%, transparent)' }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--accent-green)', fontSize: '11px', fontWeight: 600 }}><CheckCircle size={13} /> Task complete</div>
-    <div style={{ marginTop: '6px', color: 'var(--text-primary)', fontSize: '12px', whiteSpace: 'pre-wrap' }}>{summary}</div>
+  <div style={{
+    margin: '7px 0',
+    padding: '10px 12px',
+    border: '1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 38%, transparent)',
+    borderRadius: 'var(--radius-sm)',
+    background: 'color-mix(in srgb, var(--matugen-primary, #a0c9dc) 9%, transparent)'
+  }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--matugen-primary, #a0c9dc)', fontSize: '11px', fontWeight: 600, marginBottom: '5px' }}>
+      <CheckCircle size={13} color="#22c55e" /> Task complete
+    </div>
+    <div className="markdown-body" style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
+      <ReactMarkdown>{summary}</ReactMarkdown>
+    </div>
     {remaining ? <div style={{ marginTop: '5px', color: 'var(--text-muted)', fontSize: '10px' }}>Remaining: {remaining}</div> : null}
   </div>
 );
@@ -111,7 +107,7 @@ export const ChatStream: React.FC = () => {
     return <EmptyChatScreen />;
   }
 
-  // Derive current agent phase from the last assistant message
+  // Live phase from the last assistant message
   const lastMsg = messages[messages.length - 1];
   const currentPhase = store.agentRunning ? deriveAgentPhase(lastMsg?.tools) : null;
 
@@ -131,15 +127,10 @@ export const ChatStream: React.FC = () => {
         />
       ))}
 
-      {/* Live agentic phase indicator while running, only when no streaming content yet */}
-      {store.agentRunning && currentPhase && (
-        <div className="agent-turn-flow animate-fade-in" style={{ marginTop: '6px' }}>
-          <div className="agent-turn-avatar">
-            <Bot size={13} color="var(--accent-cyan)" />
-          </div>
-          <div style={{ paddingTop: '2px' }}>
-            <AgentPhaseIndicator phase={currentPhase} />
-          </div>
+      {/* Live phase pill shown only when the last message is from user (before assistant turn is mounted) */}
+      {store.agentRunning && currentPhase && lastMsg?.role === 'user' && (
+        <div className="agent-phase-standalone animate-fade-in" style={{ marginTop: '4px', paddingLeft: '12px' }}>
+          <AgentPhaseIndicator phase={currentPhase} />
         </div>
       )}
       <div ref={bottomRef} style={{ height: '4px' }} />
@@ -155,9 +146,7 @@ const MessageBlock: React.FC<{
   agentRunning: boolean;
   previousMessages: Message[];
 }> = ({ sessionId, message, isLast, agentRunning, previousMessages }) => {
-  const isUser = message.role === 'user';
-
-  if (isUser) {
+  if (message.role === 'user') {
     return (
       <UserBubble
         sessionId={sessionId}
@@ -208,17 +197,9 @@ const UserBubble: React.FC<{
   const handleResend = async () => {
     if (!editValue.trim()) return;
     setIsEditing(false);
-
-    // Cancel any running agent
     if (agentRunning) agentEngine.cancel();
-
-    // Build truncated history up to (not including) this message
     const historyBefore = previousMessages.map(m => ({ role: m.role, content: m.content }));
-
-    // Update message content in store
     storeActions.editMessage(sessionId, message.id, editValue.trim());
-
-    // Re-run conversation from this edited message
     try {
       await agentEngine.runConversation(sessionId, editValue.trim(), historyBefore);
     } catch (e) {
@@ -235,7 +216,6 @@ const UserBubble: React.FC<{
 
   return (
     <div className="user-bubble-wrap animate-fade-in">
-      {/* Timestamp + actions - shown on hover */}
       <div className="user-bubble-meta">
         {ts && <span className="bubble-timestamp">{ts}</span>}
         <div className="bubble-actions">
@@ -248,7 +228,6 @@ const UserBubble: React.FC<{
         </div>
       </div>
 
-      {/* Attachments */}
       {message.attachments && message.attachments.length > 0 && (
         <div className="user-bubble-attachments">
           {message.attachments.map(att => {
@@ -269,7 +248,6 @@ const UserBubble: React.FC<{
         </div>
       )}
 
-      {/* Bubble body */}
       {!isEditing ? (
         <div className="user-bubble">
           <p className="user-bubble-text">{message.content}</p>
@@ -300,7 +278,7 @@ const UserBubble: React.FC<{
   );
 };
 
-/* ── Agent turn (free-flowing) ──────────────────────────────────────── */
+/* ── Agent turn — clean, no avatar/name header ──────────────────────── */
 const AgentTurn: React.FC<{
   sessionId: string;
   message: Message;
@@ -321,45 +299,44 @@ const AgentTurn: React.FC<{
     });
   };
 
-  // Derive current phase for this message (only relevant when it's the last and agent is running)
   const phase = (isLast && agentRunning) ? deriveAgentPhase(message.tools) : null;
   const taskComplete = message.tools?.find(tool => tool.name === 'task_complete' && tool.status === 'completed');
   const taskResult = taskComplete?.result as { summary?: string; remaining?: string } | undefined;
 
+  // Filter tool cards — show write_file, exec_command, list_directory, read_file, web_search, errors
+  // Skip internal todo tools (shown via phase indicator), skip task_complete (shown as widget)
+  const visibleToolCards = message.tools?.filter(tool =>
+    ['write_file', 'exec_command', 'run_command', 'list_directory', 'read_file', 'web_search', 'fetch_url'].includes(tool.name) ||
+    tool.status === 'error'
+  ) || [];
+
   return (
     <div className="agent-turn-flow animate-fade-in">
-      {/* Avatar dot */}
-      <div className="agent-turn-avatar">
-        <Bot size={13} color="var(--accent-cyan)" />
-      </div>
-
       <div className="agent-turn-body">
-        {/* Tiny header with name + time */}
-        <div className="agent-turn-header">
-          <span className="agent-name">HyprCandy Agent</span>
-          {ts && <span className="bubble-timestamp">{ts}</span>}
-          {message.content && (
-            <button className="bubble-action-btn" onClick={handleCopy} title="Copy response">
-              {copied ? <Check size={10} color="var(--accent-green)" /> : <Copy size={10} />}
-            </button>
-          )}
-        </div>
-
-        {/* Plan and tool calls — inline in the flow */}
-        {message.plan && message.plan.tasks.length > 0 && <PlanWidget tasks={message.plan.tasks} />}
-        {taskComplete && <TaskCompleteWidget summary={taskResult?.summary || message.content} remaining={taskResult?.remaining} />}
-        {message.tools && message.tools.filter(tool => ['write_file', 'exec_command', 'run_command', 'plan_update'].includes(tool.name) || tool.status === 'error').length > 0 && (
-          <div className="agent-tools-flow">
-            {message.tools
-              .filter(tool => ['write_file', 'exec_command', 'run_command', 'plan_update'].includes(tool.name) || tool.status === 'error')
-              .map(tool => <ToolCard key={tool.id} tool={tool} />)}
+        {/* Timestamp + copy — minimal meta row, only when there's content */}
+        {(message.content || taskComplete) && (
+          <div className="agent-turn-meta">
+            {ts && <span className="bubble-timestamp" style={{ marginLeft: 0 }}>{ts}</span>}
+            {message.content && (
+              <button className="bubble-action-btn" onClick={handleCopy} title="Copy response">
+                {copied ? <Check size={10} color="#22c55e" /> : <Copy size={10} />}
+              </button>
+            )}
           </div>
         )}
 
-        {/* Live phase indicator inside this turn */}
-        {phase && (
-          <AgentPhaseIndicator phase={phase} />
+        {/* Task complete widget (shown before markdown content) */}
+        {taskComplete && <TaskCompleteWidget summary={taskResult?.summary || message.content} remaining={taskResult?.remaining} />}
+
+        {/* Visible tool cards (styled with Matugen tokens) */}
+        {visibleToolCards.length > 0 && (
+          <div className="agent-tools-flow">
+            {visibleToolCards.map(tool => <ToolCard key={tool.id} tool={tool} />)}
+          </div>
         )}
+
+        {/* Live phase indicator while this turn is running */}
+        {phase && <AgentPhaseIndicator phase={phase} />}
 
         {/* Markdown content */}
         {message.content && (!taskComplete || message.content !== taskResult?.summary) && (
@@ -431,19 +408,19 @@ const AgentTurn: React.FC<{
 
 /* ── Tool card ──────────────────────────────────────────────────────── */
 const TOOL_META: Record<string, { icon: React.ReactNode; color: string; label: (args: any) => string }> = {
-  thinking:        { icon: <Brain size={13} />,     color: 'var(--accent-purple)', label: () => 'Thinking' },
-  web_search:     { icon: <Globe size={13} />,     color: 'var(--accent-cyan)',   label: a => `Search: "${a?.query || ''}"` },
-  read_file:      { icon: <FileText size={13} />,  color: 'var(--accent-yellow)', label: a => `Read: ${a?.path?.split('/').pop() || a?.path || ''}` },
-  write_file:     { icon: <FileDiff size={13} />,  color: 'var(--accent-green)',  label: a => `Write: ${a?.path?.split('/').pop() || a?.path || ''}` },
-  list_directory: { icon: <Folder size={13} />,    color: 'var(--accent-yellow)', label: a => `List: ${a?.path || ''}` },
-  run_command:    { icon: <Terminal size={13} />,  color: 'var(--accent-red)',    label: a => `$ ${a?.command || ''}` },
-  task_complete:  { icon: <CheckCircle size={13} />, color: 'var(--accent-green)', label: () => 'Task complete' },
+  web_search:     { icon: <Globe size={13} />,     color: 'var(--matugen-primary, #a0c9dc)',   label: a => `Search: "${a?.query || a?.q || ''}"` },
+  read_file:      { icon: <FileText size={13} />,  color: 'var(--matugen-secondary, #b2cbd6)', label: a => `Read: ${(a?.path || a?.file_path || '').split('/').pop() || a?.path || ''}` },
+  write_file:     { icon: <FileDiff size={13} />,  color: 'var(--matugen-primary, #a0c9dc)',  label: a => `Write: ${(a?.path || a?.file_path || '').split('/').pop() || a?.path || ''}` },
+  list_directory: { icon: <Folder size={13} />,    color: 'var(--matugen-secondary, #b2cbd6)', label: a => `List: ${a?.path || a?.directory || '.'}` },
+  exec_command:   { icon: <Terminal size={13} />,  color: 'var(--matugen-primary, #a0c9dc)',    label: a => `$ ${a?.command || a?.cmd || ''}` },
+  run_command:    { icon: <Terminal size={13} />,  color: 'var(--matugen-primary, #a0c9dc)',    label: a => `$ ${a?.command || a?.cmd || ''}` },
+  task_complete:  { icon: <CheckCircle size={13} />, color: 'var(--matugen-primary, #a0c9dc)', label: () => 'Task complete' },
 };
 
 const ToolCard: React.FC<{ tool: ToolCallData }> = ({ tool }) => {
   const [collapsed, setCollapsed] = useState(true);
   const meta = TOOL_META[tool.name] || {
-    icon: <FileText size={13} />, color: 'var(--text-secondary)',
+    icon: <FileText size={13} />, color: 'var(--matugen-secondary, #b2cbd6)',
     label: () => tool.name,
   };
 
@@ -452,8 +429,8 @@ const ToolCard: React.FC<{ tool: ToolCallData }> = ({ tool }) => {
       <div className="tool-card-header" onClick={() => setCollapsed(!collapsed)}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: meta.color, flex: 1, overflow: 'hidden' }}>
           {collapsed
-            ? <ChevronRight size={12} color="var(--text-muted)" />
-            : <ChevronDown size={12} color="var(--text-muted)" />}
+            ? <ChevronRight size={12} color="var(--matugen-secondary, #b2cbd6)" />
+            : <ChevronDown size={12} color="var(--matugen-secondary, #b2cbd6)" />}
           {meta.icon}
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {meta.label(tool.arguments)}
@@ -461,19 +438,27 @@ const ToolCard: React.FC<{ tool: ToolCallData }> = ({ tool }) => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
           {tool.status === 'completed'
-            ? <CheckCircle size={12} color="var(--accent-green)" />
+            ? <CheckCircle size={12} color="#22c55e" />
             : tool.status === 'error'
-            ? <CheckCircle size={12} color="var(--accent-red)" />
-            : <Clock size={12} color="var(--accent-yellow)" style={{ animation: 'spin 2s linear infinite' }} />}
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{tool.status}</span>
+            ? <CheckCircle size={12} color="#ef4444" />
+            : <Clock size={12} color="var(--matugen-secondary, #b2cbd6)" style={{ animation: 'spin 2s linear infinite' }} />}
+          <span style={{ fontSize: '10px', color: tool.status === 'error' ? '#ef4444' : tool.status === 'completed' ? '#22c55e' : 'var(--text-muted)' }}>{tool.status}</span>
         </div>
       </div>
 
-      {!collapsed && tool.result && (
+      {!collapsed && (tool.result || tool.arguments) && (
         <div className="tool-card-body">
-          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'var(--text-secondary)' }}>
-            {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
-          </pre>
+          {tool.arguments && (
+            <div style={{ marginBottom: tool.result ? '6px' : 0, color: 'var(--text-muted)' }}>
+              <span style={{ color: 'var(--matugen-primary, #a0c9dc)', fontWeight: 600 }}>args: </span>
+              {JSON.stringify(tool.arguments)}
+            </div>
+          )}
+          {tool.result && (
+            <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: tool.status === 'error' ? '#ef4444' : 'var(--text-secondary)' }}>
+              {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
+            </pre>
+          )}
         </div>
       )}
     </div>

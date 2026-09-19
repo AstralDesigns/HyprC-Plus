@@ -20,12 +20,12 @@ Item {
         clip: true
         z: 0
 
-        // Flat mode: primary color background
+        // Flat mode: SurfaceTint color background
         Rectangle {
             anchors.fill: parent
             radius: parent.radius
             visible: Config.islandBgStyle !== "gradient"
-            color: Theme.cPrimary
+            color: Theme.cSurfaceTint
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
         }
 

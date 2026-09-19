@@ -368,6 +368,131 @@ class AgentBridge {
       }
     }
   }
-}
+
+  /**
+   * POST to the local Python runtime server (http://127.0.0.1:17900/).
+   * Falls back to direct fetch when not behind GJS (dev mode).
+   * GJS proxies these via the 'runtime_request' bridge action.
+   */
+  public async runtimeRequest(endpoint: string, payload: any = {}, method: 'GET' | 'POST' = 'POST'): Promise<any> {
+    const url = `http://127.0.0.1:17900${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+    if (this.hasWebKit) {
+      let lastError: any;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        try {
+          return await this.postToHost('runtime_request', { url, method, payload });
+        } catch (error: any) {
+          lastError = error;
+          const message = String(error?.message || error);
+          if (!/connection refused|failed to connect|runtime request error/i.test(message) || attempt === 4) {
+            throw error;
+          }
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
+      }
+      throw lastError || new Error('Runtime request failed');
+    }
+    // Dev fallback: direct fetch
+    const options: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
+    if (method === 'POST') options.body = JSON.stringify(payload);
+    const res = await fetch(url, options);
+    if (!res.ok) throw new Error(`Runtime request failed: ${res.status}`);
+    return res.json();
+  }
+
+  /**
+   * Open a URL in the system browser via GJS (xdg-open).
+   * Used for the Pro checkout link in the Cloud tab.
+   */
+  public openExternalUrl(url: string): void {
+    if (this.hasWebKit) {
+      this.postToHost('open_external_url', { url }).catch(() => {});
+    } else {
+      window.open(url, '_blank', 'noopener');
+    }
+  }
+
+  /**
+   * Fire-and-forget: notify GJS that the local model/server status has changed.
+   * GJS uses this to sync the header Llama badge without waiting for a poll.
+   * @param running   true = server is up with a loaded model, false = stopped/idle
+   * @param modelName optional model name string to show in the badge
+   */
+  public notifyModelStatus(running: boolean, modelName?: string): void {
+    const envelope = JSON.stringify({
+      action: 'model_status_update',
+      payload: { running, modelName: modelName || '' },
+    });
+    if (this.hasWebKit) {
+      try {
+        (window as any).webkit.messageHandlers.agent.postMessage(envelope);
+      } catch (_) { /* best-effort, no reply expected */ }
+    }
+  }
+
+  /**
+   * Store a credential securely via GJS CredentialsManager (GNOME Secrets / libsecret 1).
+   * Falls back to localStorage in dev mode.
+   */
+  public async storeSecret(account: string, secret: string, service = 'hyprcandy_byok'): Promise<boolean> {
+    if (this.hasWebKit) {
+      try {
+        const res = await this.postToHost('secret_store', { service, account, secret });
+        return !!res?.ok;
+      } catch (e) {
+        console.warn('[bridge] storeSecret failed:', e);
+        return false;
+      }
+    }
+    try {
+      localStorage.setItem(`secret_${service}_${account}`, secret);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Retrieve a credential securely via GJS CredentialsManager (GNOME Secrets / libsecret 1).
+   * Falls back to localStorage in dev mode.
+   */
+  public async lookupSecret(account: string, service = 'hyprcandy_byok'): Promise<string | null> {
+    if (this.hasWebKit) {
+      try {
+        const res = await this.postToHost('secret_lookup', { service, account });
+        return res?.secret || null;
+      } catch (e) {
+        console.warn('[bridge] lookupSecret failed:', e);
+        return null;
+      }
+    }
+    try {
+      return localStorage.getItem(`secret_${service}_${account}`);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Delete a credential securely via GJS CredentialsManager (GNOME Secrets / libsecret 1).
+   */
+  public async clearSecret(account: string, service = 'hyprcandy_byok'): Promise<boolean> {
+    if (this.hasWebKit) {
+      try {
+        const res = await this.postToHost('secret_clear', { service, account });
+        return !!res?.ok;
+      } catch (e) {
+        console.warn('[bridge] clearSecret failed:', e);
+        return false;
+      }
+    }
+    try {
+      localStorage.removeItem(`secret_${service}_${account}`);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+} // end class AgentBridge
 
 export const bridge = new AgentBridge();
