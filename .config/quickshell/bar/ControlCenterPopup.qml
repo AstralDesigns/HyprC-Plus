@@ -1449,7 +1449,7 @@ PanelWindow {
                                 Text {
                                     text: modelData.icon
                                     font.family: Config.fontFamily; font.pixelSize: 15
-                                    color: (_stackIdx === modelData.idx ? Theme.cOnSecondary : Theme.cWc12); opacity: 0.55
+                                    color: _stackIdx === modelData.idx ? Theme.cOnSecondary : Theme.cSurfaceTint
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                                 Text {
@@ -1510,25 +1510,6 @@ PanelWindow {
                             }
                         }
                         Item { Layout.fillWidth: true }
-                        Rectangle {
-                            width: 26; height: 26; radius: 13
-                            color: closeHov.containsMouse
-                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                          Theme.cPrimary.b, 0.15)
-                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                          Theme.cPrimary.b, 0.06)
-                            Text {
-                                anchors.centerIn: parent; text: "󰅙"
-                                font.family: Config.fontFamily; font.pixelSize: 14
-                                color: Theme.cPrimary
-                            }
-                            MouseArea {
-                                id: closeHov; anchors.fill: parent; hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: ControlCenterState.close()
-                            }
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                        }
                     }
                 }
               } // sidebarCard
