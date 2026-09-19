@@ -1224,7 +1224,7 @@ body,
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
 }
 
 .shortcut-key {
