@@ -1415,7 +1415,7 @@ ShellRoot {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: 16
-                                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.35)
+                                        color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.3)
                                     }
                                 }
 

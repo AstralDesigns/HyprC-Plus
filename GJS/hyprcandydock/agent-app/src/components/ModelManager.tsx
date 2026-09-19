@@ -495,9 +495,18 @@ const LocalTab: FC = () => {
     if (!searchQuery.trim()) return;
     setSearching(true); setError(''); setSearchResults([]);
     try {
-      const result = await bridge.runtimeRequest(`/api/models/search?q=${encodeURIComponent(searchQuery.trim())}`, {}, 'GET');
-      setSearchResults(Array.isArray(result?.models) ? result.models.slice(0, 16) : []);
-    } catch (e: any) {
+      const q = encodeURIComponent(searchQuery.trim());
+      const r = await fetch(`https://huggingface.co/api/models?search=${q}&filter=gguf&sort=downloads&direction=-1&limit=20`);
+      if (!r.ok) throw new Error('HF API error');
+      const data = await r.json();
+      let results: any[] = Array.isArray(data) ? data : [];
+      if (results.length === 0) {
+        const r2 = await fetch(`https://huggingface.co/api/models?search=${q}&sort=downloads&direction=-1&limit=20`);
+        const d2 = await r2.json();
+        results = Array.isArray(d2) ? d2 : [];
+      }
+      setSearchResults(results.slice(0, 16));
+    } catch {
       setError('Search failed — check internet connection');
     } finally {
       setSearching(false);
@@ -803,7 +812,7 @@ const CloudTab: FC = () => {
     (async () => {
       const foundKeys: Record<string, string> = {};
       for (const provider of BYOK_PROVIDERS) {
-        let secret = store.byokKeys[provider.id];
+        let secret: string | null = store.byokKeys[provider.id] || null;
         if (!secret) {
           secret = await bridge.lookupSecret(provider.id);
         }
@@ -1003,7 +1012,7 @@ const CloudTab: FC = () => {
         await bridge.runtimeRequest(`/api/byok/activate/${providerId}`);
 
         const providerDef = BYOK_PROVIDERS.find(p => p.id === providerId);
-        const providerModelsList = fetchedModels[providerId] || (providerDef?.models as any[]) || [];
+        const providerModelsList = fetchedModels[providerId] || [...(providerDef?.models || [])] || [];
         const selectedModel = overrideModel
           || (store.byokProvider === providerId && store.byokModel)
           || providerModelsList[0]?.id
@@ -1117,7 +1126,7 @@ const CloudTab: FC = () => {
   const isCurrentActive = store.inferenceMode === 'byok' && store.byokProvider === currentProvider.id;
   const isCurrentConfigured = !!store.byokKeys[currentProvider.id];
 
-  const availableModels = fetchedModels[currentProvider.id] || (currentProvider.models as any[]) || [];
+  const availableModels = fetchedModels[currentProvider.id] || [...(currentProvider.models || [])] || [];
   const isModelsLive = !!modelsLive[currentProvider.id];
   const currentQuery = (searchQuery[currentProvider.id] || '').trim().toLowerCase();
 

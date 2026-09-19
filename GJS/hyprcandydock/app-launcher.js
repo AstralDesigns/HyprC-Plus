@@ -323,12 +323,13 @@ function _detectGpuTopology() {
                 const driverLink = GLib.file_read_link(GLib.build_filenamev([devDir, 'driver']));
                 driver = driverLink ? driverLink.split('/').pop() : null;
             } catch (_) { }
-            // Do not probe the render node with Gio.File.read(): on some
-            // Mesa/Vulkan stacks that probe itself returns EINVAL even though
-            // the node is usable by the child process. Check existence and
-            // permissions instead, then let the selected backend validate it.
-            const renderPath = GLib.build_filenamev(['/dev/dri', name]);
-            let isAccessible = GLib.file_test(renderPath, GLib.FileTest.EXISTS);
+            let isAccessible = true;
+            try {
+                const f = Gio.File.new_for_path('/dev/dri/' + name).read(null);
+                if (f) f.close(null);
+            } catch (_) {
+                isAccessible = false;
+            }
             gpus.push({ pciAddr, vendor, device, bootVga, driver, renderNode: name, isAccessible });
         }
     } catch (e) {
@@ -349,14 +350,8 @@ const _KNOWN_PROBLEMATIC_INTEL_DEVICE_IDS = new Set([
 
 const _gpus = _detectGpuTopology();
 const _bootGpu = _gpus.find(g => g.bootVga) || _gpus[0] || null;
-const _accessibleGpus = _gpus.filter(g => g.isAccessible);
-console.log(`[launcher] GPU topology: ${_gpus.map(g => `${g.renderNode}:${g.vendor || '?'}:${g.device || '?'}:${g.driver || '?'}:boot=${g.bootVga}:exists=${g.isAccessible}`).join(', ') || 'none'}`);
-// boot_vga is not a reliable discrete-vs-integrated signal on laptops: the
-// dGPU can be the boot GPU while the Intel adapter remains available. Prefer
-// any accessible non-Intel adapter first, then a non-boot adapter.
 const _discreteGpu = _gpus.length > 1
-    ? (_accessibleGpus.find(g => g.vendor && g.vendor !== '0x8086')
-        || _accessibleGpus.find(g => !g.bootVga))
+    ? (_gpus.find(g => !g.bootVga && g.isAccessible) || _gpus.find(g => g.vendor !== '0x8086' && g.isAccessible))
     : null;
 
 const _isProblematicIntelGpu = (g) => g && g.vendor === '0x8086' && _KNOWN_PROBLEMATIC_INTEL_DEVICE_IDS.has(g.device);
@@ -368,14 +363,11 @@ if (_discreteGpu) {
         GLib.setenv('__NV_PRIME_RENDER_OFFLOAD', '1', true);
         GLib.setenv('__GLX_VENDOR_LIBRARY_NAME', 'nvidia', true);
         try { GLib.setenv('__VK_LAYER_NV_optimus', 'NVIDIA_only', true); } catch (_) { }
-        GLib.setenv('HYPRCANDY_LLAMA_GPU_PCI', _discreteGpu.pciAddr, true);
         console.log(`[launcher] Hybrid graphics detected — discrete NVIDIA GPU ${_discreteGpu.pciAddr}; routing via __NV_PRIME_RENDER_OFFLOAD.`);
     } else {
         // Mesa-based discrete GPU (AMD Radeon, Intel Arc/dGPU, nouveau, etc.)
         const driPrimeId = 'pci-' + _discreteGpu.pciAddr.replace(/[:.]/g, '_');
         GLib.setenv('DRI_PRIME', driPrimeId, true);
-        GLib.setenv('HYPRCANDY_LLAMA_DRI_PRIME', driPrimeId, true);
-        GLib.setenv('HYPRCANDY_LLAMA_GPU_PCI', _discreteGpu.pciAddr, true);
         console.log(`[launcher] Hybrid graphics detected — discrete GPU ${_discreteGpu.pciAddr}; routing via DRI_PRIME=${driPrimeId}.`);
     }
 }
@@ -1109,7 +1101,7 @@ window.hyprcandy-launcher {
    No padding here — the border sits flush against the SearchEntry.       */
 
 .search-frame {
-    background-color: @blur_background8;/*alpha(@on_secondary, 0.85);*/
+    background-color: @blur_background8;
     border-radius: ${sr}px;
     border-style: solid;
     border-width: 0px;
@@ -1419,7 +1411,7 @@ window.hyprcandy-group-dialog {
 }
 
 .tab-btn.active {
-    background-color: alpha(@surface_tint, 0.8);
+    background-color: @surface_tint;
 }
 
 .tab-btn:active {
@@ -2320,30 +2312,19 @@ const AppLauncherWindow = GObject.registerClass({
         this._agentWorkspaceBtn = null;
         this._agentWorkspaceGlyph = null;
         this._agentWorkspaceLabel = null;
-        this._agentLlamaBtn = null;
-        this._agentLlamaGlyph = null;
-        this._agentLlamaLabel = null;
-        this._agentLlamaRunning = false;
-        this._agentLlamaStarting = false;
-        this._agentLlamaEnabled = false;
+        this._agentLlamaRunning = false;   // synced from the ModelManager Local tab via 'model_status_update'
         this._workspaceStartupEnabled = readWorkspaceStartupState();
         this._agentWebView = null;
         this._agentHttpServer = null;
         this._agentHttpPort = 0;
-        // Host replies must return to the renderer that made the request:
-        // visible WebKitGTK for UI requests, hidden Electron for inference
-        // renderer requests.  Without this map, the old Electron-first reply
-        // path leaves WebKit promises pending forever.
+        // Host replies must return to the renderer that made the request. The
+        // visible WebKitGTK view is now the only agent renderer; this map is
+        // kept so a future secondary surface could reuse the same mechanism.
         this._agentReplyTargets = new Map();
 
         this._loadGlobalCSS();
         this._setupLayerShell();
         this._buildUI();
-        this._agentCheckLlamaStatus((running) => {
-            this._agentLlamaRunning = !!running;
-            this._agentLlamaEnabled = !!running;
-            this._agentUpdateLlamaBtn();
-        });
         this._setupKeyboard();
         this._setupFocusClose();
         this._setupColorMonitor();
@@ -2360,30 +2341,6 @@ const AppLauncherWindow = GObject.registerClass({
                 try { this._agentHttpServer.disconnect(); } catch (_) { }
                 this._agentHttpServer = null;
                 this._agentHttpPort = 0;
-            }
-            // Gracefully terminate the embedded Electron agent renderer so it
-            // doesn't persist as a zombie after launcher is destroyed (we
-            // use Gio.Subprocess so it IS a child of the launcher process,
-            // but we still request clean shutdown via quit message so the
-            // Chromium user-data-dir IndexedDB model caches are flushed).
-            if (this._agentElectronProc && !this._agentElectronExited) {
-                try {
-                    const quitMsg = JSON.stringify({ type: 'quit' }) + '\n';
-                    try {
-                        const stdinP = this._agentElectronProc.get_stdin_pipe();
-                        if (stdinP) stdinP.write_all(new TextEncoder().encode(quitMsg), null);
-                    } catch (_) { }
-                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
-                        try {
-                            if (this._agentElectronProc && !this._agentElectronExited) {
-                                this._agentElectronProc.force_exit();
-                            }
-                        } catch (_) { }
-                        return GLib.SOURCE_REMOVE;
-                    });
-                } catch (_) { }
-                this._agentElectronProc = null;
-                this._agentElectronStdin = null;
             }
             // Write "closed" to launcher.state so dock autohide is never left
             // permanently suppressed if the launcher exits while visible.
@@ -2999,11 +2956,6 @@ const AppLauncherWindow = GObject.registerClass({
             this._searchEntry.set_placeholder_text(' Ask the agent…');
             this._searchEntry.set_text('');
             this._agentInjectTheme();
-            this._agentCheckLlamaStatus((running) => {
-                this._agentLlamaRunning = !!running;
-                this._agentLlamaEnabled = !!running;
-                this._agentUpdateLlamaBtn();
-            });
         } else if (id === 'clipboard') {
             this._searchEntry.set_placeholder_text(' Search clipboard…');
             this._searchEntry.set_text('');
@@ -4830,14 +4782,6 @@ const AppLauncherWindow = GObject.registerClass({
         // SIGUSR1 hide, and the bgWin click handler above.
         this.connect('notify::visible', () => {
             if (this._bgWin) this._bgWin.set_visible(this.get_visible());
-            // Show/hide the embedded Electron agent renderer in lockstep with the
-            // launcher layer window.  This avoids the always-on-top Electron window
-            // "ghosting" over other workspaces when the launcher is hidden.
-            try {
-                if (this._agentElectronProc && !this._agentElectronExited && this._agentUsingElectron) {
-                    this._agentElectronWriteStdin({ type: this.get_visible() ? 'show' : 'hide' });
-                }
-            } catch (_) { }
             // Write launcher state so dock-main.js can suppress autohide
             // while the launcher is visible.
             try {
@@ -7218,317 +7162,16 @@ const AppLauncherWindow = GObject.registerClass({
         }
     }
 
-    _startAgentElectronProc(launcherScript, agentUrl, wrapWidget) {
-        // Spawns the embedded Electron child process that renders the React
-        // agent-app with real mature Chromium WebGPU (matching CandyCode).
-        // IPC uses line-delimited JSON on stdin/stdout (no sockets, no HTTP).
-        //   stdout JSON lines (Electron → GJS):
-        //     { type: 'ready' }
-        //     { type: 'console', level, msg }
-        //     { type: 'error', message, stack }
-        //     { type: 'postMessage', data: '<envelope JSON string>' }
-        //   stdin JSON lines (GJS → Electron):
-        //     { type: 'bounds', x, y, w, h }
-        //     { type: 'dispatch', payload: {...} }
-        //     { type: 'show' | 'hide' | 'focus' | 'quit' | 'reload' | 'devtools' }
-        if (!launcherScript || !wrapWidget) return;
-
-        // Build argv
-        const argv = [launcherScript, agentUrl];
-        const envv = GLib.get_environ();
-        // Separate stdout from stderr so noisy Chromium stderr logs do not flood the JSON reader
-        const flags = Gio.SubprocessFlags.STDIN_PIPE
-            | Gio.SubprocessFlags.STDOUT_PIPE;
-        const proc = new Gio.Subprocess({
-            argv: argv,
-            flags: flags,
-            // envv is applied implicitly via current process env (inherited)
-        });
-        proc.init(null);
-        this._agentElectronProc = proc;
-        this._agentElectronExited = false;
-
-        // ── stdout/stderr reader (line JSONL) ──────────────────────────────
-        const stdoutPipe = proc.get_stdout_pipe();
-        if (stdoutPipe) {
-            const dataIn = new Gio.DataInputStream({ base_stream: stdoutPipe, close_base_stream: true });
-            dataIn.set_newline_type(Gio.DataStreamNewlineType.ANY);
-            this._agentElectronStdin = proc.get_stdin_pipe();
-            const readOne = () => {
-                if (this._agentElectronExited) return;
-                dataIn.read_line_async(GLib.PRIORITY_DEFAULT, null, (s, res) => {
-                    if (this._agentElectronExited) return;
-                    try {
-                        const [line, len] = s.read_line_finish_utf8(res);
-                        if (line === null) {
-                            console.warn('[launcher:electron] Child process closed stdout (EOF)');
-                            this._agentOnElectronDead(proc);
-                            return;
-                        }
-                        if (line.trim().length > 0) {
-                            this._agentOnElectronLine(line);
-                        }
-                        readOne();
-                    } catch (err) {
-                        console.warn('[launcher:electron] Stdout read error or EOF:', err.message);
-                        this._agentOnElectronDead(proc);
-                    }
-                });
-            };
-            readOne();
-        }
-
-        // Watch process exit so we can fall back to WebKit if it crashes.
-        proc.wait_check_async(null, (p, res) => {
-            try {
-                const ok = p.wait_check_finish(res);
-                const code = p.get_exit_status();
-                console.warn(`[launcher:electron] Child exited ok=${ok} status=${code}; activating WebKit fallback`);
-            } catch (_) { }
-            this._agentOnElectronDead(proc);
-        });
-
-        // ── Bounds / position sync removed.
-        // In the new headless-Electron architecture (HYPRCANDY_ELECTRON_EMBEDDED=1)
-        // the Electron BrowserWindow is never shown, so there is no foreign window
-        // to reposition. Bounds messages are no longer sent.
-
-        console.log('[launcher:electron] Spawned native llama bridge worker (GPU inference disabled)');
-    }
-
-    _agentElectronSyncBounds(_wrapWidget) {
-        // No-op in headless embedded mode — Electron window is never shown.
-    }
-
-    _agentElectronWriteStdin(lineOrMsg) {
-        if (!this._agentElectronStdin) return;
-        try {
-            const str = typeof lineOrMsg === 'string' ? lineOrMsg : JSON.stringify(lineOrMsg);
-            const line = str.endsWith('\n') ? str : (str + '\n');
-            const bytes = new TextEncoder().encode(line);
-            const gbytes = GLib.Bytes.new(bytes);
-            this._agentElectronStdin.write_bytes_async(gbytes, GLib.PRIORITY_DEFAULT, null, (stream, res) => {
-                try {
-                    stream.write_bytes_finish(res);
-                } catch (err) {
-                    console.warn('[launcher:electron] write_bytes_async error:', err.message);
-                }
-            });
-        } catch (e) {
-            console.warn('[launcher:electron] stdin write error:', e.message);
-        }
-    }
-
-    _agentOnElectronLine(line) {
-        if (!line || !line.trim()) return;
-        let msg = null;
-        try { msg = JSON.parse(line.trim()); }
-        catch {
-            // Electron stderr is merged into stdout by the subprocess. Keep
-            // it visible in launcher logs instead of silently discarding the
-            // reason Chromium never reaches the ready handshake.
-            console.warn('[launcher:electron:raw]', line.trim().slice(0, 4000));
-            return;
-        }
-        if (!msg || typeof msg !== 'object') return;
-        if (msg.type === 'ready') {
-            this._agentElectronActive = true;
-            // In the new headless-Electron architecture the WebKitGTK view IS the
-            // UI — keep it visible. The 'ready' signal just means the Chromium
-            // inference engine has fully booted and WebLLM is available.
-            console.log('[launcher:electron] Native llama bridge worker ready (Chromium/WebGPU disabled)');
-            try {
-                // Push current theme + user prompt state into the hidden renderer.
-                // Even though the renderer window is not shown, the React app inside
-                // it must receive theme vars to correctly theme the WebKit UI side.
-                if (this._cachedThemeVars) this._agentPostMessage({ type: 'theme_update', payload: this._cachedThemeVars });
-            } catch (_) { }
-            if (this._agentElectronQueue && this._agentElectronQueue.length > 0) {
-                const q = this._agentElectronQueue.slice();
-                this._agentElectronQueue = [];
-                for (const queued of q) {
-                    try {
-                        this._agentElectronWriteStdin({
-                            type: 'dispatch',
-                            payload: queued,
-                        });
-                    } catch (err) {
-                        console.warn('[launcher:electron] Failed to dispatch queued payload:', err.message);
-                    }
-                }
-            }
-            return;
-        }
-        if (msg.type === 'console') {
-            const lvl = String(msg.level || 'log');
-            const m = String(msg.msg || '');
-            if (lvl === 'error') console.error('[agent-react-electron]', m);
-            else if (lvl === 'warn') console.warn('[agent-react-electron]', m);
-            // Drop browser/info/log chatter from the hidden Electron renderer.
-            return;
-        }
-        if (msg.type === 'error') {
-            console.warn('[launcher:electron] Renderer error:', msg.message || '(unknown)', msg.stack || '');
-            return;
-        }
-        if (msg.type === 'postMessage') {
-            // Mirrors WebKit script-message-received::agent handler (same envelope string)
-            this._agentHandleMessage(String(msg.data || ''), 'electron');
-            return;
-        }
-        // ── Worker/native inference relay: Electron → GJS → WebKit ────────────────
-        if (msg.type === 'llama_response') {
-            const response = msg.payload || {};
-            this._agentPostMessage({ id: response.requestId, type: 'response', payload: response.value, error: response.error || undefined }, 'webkit');
-            return;
-        }
-        if (msg.type === 'llama_progress') {
-            this._agentInjectToWebView({ type: msg.type, payload: msg.payload }, true);
-            return;
-        }
-        if (msg.type === 'worker_progress' || msg.type === 'worker_model_ready' ||
-            msg.type === 'worker_done' ||
-            msg.type === 'worker_error' || msg.type === 'worker_cache_status' ||
-            msg.type === 'worker_cache_cleared') {
-            // Relay the exact message object into the WebKit React app so that
-            // bridge.ts dispatches it as an agent_worker_* CustomEvent which
-            // agent-engine.ts listens for in WebKit-delegate mode.
-            this._agentInjectToWebView({ type: msg.type, payload: msg.payload });
-            return;
-        }
-        if (msg.type === 'worker_token') {
-            this._agentInjectToWebView({ type: msg.type, payload: msg.payload }, 'token');
-            return;
-        }
-    }
-
-    // ── Inject a message directly into the WebKit React bridge ───────────────────
-    // Calls window.__hyprcandy_agent_dispatch(msg) in the WebKit renderer via
-    // evaluate_javascript. Used to push worker_* inference events from Electron
-    // back into the WebKit React app's bridge handlers.
-    _agentInjectToWebView(msg, throttle = false) {
-        const wv = this._agentWebView;
-        if (!wv) return;
-        if (throttle) {
-            const pending = this._agentInjectThrottlePending;
-            if (throttle === 'token' && pending?.type === 'worker_token' && msg.type === 'worker_token') {
-                this._agentInjectThrottlePending = {
-                    type: 'worker_token',
-                    payload: {
-                        ...(pending.payload || {}),
-                        ...(msg.payload || {}),
-                        token: String(pending.payload?.token || '') + String(msg.payload?.token || ''),
-                    },
-                };
-            } else {
-                this._agentInjectThrottlePending = msg;
-            }
-            if (this._agentInjectThrottleTimer) return;
-            const delay = throttle === 'token' ? 50 : 200;
-            this._agentInjectThrottleTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delay, () => {
-                this._agentInjectThrottleTimer = 0;
-                const pending = this._agentInjectThrottlePending;
-                this._agentInjectThrottlePending = null;
-                if (pending) this._agentInjectToWebView(pending);
-                return GLib.SOURCE_REMOVE;
-            });
-            return;
-        }
-        try {
-            const js = `(function(){
-  try {
-    if (typeof window.__hyprcandy_agent_dispatch === 'function') {
-      window.__hyprcandy_agent_dispatch(${JSON.stringify(msg)});
-    } else {
-      window.dispatchEvent(new CustomEvent('agent_host_message', { detail: ${JSON.stringify(msg)} }));
-    }
-  } catch(e) { console.warn('[bridge-inject]', e.message); }
-})();`;
-            // evaluate_javascript is the standard WebKitGTK4 API
-            if (typeof wv.evaluate_javascript === 'function') {
-                wv.evaluate_javascript(js, -1, null, null, null, null);
-            } else if (typeof wv.run_javascript === 'function') {
-                wv.run_javascript(js, null, null);
-            }
-        } catch (e) {
-            console.warn('[launcher] agentInjectToWebView error:', e.message);
-        }
-    }
-
-    _agentOnElectronDead(deadProc = null) {
-        // A previous worker can finish its wait/read callback after a restart.
-        // Never let that stale callback clear the currently active worker.
-        if (deadProc && this._agentElectronProc && this._agentElectronProc !== deadProc) return;
-        if (this._agentElectronExited && !this._agentElectronProc) return;
-        this._agentElectronExited = true;
-        this._agentElectronActive = false;
-        this._agentUsingElectron = false;
-        this._agentElectronProc = null;
-        this._agentElectronStdin = null;
-        if (this._agentElectronQueue && this._agentElectronQueue.length > 0) {
-            const errPayload = { message: 'Electron worker exited unexpectedly.' };
-            for (const item of this._agentElectronQueue) {
-                this._agentInjectToWebView({ type: 'worker_error', payload: errPayload });
-            }
-            this._agentElectronQueue = [];
-        }
-        // Do not silently switch WebLLM to WebKitGTK: WebKitGTK may expose a
-        // navigator.gpu stub without requestAdapter, producing a misleading
-        // model/cache error. Opt into the legacy fallback only for debugging.
-        const allowWebKitFallback = GLib.getenv('HYPRCANDY_AGENT_ALLOW_WEBKIT_FALLBACK') === '1';
-        if (!allowWebKitFallback) {
-            console.error('[launcher:electron] Electron agent exited; WebKitGTK fallback disabled because WebLLM requires Chromium WebGPU.');
-            return;
-        }
-        // Activate WebKit fallback widget only when explicitly requested.
-        try {
-            if (this._agentWebView) {
-                this._agentWebView.set_visible(true);
-                // If loopback server is up but webview has not loaded, load now
-                if (!this._agentWebView.get_uri()) {
-                    const url = `http://${AGENT_LOOPBACK_HOST}:${AGENT_LOOPBACK_PORT}/index.html`;
-                    try { this._agentWebView.load_uri(url); } catch (_) { }
-                }
-            }
-        } catch (_) { }
-    }
-
-    _sendOrQueueElectronDispatch(payload) {
-        const action = payload?.action || '';
-        const type = payload?.type || '';
-        const isLlamaRequest = type === 'llama_request' || action.startsWith('llama_');
-        const isLlamaStop = isLlamaRequest && action === 'llama_stop';
-        // Native llama.cpp is the only supported inference backend. Workspace
-        // UI/runtime messages must never boot the obsolete WebLLM worker.
-        const allowed = isLlamaRequest ? (this._agentLlamaEnabled || isLlamaStop) : false;
-        if (!allowed) {
-            console.log(`[launcher:${isLlamaRequest ? 'llama' : 'workspace'}] Dispatch suppressed while its independent toggle is OFF.`);
-            return;
-        }
-        if (this._agentElectronActive && this._agentElectronStdin) {
-            try {
-                this._agentElectronWriteStdin({
-                    type: 'dispatch',
-                    payload: payload,
-                });
-                return;
-            } catch (e) {
-                console.warn('[launcher:electron] Stdin write error, re-queueing:', e.message);
-            }
-        }
-        if (!this._agentElectronQueue) this._agentElectronQueue = [];
-        this._agentElectronQueue.push(payload);
-        if (isLlamaRequest) this._ensureElectronWorker();
-    }
-
-    _ensureElectronWorker() {
-        // Compatibility entrypoint for stale callers. Electron was removed;
-        // the only worker that may be started here is the Python runtime.
-        if (!this._pythonRuntimeStarted) {
-            this._pythonRuntimeStarted = true;
-            try { this._agentStartPythonRuntime(); } catch (e) {
-                console.warn('[launcher:runtime] Could not start Python runtime:', e.message);
-            }
+    // Ensures the local Python runtime server (model catalog, llama-server
+    // lifecycle, and the agentic tool loop for local/BYOK/cloud inference) is
+    // running. Chromium/Electron is no longer part of this pipeline — the
+    // WebKitGTK view is the sole UI/inference-client surface, and it talks to
+    // this server directly over HTTP via bridge.runtimeRequest().
+    _ensureRuntimeBackend() {
+        if (this._pythonRuntimeStarted) return;
+        this._pythonRuntimeStarted = true;
+        try { this._agentStartPythonRuntime(); } catch (e) {
+            console.warn('[launcher:runtime] Could not start Python runtime:', e.message);
         }
     }
 
@@ -7536,103 +7179,12 @@ const AppLauncherWindow = GObject.registerClass({
         if (!this._workspaceStartupEnabled) return;
         const agentUrl = this._startAgentLoopbackServer();
         if (!agentUrl) return;
-        // Workspace startup only warms the visible WebKit shell. Do not start
-        // the obsolete Chromium/WebLLM worker or llama-server here.
-        console.log('[launcher:workspace] Warmed WebKit workspace shell without starting inference.');
-    }
-
-    _agentCheckLlamaStatus(onDone) {
-        try {
-            if (!this._soupSession) this._soupSession = new Soup.Session();
-            const req = new Soup.Message({
-                method: 'GET',
-                uri: GLib.Uri.parse(`http://127.0.0.1:${LLAMA_SERVER_PORT}/health`, GLib.UriFlags.NONE)
-            });
-            this._soupSession.send_and_read_async(req, GLib.PRIORITY_DEFAULT, null, (session, res) => {
-                try {
-                    const bytes = session.send_and_read_finish(res);
-                    const text = new TextDecoder().decode(bytes.get_data());
-                    const payload = text ? JSON.parse(text) : null;
-                    const running = !!(payload && (payload.status === 'ok' || payload.ok === true || payload.running === true));
-                    this._agentLlamaRunning = running;
-                    this._agentUpdateLlamaBtn();
-                    if (onDone) onDone(running);
-                } catch (_) {
-                    this._agentLlamaRunning = false;
-                    this._agentUpdateLlamaBtn();
-                    if (onDone) onDone(false);
-                }
-            });
-        } catch (_) {
-            this._agentLlamaRunning = false;
-            this._agentUpdateLlamaBtn();
-            if (onDone) onDone(false);
-        }
-    }
-
-    _agentConfirmLlamaHealth(maxMs = 8000, intervalMs = 250) {
-        const started = Date.now();
-        const probe = () => {
-            this._agentCheckLlamaStatus((running) => {
-                if (running) {
-                    this._agentLlamaRunning = true;
-                    this._agentUpdateLlamaBtn();
-                    return;
-                }
-                if (Date.now() - started < maxMs) {
-                    GLib.timeout_add(GLib.PRIORITY_DEFAULT, intervalMs, () => {
-                        probe();
-                        return GLib.SOURCE_REMOVE;
-                    });
-                } else {
-                    this._agentLlamaRunning = false;
-                    this._agentUpdateLlamaBtn();
-                }
-            });
-        };
-        probe();
-    }
-
-    _agentStopElectronWorker() {
-        const proc = this._agentElectronProc;
-        if (!proc) return;
-        try {
-            try { proc.send_signal(Gio.ProcessSignal.TERM); } catch (_) { }
-            try { proc.force_exit(); } catch (_) { }
-        } catch (_) { }
-        try {
-            if (this._agentElectronQueue && this._agentElectronQueue.length > 0) {
-                this._agentElectronQueue.length = 0;
-            }
-        } catch (_) { }
-        this._agentElectronProc = null;
-        this._agentElectronStdin = null;
-        this._agentElectronActive = false;
-        this._agentUsingElectron = false;
-        this._agentElectronExited = true;
-    }
-
-    _agentStopNativeLlamaServer() {
-        try {
-            GLib.spawn_command_line_async('pkill -9 -f "llama-server"');
-        } catch (_) { }
-    }
-
-    _agentStopWorkspaceProcesses() {
-        try {
-            // Harden the shutdown path: the launcher has a single worker script
-            // and a single Electron main file, so the kill scope stays narrow.
-            const cleanup = [
-                'pkill -9 -f "start-electron-agent.sh"',
-                'pkill -9 -f "agent-app/electron/main.cjs"',
-                'pkill -9 -f "electron/dist/electron"',
-            ];
-            for (const cmd of cleanup) {
-                try {
-                    GLib.spawn_command_line_async(cmd);
-                } catch (_) { }
-            }
-        } catch (_) { }
+        // Workspace startup only warms the WebKitGTK shell and the Python
+        // runtime process. It must never start llama-server itself; the
+        // model server is an explicit user choice made from the Model
+        // Manager's Local tab.
+        this._ensureRuntimeBackend();
+        console.log('[launcher:workspace] Warmed workspace shell without starting llama-server.');
     }
 
     _agentRevealWorkspace() {
@@ -7658,19 +7210,10 @@ const AppLauncherWindow = GObject.registerClass({
         this._agentWorkspaceLabel.set_text(on ? 'Workspace ON' : 'Workspace OFF');
     }
 
-    _agentUpdateLlamaBtn() {
-        if (!this._agentLlamaBtn || !this._agentLlamaGlyph || !this._agentLlamaLabel) return;
-        const on = !!this._agentLlamaRunning;
-        this._agentLlamaBtn.remove_css_class(on ? 'agent-llama-off' : 'agent-llama-on');
-        this._agentLlamaBtn.add_css_class(on ? 'agent-llama-on' : 'agent-llama-off');
-        this._agentLlamaGlyph.set_text(on ? '󰒋' : '󰒏');
-        this._agentLlamaLabel.set_text(on ? 'Llama ON' : 'Llama OFF');
-    }
-
-    _agentMaybeStopElectronWorker() {
-        // Workspace visibility is independent from the native inference worker.
-        if (!this._agentLlamaEnabled) this._agentStopElectronWorker();
-    }
+    // Local-model start/stop is now owned entirely by the ModelManager Local
+    // tab (bridge.runtimeRequest → Python runtime's /api/server/start|stop).
+    // There is no header Llama toggle anymore; GJS only needs to keep the
+    // Python runtime process itself alive, which _ensureRuntimeBackend does.
 
     _agentToggleWorkspace() {
         const next = !this._workspaceStartupEnabled;
@@ -7679,40 +7222,15 @@ const AppLauncherWindow = GObject.registerClass({
         this._agentUpdateWorkspaceBtn();
         if (next) {
             this._agentRevealWorkspace();
+            this._ensureRuntimeBackend();
             this._switchTab('agent', true);
         } else {
             if (this._agentWebView) try { this._agentWebView.set_visible(false); } catch (_) { }
-            this._agentMaybeStopElectronWorker();
             this._switchTab('launcher', true);
         }
     }
 
-    _agentToggleLlama() {
-        if (this._agentLlamaRunning || this._agentLlamaEnabled) {
-            this._agentLlamaEnabled = false;
-            this._agentPostMessage({ type: 'llama_state', payload: { enabled: false } });
-            this._agentStopNativeLlamaServer();
-            this._agentLlamaRunning = false;
-            this._agentUpdateLlamaBtn();
-            this._agentMaybeStopElectronWorker();
-            return;
-        }
-        this._agentLlamaEnabled = true;
-        this._agentPostMessage({ type: 'llama_state', payload: { enabled: true } });
-        this._agentLlamaRunning = false;
-        this._agentUpdateLlamaBtn();
-    }
-
     _buildAgentTab(ip) {
-        // The WebKit UI now uses the Python runtime for every provider and
-        // native model operation. Start it here rather than from the removed
-        // Electron worker path.
-        if (!this._pythonRuntimeStarted) {
-            this._pythonRuntimeStarted = true;
-            try { this._agentStartPythonRuntime(); } catch (e) {
-                console.warn('[launcher:runtime] Could not start Python runtime:', e.message);
-            }
-        }
         const agentPage = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
         agentPage.set_hexpand(true);
         agentPage.set_vexpand(true);
@@ -7831,28 +7349,21 @@ const AppLauncherWindow = GObject.registerClass({
         });
 
         if (!this._workspaceStartupEnabled) {
-            console.log('[launcher:workspace] Workspace startup policy is OFF; Agent UI shell is present but WebKit process/Electron/llama stack is dormant.');
+            console.log('[launcher:workspace] Workspace startup policy is OFF; Agent UI shell is present but the WebKit process/Python runtime stack is dormant.');
             this._agentUpdateWorkspaceBtn();
-            this._agentUpdateLlamaBtn();
             return;
         }
 
-        // ── 1) Start loopback HTTP server first (shared by both renderers) ──
+        // Start the loopback HTTP server (serves the React agent-app bundle
+        // to this WebKitGTK view) and the local Python runtime process
+        // (model catalog, llama-server lifecycle, agentic tool loop for
+        // local/BYOK/cloud). WebKitGTK is the sole UI and inference-client
+        // surface — there is no Electron/Chromium renderer anymore.
         const agentUrl = this._startAgentLoopbackServer();
         if (agentUrl && this._agentWebView && !this._agentWebView.get_uri()) {
             try { this._agentWebView.load_uri(agentUrl); } catch (_) { }
         }
-        // Use the loopback origin for Electron as well as WebKit.  Electron's
-        // file:// loader can report ERR_FAILED for the Vite bundle in this
-        // embedded launch mode, while the Soup-served origin is reliable and
-        // preserves the renderer's IndexedDB/cache origin.
-        const electronAgentUrl = agentUrl;
-
-        // ── 2) WebKitGTK WebView: the only visible UI and inference surface.
-        // The visible React app runs in WebKitGTK. Native llama.cpp requests are
-        // relayed by GJS; no WebLLM/WebGPU inference worker is required. ──
-
-        // 
+        this._ensureRuntimeBackend();
 
         webView.connect('run-file-chooser', (wv, request) => {
             this._handleWebKitFileChooser(request);
@@ -7876,19 +7387,10 @@ const AppLauncherWindow = GObject.registerClass({
     }
 
     _agentPostMessage(payload, explicitTarget = null) {
-        // The visible WebKitGTK page is now the primary UI surface.  Only
-        // responses to a request originating in the hidden Electron renderer
-        // go back through Electron; ordinary host responses must be injected
-        // into WebKit or its pending Promise never resolves.
-        const target = explicitTarget
-            || (payload?.id ? this._agentReplyTargets.get(payload.id) : null)
-            || 'webkit';
+        // WebKitGTK is the only agent renderer now, so every message goes
+        // there. explicitTarget/_agentReplyTargets are kept only so a
+        // response can find the request id that asked for it.
         if (payload?.id && payload?.type === 'response') this._agentReplyTargets.delete(payload.id);
-
-        if (target === 'electron') {
-            // Electron was removed; always deliver host responses to WebKit.
-            if (payload?.id && payload?.type === 'response') this._agentReplyTargets.delete(payload.id);
-        }
 
         if (!this._agentWebView) return;
         try {
@@ -7901,8 +7403,7 @@ const AppLauncherWindow = GObject.registerClass({
     }
 
     _agentInjectTheme() {
-        // Theme cache is replayed to Electron when it signals "ready" on stdout
-        // (prevents timing race where theme update fires before renderer ready).
+        // Pushes theme + runtime config into the WebKitGTK agent view.
         try {
             const colorsPath = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
             const map = {};
@@ -7925,8 +7426,6 @@ const AppLauncherWindow = GObject.registerClass({
             // install where nothing has been chosen yet.
             this._agentPostMessage({
                 type: 'runtime_config', payload: {
-                    inferenceProvider: GLib.getenv('HYPRCANDY_INFERENCE_PROVIDER') || 'llama.cpp',
-                    llamaEnabled: !!this._agentLlamaEnabled,
                     homeDir: HOME,
                     defaultProjectRoot: GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock']),
                 }
@@ -8199,26 +7698,6 @@ const AppLauncherWindow = GObject.registerClass({
             // orphan the visible Agent WebView into the same reveal/stop UI
             // lifecycle as the header workspace button's live workspace toggle.
             this._agentPostMessage({ id, type: 'response', payload: { enabled: nextEnabled } });
-        } else if (action && action.startsWith('llama_')) {
-            if (action === 'llama_start') {
-                this._agentLlamaEnabled = true;
-                this._agentPostMessage({ type: 'llama_state', payload: { enabled: true } });
-            } else if (action === 'llama_stop') {
-                this._agentLlamaEnabled = false;
-                this._agentPostMessage({ type: 'llama_state', payload: { enabled: false } });
-            }
-            if (action === 'llama_stop') {
-                this._agentStopNativeLlamaServer();
-                this._agentLlamaRunning = false;
-                this._agentUpdateLlamaBtn();
-            }
-            this._agentPostMessage({ id, type: 'response', payload: { enabled: action === 'llama_start' } });
-        } else if (action === 'worker_load_model') {
-            this._agentPostMessage({ id, type: 'response', error: 'Legacy worker inference was removed; use the Python runtime.' });
-        } else if (action === 'worker_chat') {
-            this._agentPostMessage({ id, type: 'response', error: 'Legacy worker inference was removed; use the Python runtime.' });
-        } else if (action === 'worker_cancel_model') {
-            this._agentPostMessage({ id, type: 'response', payload: { cancelled: true } });
         } else if (action === 'runtime_request') {
             // Proxy HTTP calls to the local Python runtime server at :17900.
             // The React UI sends {url, method, payload}; we relay via Soup and
@@ -8273,24 +7752,11 @@ const AppLauncherWindow = GObject.registerClass({
                 this._agentPostMessage({ id, type: 'response', error: e.message });
             }
         } else if (action === 'model_status_update') {
-            // Fired by the React ModelManager after delete/stop so the GJS
-            // header badge syncs immediately — no poll cycle delay.
-            const running = !!payload?.running;
-            const modelName = String(payload?.modelName || '').trim();
-            this._agentLlamaRunning = running;
-            if (this._agentLlamaLabel) {
-                if (running && modelName) {
-                    this._agentLlamaLabel.set_text(modelName);
-                } else {
-                    this._agentLlamaLabel.set_text(running ? 'Llama ON' : 'Llama OFF');
-                }
-            }
-            this._agentUpdateLlamaBtn();
-            // Proactively stop the native server if React reports it stopped
-            if (!running) {
-                this._agentLlamaEnabled = false;
-                this._agentLlamaRunning = false;
-            }
+            // Fired by the React ModelManager's Local tab after it starts,
+            // stops, or deletes the active model. Nothing else in GJS reads
+            // this today, but it's kept as a bookkeeping hook for any future
+            // GTK-side status surface.
+            this._agentLlamaRunning = !!payload?.running;
         } else if (action === 'secret_store') {
             const ok = CredentialsManager.store(
                 payload?.service || 'hyprcandy_byok',

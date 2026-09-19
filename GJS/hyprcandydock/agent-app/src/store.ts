@@ -2,8 +2,19 @@
  * Agent App Global State & Store
  */
 import { useState, useEffect } from 'react';
-import type { CustomWebLLMModel } from './engine/webllm-helpers';
 import { bridge } from './bridge';
+
+// Kept only for the ModelInfo/customModels shape below — the WebLLM engine
+// that originally consumed this (agent-engine.ts's syncCustomModels) is gone
+// now that all inference runs through the Python runtime server.
+export interface CustomWebLLMModel {
+  id: string;
+  name: string;
+  model: string;
+  model_lib: string;
+  desc?: string;
+  required_features?: string[];
+}
 
 export interface DiffData {
   filePath: string;

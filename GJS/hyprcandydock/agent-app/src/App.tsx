@@ -89,13 +89,6 @@ export const App: React.FC = () => {
   const [store] = useStore();
 
   useEffect(() => {
-    // The visible WebKitGTK surface owns model selection in embedded mode.
-    // Electron still mounts the same React tree so it can expose AgentEngine
-    // and WebLLM to main.cjs, but it must not run the normal UI warm-up: that
-    // would start loading the persisted/default model before the GJS request
-    // arrives and serialize every subsequent selection behind the wrong load.
-    const isElectronWorker = Boolean((window as any).__hyprcandyElectronAgent);
-
     bridge.onThemeChange((cssVars) => {
       console.log('Applied live theme variables from GTK4:', Object.keys(cssVars).length);
       window.dispatchEvent(new CustomEvent('matugen_theme_changed', { detail: cssVars }));
@@ -149,14 +142,14 @@ export const App: React.FC = () => {
 
     // Auto-activate last active Cloud tab model/provider if saved from previous session.
     // The Local tab model is intentionally NOT auto-activated on next workspace session (llama-server stays OFF).
-    if (!isElectronWorker) {
+    {
       const autoActivateCloudModel = async () => {
         const current = getStore();
         if (current.inferenceMode === 'byok' && current.byokProvider) {
           const providerId = current.byokProvider;
           const modelId = current.byokModel || '';
           try {
-            let key = current.byokKeys[providerId];
+            let key: string | null = current.byokKeys[providerId] || null;
             if (!key) {
               key = await bridge.lookupSecret(providerId);
             }

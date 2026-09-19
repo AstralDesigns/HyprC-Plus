@@ -2,14 +2,10 @@
  * GJS <-> React WebKitGTK Bridge
  * Handles asynchronous IPC with HyprCandyDock GJS host.
  *
- * Runtime mode detection:
- * - ELECTRON mode  : window.__hyprcandyElectronAgent === true (set by preload.cjs)
- *                    Full WebGPU via Chromium. WebLLM runs locally in this process.
- * - WEBKIT UI mode : window.__hyprcandyElectronAgent is not set (WebKitGTK context)
- *                    No real WebGPU. All WebLLM inference is delegated to the Electron
- *                    worker process via GJS bridge and comes back through
- *                    __hyprcandy_agent_dispatch as worker_progress / worker_token /
- *                    worker_done / worker_error messages.
+ * WebKitGTK is the only UI and inference-client surface. There is no
+ * Electron/Chromium renderer anymore — local llama.cpp, BYOK, and managed
+ * cloud inference all go through the local Python runtime server via
+ * runtimeRequest(), which GJS proxies to http://127.0.0.1:17900.
  */
 
 export interface HostMessage {
@@ -21,13 +17,6 @@ export interface HostMessage {
 }
 
 type MessageCallback = (payload: any) => void;
-
-// ── Electron / WebKit runtime detection ──────────────────────────────────────
-// In the Electron renderer (preload.cjs) window.__hyprcandyElectronAgent = true.
-// In the WebKitGTK UI renderer this flag is absent → delegate mode.
-export function isElectronMode(): boolean {
-  return typeof window !== 'undefined' && !!(window as any).__hyprcandyElectronAgent;
-}
 
 class AgentBridge {
   private pendingRequests = new Map<string, { resolve: (val: any) => void; reject: (err: any) => void }>();
@@ -55,8 +44,6 @@ class AgentBridge {
 
   private handleIncoming(msg: HostMessage) {
     if (msg.type === 'runtime_config' && msg.payload) {
-      (window as any).__hyprcandyNativeProvider = msg.payload.inferenceProvider || '';
-      (window as any).__hyprcandyLlamaEnabled = !!msg.payload.llamaEnabled;
       if (msg.payload.homeDir) (window as any).__hyprcandyHome = msg.payload.homeDir;
       // The frontend bundle has no way to know the real user's HOME at
       // build time, so projectPath starts unset until GJS reports the real
@@ -68,11 +55,6 @@ class AgentBridge {
         (window as any).agent?.setStore?.({ projectPath: msg.payload.defaultProjectRoot });
       }
       window.dispatchEvent(new CustomEvent('agent_runtime_config', { detail: msg.payload }));
-      return;
-    }
-    if (msg.type === 'llama_state' && msg.payload) {
-      (window as any).__hyprcandyLlamaEnabled = !!msg.payload.enabled;
-      window.dispatchEvent(new CustomEvent('agent_llama_state', { detail: msg.payload }));
       return;
     }
     if (msg.type === 'theme_update' && msg.payload) {
@@ -105,45 +87,6 @@ class AgentBridge {
       return;
     }
 
-    // ── Native llama-server progress (Electron → GJS → WebKit) ───────────────
-    if (msg.type === 'llama_progress') {
-      window.dispatchEvent(new CustomEvent('agent_llama_progress', { detail: msg.payload }));
-      return;
-    }
-
-    // ── Worker inference relay messages (Electron → GJS → WebKit) ────────────
-    if (msg.type === 'worker_progress') {
-      // Forward model loading progress to the store (imported lazily to avoid
-      // circular dependencies; store.ts does not import bridge.ts).
-      window.dispatchEvent(new CustomEvent('agent_worker_progress', { detail: msg.payload }));
-      return;
-    }
-    if (msg.type === 'worker_token') {
-      window.dispatchEvent(new CustomEvent('agent_worker_token', { detail: msg.payload }));
-      return;
-    }
-    if (msg.type === 'worker_done') {
-      window.dispatchEvent(new CustomEvent('agent_worker_done', { detail: msg.payload }));
-      return;
-    }
-    if (msg.type === 'worker_error') {
-      window.dispatchEvent(new CustomEvent('agent_worker_error', { detail: msg.payload }));
-      return;
-    }
-    if (msg.type === 'worker_model_ready') {
-      window.dispatchEvent(new CustomEvent('agent_worker_model_ready', { detail: msg.payload }));
-      return;
-    }
-    if (msg.type === 'worker_cache_status') {
-      window.dispatchEvent(new CustomEvent('agent_worker_cache_status', { detail: msg.payload }));
-      return;
-    }
-    if (msg.type === 'worker_cache_cleared') {
-      window.dispatchEvent(new CustomEvent('agent_worker_cache_cleared', { detail: msg.payload }));
-      return;
-    }
-    // ─────────────────────────────────────────────────────────────────────────
-
     if (msg.id && this.pendingRequests.has(msg.id)) {
       const { resolve, reject } = this.pendingRequests.get(msg.id)!;
       this.pendingRequests.delete(msg.id);
@@ -175,10 +118,6 @@ class AgentBridge {
         this.handleDevFallback(action, payload, id);
       }
     });
-  }
-
-  public llamaRequest(action: string, payload: any = {}): Promise<any> {
-    return this.postToHost(action, payload);
   }
 
   private handleDevFallback(action: string, payload: any, id: string) {
@@ -354,43 +293,14 @@ class AgentBridge {
     return this.postToHost('take_screenshot', region ? { region } : {});
   }
   /**
-   * Fire-and-forget message to the GJS host WITHOUT waiting for a response.
-   * Used for inference delegation: load_model / chat requests that produce
-   * streaming responses delivered through separate worker_* dispatch events.
-   */
-  public fireWorkerRequest(action: string, payload: any = {}): void {
-    const envelope = JSON.stringify({ action, payload });
-    if (this.hasWebKit) {
-      try {
-        (window as any).webkit.messageHandlers.agent.postMessage(envelope);
-      } catch (e: any) {
-        console.warn('[bridge] fireWorkerRequest failed:', e.message);
-      }
-    }
-  }
-
-  /**
    * POST to the local Python runtime server (http://127.0.0.1:17900/).
    * Falls back to direct fetch when not behind GJS (dev mode).
    * GJS proxies these via the 'runtime_request' bridge action.
    */
-  public async runtimeRequest(endpoint: string, payload: any = {}, method: 'GET' | 'POST' = 'POST'): Promise<any> {
+  public async runtimeRequest(endpoint: string, payload: any = {}, method: 'GET' | 'POST' | 'DELETE' = 'POST'): Promise<any> {
     const url = `http://127.0.0.1:17900${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
     if (this.hasWebKit) {
-      let lastError: any;
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        try {
-          return await this.postToHost('runtime_request', { url, method, payload });
-        } catch (error: any) {
-          lastError = error;
-          const message = String(error?.message || error);
-          if (!/connection refused|failed to connect|runtime request error/i.test(message) || attempt === 4) {
-            throw error;
-          }
-          await new Promise(resolve => setTimeout(resolve, 400));
-        }
-      }
-      throw lastError || new Error('Runtime request failed');
+      return this.postToHost('runtime_request', { url, method, payload });
     }
     // Dev fallback: direct fetch
     const options: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };
@@ -414,9 +324,8 @@ class AgentBridge {
 
   /**
    * Fire-and-forget: notify GJS that the local model/server status has changed.
-   * GJS uses this to sync the header Llama badge without waiting for a poll.
    * @param running   true = server is up with a loaded model, false = stopped/idle
-   * @param modelName optional model name string to show in the badge
+   * @param modelName optional model name string for logging
    */
   public notifyModelStatus(running: boolean, modelName?: string): void {
     const envelope = JSON.stringify({
