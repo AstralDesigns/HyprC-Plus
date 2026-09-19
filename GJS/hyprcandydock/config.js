@@ -25,7 +25,7 @@ var DockConfig = {
     // ── Button spacing (gap between every button in the dock) ─────────────
     // Controls GtkBox spacing — applies uniformly between start↔first-app,
     // app↔app, and last-app↔trash so all gaps are edited in one place.
-    buttonSpacing: 1,              // @HCD:buttonSpacing
+    buttonSpacing: 0,              // @HCD:buttonSpacing
 
     // ── App icon size (Gtk.Image pixel_size) ─────────────────────────────
     // Controls Gtk.Image icons from the theme (e.g. Nautilus, Firefox).
@@ -84,7 +84,7 @@ var DockConfig = {
     // ── Island Border (Start & Trash icon badges) ─────────────────────────
     islandBorderWidth: 1,           // @HCD:islandBorderWidth
     islandBorderAlpha: 1,        // @HCD:islandBorderAlpha
-    islandBorderColorVar: 'scrim', // @HCD:islandBorderColorVar
+    islandBorderColorVar: 'primary_container', // @HCD:islandBorderColorVar
 
     // ── External margins (dock edge ↔ screen / window edge) ──────────────
     // The exclusive zone is auto-calculated from the rendered content height:

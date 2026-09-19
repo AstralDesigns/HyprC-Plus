@@ -7360,23 +7360,14 @@ const AppLauncherWindow = GObject.registerClass({
             return null;
         });
 
-        if (!this._workspaceStartupEnabled) {
-            console.log('[launcher:workspace] Workspace startup policy is OFF; Agent UI shell is present but the WebKit process/Python runtime stack is dormant.');
-            this._agentUpdateWorkspaceBtn();
-            return;
-        }
-
-        // Start the loopback HTTP server (serves the React agent-app bundle
-        // to this WebKitGTK view) and the local Python runtime process
-        // (model catalog, llama-server lifecycle, agentic tool loop for
-        // local/BYOK/cloud). WebKitGTK is the sole UI and inference-client
-        // surface — there is no Electron/Chromium renderer anymore.
-        const agentUrl = this._startAgentLoopbackServer();
-        if (agentUrl && this._agentWebView && !this._agentWebView.get_uri()) {
-            try { this._agentWebView.load_uri(agentUrl); } catch (_) { }
-        }
-        this._ensureRuntimeBackend();
-
+        // These signal connections must happen unconditionally, regardless of
+        // whether workspace startup is enabled right now. If they were gated
+        // behind the startup check below, a workspace that starts OFF would
+        // never get a 'load-changed' listener wired up at all — so when the
+        // user later manually toggles the workspace ON and load_uri() fires
+        // for the first time, nothing would be listening for FINISHED, and
+        // _agentInjectTheme() would only ever run from the synchronous calls
+        // in _agentToggleWorkspace(), before the page has even begun loading.
         webView.connect('run-file-chooser', (wv, request) => {
             this._handleWebKitFileChooser(request);
             return true;
@@ -7396,6 +7387,23 @@ const AppLauncherWindow = GObject.registerClass({
         webView.connect('load-failed', (wv, loadEvent, failingUri, error) => {
             console.warn('[launcher] Agent WebKit load-failed:', failingUri, error.message);
         });
+
+        if (!this._workspaceStartupEnabled) {
+            console.log('[launcher:workspace] Workspace startup policy is OFF; Agent UI shell is present but the WebKit process/Python runtime stack is dormant.');
+            this._agentUpdateWorkspaceBtn();
+            return;
+        }
+
+        // Start the loopback HTTP server (serves the React agent-app bundle
+        // to this WebKitGTK view) and the local Python runtime process
+        // (model catalog, llama-server lifecycle, agentic tool loop for
+        // local/BYOK/cloud). WebKitGTK is the sole UI and inference-client
+        // surface — there is no Electron/Chromium renderer anymore.
+        const agentUrl = this._startAgentLoopbackServer();
+        if (agentUrl && this._agentWebView && !this._agentWebView.get_uri()) {
+            try { this._agentWebView.load_uri(agentUrl); } catch (_) { }
+        }
+        this._ensureRuntimeBackend();
     }
 
     _agentPostMessage(payload, explicitTarget = null) {
@@ -7407,7 +7415,24 @@ const AppLauncherWindow = GObject.registerClass({
         if (!this._agentWebView) return;
         try {
             const jsonStr = JSON.stringify(payload);
-            const script = `if (window.__hyprcandy_agent_dispatch) { window.__hyprcandy_agent_dispatch(${jsonStr}); }`;
+            // A one-shot "if the hook exists, call it" check silently drops
+            // the message forever if the React bundle hasn't finished
+            // executing yet — e.g. on a cold launcher start, WebKitGTK's
+            // load-changed FINISHED can fire before a multi-megabyte bundle
+            // has run far enough to register __hyprcandy_agent_dispatch.
+            // Poll briefly (self-contained inside the page, no GJS timers
+            // needed) instead of guessing when the page is "ready enough".
+            const script = `(function(){
+                var payload = ${jsonStr};
+                var attempts = 0;
+                (function tryDispatch(){
+                    if (window.__hyprcandy_agent_dispatch) {
+                        window.__hyprcandy_agent_dispatch(payload);
+                    } else if (attempts++ < 100) {
+                        setTimeout(tryDispatch, 50);
+                    }
+                })();
+            })();`;
             this._agentWebView.evaluate_javascript(script, -1, null, null, null, null);
         } catch (e) {
             console.warn('[launcher] _agentPostMessage webkit error:', e.message);

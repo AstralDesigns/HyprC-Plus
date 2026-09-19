@@ -767,9 +767,11 @@ const CloudTab: FC = () => {
   const [licenseError, setLicenseError]     = useState('');
   const hasBYOKLicense = !!store.byokLicenseKey;
 
-  // Selected provider in the scrollable tab bar
+  // Selected provider in the scrollable tab bar — resumes whichever provider
+  // was actually last active; otherwise defaults to OpenRouter, the first
+  // (and free-tier-friendly) entry in the provider row.
   const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    store.byokProvider || 'google'
+    store.byokProvider || 'openrouter'
   );
 
   // Per-provider key input and control state
