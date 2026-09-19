@@ -36,9 +36,7 @@ MODELS_DIR = Path(os.environ.get(
 ))
 FALLBACK_DIRS = [
     LLAMA_MODELS_DIR,
-    Path.home() / ".local" / "share" / "hyprcand" / "llama-models",
     Path.home() / ".local" / "share" / "hyprcandy" / "models",
-    Path.home() / ".local" / "share" / "hyprcand" / "models",
 ]
 LLAMA_BINARY_CANDIDATES = [
     "llama-server",
@@ -48,7 +46,6 @@ LLAMA_BINARY_CANDIDATES = [
     str(Path(__file__).resolve().parent.parent.parent / "native" / "llama.cpp" / "build" / "bin" / "llama-server"),
     str(Path(__file__).resolve().parent.parent.parent / "native" / "llama-server"),
 ]
-GPU_LAYERS = os.environ.get("HYPRCANDY_LLAMA_GPU_LAYERS", "-1")
 
 # ── State ─────────────────────────────────────────────────────────────────────
 _server_proc: Optional[subprocess.Popen] = None
@@ -123,9 +120,7 @@ def _resolve_source_path(src_str: str) -> Optional[Path]:
     fname = p.name
     search_dirs = [
         LLAMA_MODELS_DIR,
-        Path.home() / ".local" / "share" / "hyprcand" / "llama-models",
         Path.home() / ".local" / "share" / "hyprcandy" / "models",
-        Path.home() / ".local" / "share" / "hyprcand" / "models",
         Path.home() / "Downloads",
         Path.home(),
         Path.home() / ".cache",
@@ -288,22 +283,9 @@ async def start_server(model_path: str, ctx_size: int = 0, max_tokens: int = 204
         "--ctx-size", str(ctx),
         "--n-predict", str(max_tokens),
         "--parallel", "1",
-        # -1 means offload every layer supported by the selected backend.
-        # The previous default left llama-server on CPU (or backend default),
-        # making the launcher’s discrete-GPU selection ineffective.
-        "--n-gpu-layers", GPU_LAYERS,
         "--jinja",
         "--log-disable",
     ]
-
-    # Keep the device choice explicit when the runtime is launched outside
-    # the GTK launcher. The launcher exports these variables after selecting
-    # the accessible discrete render node; Vulkan/GL loaders inherit them.
-    selected_prime = os.environ.get("HYPRCANDY_LLAMA_DRI_PRIME")
-    if selected_prime:
-        os.environ["DRI_PRIME"] = selected_prime
-    selected_pci = os.environ.get("HYPRCANDY_LLAMA_GPU_PCI", "auto")
-    print(f"[llama-runtime] starting {path.name} with n-gpu-layers={GPU_LAYERS}, gpu={selected_pci}, DRI_PRIME={os.environ.get('DRI_PRIME', '')}", flush=True)
 
     _server_proc = subprocess.Popen(
         cmd,

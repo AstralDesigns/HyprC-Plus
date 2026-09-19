@@ -122,52 +122,6 @@ async def get_models():
     return {"models": llama_manager.list_models()}
 
 
-@app.get("/api/models/search")
-async def search_models(q: str = ""):
-    """Search public Hugging Face GGUF repositories from the native runtime."""
-    query = q.strip()
-    if not query:
-        return {"models": []}
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.get(
-                "https://huggingface.co/api/models",
-                params={"search": query, "filter": "gguf", "sort": "downloads", "direction": "-1", "limit": 15},
-            )
-            response.raise_for_status()
-            rows = response.json()
-        return {"models": [
-            {
-                "id": row.get("id") or row.get("modelId"),
-                "downloads": row.get("downloads"),
-                "likes": row.get("likes"),
-                "tags": row.get("tags") or [],
-            }
-            for row in rows
-            if isinstance(row, dict) and (row.get("id") or row.get("modelId"))
-        ][:15]}
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Hugging Face search failed: {exc}")
-
-
-@app.get("/api/models/inspect")
-async def inspect_model(repo: str = ""):
-    """Return files available in a Hugging Face repository."""
-    import re
-    safe_repo = repo.strip()
-    if not re.match(r"^[^/]+/[^/]+$", safe_repo):
-        raise HTTPException(status_code=400, detail="Invalid Hugging Face repository; expected owner/name")
-    try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.get(f"https://huggingface.co/api/models/{safe_repo}", params={"full": "true"})
-            response.raise_for_status()
-            metadata = response.json()
-        files = [item.get("rfilename") for item in metadata.get("siblings", []) if isinstance(item, dict) and item.get("rfilename")]
-        return {"repo": safe_repo, "files": files}
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Hugging Face inspection failed: {exc}")
-
-
 @app.post("/api/models/pull/start")
 async def pull_model_start(req: PullRequest):
     """Start a background GGUF download. Returns {task_id} immediately."""
@@ -277,9 +231,9 @@ async def chat_start(req: ChatRequest):
         "events": [],
         "done": False,
         "error": None,
-        "cancelled": False,
         "created_at": time.time(),
-        "task": None,
+        "task": None,       # asyncio.Task, set below once created
+        "cancelled": False,
     }
 
     # Determine route based on explicit inference_mode preference and available credentials
@@ -338,9 +292,15 @@ async def chat_start(req: ChatRequest):
                     break
 
         except asyncio.CancelledError:
+            # Client aborted (Stop button / new message superseding this one).
+            # Don't resurrect the task — just record that it ended, so a
+            # stale poll doesn't hang waiting for a 'done' event that will
+            # never come from run_agentic_turn's normal exit paths.
+            _chat_tasks[task_id]["cancelled"] = True
             _chat_tasks[task_id]["events"].append(
-                {"type": "error", "data": {"message": "Generation cancelled"}}
+                {"type": "error", "data": {"message": "Cancelled."}}
             )
+            raise
         except Exception as exc:
             _chat_tasks[task_id]["events"].append(
                 {"type": "error", "data": {"message": str(exc)}}
@@ -348,8 +308,30 @@ async def chat_start(req: ChatRequest):
         finally:
             _chat_tasks[task_id]["done"] = True
 
-    _chat_tasks[task_id]["task"] = asyncio.create_task(_run())
+    task = asyncio.create_task(_run())
+    _chat_tasks[task_id]["task"] = task
     return {"task_id": task_id, "endpoint": endpoint}
+
+
+@app.post("/api/chat/cancel/{task_id}")
+async def chat_cancel(task_id: str):
+    """
+    Cancel an in-flight chat turn. Cancels the backing asyncio.Task, which
+    unwinds run_agentic_turn and closes the underlying HTTP stream to
+    llama-server / the cloud provider (dropping the connection makes
+    llama-server itself stop generating for that request instead of
+    burning tokens/CPU for a client that has already given up).
+    """
+    task_entry = _chat_tasks.get(task_id)
+    if not task_entry:
+        raise HTTPException(status_code=404, detail="Unknown chat task_id")
+    if task_entry.get("done"):
+        return {"ok": True, "already_done": True}
+    task: Optional[asyncio.Task] = task_entry.get("task")
+    if task and not task.done():
+        task.cancel()
+    task_entry["cancelled"] = True
+    return {"ok": True, "already_done": False}
 
 
 @app.get("/api/chat/poll/{task_id}")
@@ -367,21 +349,6 @@ async def chat_poll(task_id: str, since: int = 0):
         "done": task["done"],
         "total": len(task["events"]),
     }
-
-
-@app.post("/api/chat/cancel/{task_id}")
-async def chat_cancel(task_id: str):
-    """Cancel a running chat task and release the llama-server request."""
-    task = _chat_tasks.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Unknown chat task_id")
-    if task.get("done"):
-        return {"cancelled": False, "done": True}
-    task["cancelled"] = True
-    running = task.get("task")
-    if running and not running.done():
-        running.cancel()
-    return {"cancelled": True, "task_id": task_id}
 
 
 # Legacy SSE endpoints kept for compatibility — use /chat/start + /chat/poll instead

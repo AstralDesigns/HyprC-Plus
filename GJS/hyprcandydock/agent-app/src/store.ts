@@ -376,6 +376,22 @@ function loadInitialState(): AppState {
           customModels: Array.isArray(parsed.customModels)
             ? parsed.customModels.filter((model: ModelInfo) => model?.id)
             : [],
+          // Which backend was actually active last session, so the header
+          // chip and Model Manager both resume showing it instead of
+          // silently reverting to the 'local' default.
+          inferenceMode: parsed.inferenceMode === 'byok' || parsed.inferenceMode === 'cloud' || parsed.inferenceMode === 'local'
+            ? parsed.inferenceMode
+            : defaultState.inferenceMode,
+          byokProvider: typeof parsed.byokProvider === 'string' ? parsed.byokProvider : defaultState.byokProvider,
+          byokModel: typeof parsed.byokModel === 'string' ? parsed.byokModel : defaultState.byokModel,
+          cloudModel: typeof parsed.cloudModel === 'string' ? parsed.cloudModel : defaultState.cloudModel,
+          // Model Manager's open tab always follows whichever backend was
+          // actually active — never the tab that merely happened to be
+          // in view when the app last closed.
+          modelManagerTab: (() => {
+            const mode = parsed.inferenceMode;
+            return (mode === 'byok' || mode === 'cloud') ? 'cloud' : 'local';
+          })(),
         };
       }
     }
@@ -419,6 +435,14 @@ function persistStore() {
       panes: next.panes.map(p => ({ ...p, isUnsaved: false })),
       activePaneId: next.activePaneId,
       workspaceStartupEnabled: next.workspaceStartupEnabled,
+      // Which backend was active — restored on next launch so the header
+      // chip and Model Manager tab reflect it instead of resetting to
+      // 'local'. Secrets themselves (byokKeys, licenseKey) stay out of
+      // localStorage; they're synced through GJS libsecret instead.
+      inferenceMode: next.inferenceMode,
+      byokProvider: next.byokProvider,
+      byokModel: next.byokModel,
+      cloudModel: next.cloudModel,
     }));
   } catch (e) {
     console.warn('Failed to save to localStorage:', e);

@@ -7223,7 +7223,19 @@ const AppLauncherWindow = GObject.registerClass({
         if (next) {
             this._agentRevealWorkspace();
             this._ensureRuntimeBackend();
+            // Workspace may have started this session with startup disabled,
+            // in which case _buildAgentTab's initial load_uri never ran —
+            // make sure the WebKit view actually has content before showing it.
+            const agentUrl = this._startAgentLoopbackServer();
+            if (agentUrl && this._agentWebView && !this._agentWebView.get_uri()) {
+                try { this._agentWebView.load_uri(agentUrl); } catch (_) { }
+            }
             this._switchTab('agent', true);
+            // Apply the currently-watched matugen colors immediately rather
+            // than waiting for the next colors.css change event — the view
+            // may have been dormant (hidden, no page-load event) since colors
+            // last changed.
+            this._agentInjectTheme();
         } else {
             if (this._agentWebView) try { this._agentWebView.set_visible(false); } catch (_) { }
             this._switchTab('launcher', true);

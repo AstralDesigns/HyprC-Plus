@@ -784,6 +784,14 @@ const CloudTab: FC = () => {
   const [searchQuery, setSearchQuery]     = useState<Record<string, string>>({});
   const [modelsLive, setModelsLive]       = useState<Record<string, boolean>>({});
   const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const providerTabsRef = useRef<HTMLDivElement>(null);
+
+  const handleWheelProviderTabs = (e: React.WheelEvent) => {
+    if (providerTabsRef.current) {
+      e.preventDefault();
+      providerTabsRef.current.scrollLeft += e.deltaX !== 0 ? e.deltaX : e.deltaY;
+    }
+  };
 
   const fetchModelsForProvider = useCallback(async (providerId: string, force = false) => {
     if (!force && fetchedModels[providerId] && fetchedModels[providerId].length > 0) return;
@@ -1195,13 +1203,16 @@ const CloudTab: FC = () => {
         <div style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '8px' }}>
           Select Cloud Provider
         </div>
-        <div style={{
-          display: 'flex',
-          gap: '5px',
-          overflowX: 'auto',
-          paddingBottom: '4px',
-          scrollbarWidth: 'none',
-        }}>
+        <div
+          ref={providerTabsRef}
+          onWheel={handleWheelProviderTabs}
+          style={{
+            display: 'flex',
+            gap: '5px',
+            overflowX: 'auto',
+            paddingBottom: '4px',
+            scrollbarWidth: 'none',
+          }}>
           {BYOK_PROVIDERS.map(provider => {
             const isTabSelected = selectedProviderId === provider.id;
             const isProvActive = store.inferenceMode === 'byok' && store.byokProvider === provider.id;
