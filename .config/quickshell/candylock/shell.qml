@@ -1058,7 +1058,7 @@ ShellRoot {
                                             spacing: 0
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockHour; color: root.cPrimaryContainer
+                                                text: root.clockHour; color: root.cWc2
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
@@ -1117,7 +1117,7 @@ ShellRoot {
                                                     radius: width / 2
                                                     color: "transparent"
                                                     border.width: 4
-                                                    border.color: root.cPrimaryContainer
+                                                    border.color: root.cWc2
                                                 }
                                             }
                                             
@@ -1197,7 +1197,7 @@ ShellRoot {
                                             spacing: 14
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDayName; color: root.cPrimaryContainer
+                                                text: root.clockDayName; color: root.cWc2
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 22
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
