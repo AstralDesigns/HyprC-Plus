@@ -1058,20 +1058,20 @@ ShellRoot {
                                             spacing: 0
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockHour; color: root.cWc3
+                                                text: root.clockHour; color: root.cPrimaryContainer
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "󰫢  󰫢"; color: root.cWc13
+                                                text: "󰫢  󰫢"; color: root.cWc3
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
                                                 topPadding: 6; bottomPadding: 6
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockMin; color: root.cWc6
+                                                text: root.clockMin; color: root.cPrimary
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
@@ -1117,7 +1117,7 @@ ShellRoot {
                                                     radius: width / 2
                                                     color: "transparent"
                                                     border.width: 4
-                                                    border.color: root.cWc11
+                                                    border.color: root.cPrimaryContainer
                                                 }
                                             }
                                             
@@ -1136,14 +1136,14 @@ ShellRoot {
                                                     border.color: root.authFailed ? root.cErr
                                                         : (root.authChecking
                                                             ? root.cWc12
-                                                            : root.cWc13)
+                                                            : root.cWc3)
                                                     Behavior on border.color { ColorAnimation { duration: 250 } }
                                                 }
                                                 RowLayout {
                                                     anchors.centerIn: parent; spacing: 6
                                                     visible: root.pinEntry.length === 0 && !root.authChecking
                                                     Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc6 }
-                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cWc13; opacity: 1.00 }
+                                                    Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cPrimary; opacity: 1.00 }
                                                 }
                                                 Text {
                                                     anchors.centerIn: parent; visible: root.authChecking
@@ -1197,14 +1197,14 @@ ShellRoot {
                                             spacing: 14
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDayName; color: root.cWc3
+                                                text: root.clockDayName; color: root.cPrimaryContainer
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 22
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDateNum; color: root.cWc13
+                                                text: root.clockDateNum; color: root.cWc3
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.DemiBold
                                                 lineHeight: 0.88
@@ -1212,7 +1212,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockMonthName; color: root.cWc6
+                                                text: root.clockMonthName; color: root.cPrimary
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 22
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
@@ -1261,7 +1261,7 @@ ShellRoot {
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: root.weatherTemp
-                                                color: root.cWc13
+                                                color: root.cPrimary
                                                 font.pixelSize: 18
                                                 font.weight: Font.Bold
                                                 font.family: "C059"
@@ -1308,7 +1308,7 @@ ShellRoot {
 
                                                     Text {
                                                         text: modelData.glyph
-                                                        color: root.cWc10
+                                                        color: root.cWc12
                                                         font.pixelSize: 14
                                                         font.family: "Symbols Nerd Font Mono"
                                                     }
@@ -1556,7 +1556,7 @@ ShellRoot {
                                                 text: root._volumeMuted ? "󰝟" : "󰕾"
                                                 font.family: "Symbols Nerd Font Mono"
                                                 font.pixelSize: 14
-                                                color: root.cWc13
+                                                color: root.cWc12
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     cursorShape: Qt.PointingHandCursor

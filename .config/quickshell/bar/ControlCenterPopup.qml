@@ -2979,27 +2979,27 @@ PanelWindow {
                                             }
                                         }
 
-                                        CCToggle {
-                                            id: _triCenterAhToggle
-                                            label: "Auto-Hide Center Panel"
-                                            visible: Config.barMode === "tri" //-> || Config.barMode === "shell"
-                                            value: Config.triCenterAutoHide
-                                            onToggled: function(v) {
-                                                Config.triCenterAutoHide = v
-                                            }
-                                        }
+                                        //CCToggle {
+                                            //id: _triCenterAhToggle
+                                            //label: "Auto-Hide Center Panel"
+                                            //visible: Config.barMode === "tri" || Config.barMode === "shell"
+                                            //value: Config.triCenterAutoHide
+                                            //onToggled: function(v) {
+                                                //Config.triCenterAutoHide = v
+                                            //}
+                                        //}
 
-                                        CCSlider {
-                                            label: "Center Delay (s)"
-                                            visible: Config.barMode === "tri" //-> || Config.barMode === "shell"
-                                            from: 1; to: 60; stepSize: 1
-                                            value: Config.triCenterAutoHideDelay
-                                            opacity: Config.triCenterAutoHide ? 1.0 : 0.4
-                                            Behavior on opacity { NumberAnimation { duration: 120 } }
-                                            onMoved: function(v) {
-                                                Config.triCenterAutoHideDelay = v
-                                            }
-                                        }
+                                        //CCSlider {
+                                            //label: "Center Delay (s)"
+                                            //visible: Config.barMode === "tri" || Config.barMode === "shell"
+                                            //from: 1; to: 60; stepSize: 1
+                                            //value: Config.triCenterAutoHideDelay
+                                            //opacity: Config.triCenterAutoHide ? 1.0 : 0.4
+                                            //Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            //onMoved: function(v) {
+                                                //Config.triCenterAutoHideDelay = v
+                                            //}
+                                        //}
 
                                         CCToggle {
                                             id: _triRightAhToggle
