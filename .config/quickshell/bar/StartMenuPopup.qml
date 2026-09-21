@@ -353,7 +353,7 @@ PanelWindow {
             RowLayout {
                 Layout.fillWidth: true; height: 25; spacing: 8
                 Text {
-                	text: "󰖔"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cWc6
+                	text: "󰖔"; font.pixelSize: 17; font.family: Config.fontFamily; color: Theme.cSurfaceTint
                 }
                 Text {
                 	text: "Night light"; color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 12
@@ -399,7 +399,7 @@ PanelWindow {
                             : StartMenuState.netIsEthernet ? "󰈀"
                             : StartMenuState.netRadioEnabled ? "󰤨" : "󰤮"
                         color: StartMenuState.netIsWifi
-                            ? (StartMenuState.netRadioEnabled ? Theme.cWc6 : Theme.cOnSurf)
+                            ? (StartMenuState.netRadioEnabled ? Theme.cSurfaceTint : Theme.cOnSurf)
                             : (StartMenuState.networkStatus === "connected" ? Qt.rgba(Theme.cPrimaryContainer.r, Theme.cSourceColor.g, Theme.cSourceColor.b, 1.00) : Theme.cOnSurf)
                         Behavior on color { ColorAnimation { duration: 150 } }
                         MouseArea {
@@ -480,7 +480,7 @@ PanelWindow {
                     Text {
                         font.pixelSize: 15; font.family: Config.fontFamily
                         text: StartMenuState.btPowered ? "󰂱" : "󰂲"
-                        color: StartMenuState.btPowered ? Theme.cWc6 : Theme.cOnSurf
+                        color: StartMenuState.btPowered ? Theme.cSurfaceTint : Theme.cOnSurf
                         Behavior on color { ColorAnimation { duration: 150 } }
                         MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: StartMenuState.toggleBtPower() }
