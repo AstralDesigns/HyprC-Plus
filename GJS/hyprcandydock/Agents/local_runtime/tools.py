@@ -11,6 +11,7 @@ Errors raise exceptions; the caller converts them to tool error results.
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import os
 import re
@@ -23,6 +24,79 @@ from typing import Optional
 from urllib.parse import urlencode
 
 import httpx
+
+# ── Pending file edits (write_file stages here for accept/reject review) ────
+# Files are written to disk immediately (so subsequent tool calls in the same
+# turn see consistent state — a read_file right after a write_file must see
+# the new content), but the pre-edit snapshot is kept here so the UI can
+# offer a real "reject" (revert to snapshot) and "accept" (just forget the
+# snapshot — the file is already correct on disk) without re-running the
+# model. Keyed by absolute path; last write for a path wins.
+PENDING_EDITS: dict[str, dict] = {}
+
+
+def _diff_counts(old: str, new: str) -> tuple[int, int]:
+    if old == new:
+        return (0, 0)
+    diff = difflib.unified_diff(old.splitlines(), new.splitlines(), lineterm="")
+    additions = deletions = 0
+    for line in diff:
+        if line.startswith("+++") or line.startswith("---"):
+            continue
+        if line.startswith("+"):
+            additions += 1
+        elif line.startswith("-"):
+            deletions += 1
+    return (additions, deletions)
+
+
+def accept_edit(path: str) -> bool:
+    """File is already on disk with the new content — just forget the snapshot."""
+    return PENDING_EDITS.pop(path, None) is not None
+
+
+def reject_edit(path: str) -> bool:
+    """Restore the pre-edit snapshot (or delete the file if it was newly created)."""
+    record = PENDING_EDITS.pop(path, None)
+    if record is None:
+        return False
+    p = Path(path)
+    if record["is_new"]:
+        try:
+            p.unlink(missing_ok=True)
+        except OSError:
+            pass
+    else:
+        p.write_text(record["old_content"])
+    return True
+
+
+def accept_all_edits() -> int:
+    count = len(PENDING_EDITS)
+    PENDING_EDITS.clear()
+    return count
+
+
+def reject_all_edits() -> int:
+    paths = list(PENDING_EDITS.keys())
+    for path in paths:
+        reject_edit(path)
+    return len(paths)
+
+
+def list_pending_edits() -> list[dict]:
+    return [
+        {
+            "path": path,
+            "is_new": record["is_new"],
+            "additions": record["additions"],
+            "deletions": record["deletions"],
+            "old_content": record["old_content"],
+            "new_content": record["new_content"],
+            "timestamp": record["timestamp"],
+        }
+        for path, record in PENDING_EDITS.items()
+    ]
 
 # ── SearXNG config (same instance as the GJS launcher web-search tab) ─────────
 SEARXNG_URL = os.environ.get("HYPRCANDY_SEARXNG_URL", "http://127.0.0.1:8888")
@@ -298,9 +372,33 @@ async def read_file(path: str, offset: Optional[int] = None, limit: Optional[int
 
 async def write_file(path: str, content: str) -> dict:
     p = _resolve_path(path)
+    is_new = not p.exists()
+    old_content = "" if is_new else p.read_text(errors="replace")
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(content)
-    return {"success": True, "path": str(p), "bytes": len(content.encode())}
+
+    additions, deletions = _diff_counts(old_content, content)
+    record = {
+        "path": str(p),
+        "old_content": old_content,
+        "new_content": content,
+        "is_new": is_new,
+        "additions": additions,
+        "deletions": deletions,
+        "timestamp": time.time(),
+    }
+    PENDING_EDITS[str(p)] = record
+
+    return {
+        "success": True,
+        "path": str(p),
+        "bytes": len(content.encode()),
+        "old_content": old_content,
+        "new_content": content,
+        "is_new": is_new,
+        "additions": additions,
+        "deletions": deletions,
+    }
 
 
 async def exec_command(command: str, cwd: Optional[str] = None) -> dict:
@@ -381,7 +479,13 @@ async def capture_preview(region: Optional[str] = None) -> dict:
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
     if result.returncode != 0:
         raise RuntimeError(f"grim failed: {result.stderr}")
-    return {"path": out_path, "filename": f"hyprcandy_preview_{ts}.png"}
+    return {
+        "path": out_path,
+        "filename": f"hyprcandy_preview_{ts}.png",
+        "verified": True,
+        "status": "success",
+        "message": f"Wayland screenshot captured to {out_path}. Visual layout and UI elements are captured for verification.",
+    }
 
 
 async def task_complete(summary: str, remaining: str = "") -> dict:

@@ -16,10 +16,10 @@ case "$ACTION" in
         # 1. Check if docker daemon is accessible
         if ! docker info >/dev/null 2>&1; then
             if ! systemctl is-active docker >/dev/null 2>&1; then
-                sudo -n systemctl start docker 2>/dev/null || sudo systemctl start docker 2>/dev/null || pkexec sh -c "systemctl start docker && chmod 666 /var/run/docker.sock 2>/dev/null || true" || exit 1
+                sudo -n /usr/bin/systemctl start docker 2>/dev/null || sudo systemctl start docker 2>/dev/null || true
             fi
             if ! docker info >/dev/null 2>&1; then
-                sudo -n chmod 666 /var/run/docker.sock 2>/dev/null || sudo chmod 666 /var/run/docker.sock 2>/dev/null || pkexec chmod 666 /var/run/docker.sock 2>/dev/null || true
+                sudo -n /usr/bin/chmod 666 /var/run/docker.sock 2>/dev/null || sudo chmod 666 /var/run/docker.sock 2>/dev/null || true
             fi
         fi
 
@@ -51,6 +51,6 @@ case "$ACTION" in
         fi
         ;;
     stop)
-        docker stop hyprcandy-searxng 2>/dev/null || true
+        docker stop -t 2 hyprcandy-searxng 2>/dev/null || true
         ;;
 esac

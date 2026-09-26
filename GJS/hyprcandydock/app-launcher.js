@@ -57,11 +57,9 @@ const GlyphData = imports.glyphData.GlyphData;
 imports.gi.versions.Soup = '3.0';
 const Soup = imports.gi.Soup;
 
-// The agent must use a secure/loopback HTTP origin for WebGPU. Loading the
-// React bundle from file:// makes navigator.gpu unavailable in WebKitGTK even
-// when the WebGPU feature and hardware acceleration are enabled. Keep this
-// port stable so the agent's IndexedDB origin and WebLLM model cache survive
-// daemon restarts.
+// The agent's React UI is served from a stable loopback HTTP origin (rather
+// than file://) so its localStorage/IndexedDB origin (session history, editor
+// state, etc.) survives daemon restarts and tab reloads.
 const AGENT_LOOPBACK_HOST = '127.0.0.1';
 const AGENT_LOOPBACK_PORT = 17842;
 const LLAMA_SERVER_PORT = Number(GLib.getenv('HYPRCANDY_LLAMA_PORT') || 17843);
@@ -387,11 +385,13 @@ if (_bootGpu && _isProblematicIntelGpu(_bootGpu)) {
     GLib.setenv('LIBVA_DRIVER_NAME', 'i965', true);
 }
 
+// WebGPU in WebKitGTK is experimental and triggers unstable Mesa Vulkan probes. Disable unconditionally.
+try { GLib.setenv('WEBKIT_ENABLE_WEBGPU', '0', true); } catch (_) { }
+
 if (_activeGpuIsKnownProblematic) {
     console.log(`[launcher] CPU-only or problematic legacy iGPU detected — configuring safe WebKit parameters.`);
     GLib.setenv('WEBKIT_DISABLE_DMABUF_RENDERER', '1', true);
     GLib.setenv('WEBKIT_FORCE_COMPOSITING_MODE', '0', true);
-    try { GLib.setenv('WEBKIT_ENABLE_WEBGPU', '0', true); } catch (_) { }
     GLib.setenv('WEBKIT_GL_DISABLE_DMABUF', '1', true);
 } else {
     console.log(`[launcher] Hardware accelerated GPU configuration active (${_activeGpu ? _activeGpu.vendor + ':' + _activeGpu.device : 'GPU'}).`);
@@ -1104,8 +1104,8 @@ window.hyprcandy-launcher {
     background-color: @blur_background8;
     border-radius: ${sr}px;
     border-style: solid;
-    border-width: 0px;
-    border-color: @scrim;
+    border-width: 1px;
+    border-color: alpha(@primary, 0.20);
     margin: 0px;
 }
 
@@ -1113,8 +1113,8 @@ window.hyprcandy-launcher {
     background-color: @blur_background8;
     border-radius: ${lr}px;
     border-style: solid;
-    border-width: 0px; /*${ib}px;*/
-    border-color: @scrim;
+    border-width: 1px; /*${ib}px;*/
+    border-color: alpha(@primary, 0.20);
     margin: ${Math.round(ip / 2)}px ${ip}px ${ip}px ${ip}px;
 }
 
@@ -1667,11 +1667,20 @@ window.hyprcandy-group-dialog {
 
 /* Status / info card (offline, loading, empty) */
 .searx-status-card {
-    background-color: alpha(@inverse_primary, 0.18);
-    border-radius: 14px;
-    border: 1px solid alpha(@primary, 0.12);
-    margin: 20px ${ip}px 10px ${ip}px;
-    padding: 22px 18px;
+    background-color: transparent;
+    border-radius: 0;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+.searx-status-cairo-loop {
+    color: @primary;
+    margin-bottom: 12px;
+}
+.searx-status-spinner {
+    -gtk-icon-size: 36px;
+    color: alpha(@primary, 0.80);
+    margin-bottom: 10px;
 }
 .searx-status-glyph {
     font-family: 'FantasqueSansM Nerd Font Mono Regular', 'FantasqueSansM Nerd Font Mono', 'NerdFontsSymbols Nerd Font', monospace;
@@ -1684,6 +1693,16 @@ window.hyprcandy-group-dialog {
     font-size: 13px;
     font-weight: bold;
     margin-bottom: 4px;
+}
+.searx-status-title-ready {
+    color: @color3;
+    font-size: 15px;
+    font-weight: bold;
+}
+.searx-status-title-error {
+    color: alpha(@primary, 0.85);
+    font-size: 13px;
+    font-weight: bold;
 }
 .searx-status-body {
     color: alpha(@primary, 0.60);
@@ -2906,12 +2925,18 @@ const AppLauncherWindow = GObject.registerClass({
 
     _switchTab(id, force = false) {
         if (this._activeTab === id && !force) return;
+        const prevTab = this._activeTab;
         this._lastTab = id;
         this._activeTab = id;
         // Persist immediately, not only when the window is hidden.
         // This makes a later toggle restore the last open tab even if the
         // process is interrupted between tab switching and hiding.
         try { this._persistWebState(); } catch (_) { }
+
+        // Auto-disable SearXNG docker container when leaving the websearch tab
+        if (prevTab === 'websearch' && id !== 'websearch') {
+            this._searxStopDocker();
+        }
 
         // Update sidebar button active state
         for (const [tid, btn] of Object.entries(this._tabBtns)) {
@@ -2943,13 +2968,21 @@ const AppLauncherWindow = GObject.registerClass({
                 this._searchEntry.set_text('');
                 this._searxLastQuery = '';
                 this._searxClearList();
-                this._searxShowIdle();
+                if (this._searxDockerAutoStarted) {
+                    this._searxShowIdle();
+                }
             } else {
                 this._searchEntry.set_placeholder_text(' Search the web…');
                 this._searchEntry.set_text('');
                 this._searxLastQuery = '';
                 this._searxClearList();
-                this._searxShowIdle();
+                if (this._searxDockerAutoStarted) {
+                    this._searxShowIdle();
+                }
+            }
+            // Auto-enable SearXNG docker container when entering the websearch tab
+            if (!this._searxDockerAutoStarted) {
+                this._searxStartDocker();
             }
 
         } else if (id === 'agent') {
@@ -4973,22 +5006,99 @@ const AppLauncherWindow = GObject.registerClass({
         newTabBtn.connect('clicked', () => this._searxCreateNewTab());
         if (this._webHeaderRightSlot) this._webHeaderRightSlot.append(newTabBtn);
 
-        // ── Status card (offline / loading / empty) ───────────────────────
-        const statusCard = Gtk.Box.new(Gtk.Orientation.VERTICAL, 4);
+        // ── Soup search container: mirrors agent-tab rounded-corner wrap ─────
+        // soupBox (agent-webview-box) → soupWrap (agent-webview-wrap) → contents
+        // This gives the soup search UI the same 16px rounded-corner clipping as
+        // the agent-tab workspace view, without the extra header/toolbar margins
+        // that the webview mode requires.
+        const soupBox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        soupBox.add_css_class('agent-webview-box');
+        soupBox.set_overflow(Gtk.Overflow.HIDDEN);
+        soupBox.set_hexpand(true);
+        soupBox.set_vexpand(true);
+        this._searxSoupBox = soupBox;
+        page.append(soupBox);
+
+        const soupWrap = Gtk.Box.new(Gtk.Orientation.VERTICAL, 0);
+        soupWrap.add_css_class('agent-webview-wrap');
+        soupWrap.set_overflow(Gtk.Overflow.HIDDEN);
+        soupWrap.set_hexpand(true);
+        soupWrap.set_vexpand(true);
+        soupBox.append(soupWrap);
+
+        // ── Status card (loading / offline / empty) ───────────────────────
+        // In loading state: shows spinner + title only (glyph/body/buttons hidden)
+        // In error state:   shows glyph + title + body + action/fallback buttons
+        const statusCard = Gtk.Box.new(Gtk.Orientation.VERTICAL, 8);
         statusCard.add_css_class('searx-status-card');
-        statusCard.set_halign(Gtk.Align.FILL);
-        statusCard.set_valign(Gtk.Align.START);
+        statusCard.set_halign(Gtk.Align.CENTER);
+        statusCard.set_valign(Gtk.Align.CENTER);
+        statusCard.set_hexpand(true);
+        statusCard.set_vexpand(true);
         statusCard.set_visible(false);
         this._searxStatusCard = statusCard;
-        page.append(statusCard);
+        soupWrap.append(statusCard);
 
+        // Custom Cairo Spinning Loop — shown while SearXNG is booting/checking
+        const cairoLoop = new Gtk.DrawingArea();
+        cairoLoop.add_css_class('searx-status-cairo-loop');
+        cairoLoop.set_halign(Gtk.Align.CENTER);
+        cairoLoop.set_valign(Gtk.Align.CENTER);
+        cairoLoop.set_size_request(44, 44);
+        cairoLoop._angle = 0;
+        cairoLoop._tickId = null;
+
+        cairoLoop.set_draw_func((area, cr, w, h) => {
+            const cx = w / 2;
+            const cy = h / 2;
+            const r = Math.min(w, h) / 2 - 4;
+            const angle = area._angle || 0;
+
+            const rgba = area.get_style_context().get_color();
+            // Faint circular track
+            cr.setSourceRGBA(rgba.red, rgba.green, rgba.blue, rgba.alpha * 0.18);
+            cr.setLineWidth(3.0);
+            cr.arc(cx, cy, r, 0, 2 * Math.PI);
+            cr.stroke();
+
+            // Animated rotating loop arc
+            cr.setSourceRGBA(rgba.red, rgba.green, rgba.blue, rgba.alpha * 0.95);
+            cr.setLineWidth(3.0);
+            cr.setLineCap(1); // Cairo round cap
+            cr.arc(cx, cy, r, angle, angle + 1.35 * Math.PI);
+            cr.stroke();
+        });
+
+        cairoLoop._start = function() {
+            if (this._tickId) return;
+            this.set_visible(true);
+            this._tickId = this.add_tick_callback((widget) => {
+                widget._angle = ((widget._angle || 0) + 0.08) % (2 * Math.PI);
+                widget.queue_draw();
+                return GLib.SOURCE_CONTINUE;
+            });
+        };
+
+        cairoLoop._stop = function() {
+            if (this._tickId) {
+                this.remove_tick_callback(this._tickId);
+                this._tickId = null;
+            }
+            this.set_visible(false);
+        };
+        cairoLoop.set_visible(false);
+        this._searxStatusCairoLoop = cairoLoop;
+        statusCard.append(cairoLoop);
+
+        // Glyph — shown only in error/offline states
         const statusGlyph = Gtk.Label.new('󱎸');
         statusGlyph.add_css_class('searx-status-glyph');
         statusGlyph.set_halign(Gtk.Align.CENTER);
+        statusGlyph.set_visible(false);
         this._searxStatusGlyph = statusGlyph;
         statusCard.append(statusGlyph);
 
-        const statusTitle = Gtk.Label.new('SearXNG');
+        const statusTitle = Gtk.Label.new('');
         statusTitle.add_css_class('searx-status-title');
         statusTitle.set_halign(Gtk.Align.CENTER);
         statusTitle.set_wrap(true);
@@ -4996,15 +5106,16 @@ const AppLauncherWindow = GObject.registerClass({
         this._searxStatusTitle = statusTitle;
         statusCard.append(statusTitle);
 
-        const statusBody = Gtk.Label.new('Search the web privately with SearXNG.');
+        const statusBody = Gtk.Label.new('');
         statusBody.add_css_class('searx-status-body');
         statusBody.set_halign(Gtk.Align.CENTER);
         statusBody.set_wrap(true);
         statusBody.set_max_width_chars(40);
+        statusBody.set_visible(false);
         this._searxStatusBody = statusBody;
         statusCard.append(statusBody);
 
-        // Action button (Retry search)
+        // Action button (Retry search) — only shown on error
         const actionBtn = Gtk.Button.new_with_label('󰑐  Retry');
         actionBtn.add_css_class('searx-action-btn');
         actionBtn.set_halign(Gtk.Align.CENTER);
@@ -5012,15 +5123,15 @@ const AppLauncherWindow = GObject.registerClass({
         this._searxActionBtn = actionBtn;
         actionBtn.connect('clicked', () => {
             const q = this._searchEntry.get_text().trim() || this._searxLastQuery;
-            if (q) {
-                this._performWebSearch(q, true);
-            } else {
-                this._checkSearxHealth();
-            }
+            this._searxStartDocker((ok) => {
+                if (ok && q) {
+                    this._performWebSearch(q, true);
+                }
+            });
         });
         statusCard.append(actionBtn);
 
-        // Fallback: open in browser
+        // Fallback: open in browser — only shown on error
         const fallbackBtn = Gtk.Button.new_with_label('󰖟  Open in Browser');
         fallbackBtn.add_css_class('searx-fallback-btn');
         fallbackBtn.set_halign(Gtk.Align.CENTER);
@@ -5041,12 +5152,9 @@ const AppLauncherWindow = GObject.registerClass({
         resultScroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
         resultScroll.set_vexpand(true);
         resultScroll.add_css_class('launcher-scroll');
-        resultScroll.set_margin_start(6);
-        resultScroll.set_margin_end(8);
-        resultScroll.set_margin_bottom(8);
         resultScroll.set_visible(false);
         this._searxResultScroll = resultScroll;
-        page.append(resultScroll);
+        soupWrap.append(resultScroll);
 
         const listBox = new Gtk.ListBox();
         listBox.add_css_class('searx-list');
@@ -6447,6 +6555,8 @@ const AppLauncherWindow = GObject.registerClass({
 
         if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
         if (this._searxStatusCard) this._searxStatusCard.set_visible(false);
+        // Hide soup search container, show webview
+        if (this._searxSoupBox) this._searxSoupBox.set_visible(false);
         if (this._searxWebBox) this._searxWebBox.set_visible(true);
 
         if (this._searxWebStack) {
@@ -6738,7 +6848,8 @@ const AppLauncherWindow = GObject.registerClass({
         if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
         if (this._searxStatusCard) this._searxStatusCard.set_visible(false);
 
-        // Show webview container and set stack active child
+        // Show webview container, hide soup search container
+        if (this._searxSoupBox) this._searxSoupBox.set_visible(false);
         if (this._searxWebBox) this._searxWebBox.set_visible(true);
         if (this._searxWebStack) {
             this._searxWebStack.set_visible(true);
@@ -6755,12 +6866,91 @@ const AppLauncherWindow = GObject.registerClass({
     _searxCloseWebView() {
         this._searxWebBoxOpen = false;
         if (this._searxWebBox) this._searxWebBox.set_visible(false);
+        // Restore soup search container
+        if (this._searxSoupBox) this._searxSoupBox.set_visible(true);
         if (this._searxResultScroll) this._searxResultScroll.set_visible(true);
         this._persistWebState();
     }
 
+    // ── SearXNG: start/stop docker container automatically ───────────────
+    _searxStartDocker(onDone) {
+        if (this._searxDockerStarting) {
+            if (onDone) onDone(false);
+            return;
+        }
+        this._searxDockerStarting = true;
+        // Show the centered spinner loading state (no glyph, no body, no buttons)
+        this._searxShowLoading('Starting SearXNG…');
+
+        const controlScript = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'searxng-control.sh']);
+        try {
+            const proc = Gio.Subprocess.new(
+                [controlScript, 'start'],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE
+            );
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                this._searxDockerStarting = false;
+                try {
+                    p.communicate_utf8_finish(res);
+                } catch (_) { }
+
+                let attempts = 0;
+                const verify = () => {
+                    // While retrying, suppress the offline error card — keep the
+                    // spinner visible until we know the final outcome.
+                    const isLastAttempt = attempts >= 6 || this._activeTab !== 'websearch';
+                    this._checkSearxHealth((ok) => {
+                        if (ok) {
+                            this._searxDockerAutoStarted = true;
+                            if (onDone) onDone(true);
+                        } else if (!isLastAttempt) {
+                            // Still retrying — keep the spinner, schedule next check
+                            attempts++;
+                            GLib.timeout_add(GLib.PRIORITY_DEFAULT, 800, () => {
+                                verify();
+                                return GLib.SOURCE_REMOVE;
+                            });
+                        } else {
+                            // All retries exhausted: show offline error
+                            if (onDone) onDone(false);
+                        }
+                    }, /* suppressError */ !isLastAttempt);
+                };
+                GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
+                    verify();
+                    return GLib.SOURCE_REMOVE;
+                });
+            });
+        } catch (e) {
+            this._searxDockerStarting = false;
+            console.warn('[launcher] Failed to execute searxng-control.sh start:', e.message);
+            this._checkSearxHealth(onDone);
+        }
+    }
+
+    _searxStopDocker(onDone) {
+        this._searxDockerAutoStarted = false;
+        const controlScript = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'searxng-control.sh']);
+        try {
+            const proc = Gio.Subprocess.new(
+                [controlScript, 'stop'],
+                Gio.SubprocessFlags.NONE
+            );
+            proc.wait_async(null, (p, res) => {
+                try { p.wait_finish(res); } catch (_) { }
+                if (onDone) onDone(true);
+            });
+        } catch (e) {
+            console.warn('[launcher] Failed to execute searxng-control.sh stop:', e.message);
+            if (onDone) onDone(false);
+        }
+    }
+
     // ── SearXNG: check if local SearXNG service is reachable ──────────────
-    _checkSearxHealth(onDone) {
+    // suppressError=true: keep spinner/loop visible on failure (used during boot retries)
+    // suppressError=false (default): show the offline error card on failure
+    // updateUI=false: purely check health without modifying websearch tab UI
+    _checkSearxHealth(onDone, suppressError = false, updateUI = true) {
         if (!this._soupSession) {
             this._soupSession = new Soup.Session();
             this._soupSession.timeout = 4;
@@ -6777,31 +6967,92 @@ const AppLauncherWindow = GObject.registerClass({
                     ok = true;
                 }
             } catch (_) { }
-            if (ok) {
-                this._searxShowIdle();
-            } else {
-                this._searxShowStatus(
-                    '󱎸',
-                    'SearXNG offline',
-                    'SearXNG service is not responding on 127.0.0.1:8080.\nPlease ensure SearXNG is running.',
-                    true,
-                    true
-                );
+            if (updateUI && this._activeTab === 'websearch') {
+                if (ok) {
+                    // Show 'Ready' briefly then go idle
+                    this._searxShowReady();
+                } else if (!suppressError) {
+                    // Only show the offline error card when NOT in the retry window
+                    this._searxShowStatus(
+                        '󱎸',
+                        'SearXNG offline',
+                        'SearXNG service is not responding on 127.0.0.1:8080.\nPlease ensure SearXNG is running.',
+                        true,
+                        true
+                    );
+                }
             }
+            // If suppressError && !ok, the spinner / cairo loop stays as-is (no state change)
             if (onDone) onDone(ok);
+        });
+    }
+
+    // ── SearXNG: show centered cairo spinning loop + title while booting ──
+    _searxShowLoading(title = 'Starting SearXNG…') {
+        if (this._searxWebBox) this._searxWebBox.set_visible(false);
+        if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+        // Cairo loop on, spinner fallback on, glyph/body/buttons off
+        if (this._searxStatusCairoLoop) this._searxStatusCairoLoop._start();
+        if (this._searxStatusSpinner) { this._searxStatusSpinner.set_visible(true); this._searxStatusSpinner.start(); }
+        if (this._searxStatusGlyph) this._searxStatusGlyph.set_visible(false);
+        if (this._searxStatusTitle) {
+            this._searxStatusTitle.remove_css_class('searx-status-title-ready');
+            this._searxStatusTitle.remove_css_class('searx-status-title-error');
+            this._searxStatusTitle.set_text(title);
+            this._searxStatusTitle.set_visible(true);
+        }
+        if (this._searxStatusBody) this._searxStatusBody.set_visible(false);
+        if (this._searxActionBtn) this._searxActionBtn.set_visible(false);
+        if (this._searxFallbackBtn) this._searxFallbackBtn.set_visible(false);
+        if (this._searxStatusCard) this._searxStatusCard.set_visible(true);
+    }
+
+    // ── SearXNG: show 'Ready' briefly then transition to idle ─────────────
+    _searxShowReady() {
+        if (this._searxStatusCairoLoop) this._searxStatusCairoLoop._stop();
+        if (this._searxStatusSpinner) { this._searxStatusSpinner.stop(); this._searxStatusSpinner.set_visible(false); }
+        if (this._searxStatusGlyph) this._searxStatusGlyph.set_visible(false);
+        if (this._searxStatusTitle) {
+            this._searxStatusTitle.remove_css_class('searx-status-title-error');
+            this._searxStatusTitle.add_css_class('searx-status-title-ready');
+            this._searxStatusTitle.set_text('Ready');
+            this._searxStatusTitle.set_visible(true);
+        }
+        if (this._searxStatusBody) this._searxStatusBody.set_visible(false);
+        if (this._searxActionBtn) this._searxActionBtn.set_visible(false);
+        if (this._searxFallbackBtn) this._searxFallbackBtn.set_visible(false);
+        if (this._searxStatusCard) this._searxStatusCard.set_visible(true);
+        // After 1.2s, if user hasn't typed a query, go to idle
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1200, () => {
+            const q = this._searchEntry ? this._searchEntry.get_text().trim() : '';
+            if (!q && this._searxStatusTitle) {
+                this._searxStatusTitle.remove_css_class('searx-status-title-ready');
+            }
+            if (this._activeTab === 'websearch' && !q) {
+                this._searxShowIdle();
+            }
+            return GLib.SOURCE_REMOVE;
         });
     }
 
     // ── SearXNG: show the status card (hides result list & webview) ──────
     _searxShowStatus(glyph, title, body, showFallback, showActionBtn = false) {
         if (this._searxWebBox) this._searxWebBox.set_visible(false);
-        if (this._searxStatusGlyph) this._searxStatusGlyph.set_text(glyph);
-        if (this._searxStatusTitle) this._searxStatusTitle.set_text(title);
-        if (this._searxStatusBody) this._searxStatusBody.set_text(body);
+        if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+        // Stop cairo loop & spinner — this is a static (non-loading) state
+        if (this._searxStatusCairoLoop) this._searxStatusCairoLoop._stop();
+        if (this._searxStatusSpinner) { this._searxStatusSpinner.stop(); this._searxStatusSpinner.set_visible(false); }
+        if (this._searxStatusGlyph) { this._searxStatusGlyph.set_text(glyph); this._searxStatusGlyph.set_visible(true); }
+        if (this._searxStatusTitle) {
+            this._searxStatusTitle.remove_css_class('searx-status-title-ready');
+            this._searxStatusTitle.add_css_class('searx-status-title-error');
+            this._searxStatusTitle.set_text(title);
+            this._searxStatusTitle.set_visible(true);
+        }
+        if (this._searxStatusBody) { this._searxStatusBody.set_text(body); this._searxStatusBody.set_visible(true); }
         if (this._searxActionBtn) this._searxActionBtn.set_visible(!!showActionBtn);
         if (this._searxFallbackBtn) this._searxFallbackBtn.set_visible(!!showFallback);
         if (this._searxStatusCard) this._searxStatusCard.set_visible(true);
-        if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
     }
 
     // ── SearXNG: show idle/empty state (result area hidden) ───────────────
@@ -6809,6 +7060,8 @@ const AppLauncherWindow = GObject.registerClass({
         if (this._searxWebBox) this._searxWebBox.set_visible(false);
         if (this._searxStatusCard) this._searxStatusCard.set_visible(false);
         if (this._searxResultScroll) this._searxResultScroll.set_visible(false);
+        if (this._searxStatusCairoLoop) this._searxStatusCairoLoop._stop();
+        if (this._searxStatusSpinner) { this._searxStatusSpinner.stop(); this._searxStatusSpinner.set_visible(false); }
     }
 
     // ── SearXNG: clear the result list widget ─────────────────────────────
@@ -7078,7 +7331,7 @@ const AppLauncherWindow = GObject.registerClass({
             this._favFlow.append(this._makeAppTile(app));
     }
 
-    // ── Agent Tab (WebKitGTK + WebLLM + React) ─────────────────────────────
+    // ── Agent Tab (WebKitGTK + React) ────────────────────────────────────
     _enableWebKitWebGPU(settings) {
         // WebGPU is a development/experimental feature in WebKitGTK. On
         // versions where it is exposed, WebGPU also needs the GPU-process
@@ -7152,7 +7405,7 @@ const AppLauncherWindow = GObject.registerClass({
         try {
             this._agentHttpServer = createAgentLoopbackServer(appDist);
             this._agentHttpPort = AGENT_LOOPBACK_PORT;
-            console.log(`[launcher] Agent WebLLM loopback origin: http://${AGENT_LOOPBACK_HOST}:${AGENT_LOOPBACK_PORT}/`);
+            console.log(`[launcher] Agent loopback origin: http://${AGENT_LOOPBACK_HOST}:${AGENT_LOOPBACK_PORT}/`);
             return `http://${AGENT_LOOPBACK_HOST}:${AGENT_LOOPBACK_PORT}/index.html`;
         } catch (error) {
             this._agentHttpServer = null;
@@ -7415,13 +7668,30 @@ const AppLauncherWindow = GObject.registerClass({
         if (!this._agentWebView) return;
         try {
             const jsonStr = JSON.stringify(payload);
-            // A one-shot "if the hook exists, call it" check silently drops
-            // the message forever if the React bundle hasn't finished
-            // executing yet — e.g. on a cold launcher start, WebKitGTK's
-            // load-changed FINISHED can fire before a multi-megabyte bundle
-            // has run far enough to register __hyprcandy_agent_dispatch.
-            // Poll briefly (self-contained inside the page, no GJS timers
-            // needed) instead of guessing when the page is "ready enough".
+            // Plain one-shot dispatch. This method is on the hot path for
+            // chat (a runtime_request response is relayed through here on
+            // every ~150ms poll tick, more often with several tool calls in
+            // flight) — by the time chat traffic exists at all, the page has
+            // obviously already loaded and __hyprcandy_agent_dispatch exists,
+            // so retry machinery here is pure wasted evaluate_javascript work
+            // repeated many times a second. See _agentPostMessageWithRetry
+            // for the one place (cold-start theme/config push) that actually
+            // needs to tolerate the hook not existing yet.
+            const script = `if (window.__hyprcandy_agent_dispatch) { window.__hyprcandy_agent_dispatch(${jsonStr}); }`;
+            this._agentWebView.evaluate_javascript(script, -1, null, null, null, null);
+        } catch (e) {
+            console.warn('[launcher] _agentPostMessage webkit error:', e.message);
+        }
+    }
+
+    _agentPostMessageWithRetry(payload) {
+        // Same as _agentPostMessage, but self-polls for up to 5s in case the
+        // page's JS bundle hasn't finished executing yet. Used only for the
+        // theme/runtime_config push on cold start (see _agentInjectTheme) —
+        // never for high-frequency chat traffic.
+        if (!this._agentWebView) return;
+        try {
+            const jsonStr = JSON.stringify(payload);
             const script = `(function(){
                 var payload = ${jsonStr};
                 var attempts = 0;
@@ -7435,7 +7705,7 @@ const AppLauncherWindow = GObject.registerClass({
             })();`;
             this._agentWebView.evaluate_javascript(script, -1, null, null, null, null);
         } catch (e) {
-            console.warn('[launcher] _agentPostMessage webkit error:', e.message);
+            console.warn('[launcher] _agentPostMessageWithRetry webkit error:', e.message);
         }
     }
 
@@ -7461,13 +7731,13 @@ const AppLauncherWindow = GObject.registerClass({
             // to the user (folder picker) and persists in the frontend's
             // own storage; this is only a safety net for a brand-new
             // install where nothing has been chosen yet.
-            this._agentPostMessage({
+            this._agentPostMessageWithRetry({
                 type: 'runtime_config', payload: {
                     homeDir: HOME,
                     defaultProjectRoot: GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock']),
                 }
             });
-            this._agentPostMessage({ type: 'theme_update', payload: map });
+            this._agentPostMessageWithRetry({ type: 'theme_update', payload: map });
         } catch (e) {
             console.warn('[launcher] _agentInjectTheme failed:', e.message);
         }
@@ -7521,9 +7791,9 @@ const AppLauncherWindow = GObject.registerClass({
         } else if (action === 'searxng_status') {
             this._checkSearxHealth((running) => {
                 this._agentPostMessage({ id, type: 'response', payload: { running } });
-            });
+            }, true, false);
         } else if (action === 'searxng_start') {
-            this._checkSearxHealth((running) => {
+            this._searxStartDocker((running) => {
                 this._agentPostMessage({ id, type: 'response', payload: { success: running } });
             });
         } else if (action === 'read_file') {
@@ -7538,11 +7808,6 @@ const AppLauncherWindow = GObject.registerClass({
                         const start = offset > 0 ? offset - 1 : 0;
                         const end = limit > 0 ? start + limit : lines.length;
                         text = lines.slice(start, end).join('\n');
-                    } else if (text.length > 200000) {
-                        // Safety cap so one huge file can't blow the model's
-                        // context on its own; the model can re-read with an
-                        // offset/limit slice if it needs more of the file.
-                        text = text.slice(0, 200000) + `\n\n[...truncated; file is larger, use offset/limit to read more...]`;
                     }
                     this._agentPostMessage({ id, type: 'response', payload: text });
                 } else {
@@ -7746,7 +8011,11 @@ const AppLauncherWindow = GObject.registerClass({
 
                 if (!this._runtimeSoupSession) {
                     this._runtimeSoupSession = new Soup.Session();
-                    this._runtimeSoupSession.timeout = 30;
+                    // 220s: comfortably above the Python side's own
+                    // waitHealthy(180000) for llama-server model loads, so a
+                    // large GGUF loading into VRAM doesn't get truncated here
+                    // before the backend even gets to report its own timeout.
+                    this._runtimeSoupSession.timeout = 220;
                 }
                 const session = this._runtimeSoupSession;
                 const msg = Soup.Message.new(method, reqUrl);
@@ -7935,9 +8204,18 @@ const LauncherApp = GObject.registerClass({
             this._win._favSep.set_visible(false);
             this._win._favChevron.set_text(CHEV_UP);
             this._win._groupCollapsed = {};
-            // Restore last active tab (or 'launcher' if none was saved, or env var override).
-            // Launcher tab always resets scroll position to the top.
-            const tabToOpen = GLib.getenv('HYPRCANDY_LAUNCHER_TAB') || this._win._lastTab || 'launcher';
+            let tabToOpen = GLib.getenv('HYPRCANDY_LAUNCHER_TAB') || this._win._lastTab || 'launcher';
+            try {
+                const tabFile = GLib.build_filenamev([GLib.get_user_runtime_dir(), 'hyprcandy-launcher-tab']);
+                if (GLib.file_test(tabFile, GLib.FileTest.EXISTS)) {
+                    const [ok, bytes] = GLib.file_get_contents(tabFile);
+                    if (ok && bytes) {
+                        const content = new TextDecoder().decode(bytes).trim();
+                        if (content) tabToOpen = content;
+                        GLib.unlink(tabFile);
+                    }
+                }
+            } catch (_) { }
             this._win._switchTab(tabToOpen, true);
             // Show with fade-in
             this._laFadeIn(this._win, () => {
@@ -7959,6 +8237,9 @@ const LauncherApp = GObject.registerClass({
 
     _hideLauncherWindow() {
         if (!this._win || !this._win.get_visible()) return;
+        if (this._win._activeTab === 'websearch') {
+            this._win._searxStopDocker();
+        }
         this._laCancelFade();
         this._laFadeOut(this._win, () => {
             this._win.set_visible(false);
@@ -8013,26 +8294,6 @@ const LauncherApp = GObject.registerClass({
                 if (this._win) {
                     this._win._loadGlobalCSS();
                     this._win.queue_draw();
-                    if (this._win._agentWebView) {
-                        this._win._agentWebView.evaluate_javascript(
-                            `(() => {
-                                const chatBtn = document.querySelector('button[title*="chat"]');
-                                if (chatBtn) chatBtn.click();
-                                const themeBtn = document.querySelector('button[title*="Theme"]');
-                                if (themeBtn) themeBtn.click();
-                                return 'Toggled chat and theme picker';
-                            })()`,
-                            -1, null, null, null,
-                            (wv, res) => {
-                                try {
-                                    const val = wv.evaluate_javascript_finish(res);
-                                    console.log('[AGENT DEBUG ON SIGUSR2]:', val.to_string());
-                                } catch (e) {
-                                    console.warn('[AGENT DEBUG EVAL ERR]:', e.message);
-                                }
-                            }
-                        );
-                    }
                 }
                 return GLib.SOURCE_CONTINUE;
             });

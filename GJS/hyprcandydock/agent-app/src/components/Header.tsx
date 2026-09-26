@@ -33,6 +33,11 @@ export const Header: React.FC = () => {
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const tabRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const pointerStartRef = useRef<{ x: number; y: number; id: string } | null>(null);
+  const suppressClickRef = useRef(false);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -57,11 +62,81 @@ export const Header: React.FC = () => {
         store.modelStatus === 'error' ? 'error' : 'idle';
 
   const handleWheelTabs = (e: React.WheelEvent) => {
+    // Kept only as a fallback for environments where the native listener
+    // below doesn't attach in time; the real fix is the useEffect listener,
+    // since React's onWheel is passive by default and preventDefault() here
+    // is otherwise silently ignored.
     if (tabsContainerRef.current) {
-      e.preventDefault();
       tabsContainerRef.current.scrollLeft += e.deltaX !== 0 ? e.deltaX : e.deltaY;
     }
   };
+
+  useEffect(() => {
+    const el = tabsContainerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      el.scrollLeft += e.deltaX !== 0 ? e.deltaX : e.deltaY;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // Manual pointer-based tab reordering (see onPointerDown above for why
+  // this isn't native HTML5 drag-and-drop). A small movement threshold
+  // before "drag" actually starts keeps ordinary clicks unaffected.
+  useEffect(() => {
+    const DRAG_THRESHOLD = 6;
+    let dragging = false;
+
+    const hitTest = (clientX: number): string | null => {
+      for (const [id, node] of Object.entries(tabRefs.current)) {
+        if (!node) continue;
+        const rect = node.getBoundingClientRect();
+        if (clientX >= rect.left && clientX <= rect.right) return id;
+      }
+      return null;
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const start = pointerStartRef.current;
+      if (!start) return;
+      if (!dragging) {
+        if (Math.abs(e.clientX - start.x) < DRAG_THRESHOLD && Math.abs(e.clientY - start.y) < DRAG_THRESHOLD) return;
+        dragging = true;
+        suppressClickRef.current = true;
+        setDraggedId(start.id);
+      }
+      const overId = hitTest(e.clientX);
+      setDragOverId(overId && overId !== start.id ? overId : null);
+    };
+
+    const onUp = () => {
+      const start = pointerStartRef.current;
+      pointerStartRef.current = null;
+      if (dragging && start) {
+        setDragOverId(current => {
+          if (current && current !== start.id) storeActions.reorderPanes(start.id, current);
+          return null;
+        });
+      }
+      dragging = false;
+      setDraggedId(null);
+      // Swallow the click that follows a real drag; let a plain click
+      // (no movement past the threshold) through normally.
+      if (suppressClickRef.current) {
+        setTimeout(() => { suppressClickRef.current = false; }, 0);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+  }, []);
 
   const handleNewFile = () => {
     setShowDropdown(false);
@@ -163,9 +238,19 @@ export const Header: React.FC = () => {
           return (
             <div
               key={pane.id}
-              className={`header-tab ${isActive ? 'active' : ''}`}
-              onClick={() => storeActions.setActivePane(pane.id)}
+              ref={(el) => { tabRefs.current[pane.id] = el; }}
+              className={`header-tab ${isActive ? 'active' : ''} ${dragOverId === pane.id ? 'tab-drag-over' : ''} ${draggedId === pane.id ? 'tab-dragging' : ''}`}
+              onClick={() => { if (!suppressClickRef.current) storeActions.setActivePane(pane.id); }}
               title={pane.path || pane.name}
+              onPointerDown={(e) => {
+                // Manual pointer-based reordering instead of native HTML5
+                // drag-and-drop: the native DnD API depends on platform
+                // integration that embedded WebKitGTK views don't reliably
+                // provide (drag sessions can get stuck with no drop ever
+                // firing). Plain pointer events work the same everywhere.
+                if (e.button !== 0) return;
+                pointerStartRef.current = { x: e.clientX, y: e.clientY, id: pane.id };
+              }}
             >
               {getTabIcon(pane)}
               {pane.isUnsaved && <span className="tab-unsaved-dot" title="Unsaved changes" />}

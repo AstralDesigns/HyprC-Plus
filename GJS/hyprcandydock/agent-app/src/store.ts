@@ -1,7 +1,7 @@
 /**
  * Agent App Global State & Store
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { bridge } from './bridge';
 
 // Kept only for the ModelInfo/customModels shape below — the WebLLM engine
@@ -21,6 +21,19 @@ export interface DiffData {
   originalCode: string;
   modifiedCode: string;
   status: 'pending' | 'accepted' | 'rejected';
+  additions?: number;
+  deletions?: number;
+  isNew?: boolean;
+}
+
+export interface PendingFileEdit {
+  path: string;
+  additions: number;
+  deletions: number;
+  isNew: boolean;
+  oldContent: string;
+  newContent: string;
+  timestamp: number;
 }
 
 export interface CommandData {
@@ -52,14 +65,29 @@ export interface PlanData {
   updatedAt: number;
 }
 
+/**
+ * A turn is stored as an ordered sequence of blocks, built in the order
+ * events actually arrive — this is what lets a diff card or activity
+ * timeline appear inline exactly where it happened, with normal response
+ * text before and after it, instead of all text being concatenated into one
+ * block rendered after every widget.
+ */
+export type MessageBlock =
+  | { type: 'text'; id: string; content: string }
+  | { type: 'activity'; id: string; tools: ToolCallData[] }   // grouped ambient tool calls (read/list/search/plan)
+  | { type: 'command'; id: string; tool: ToolCallData }        // elevated: exec_command / run_command
+  | { type: 'diff'; id: string; diff: DiffData };              // elevated: write_file result
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: number;
+  blocks?: MessageBlock[];
   tools?: ToolCallData[];
   plan?: PlanData;
   diff?: DiffData;
+  diffs?: DiffData[];
   command?: CommandData;
   attachments?: AttachmentData[];
 }
@@ -73,6 +101,7 @@ export interface AttachmentData {
 export interface Session {
   id: string;
   title: string;
+  titleSource?: 'auto' | 'user';
   createdAt: number;
   updatedAt: number;
   messages: Message[];
@@ -95,7 +124,7 @@ export interface ModelInfo {
   wllamaFile?: string;
 }
 
-export type FilePaneType = 'code' | 'markdown' | 'image' | 'video' | 'audio' | 'image-gallery' | 'video-gallery';
+export type FilePaneType = 'code' | 'markdown' | 'image' | 'video' | 'audio' | 'image-gallery' | 'video-gallery' | 'preview';
 
 export interface FilePane {
   id: string;
@@ -106,6 +135,8 @@ export interface FilePane {
   isUnsaved?: boolean;
   language?: string;
   data?: any;
+  cursorPosition?: { lineNumber: number; column: number };
+  scrollTop?: number;
 }
 
 export interface FileSystemItem {
@@ -189,6 +220,10 @@ export interface AppState {
   // Context files and images for chat
   contextFiles: Array<{ path: string; name: string }>;
   contextImages: Array<{ path: string; data: string }>;
+
+  // Pending write_file edits awaiting accept/reject, keyed by absolute path.
+  // Mirrors the Python runtime's PENDING_EDITS registry (see /api/files/pending).
+  pendingFiles: Record<string, PendingFileEdit>;
 
   // Monaco editor theme
   monacoTheme: string;
@@ -278,8 +313,8 @@ function loadInitialState(): AppState {
   const defaultState: AppState = {
     sessions: [defSession],
     activeSessionId: defSession.id,
-    activeModel: PRESET_MODELS[0].id,
-    modelStatus: 'idle',
+    activeModel: 'openrouter/free',
+    modelStatus: 'ready',
     downloadProgress: { progress: 0, text: '' },
     // Placeholder until the GJS host reports the real HOME via the
     // 'runtime_config' message (see bridge.ts) — never a hardcoded path,
@@ -316,21 +351,22 @@ function loadInitialState(): AppState {
 
     contextFiles: [],
     contextImages: [],
+    pendingFiles: {},
 
     monacoTheme: 'matugen',
 
     // Hybrid inference defaults
-    inferenceMode: 'local' as const,
+    inferenceMode: 'byok' as const,
     licenseKey: '',
     cloudModel: 'google/gemini-2.5-flash',
     cloudCredits: 0,
-    runtimeServerReady: false,
-    modelManagerTab: 'local' as const,
+    runtimeServerReady: true,
+    modelManagerTab: 'cloud' as const,
 
     // BYOK defaults
-    byokProvider: null,
+    byokProvider: 'openrouter',
     byokKeys: {},
-    byokModel: '',
+    byokModel: 'openrouter/free',
     byokLicenseKey: '',
     byokLicenseInstanceId: '',
   };
@@ -354,13 +390,19 @@ function loadInitialState(): AppState {
           monacoTheme: 'matugen',
           projectFiles: Array.isArray(parsed.projectFiles) ? parsed.projectFiles : [],
           activeModel: (() => {
-            const customIds = Array.isArray(parsed.customModels)
-              ? parsed.customModels.map((model: ModelInfo) => model.id)
-              : [];
-            const knownIds = new Set([...PRESET_MODELS.map(model => model.id), ...customIds]);
-            return knownIds.has(parsed.activeModel) ? parsed.activeModel : PRESET_MODELS[0].id;
+            if (parsed.inferenceMode === 'cloud') {
+              return (typeof parsed.cloudModel === 'string' && parsed.cloudModel)
+                ? parsed.cloudModel
+                : (typeof parsed.activeModel === 'string' ? parsed.activeModel : 'google/gemini-2.5-flash');
+            }
+            if (parsed.inferenceMode === 'byok') {
+              return (typeof parsed.byokModel === 'string' && parsed.byokModel)
+                ? parsed.byokModel
+                : (typeof parsed.activeModel === 'string' ? parsed.activeModel : 'openrouter/free');
+            }
+            return (typeof parsed.byokModel === 'string' && parsed.byokModel) || 'openrouter/free';
           })(),
-          modelStatus: 'idle',
+          modelStatus: 'ready',
           downloadProgress: { progress: 0, text: '' },
           agentRunning: false,
           selectedFile: null,
@@ -369,29 +411,18 @@ function loadInitialState(): AppState {
           panes: Array.isArray(parsed.panes) ? parsed.panes : [],
           activePaneId: parsed.activePaneId || null,
           sidebarVisible: typeof parsed.sidebarVisible === 'boolean' ? parsed.sidebarVisible : true,
-          chatVisible: typeof parsed.chatVisible === 'boolean' ? parsed.chatVisible : true,
+          chatVisible: true,
           contextMode: 'minimal',
           sidebarWidth: typeof parsed.sidebarWidth === 'number' ? parsed.sidebarWidth : 260,
           chatWidth: typeof parsed.chatWidth === 'number' ? parsed.chatWidth : 380,
           customModels: Array.isArray(parsed.customModels)
             ? parsed.customModels.filter((model: ModelInfo) => model?.id)
             : [],
-          // Which backend was actually active last session, so the header
-          // chip and Model Manager both resume showing it instead of
-          // silently reverting to the 'local' default.
-          inferenceMode: parsed.inferenceMode === 'byok' || parsed.inferenceMode === 'cloud' || parsed.inferenceMode === 'local'
-            ? parsed.inferenceMode
-            : defaultState.inferenceMode,
-          byokProvider: typeof parsed.byokProvider === 'string' ? parsed.byokProvider : defaultState.byokProvider,
-          byokModel: typeof parsed.byokModel === 'string' ? parsed.byokModel : defaultState.byokModel,
+          inferenceMode: parsed.inferenceMode === 'cloud' ? 'cloud' : 'byok',
+          byokProvider: typeof parsed.byokProvider === 'string' && parsed.byokProvider ? parsed.byokProvider : 'openrouter',
+          byokModel: typeof parsed.byokModel === 'string' && parsed.byokModel ? parsed.byokModel : 'openrouter/free',
           cloudModel: typeof parsed.cloudModel === 'string' ? parsed.cloudModel : defaultState.cloudModel,
-          // Model Manager's open tab always follows whichever backend was
-          // actually active — never the tab that merely happened to be
-          // in view when the app last closed.
-          modelManagerTab: (() => {
-            const mode = parsed.inferenceMode;
-            return (mode === 'byok' || mode === 'cloud') ? 'cloud' : 'local';
-          })(),
+          modelManagerTab: 'cloud',
         };
       }
     }
@@ -498,6 +529,53 @@ export function useStore(): [AppState, typeof setStore] {
   return [state, setStore];
 }
 
+function shallowEqual(a: any, b: any): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || a === null || typeof b !== 'object' || b === null) return false;
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    if (!Object.is(a[key], b[key])) return false;
+  }
+  return true;
+}
+
+/**
+ * Selective subscription: only re-renders when the selected slice actually
+ * changes (per isEqual, shallow by default) — unlike useStore(), which
+ * re-renders on every single setStore() call anywhere in the app. Use this
+ * for components that don't need to react to the high-frequency updates
+ * (e.g. chat streaming touches `sessions` roughly every 80ms) but do read
+ * from the store — Canvas/Monaco being the main example, since re-rendering
+ * an editor that often produces visible flicker with no functional benefit.
+ */
+export function useStoreSelector<T>(selector: (s: AppState) => T, isEqual: (a: T, b: T) => boolean = shallowEqual): T {
+  const selectorRef = useRef(selector);
+  selectorRef.current = selector;
+  const isEqualRef = useRef(isEqual);
+  isEqualRef.current = isEqual;
+
+  const [selected, setSelected] = useState<T>(() => selector(currentState));
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+
+  useEffect(() => {
+    const check = () => {
+      const next = selectorRef.current(currentState);
+      if (!isEqualRef.current(selectedRef.current, next)) {
+        selectedRef.current = next;
+        setSelected(next);
+      }
+    };
+    check(); // catch any change that happened between initial render and this effect mounting
+    listeners.add(check);
+    return () => { listeners.delete(check); };
+  }, []);
+
+  return selected;
+}
+
 let untitledCount = 1;
 
 /* Store Actions */
@@ -520,6 +598,31 @@ export const storeActions = {
       activeSessionId: newSession.id,
     }));
     return newSession.id;
+  },
+
+  /**
+   * Called once a session's first turn completes (see agent-engine.ts). Only
+   * takes effect while the title is still auto-assigned — a manual rename
+   * (renameSession) always wins and is never overwritten again.
+   */
+  autoNameSession: (sessionId: string, title: string) => {
+    const clean = title.trim();
+    if (!clean) return;
+    setStore(prev => ({
+      sessions: prev.sessions.map(s =>
+        s.id === sessionId && s.titleSource !== 'user' ? { ...s, title: clean, titleSource: 'auto' } : s
+      ),
+    }));
+  },
+
+  renameSession: (sessionId: string, title: string) => {
+    const clean = title.trim();
+    if (!clean) return;
+    setStore(prev => ({
+      sessions: prev.sessions.map(s =>
+        s.id === sessionId ? { ...s, title: clean, titleSource: 'user' } : s
+      ),
+    }));
   },
 
   deleteSession: (id: string) => {
@@ -597,21 +700,161 @@ export const storeActions = {
     });
   },
 
-  updateDiffStatus: (sessionId: string, messageId: string, status: 'accepted' | 'rejected') => {
+  updateDiffStatus: (sessionId: string, messageId: string, status: 'accepted' | 'rejected', filePath?: string) => {
     setStore(prev => {
       const updated = prev.sessions.map(s => {
         if (s.id !== sessionId) return s;
         return {
           ...s,
           messages: s.messages.map(m => {
-            if (m.id === messageId && m.diff) {
-              return { ...m, diff: { ...m.diff, status } };
-            }
-            return m;
+            if (m.id !== messageId) return m;
+            const diff = (m.diff && (!filePath || m.diff.filePath === filePath)) ? { ...m.diff, status } : m.diff;
+            const diffs = m.diffs?.map(d => (!filePath || d.filePath === filePath) ? { ...d, status } : d);
+            return { ...m, diff, diffs };
           }),
         };
       });
       return { sessions: updated };
+    });
+  },
+
+  /**
+   * Register a write_file result as a pending edit — called from
+   * agent-engine.ts's poll loop as soon as a write_file tool_result arrives.
+   * The file is already on disk (Python writes immediately); this only
+   * tracks the snapshot for the accept/reject UI.
+   */
+  registerPendingFile: (edit: PendingFileEdit) => {
+    setStore(prev => ({ pendingFiles: { ...prev.pendingFiles, [edit.path]: edit } }));
+  },
+
+  /** Attaches a per-file diff card to a turn — a turn can touch several files. */
+  appendDiff: (sessionId: string, messageId: string, diff: DiffData) => {
+    setStore(prev => ({
+      sessions: prev.sessions.map(s => {
+        if (s.id !== sessionId) return s;
+        return {
+          ...s,
+          messages: s.messages.map(m => {
+            if (m.id !== messageId) return m;
+            const existing = m.diffs || [];
+            const withoutSame = existing.filter(d => d.filePath !== diff.filePath);
+            return { ...m, diffs: [...withoutSame, diff] };
+          }),
+        };
+      }),
+    }));
+  },
+
+  refreshPendingFiles: async () => {
+    try {
+      const res = await bridge.runtimeRequest('/api/files/pending', {}, 'GET');
+      const files = (res?.files || []) as Array<any>;
+      const map: Record<string, PendingFileEdit> = {};
+      for (const f of files) {
+        map[f.path] = {
+          path: f.path, additions: f.additions, deletions: f.deletions,
+          isNew: f.is_new, oldContent: f.old_content, newContent: f.new_content,
+          timestamp: f.timestamp,
+        };
+      }
+      setStore({ pendingFiles: map });
+    } catch { /* runtime not up yet — fine, list stays empty */ }
+  },
+
+  /**
+   * Diffs live inside per-message `diff`/`diffs`/`blocks` fields, but accept
+   * /reject can originate from the global pending-files bar which has no
+   * reference back to which message/session a file's diff card lives in.
+   * Sweep every session's messages and update any diff card matching this
+   * path — this is what keeps a DiffWidget's buttons in sync (Open + a kept
+   * /undone indicator, instead of Keep/Undo staying visible) no matter which
+   * UI surface actually performed the accept/reject.
+   */
+  syncDiffStatusEverywhere: (path: string, status: 'accepted' | 'rejected') => {
+    setStore(prev => ({
+      sessions: prev.sessions.map(s => ({
+        ...s,
+        messages: s.messages.map(m => {
+          const touchesPath = (m.diff?.filePath === path) || m.diffs?.some(d => d.filePath === path)
+            || m.blocks?.some(b => b.type === 'diff' && b.diff.filePath === path);
+          if (!touchesPath) return m;
+          return {
+            ...m,
+            diff: m.diff && m.diff.filePath === path ? { ...m.diff, status } : m.diff,
+            diffs: m.diffs?.map(d => d.filePath === path ? { ...d, status } : d),
+            blocks: m.blocks?.map(b => b.type === 'diff' && b.diff.filePath === path
+              ? { ...b, diff: { ...b.diff, status } } : b),
+          };
+        }),
+      })),
+    }));
+  },
+
+  acceptFile: async (path: string) => {
+    setStore(prev => {
+      const next = { ...prev.pendingFiles };
+      delete next[path];
+      return { pendingFiles: next };
+    });
+    storeActions.syncDiffStatusEverywhere(path, 'accepted');
+    try { await bridge.runtimeRequest('/api/files/accept', { path }); } catch { /* best-effort */ }
+  },
+
+  rejectFile: async (path: string) => {
+    const edit = getStore().pendingFiles[path];
+    setStore(prev => {
+      const next = { ...prev.pendingFiles };
+      delete next[path];
+      return { pendingFiles: next };
+    });
+    storeActions.syncDiffStatusEverywhere(path, 'rejected');
+    try { await bridge.runtimeRequest('/api/files/reject', { path }); } catch { /* best-effort */ }
+    // If the reverted file is open in a pane, refresh its content from disk.
+    if (edit) {
+      const pane = getStore().panes.find(p => p.path === path);
+      if (pane) {
+        try {
+          const content = await bridge.readFile(path);
+          setStore(prev => ({ panes: prev.panes.map(p => p.id === pane.id ? { ...p, content, isUnsaved: false } : p) }));
+        } catch { /* best-effort */ }
+      }
+    }
+  },
+
+  acceptAllFiles: async () => {
+    const paths = Object.keys(getStore().pendingFiles);
+    setStore({ pendingFiles: {} });
+    for (const path of paths) storeActions.syncDiffStatusEverywhere(path, 'accepted');
+    try { await bridge.runtimeRequest('/api/files/accept-all', {}); } catch { /* best-effort */ }
+  },
+
+  rejectAllFiles: async () => {
+    const paths = Object.keys(getStore().pendingFiles);
+    setStore({ pendingFiles: {} });
+    for (const path of paths) storeActions.syncDiffStatusEverywhere(path, 'rejected');
+    try { await bridge.runtimeRequest('/api/files/reject-all', {}); } catch { /* best-effort */ }
+    for (const path of paths) {
+      const pane = getStore().panes.find(p => p.path === path);
+      if (!pane) continue;
+      try {
+        const content = await bridge.readFile(path);
+        setStore(prev => ({ panes: prev.panes.map(p => p.id === pane.id ? { ...p, content, isUnsaved: false } : p) }));
+      } catch { /* best-effort */ }
+    }
+  },
+
+  /** Opens a live file:// preview of a web page/asset in a new Canvas pane. */
+  openPreview: (path: string, name?: string) => {
+    setStore(prev => {
+      const id = `preview_${path}`;
+      const existing = prev.panes.find(p => p.id === id);
+      if (existing) return { activePaneId: id };
+      const pane: FilePane = {
+        id, name: name || path.split('/').pop() || path, path,
+        type: 'preview', content: '',
+      };
+      return { panes: [...prev.panes, pane], activePaneId: id };
     });
   },
 
@@ -670,6 +913,20 @@ export const storeActions = {
     });
   },
 
+  /** Drag-to-rearrange for the Canvas tab row. */
+  reorderPanes: (draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    setStore(prev => {
+      const from = prev.panes.findIndex(p => p.id === draggedId);
+      const to = prev.panes.findIndex(p => p.id === targetId);
+      if (from === -1 || to === -1) return {};
+      const next = [...prev.panes];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return { panes: next };
+    });
+  },
+
   setActivePane: (id: string | null) => {
     setStore({ activePaneId: id, activeOpenFile: id });
   },
@@ -678,6 +935,17 @@ export const storeActions = {
     setStore(prev => ({
       panes: prev.panes.map(p => p.id === id ? { ...p, content, isUnsaved: true } : p),
       openFileContents: { ...prev.openFileContents, [id]: content },
+    }));
+  },
+
+  /** Remembers cursor/scroll position per pane so re-opening or switching
+   * back to a tab restores exactly where you left off, instead of always
+   * landing at line 1. Persistence is already debounced (schedulePersist),
+   * so frequent cursor moves coalesce into one write rather than one per
+   * keystroke. */
+  setPaneViewState: (id: string, viewState: { cursorPosition?: { lineNumber: number; column: number }; scrollTop?: number }) => {
+    setStore(prev => ({
+      panes: prev.panes.map(p => p.id === id ? { ...p, ...viewState } : p),
     }));
   },
 

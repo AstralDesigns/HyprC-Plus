@@ -13,7 +13,7 @@ window.background {
     border-style: solid;
     border-width: 2px;
     /* config: borderWidth  */
-    border-color: @inverse_primary;
+    border-color: @primary_container;
     /* CC border picker → dock-border.sh writes @gtk_name here */
 }
 

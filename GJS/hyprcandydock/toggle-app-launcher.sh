@@ -17,9 +17,10 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LAUNCHER="$SCRIPT_DIR/app-launcher.js"
 
-# ── Send SIGUSR1 to the running daemon ──────────────────────────────────────
-# Use a broad pattern so it matches regardless of how the path was passed,
-# avoiding false "not found" that would spawn a duplicate process.
+TARGET_TAB="${1:-}"
+if [ -n "$TARGET_TAB" ]; then
+    echo "$TARGET_TAB" > "${XDG_RUNTIME_DIR:-/tmp}/hyprcandy-launcher-tab"
+fi
 
 if pkill -10 -f "gjs.*app-launcher\.js" 2>/dev/null; then
     # Signal delivered — daemon will show/hide itself

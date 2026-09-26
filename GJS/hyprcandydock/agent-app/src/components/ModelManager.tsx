@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type FC } from 'react';
 import {
-  AlertTriangle, Check, Cloud, Cpu,
-  Eye, EyeOff, ExternalLink, HardDrive, Key, Loader, Play,
-  RefreshCw, Trash2, Upload, X, Zap, Sparkles, TestTube, Search,
+  AlertTriangle, Check, Cpu,
+  Eye, EyeOff, ExternalLink, Key, Loader,
+  RefreshCw, Trash2, X, Zap, Sparkles, TestTube, Search,
 } from 'lucide-react';
 import { useStore, setStore } from '../store';
 import { bridge } from '../bridge';
@@ -269,491 +269,7 @@ export const IosToggle: FC<{
   );
 };
 
-const StatusPill: FC<{ running: boolean; loading?: boolean; label?: string }> = ({ running, loading, label }) => (
-  <span style={{
-    display: 'inline-flex', alignItems: 'center', gap: '5px',
-    padding: '3px 10px', borderRadius: 'var(--radius-full)', fontSize: '11px', fontWeight: 600,
-    background: loading
-      ? `color-mix(in srgb, ${COLOR5_AMBER} 16%, transparent)`
-      : running
-      ? `color-mix(in srgb, ${PRIMARY} 16%, transparent)`
-      : 'color-mix(in srgb, var(--matugen-surface-variant, #40484c) 20%, transparent)',
-    color: loading ? COLOR5_AMBER : running ? PRIMARY : 'var(--text-muted)',
-    border: `1px solid ${
-      loading
-        ? `color-mix(in srgb, ${COLOR5_AMBER} 40%, transparent)`
-        : running
-        ? `color-mix(in srgb, ${PRIMARY} 40%, transparent)`
-        : 'var(--border-subtle)'
-    }`,
-  }}>
-    {loading
-      ? <Loader size={10} style={{ animation: 'spin 1.5s linear infinite' }} />
-      : <span style={{ width: 7, height: 7, borderRadius: '50%', background: running ? PRIMARY : 'var(--text-muted)', display: 'inline-block' }} />}
-    {label ?? (loading ? 'Starting…' : running ? 'Running' : 'Stopped')}
-  </span>
-);
 
-// ── Outer tab bar (Local / Cloud) ─────────────────────────────────────────────
-const TabBar: FC<{ active: 'local' | 'cloud'; onChange: (t: 'local' | 'cloud') => void }> = ({ active, onChange }) => (
-  <div style={{
-    display: 'flex', gap: '4px', padding: '4px',
-    background: 'color-mix(in srgb, var(--matugen-surface, #0c1014) 40%, transparent)',
-    borderRadius: 'var(--radius-full, 9999px)',
-    border: '1px solid var(--border-subtle)',
-  }}>
-    {(['local', 'cloud'] as const).map(tab => {
-      const isSelected = active === tab;
-      return (
-        <button
-          key={tab}
-          onClick={() => onChange(tab)}
-          style={{
-            flex: 1, padding: '7px 0', border: 'none',
-            borderRadius: 'var(--radius-full, 9999px)',
-            fontWeight: 700, fontSize: '12px', cursor: 'pointer', transition: 'all .18s ease',
-            background: isSelected ? PRIMARY : 'transparent',
-            color: isSelected ? ON_PRIMARY : 'var(--text-secondary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-            boxShadow: isSelected ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-          }}
-        >
-          {tab === 'local' ? <><Cpu size={13} />Local</> : <><Cloud size={13} />Cloud</>}
-        </button>
-      );
-    })}
-  </div>
-);
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LOCAL TAB
-// ═══════════════════════════════════════════════════════════════════════════════
-interface LocalModel { path: string; filename: string; size_label: string; quant: string; id: string; }
-
-const LocalTab: FC = () => {
-  const [store] = useStore();
-  const [localModels, setLocalModels]       = useState<any[]>([]);
-  const [serverStatus, setServerStatus]     = useState<{ running: boolean; model_name?: string }>({ running: false });
-  const [loadingServer, setLoadingServer]   = useState(false);
-  const [downloadUrl, setDownloadUrl]       = useState('');
-  const [downloadTaskId, setDownloadTaskId] = useState<string | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadText, setDownloadText]     = useState('');
-  const [searchQuery, setSearchQuery]       = useState('');
-  const [searchResults, setSearchResults]   = useState<any[]>([]);
-  const [searching, setSearching]           = useState(false);
-  const [error, setError]                   = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollRef      = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const refreshModels = useCallback(async () => {
-    try {
-      const d = await bridge.runtimeRequest('/api/models', {}, 'GET');
-      setLocalModels(d.models || []);
-    } catch { /* not ready */ }
-  }, []);
-
-  const refreshStatus = useCallback(async () => {
-    try {
-      const d = await bridge.runtimeRequest('/api/server/status', {}, 'GET');
-      setServerStatus(d);
-      if (d.running) {
-        setStore({
-          runtimeServerReady: true,
-          ...(store.inferenceMode === 'local' ? { modelStatus: 'ready' } : {}),
-          ...(d.model_name ? { activeModel: d.model_name } : {}),
-        });
-      }
-    } catch {
-      setServerStatus({ running: false });
-    }
-  }, [store.inferenceMode]);
-
-  useEffect(() => {
-    refreshModels();
-    refreshStatus();
-    const t = setInterval(refreshStatus, 4000);
-    return () => clearInterval(t);
-  }, [refreshModels, refreshStatus]);
-
-  useEffect(() => {
-    if (!downloadTaskId) return;
-    pollRef.current = setInterval(async () => {
-      try {
-        const s = await bridge.runtimeRequest(`/api/models/pull/status/${downloadTaskId}`, {}, 'GET');
-        setDownloadProgress(s.percent ?? 0);
-        setDownloadText(s.text ?? '');
-        if (s.done || s.error) {
-          clearInterval(pollRef.current!);
-          pollRef.current = null;
-          setDownloadTaskId(null);
-          if (s.error) setError(`Download failed: ${s.error}`);
-          else { await refreshModels(); setDownloadUrl(''); }
-        }
-      } catch (e: any) {
-        clearInterval(pollRef.current!);
-        pollRef.current = null;
-        setDownloadTaskId(null);
-        setError(`Poll error: ${e?.message}`);
-      }
-    }, 800);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [downloadTaskId, refreshModels]);
-
-  const handleStartServer = async (path: string) => {
-    setLoadingServer(true); setError('');
-    try {
-      const r = await bridge.runtimeRequest('/api/server/start', { model_path: path, ctx_size: 0, max_tokens: 2048 });
-      setServerStatus(r || { running: true });
-      await refreshModels();
-      const name = r?.model_name || path.split('/').pop()?.replace('.gguf', '') || path;
-      // Deactivate any active cloud provider
-      try { await bridge.runtimeRequest('/api/byok/deactivate'); } catch {}
-      setStore({
-        inferenceMode: 'local',
-        byokProvider: null,
-        modelStatus: 'ready',
-        activeModel: name,
-      });
-      bridge.notifyModelStatus(true, name);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to start llama-server');
-    } finally {
-      setLoadingServer(false);
-    }
-  };
-
-  const handleStopServer = async () => {
-    setLoadingServer(true);
-    try {
-      await bridge.runtimeRequest('/api/server/stop');
-      setServerStatus({ running: false });
-      await refreshModels();
-      setStore({ modelStatus: 'idle', activeModel: '' });
-      bridge.notifyModelStatus(false);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to stop llama-server');
-    } finally {
-      setLoadingServer(false);
-    }
-  };
-
-  const handleToggleLocalActive = async (activate: boolean) => {
-    if (activate) {
-      if (serverStatus.running) {
-        try { await bridge.runtimeRequest('/api/byok/deactivate'); } catch {}
-        setStore({
-          inferenceMode: 'local',
-          byokProvider: null,
-          modelStatus: 'ready',
-          ...(serverStatus.model_name ? { activeModel: serverStatus.model_name } : {}),
-        });
-        bridge.notifyModelStatus(true, serverStatus.model_name || 'local');
-        return;
-      }
-      const candidate = localModels[0]?.path;
-      if (!candidate) {
-        setError('No local models installed. Download a model below or import from disk first.');
-        return;
-      }
-      await handleStartServer(candidate);
-    } else {
-      await handleStopServer();
-    }
-  };
-
-  const handleDelete = async (m: LocalModel) => {
-    if (!confirm(`Delete "${m.filename}" (${m.size_label})?`)) return;
-    try {
-      await bridge.runtimeRequest('/api/models/delete', { path: m.path });
-      await refreshModels();
-      await refreshStatus();
-      const wasActive = serverStatus.running && (
-        serverStatus.model_name === m.id ||
-        serverStatus.model_name === m.filename ||
-        serverStatus.model_name === m.filename?.replace('.gguf', '')
-      );
-      if (wasActive) bridge.notifyModelStatus(false);
-    } catch (e: any) {
-      setError(e?.message || 'Delete failed');
-    }
-  };
-
-  const handleDownload = async () => {
-    if (!downloadUrl.trim() || downloadTaskId) return;
-    setDownloadProgress(0); setDownloadText('Queuing…'); setError('');
-    try {
-      const r = await bridge.runtimeRequest('/api/models/pull/start', { url: downloadUrl.trim() });
-      if (r?.task_id) setDownloadTaskId(r.task_id);
-      else setError('No task_id returned');
-    } catch (e: any) {
-      setError(e?.message || 'Download failed');
-    }
-  };
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
-    setSearching(true); setError(''); setSearchResults([]);
-    try {
-      const q = encodeURIComponent(searchQuery.trim());
-      const r = await fetch(`https://huggingface.co/api/models?search=${q}&filter=gguf&sort=downloads&direction=-1&limit=20`);
-      if (!r.ok) throw new Error('HF API error');
-      const data = await r.json();
-      let results: any[] = Array.isArray(data) ? data : [];
-      if (results.length === 0) {
-        const r2 = await fetch(`https://huggingface.co/api/models?search=${q}&sort=downloads&direction=-1&limit=20`);
-        const d2 = await r2.json();
-        results = Array.isArray(d2) ? d2 : [];
-      }
-      setSearchResults(results.slice(0, 16));
-    } catch {
-      setError('Search failed — check internet connection');
-    } finally {
-      setSearching(false);
-    }
-  };
-
-  const handleAddSearchResult = async (repo: string) => {
-    setError('');
-    try {
-      const r = await fetch(`https://huggingface.co/api/models/${repo}?full=true`);
-      const meta = await r.json();
-      const files = (meta?.siblings || []).map((f: any) => f.rfilename).filter((f: string) => /\.gguf$/i.test(f));
-      const ranked = [...files].sort((a: string, b: string) => {
-        const rank = (f: string) => /Q4_K_M/i.test(f) ? 0 : /Q5_K_M/i.test(f) ? 1 : /Q4_K_S/i.test(f) ? 2 : /Q6_K/i.test(f) ? 3 : 4;
-        return rank(a) - rank(b);
-      });
-      if (!ranked[0]) throw new Error('No GGUF files found. Try a quantized fork (bartowski, unsloth, etc.)');
-      setDownloadUrl(`https://huggingface.co/${repo}/resolve/main/${ranked[0]}`);
-      setSearchResults([]); setSearchQuery('');
-    } catch (e: any) {
-      setError(e?.message || 'Could not resolve GGUF');
-    }
-  };
-
-  const isDownloading = !!downloadTaskId;
-  const isLocalActive = serverStatus.running && store.inferenceMode === 'local';
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-      {/* Activation Bar with iOS Pill Toggle */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 14px',
-        background: isLocalActive
-          ? `color-mix(in srgb, ${PRIMARY} 10%, transparent)`
-          : 'color-mix(in srgb, var(--matugen-surface, #0c1014) 30%, transparent)',
-        borderRadius: 'var(--radius-md)',
-        border: `1px solid ${isLocalActive ? `color-mix(in srgb, ${PRIMARY} 45%, transparent)` : 'var(--border-subtle)'}`,
-        transition: 'all .2s ease',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 'var(--radius-sm)',
-            background: isLocalActive ? `color-mix(in srgb, ${PRIMARY} 20%, transparent)` : 'color-mix(in srgb, var(--matugen-surface-variant, #40484c) 25%, transparent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Zap size={16} color={isLocalActive ? PRIMARY : 'var(--text-muted)'} />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>Local Runtime</span>
-              <StatusPill running={serverStatus.running} loading={loadingServer} />
-            </div>
-            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-              {serverStatus.running
-                ? `Running on :17843 · ${serverStatus.model_name || 'GGUF model active'}`
-                : 'Offline — toggle on to launch llama-server'}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <IosToggle
-            checked={isLocalActive}
-            onChange={handleToggleLocalActive}
-            disabled={loadingServer}
-            label={isLocalActive ? 'Active' : 'Inactive'}
-          />
-          <button onClick={refreshStatus} title="Refresh status"
-            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: '4px' }}>
-            <RefreshCw size={12} />
-          </button>
-        </div>
-      </div>
-
-      {error && (
-        <div style={{ padding: '8px 12px', background: `color-mix(in srgb, ${ERROR_COLOR} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${ERROR_COLOR} 35%, transparent)`, borderRadius: 'var(--radius-sm)', fontSize: '11.5px', color: ERROR_COLOR, display: 'flex', gap: '7px', alignItems: 'flex-start' }}>
-          <AlertTriangle size={13} style={{ flexShrink: 0, marginTop: 1 }} /> {error}
-        </div>
-      )}
-
-      {/* Installed models */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-            Installed Models ({localModels.length})
-          </div>
-          {localModels.length > 0 && (
-            <button
-              onClick={async () => {
-                if (!confirm('Delete ALL GGUF models?')) return;
-                try {
-                  await bridge.runtimeRequest('/api/models/clear');
-                  setServerStatus({ running: false });
-                  await refreshModels();
-                  setStore({ modelStatus: 'idle', activeModel: '' });
-                  bridge.notifyModelStatus(false);
-                } catch (e: any) { setError(e?.message); }
-              }}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'transparent', border: 'none', color: ERROR_COLOR, fontSize: '11px', cursor: 'pointer' }}
-            >
-              <Trash2 size={11} /> Clear Cache
-            </button>
-          )}
-        </div>
-
-        {localModels.length === 0 ? (
-          <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11.5px', border: '1px dashed var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
-            No GGUF models found. Download one below or import from disk.
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {localModels.map((m) => {
-              const active = !!(serverStatus.running && serverStatus.model_name && (
-                serverStatus.model_name === m.id || serverStatus.model_name === m.filename ||
-                serverStatus.model_name === m.filename?.replace('.gguf', '')
-              ));
-              return (
-                <div key={m.path} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
-                  padding: '10px 12px', borderRadius: 'var(--radius-sm)',
-                  background: active ? `color-mix(in srgb, ${PRIMARY} 12%, transparent)` : 'color-mix(in srgb, var(--matugen-surface, #0c1014) 22%, transparent)',
-                  border: `1px solid ${active ? PRIMARY : 'var(--border-subtle)'}`,
-                }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <span style={{ fontWeight: 600, fontSize: '12px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '210px' }}>
-                        {m.filename}
-                      </span>
-                      {m.quant && (
-                        <span style={{
-                          fontSize: '10px', padding: '1px 6px', borderRadius: 'var(--radius-full)',
-                          background: `color-mix(in srgb, ${PRIMARY} 20%, transparent)`,
-                          color: PRIMARY, fontWeight: 600,
-                        }}>
-                          {m.quant}
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '3px' }}>
-                      <HardDrive size={10} style={{ marginRight: 3 }} />{m.size_label}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {active ? (
-                      <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: PRIMARY, fontSize: '11px', fontWeight: 700 }}>
-                        <Check size={13} /> Active
-                      </span>
-                    ) : (
-                      <button onClick={() => handleStartServer(m.path)} disabled={loadingServer}
-                        style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '6px 12px', borderRadius: 'var(--radius-sm)', border: 'none', background: PRIMARY, color: ON_PRIMARY, fontSize: '11px', fontWeight: 700, cursor: 'pointer' }}>
-                        <Play size={11} /> Load
-                      </button>
-                    )}
-                    <button onClick={() => handleDelete(m)} style={{ display: 'flex', alignItems: 'center', padding: '6px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'rgba(255,255,255,.05)', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                      <Trash2 size={12} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Download by URL */}
-      <div style={{ padding: '12px', background: 'color-mix(in srgb, var(--matugen-surface, #0c1014) 25%, transparent)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '8px' }}>Download GGUF by URL</div>
-        <div style={{ display: 'flex', gap: '6px' }}>
-          <input type="text" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)}
-            placeholder="HuggingFace direct .gguf URL…" onKeyDown={e => e.key === 'Enter' && handleDownload()} disabled={isDownloading}
-            style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '11px', outline: 'none', opacity: isDownloading ? 0.6 : 1 }} />
-          <button onClick={handleDownload} disabled={!downloadUrl.trim() || isDownloading}
-            style={{ padding: '7px 12px', background: PRIMARY, border: 'none', borderRadius: 'var(--radius-sm)', color: ON_PRIMARY, fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', opacity: (!downloadUrl.trim() || isDownloading) ? 0.5 : 1 }}>
-            {isDownloading ? <Loader size={11} style={{ animation: 'spin 1.5s linear infinite' }} /> : null}
-            {isDownloading ? 'Downloading…' : 'Pull'}
-          </button>
-        </div>
-        {isDownloading && (
-          <div style={{ marginTop: '8px' }}>
-            <div style={{ fontSize: '10.5px', color: 'var(--text-secondary)', marginBottom: '4px' }}>{downloadText}</div>
-            <div style={{ height: '5px', background: 'rgba(255,255,255,.1)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${downloadProgress}%`, background: PRIMARY, transition: 'width .4s ease' }} />
-            </div>
-            <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '3px', textAlign: 'right' }}>{downloadProgress}%</div>
-          </div>
-        )}
-      </div>
-
-      {/* HF Search */}
-      <div style={{ padding: '12px', background: 'color-mix(in srgb, var(--matugen-surface, #0c1014) 25%, transparent)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-        <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '4px' }}>Search HuggingFace</div>
-        <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginBottom: '7px' }}>
-          Try: <code style={{ fontFamily: 'var(--font-mono)', color: PRIMARY }}>bartowski Qwen2.5</code>, <code style={{ fontFamily: 'var(--font-mono)', color: PRIMARY }}>unsloth llama</code>
-        </div>
-        <div style={{ display: 'flex', gap: '6px', marginBottom: searchResults.length ? '8px' : 0 }}>
-          <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search author or model name…" onKeyDown={e => e.key === 'Enter' && handleSearch()}
-            style={{ flex: 1, padding: '7px 10px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '11px', outline: 'none' }} />
-          <button onClick={handleSearch} disabled={searching || !searchQuery.trim()}
-            style={{ padding: '7px 12px', background: 'color-mix(in srgb, var(--matugen-surface-variant, #40484c) 25%, transparent)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '11px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            {searching ? 'Searching…' : 'Search'}
-          </button>
-        </div>
-        {searchResults.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', maxHeight: '160px', overflowY: 'auto' }}>
-            {searchResults.map(r => {
-              const id = r.id || r.modelId || '';
-              const author = id.split('/')[0] || '';
-              const isGguf = !!(r.tags?.includes('gguf') || r.library_name === 'gguf');
-              return (
-                <button key={id} onClick={() => handleAddSearchResult(id)}
-                  style={{ display: 'flex', flexDirection: 'column', gap: '2px', padding: '7px 10px', background: 'color-mix(in srgb, var(--matugen-surface, #0c1014) 20%, transparent)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '11px', textAlign: 'left' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                    <strong style={{ color: PRIMARY }}>{id}</strong>
-                    {isGguf && <span style={{ fontSize: '9px', padding: '1px 5px', background: `color-mix(in srgb, ${PRIMARY} 18%, transparent)`, color: PRIMARY, borderRadius: 'var(--radius-full)', fontWeight: 700 }}>GGUF</span>}
-                  </div>
-                  <div style={{ display: 'flex', gap: '10px', color: 'var(--text-muted)', fontSize: '10px' }}>
-                    <span>by {author}</span>
-                    {r.downloads && <span>↓ {r.downloads.toLocaleString()}</span>}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Import from disk */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        <input ref={fileInputRef} type="file" accept=".gguf" style={{ display: 'none' }} onChange={async e => {
-          const file = e.target.files?.[0]; if (!file) return;
-          try { await bridge.runtimeRequest('/api/models/import', { path: (file as any).path || file.name }); await refreshModels(); }
-          catch (e: any) { setError(e?.message || 'Import failed'); }
-        }} />
-        <button onClick={async () => {
-          setError(''); try { const p = await bridge.openFileDialog({ directory: false }); if (!p) return; await bridge.runtimeRequest('/api/models/import', { path: p }); await refreshModels(); } catch (e: any) { setError(e?.message || 'Import failed'); }
-        }} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '7px 12px', background: 'color-mix(in srgb, var(--matugen-surface-variant, #40484c) 25%, transparent)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)', fontSize: '11px', cursor: 'pointer' }}>
-          <Upload size={12} /> Import from disk
-        </button>
-        <button onClick={refreshModels} style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '7px 10px', background: 'transparent', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-muted)', fontSize: '11px', cursor: 'pointer' }}>
-          <RefreshCw size={11} />
-        </button>
-      </div>
-    </div>
-  );
-};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CLOUD TAB — Pure BYOK with Material-You Rounded Pills & Robust Show/Hide
@@ -788,12 +304,21 @@ const CloudTab: FC = () => {
   const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const providerTabsRef = useRef<HTMLDivElement>(null);
 
-  const handleWheelProviderTabs = (e: React.WheelEvent) => {
-    if (providerTabsRef.current) {
+  // React's onWheel listener is passive by default, so preventDefault() in a
+  // normal JSX onWheel handler is silently ignored and the page still
+  // scrolls vertically underneath. A real fix needs a native, explicitly
+  // non-passive listener attached directly to the element.
+  useEffect(() => {
+    const el = providerTabsRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      providerTabsRef.current.scrollLeft += e.deltaX !== 0 ? e.deltaX : e.deltaY;
-    }
-  };
+      e.stopPropagation();
+      el.scrollLeft += e.deltaX !== 0 ? e.deltaX : e.deltaY;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
   const fetchModelsForProvider = useCallback(async (providerId: string, force = false) => {
     if (!force && fetchedModels[providerId] && fetchedModels[providerId].length > 0) return;
@@ -1207,7 +732,6 @@ const CloudTab: FC = () => {
         </div>
         <div
           ref={providerTabsRef}
-          onWheel={handleWheelProviderTabs}
           style={{
             display: 'flex',
             gap: '5px',
@@ -1631,15 +1155,14 @@ const CloudTab: FC = () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 export const ModelManager: FC = () => {
   const [store] = useStore();
-  const activeTab = store.modelManagerTab ?? 'local';
 
   if (!store.modelManagerOpen) return null;
 
   const statusSubtitle =
     store.inferenceMode === 'byok' && store.byokProvider
       ? `BYOK · ${BYOK_PROVIDERS.find(p => p.id === store.byokProvider)?.name ?? store.byokProvider} active`
-      : store.inferenceMode === 'local' && store.modelStatus === 'ready'
-      ? `Local active · ${store.activeModel || 'llama-server'}`
+      : store.inferenceMode === 'cloud'
+      ? `Cloud Gateway · ${store.activeModel || 'active'}`
       : 'Configure your inference backend';
 
   return (
@@ -1671,19 +1194,11 @@ export const ModelManager: FC = () => {
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{statusSubtitle}</div>
             </div>
           </div>
-          <button onClick={() => setStore({ modelManagerOpen: false })} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: '4px' }}>
-            <X size={16} />
-          </button>
         </div>
 
-        {/* Outer Tab bar (Local / Cloud) */}
-        <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border-subtle)' }}>
-          <TabBar active={activeTab} onChange={tab => setStore({ modelManagerTab: tab })} />
-        </div>
-
-        {/* Tab Content */}
+        {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', scrollbarWidth: 'thin' }}>
-          {activeTab === 'local' ? <LocalTab /> : <CloudTab />}
+          <CloudTab />
         </div>
       </div>
     </div>

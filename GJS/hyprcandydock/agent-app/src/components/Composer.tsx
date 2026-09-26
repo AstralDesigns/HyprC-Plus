@@ -56,20 +56,21 @@ export const Composer: React.FC = () => {
     const userMsg = { id: 'msg_' + Date.now(), role: 'user' as const, content: text, timestamp: Date.now() };
     storeActions.addMessage(store.activeSessionId, userMsg);
 
-    if (currentSession.messages.filter(m => m.role === 'user').length === 0) {
-      const title = text.slice(0, 32) + (text.length > 32 ? '…' : '');
-      setStore(prev => ({ sessions: prev.sessions.map(s => s.id === store.activeSessionId ? { ...s, title } : s) }));
-    }
+    // Naming is left to the agent (storeActions.autoNameSession, called once
+    // the first turn completes in agent-engine.ts) rather than truncating
+    // the raw first prompt, which is often not a good topic summary on its
+    // own. The session keeps its placeholder title until then.
 
     try {
       if (store.modelStatus !== 'ready') await agentEngine.loadModel(store.activeModel);
       const attachmentContext = (await Promise.all(attachments
         .filter((attachment) => attachment.kind === 'text')
         .map(async (attachment) => `\n\n[Attached file: ${attachment.name}]\n${await bridge.readFile(attachment.path)}\n[End attached file]`))).join('');
+      const priorHistory = currentSession.messages.map(m => ({ role: m.role, content: m.content }));
       await agentEngine.runConversation(
-        store.activeSessionId, text,
-        [...currentSession.messages, { ...userMsg, content: text + attachmentContext }]
-          .map(m => ({ role: m.role, content: m.content }))
+        store.activeSessionId,
+        text + attachmentContext,
+        priorHistory
       );
     } catch (e: any) {
       console.error('Inference error:', e);

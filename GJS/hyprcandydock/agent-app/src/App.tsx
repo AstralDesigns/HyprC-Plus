@@ -89,6 +89,7 @@ export const App: React.FC = () => {
   const [store] = useStore();
 
   useEffect(() => {
+    storeActions.refreshPendingFiles();
     bridge.onThemeChange((cssVars) => {
       console.log('Applied live theme variables from GTK4:', Object.keys(cssVars).length);
       window.dispatchEvent(new CustomEvent('matugen_theme_changed', { detail: cssVars }));
@@ -147,14 +148,14 @@ export const App: React.FC = () => {
         const current = getStore();
         if (current.inferenceMode === 'byok' && current.byokProvider) {
           const providerId = current.byokProvider;
-          const modelId = current.byokModel || '';
+          const modelId = current.byokModel || current.activeModel || '';
           try {
             let key: string | null = current.byokKeys[providerId] || null;
             if (!key) {
               key = await bridge.lookupSecret(providerId);
             }
             if (key) {
-              for (let attempt = 0; attempt < 5; attempt++) {
+              for (let attempt = 0; attempt < 8; attempt++) {
                 try {
                   await bridge.runtimeRequest('/api/byok/set', {
                     provider: providerId,
@@ -205,12 +206,24 @@ export const App: React.FC = () => {
     };
   }, []);
 
+  const workspaceRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = workspaceRef.current;
+    if (!el) return;
+    const enforceZeroScrollLeft = () => {
+      if (el.scrollLeft !== 0) el.scrollLeft = 0;
+    };
+    el.addEventListener('scroll', enforceZeroScrollLeft);
+    return () => el.removeEventListener('scroll', enforceZeroScrollLeft);
+  }, []);
+
   return (
     <AppErrorBoundary>
       <div className="app-container">
         <Header />
 
-        <div className="workspace-container">
+        <div className="workspace-container" ref={workspaceRef}>
           <main className="canvas-main-area">
             <Canvas />
           </main>

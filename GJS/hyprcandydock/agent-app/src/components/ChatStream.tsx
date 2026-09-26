@@ -7,7 +7,7 @@ import {
   Brain, Zap, Eye, ListChecks,
   X,
 } from 'lucide-react';
-import { useStore, Message, ToolCallData, storeActions, setStore } from '../store';
+import { useStore, getStore, Message, ToolCallData, storeActions, setStore } from '../store';
 import { DiffWidget } from './DiffWidget';
 import { CommandWidget } from './CommandWidget';
 import { agentEngine } from '../engine/agent-engine';
@@ -70,6 +70,112 @@ const AgentPhaseIndicator: React.FC<{ phase: AgentPhase; label?: string }> = ({ 
   );
 };
 
+/* ── Elevated vs ambient tool classification ──────────────────────────
+   Elevated tools (file writes, shell commands) always render as their own
+   foreground card — never hidden inside the collapsed activity line.
+   Everything else ("ambient" — reads, listings, search, plan bookkeeping)
+   collapses into a single line that morphs to show the current step, and
+   expands into a cascading timeline on click. */
+const ELEVATED_TOOLS = ['write_file', 'exec_command', 'run_command'];
+
+function isElevatedTool(name: string) {
+  return ELEVATED_TOOLS.includes(name) || name === 'task_complete';
+}
+
+const AMBIENT_META: Record<string, { icon: React.ReactNode; label: (a: any) => string }> = {
+  web_search:     { icon: <Globe size={12} />, label: a => `Searched: "${a?.query || a?.q || ''}"` },
+  fetch_url:      { icon: <Globe size={12} />, label: a => `Fetched ${a?.url || ''}` },
+  read_file:      { icon: <Eye size={12} />, label: a => `Read ${(a?.path || '').split('/').pop() || a?.path || ''}` },
+  list_directory: { icon: <Folder size={12} />, label: a => `Listed ${a?.path || '.'}` },
+  todo_add:       { icon: <ListChecks size={12} />, label: a => `Planned: ${a?.title || a?.task || ''}` },
+  todo_start:     { icon: <ListChecks size={12} />, label: a => `Started: ${a?.title || ''}` },
+  todo_done:      { icon: <ListChecks size={12} />, label: a => `Done: ${a?.title || ''}` },
+  todo_skip:      { icon: <ListChecks size={12} />, label: a => `Skipped: ${a?.title || ''}` },
+  todo_list:      { icon: <ListChecks size={12} />, label: () => 'Reviewed the plan' },
+};
+
+function ambientLabel(tool: ToolCallData): { icon: React.ReactNode; text: string } {
+  const meta = AMBIENT_META[tool.name] || { icon: <Brain size={12} />, label: () => tool.name };
+  return { icon: meta.icon, text: meta.label(tool.arguments) };
+}
+
+/* ── Interstitial narration: brief text between tool calls, rendered as a
+   thin gradient separator rather than a full response bubble. Never the
+   final answer of a turn — only text a model emits mid-loop ("Let me check
+   the config first…"). Skippable by nature: if the model doesn't emit any,
+   nothing renders here at all. Not expandable/interactive — the chevron is
+   purely a "this wrapped to more than one line" hint, shown only when the
+   text actually doesn't fit on one line at the panel's current width. */
+const InterstitialLine: React.FC<{ text: string }> = ({ text }) => {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [wrapped, setWrapped] = useState(false);
+  const trimmed = text.trim();
+
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const measure = () => setWrapped(el.scrollWidth > el.clientWidth + 1);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [trimmed]);
+
+  if (!trimmed) return null;
+  return (
+    <div className="agent-interstitial">
+      <span ref={textRef} className={`agent-interstitial-text ${wrapped ? 'agent-interstitial-text-wrap' : ''}`}>
+        {trimmed}
+      </span>
+      {wrapped && <ChevronRight size={12} className="agent-interstitial-chevron" />}
+    </div>
+  );
+};
+
+/* ── Agent activity: single morphing line ↔ cascading timeline ────────── */
+const AgentActivity: React.FC<{ tools: ToolCallData[]; running: boolean }> = ({ tools, running }) => {
+  const [expanded, setExpanded] = useState(false);
+  const ambient = tools.filter(t => !isElevatedTool(t.name));
+  if (ambient.length === 0) return null;
+
+  const activeStep = running ? [...ambient].reverse().find(t => t.status === 'running') : null;
+  const lastStep = ambient[ambient.length - 1];
+  const headerStep = activeStep || lastStep;
+  const { icon, text } = ambientLabel(headerStep);
+  const isLive = !!activeStep;
+
+  return (
+    <div className={`agent-activity ${expanded ? 'agent-activity-expanded' : ''}`}>
+      <div className="agent-activity-line" onClick={() => setExpanded(!expanded)}>
+        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <span className={`agent-activity-icon ${isLive ? 'agent-activity-icon-live' : ''}`}>{icon}</span>
+        <span className="agent-activity-label">{text}</span>
+        <span className="agent-activity-count">{ambient.length} step{ambient.length === 1 ? '' : 's'}</span>
+      </div>
+
+      {expanded && (
+        <div className="agent-activity-cascade">
+          {ambient.map(tool => {
+            const row = ambientLabel(tool);
+            return (
+              <div key={tool.id} className="agent-activity-row">
+                <span className={`agent-activity-row-icon status-${tool.status}`}>{row.icon}</span>
+                <span className="agent-activity-row-label">{row.text}</span>
+                {tool.status === 'running'
+                  ? <Clock size={11} className="agent-activity-spin" />
+                  : tool.status === 'error'
+                  ? <X size={11} color="var(--matugen-error, #ef4444)" />
+                  : <CheckCircle size={11} color="#22c55e" />}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 const TaskCompleteWidget: React.FC<{ summary: string; remaining?: string }> = ({ summary, remaining }) => (
   <div style={{
     margin: '7px 0',
@@ -92,16 +198,51 @@ const TaskCompleteWidget: React.FC<{ summary: string; remaining?: string }> = ({
 export const ChatStream: React.FC = () => {
   const [store] = useStore();
   const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
 
   const activeSession = store.sessions.find(s => s.id === store.activeSessionId);
   const messages = activeSession?.messages || [];
 
   useEffect(() => {
-    const node = bottomRef.current?.parentElement;
+    if (!store.chatVisible) return;
+    const node = containerRef.current || bottomRef.current?.parentElement;
     if (!node) return;
     const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 160;
-    if (nearBottom) bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, store.agentRunning]);
+    if (nearBottom) {
+      node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+    }
+  }, [messages, store.agentRunning, store.chatVisible]);
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    // Smooth-scroll animations (the auto-scroll-to-bottom effect above)
+    // fire a 'scroll' event on essentially every animation frame — rAF-
+    // throttle so this doesn't add a re-render per frame on top of that.
+    let rafId: number | null = null;
+    const onScroll = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 160;
+        setShowJumpToBottom(prev => (prev === !nearBottom ? prev : !nearBottom));
+      });
+    };
+    onScroll();
+    node.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      node.removeEventListener('scroll', onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [activeSession?.id]);
+
+  const jumpToBottom = () => {
+    const node = containerRef.current || bottomRef.current?.parentElement;
+    if (node) {
+      node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+    }
+  };
 
   if (messages.length === 0) {
     return <EmptyChatScreen />;
@@ -112,11 +253,17 @@ export const ChatStream: React.FC = () => {
   const currentPhase = store.agentRunning ? deriveAgentPhase(lastMsg?.tools) : null;
 
   return (
-    <div className="chat-stream" style={{
-      flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 14px',
-      display: 'flex', flexDirection: 'column', gap: '4px',
-    }}>
-      {messages.map((msg, idx) => (
+    <>
+      {showJumpToBottom && (
+        <button type="button" className="chat-scroll-to-bottom-btn" onClick={jumpToBottom} title="Jump to latest">
+          <ChevronDown size={15} />
+        </button>
+      )}
+      <div ref={containerRef} className="chat-stream" style={{
+        flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 14px',
+        display: 'flex', flexDirection: 'column', gap: '4px',
+      }}>
+        {messages.map((msg, idx) => (
         <MessageBlock
           key={msg.id || idx}
           sessionId={store.activeSessionId}
@@ -134,7 +281,8 @@ export const ChatStream: React.FC = () => {
         </div>
       )}
       <div ref={bottomRef} style={{ height: '4px' }} />
-    </div>
+      </div>
+    </>
   );
 };
 
@@ -195,13 +343,16 @@ const UserBubble: React.FC<{
   };
 
   const handleResend = async () => {
-    if (!editValue.trim()) return;
+    const text = editValue.trim();
+    if (!text) return;
     setIsEditing(false);
     if (agentRunning) agentEngine.cancel();
     const historyBefore = previousMessages.map(m => ({ role: m.role, content: m.content }));
-    storeActions.editMessage(sessionId, message.id, editValue.trim());
+    storeActions.editMessage(sessionId, message.id, text);
     try {
-      await agentEngine.runConversation(sessionId, editValue.trim(), historyBefore);
+      const currentStore = getStore();
+      if (currentStore.modelStatus !== 'ready') await agentEngine.loadModel(currentStore.activeModel);
+      await agentEngine.runConversation(sessionId, text, historyBefore);
     } catch (e) {
       console.error('Resend error:', e);
     }
@@ -299,16 +450,38 @@ const AgentTurn: React.FC<{
     });
   };
 
-  const phase = (isLast && agentRunning) ? deriveAgentPhase(message.tools) : null;
   const taskComplete = message.tools?.find(tool => tool.name === 'task_complete' && tool.status === 'completed');
   const taskResult = taskComplete?.result as { summary?: string; remaining?: string } | undefined;
+  const running = isLast && agentRunning;
 
-  // Filter tool cards — show write_file, exec_command, list_directory, read_file, web_search, errors
-  // Skip internal todo tools (shown via phase indicator), skip task_complete (shown as widget)
-  const visibleToolCards = message.tools?.filter(tool =>
-    ['write_file', 'exec_command', 'run_command', 'list_directory', 'read_file', 'web_search', 'fetch_url'].includes(tool.name) ||
-    tool.status === 'error'
-  ) || [];
+  // Fallback for messages persisted before the block model existed (or any
+  // message that never got a blocks array attached) — reconstruct the old
+  // fixed-order layout so old sessions don't render blank.
+  const legacyElevatedCommandCards = !message.blocks ? (message.tools?.filter(tool =>
+    (tool.name === 'exec_command' || tool.name === 'run_command') || (tool.status === 'error' && isElevatedTool(tool.name))
+  ) || []) : [];
+
+  const renderMarkdown = (content: string) => (
+    <div className="markdown-body agent-turn-content">
+      <ReactMarkdown
+        components={{
+          code({ node, className, children, ...props }: any) {
+            const isInline = !className;
+            if (isInline) {
+              return <code {...props}>{children}</code>;
+            }
+            return (
+              <pre>
+                <code className={className} {...props}>{children}</code>
+              </pre>
+            );
+          }
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
 
   return (
     <div className="agent-turn-flow animate-fade-in">
@@ -325,41 +498,66 @@ const AgentTurn: React.FC<{
           </div>
         )}
 
-        {/* Task complete widget (shown before markdown content) */}
-        {taskComplete && <TaskCompleteWidget summary={taskResult?.summary || message.content} remaining={taskResult?.remaining} />}
-
-        {/* Visible tool cards (styled with Matugen tokens) */}
-        {visibleToolCards.length > 0 && (
-          <div className="agent-tools-flow">
-            {visibleToolCards.map(tool => <ToolCard key={tool.id} tool={tool} />)}
-          </div>
+        {/* Blocks render in the order events actually happened: text,
+            activity timelines, elevated command cards, and diffs can all
+            appear and reappear as the turn progresses, instead of every
+            widget being bunched before all of the response text. */}
+        {message.blocks && message.blocks.length > 0 ? (
+          message.blocks.map((block, i) => {
+            const isFinalPosition = i === message.blocks!.length - 1;
+            const isLastBlock = running && isFinalPosition;
+            if (block.type === 'text') {
+              // Only the very last block of a turn is ever the "real" answer
+              // — a model's own tool-use narration always happens between
+              // tool calls, so any earlier text block is by definition
+              // transitional commentary ("Let me check the config first…").
+              // Render those as thin gradient separators instead of full
+              // response bubbles, matching how step-by-step agent traces
+              // usually show this kind of narration.
+              return isFinalPosition
+                ? <React.Fragment key={block.id}>{renderMarkdown(block.content)}</React.Fragment>
+                : <InterstitialLine key={block.id} text={block.content} />;
+            }
+            if (block.type === 'activity') {
+              return <AgentActivity key={block.id} tools={block.tools} running={isLastBlock} />;
+            }
+            if (block.type === 'command') {
+              return (
+                <div key={block.id} className="agent-tools-flow">
+                  <ToolCard tool={block.tool} />
+                </div>
+              );
+            }
+            if (block.type === 'diff') {
+              return (
+                <div key={block.id} style={{ marginTop: '4px' }}>
+                  <DiffWidget sessionId={sessionId} messageId={message.id} diff={block.diff} />
+                </div>
+              );
+            }
+            return null;
+          })
+        ) : (
+          <>
+            {message.tools && message.tools.length > 0 && <AgentActivity tools={message.tools} running={running} />}
+            {legacyElevatedCommandCards.length > 0 && (
+              <div className="agent-tools-flow">
+                {legacyElevatedCommandCards.map(tool => <ToolCard key={tool.id} tool={tool} />)}
+              </div>
+            )}
+            {message.diffs && message.diffs.length > 0 && (
+              <div style={{ marginTop: '4px' }}>
+                {message.diffs.map(diff => (
+                  <DiffWidget key={diff.filePath} sessionId={sessionId} messageId={message.id} diff={diff} />
+                ))}
+              </div>
+            )}
+            {message.content && renderMarkdown(message.content)}
+          </>
         )}
 
-        {/* Live phase indicator while this turn is running */}
-        {phase && <AgentPhaseIndicator phase={phase} />}
-
-        {/* Markdown content */}
-        {message.content && (!taskComplete || message.content !== taskResult?.summary) && (
-          <div className="markdown-body agent-turn-content">
-            <ReactMarkdown
-              components={{
-                code({ node, className, children, ...props }: any) {
-                  const isInline = !className;
-                  if (isInline) {
-                    return <code {...props}>{children}</code>;
-                  }
-                  return (
-                    <pre>
-                      <code className={className} {...props}>{children}</code>
-                    </pre>
-                  );
-                }
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
-          </div>
-        )}
+        {/* Task complete: end-of-turn summary/suggestions, after every block */}
+        {taskComplete && taskResult?.summary && <TaskCompleteWidget summary={taskResult.summary} remaining={taskResult?.remaining} />}
 
         {/* Attachments from assistant */}
         {message.attachments && message.attachments.length > 0 && (
@@ -379,13 +577,6 @@ const AgentTurn: React.FC<{
               }
               return <span key={att.path} className="bubble-file-chip"><FileText size={11} /> {att.name}</span>;
             })}
-          </div>
-        )}
-
-        {/* Diff widget */}
-        {message.diff && (
-          <div data-diff-id={message.id} style={{ marginTop: '10px' }}>
-            <DiffWidget sessionId={sessionId} messageId={message.id} diff={message.diff} />
           </div>
         )}
 

@@ -78,6 +78,18 @@ function withAlpha(hex: string, alphaPct: number): string {
 
 const strip = (c: string) => c.replace('#', '').slice(0, 6);
 
+/** Blends fg over bg at the given opacity into a plain opaque 6-hex color —
+ * for use in tokenizer `rules[].foreground`, which (unlike the `colors` map)
+ * does not support an alpha channel. */
+function blendWithBackground(fgHex: string, alphaPct: number, bgHex: string): string {
+  const fg = hexToRgb(fgHex);
+  const bg = hexToRgb(bgHex);
+  const a = Math.max(0, Math.min(1, alphaPct / 100));
+  const mix = (f: number, b: number) => Math.round(f * a + b * (1 - a));
+  return [mix(fg.r, bg.r), mix(fg.g, bg.g), mix(fg.b, bg.b)]
+    .map(n => n.toString(16).padStart(2, '0')).join('');
+}
+
 // ── Theme registration ────────────────────────────────────────────────────────
 
 export function registerMatugenTheme(monaco: any): void {
@@ -104,6 +116,15 @@ export function registerMatugenTheme(monaco: any): void {
   const editorBg   = withAlpha(onSecondary,    20);
   const subtleLine  = withAlpha(outline,        35);
 
+  // Inactive line numbers and comments use a proper text-safe role
+  // (textSecondary/primary) at reduced alpha, rather than a background-
+  // adjacent tone like surfaceVariant — surfaceVariant is only guaranteed to
+  // contrast against `surface`, not to be readable as foreground text, which
+  // is exactly what made these low-contrast on matugen's lighter (system
+  // light-mode) palettes.
+  const lineNumberDim = withAlpha(primary, 75);
+  const commentColor  = blendWithBackground(textSecondary, 70, surface);
+
   // Cursor and line-highlight use the primary accent directly
   const cursorColor       = '#' + strip(primary);
   const lineHighlight     = withAlpha(primary, 12); // 12% opacity
@@ -118,7 +139,7 @@ export function registerMatugenTheme(monaco: any): void {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      { token: 'comment',     fontStyle: 'italic', foreground: strip(surfaceVariant) },
+      { token: 'comment',     fontStyle: 'italic', foreground: strip(commentColor) },
       { token: 'keyword',     fontStyle: 'bold',   foreground: strip(primary) },
       { token: 'string',                           foreground: strip(onPrimaryCont) },
       { token: 'number',                           foreground: 'fab387' },
@@ -127,15 +148,24 @@ export function registerMatugenTheme(monaco: any): void {
       { token: 'variable',                         foreground: strip(textPrimary) },
       { token: 'operator',                         foreground: strip(textSecondary) },
       { token: 'punctuation',                      foreground: strip(textSecondary) },
+      { token: 'delimiter.bracket',                foreground: strip(textSecondary) },
+      // Shell-specific: Monaco's shell tokenizer emits these for flags
+      // (-e, --needed, --noconfirm) and for redirect/operator characters
+      // (>, &, ;, = in `2>&1`, `cmd1 && cmd2`, etc). Neither had a rule
+      // before, so they fell through to vs-dark's generic defaults instead
+      // of a matugen tone — visibly inconsistent next to everything else.
+      { token: 'delimiter',                        foreground: strip(textSecondary) },
+      { token: 'attribute.name',                   foreground: strip(secondary) },
+      { token: 'metatag',    fontStyle: 'bold',     foreground: strip(primary) },
     ],
     colors: {
       // Editor core
       'editor.background':                    editorBg,
       'editor.foreground':                    textPrimary,
       'editorGutter.background':              editorBg,
-      'editorLineNumber.foreground':          '#' + strip(surfaceVariant),
+      'editorLineNumber.foreground':          lineNumberDim,
       'editorLineNumber.activeForeground':    '#' + strip(primary),
-      'editorLineNumber.dimmedForeground':    '#' + strip(surfaceVariant),
+      'editorLineNumber.dimmedForeground':    lineNumberDim,
       'editor.lineHighlightBackground':       lineHighlight,
       'editor.lineHighlightBorder':           '#00000000',
       'editorCursor.foreground':              cursorColor,
@@ -147,6 +177,17 @@ export function registerMatugenTheme(monaco: any): void {
       'editor.wordHighlightStrongBackground': wordHighlightStrg,
       'editor.findMatchBackground':           '#' + strip(primary) + '44',
       'editor.findMatchHighlightBackground':  '#' + strip(primary) + '22',
+      // Bracket pairs / matching — matugen tones so brace nesting stays
+      // legible regardless of the underlying wallpaper-derived palette
+      'editorBracketMatch.background':        withAlpha(primary, 20),
+      'editorBracketMatch.border':            '#' + strip(primary),
+      'editorBracketHighlight.foreground1':   '#' + strip(primary),
+      'editorBracketHighlight.foreground2':   '#' + strip(secondary),
+      'editorBracketHighlight.foreground3':   '#' + strip(onPrimaryCont),
+      'editorBracketHighlight.foreground4':   '#' + strip(primary),
+      'editorBracketHighlight.foreground5':   '#' + strip(secondary),
+      'editorBracketHighlight.foreground6':   '#' + strip(onPrimaryCont),
+      'editorBracketHighlight.unexpectedBracket.foreground': '#' + strip(outline),
       // Indent / whitespace
       'editorWhitespace.foreground':          '#' + strip(surfaceVariant) + '44',
       'editorIndentGuide.background1':        subtleLine,

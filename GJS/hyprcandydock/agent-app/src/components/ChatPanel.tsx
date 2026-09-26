@@ -7,6 +7,8 @@ import {
   Trash2,
   X,
   FileCode,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import { useStore, storeActions, setStore } from '../store';
 import { ChatStream } from './ChatStream';
@@ -23,6 +25,18 @@ function relativeTime(ts: number) {
 
 export const ChatPanel: React.FC = () => {
   const [store] = useStore();
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const startRename = (e: React.MouseEvent, id: string, currentTitle: string) => {
+    e.stopPropagation();
+    setRenamingId(id);
+    setRenameValue(currentTitle);
+  };
+  const commitRename = (id: string) => {
+    storeActions.renameSession(id, renameValue);
+    setRenamingId(null);
+  };
   const [showSessionsDropdown, setShowSessionsDropdown] = useState(false);
   const [hoveredImage, setHoveredImage] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -118,15 +132,50 @@ export const ChatPanel: React.FC = () => {
                       key={s.id}
                       className={`dropdown-session-item ${s.id === store.activeSessionId ? 'active' : ''}`}
                       onClick={() => {
+                        if (renamingId === s.id) return;
                         storeActions.switchSession(s.id);
                         setShowSessionsDropdown(false);
                       }}
                     >
                       <MessageSquare size={12} className="session-icon" />
-                      <div className="session-item-text">
-                        <div className="session-item-name">{s.title}</div>
-                        <div className="session-item-time">{relativeTime(s.updatedAt)}</div>
-                      </div>
+                      {renamingId === s.id ? (
+                        <input
+                          autoFocus
+                          className="session-rename-input"
+                          value={renameValue}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitRename(s.id);
+                            if (e.key === 'Escape') setRenamingId(null);
+                          }}
+                          onBlur={() => commitRename(s.id)}
+                        />
+                      ) : (
+                        <div className="session-item-text">
+                          <div className="session-item-name">{s.title}</div>
+                          <div className="session-item-time">{relativeTime(s.updatedAt)}</div>
+                        </div>
+                      )}
+                      {renamingId === s.id ? (
+                        <button
+                          type="button"
+                          className="session-delete-btn"
+                          onClick={(e) => { e.stopPropagation(); commitRename(s.id); }}
+                          title="Save name"
+                        >
+                          <Check size={12} />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="session-delete-btn"
+                          onClick={(e) => startRename(e, s.id, s.title)}
+                          title="Rename chat"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="session-delete-btn"
@@ -158,6 +207,10 @@ export const ChatPanel: React.FC = () => {
         </button>
 
       </div>
+
+      {/* Minimal ambient gradient line — a subtle "the agent is thinking"
+          signal distinct from the text-based activity timeline. */}
+      {store.agentRunning && <div className="agent-thinking-line" />}
 
       {/* Chat Messages Stream */}
       <div className="chat-panel-stream-wrap">

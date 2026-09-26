@@ -98,11 +98,30 @@ class AgentBridge {
     }
   }
 
-  private postToHost(action: string, payload: any = {}): Promise<any> {
+  private postToHost(action: string, payload: any = {}, timeoutMs = 30000): Promise<any> {
     const id = 'req_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
-    
+
     return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve, reject });
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+
+      const finish = (fn: (v: any) => void, v: any) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        this.pendingRequests.delete(id);
+        fn(v);
+      };
+
+      // Bounds worst case: if GJS or the host never answers (a stuck HTTP
+      // call, a crashed helper process, etc.) this request would otherwise
+      // sit in pendingRequests forever. 0 disables the timeout for actions
+      // that can legitimately run a long time (shell commands, downloads).
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => finish(reject, new Error(`${action} timed out after ${timeoutMs}ms`)), timeoutMs);
+      }
+
+      this.pendingRequests.set(id, { resolve: (v) => finish(resolve, v), reject: (e) => finish(reject, e) });
 
       const envelope = { id, action, payload };
 
@@ -110,8 +129,7 @@ class AgentBridge {
         try {
           (window as any).webkit.messageHandlers.agent.postMessage(JSON.stringify(envelope));
         } catch (e: any) {
-          this.pendingRequests.delete(id);
-          reject(new Error(`Failed to post to WebKit messageHandler: ${e.message}`));
+          finish(reject, new Error(`Failed to post to WebKit messageHandler: ${e.message}`));
         }
       } else {
         // Fallback / Mock mode when outside WebKitGTK
@@ -246,7 +264,7 @@ class AgentBridge {
   /* Native Host Tools */
 
   public execCommand(command: string, cwd?: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-    return this.postToHost('exec_command', { command, cwd });
+    return this.postToHost('exec_command', { command, cwd }, 0);
   }
 
   public readFile(path: string, offset?: number, limit?: number): Promise<string> {
@@ -297,10 +315,10 @@ class AgentBridge {
    * Falls back to direct fetch when not behind GJS (dev mode).
    * GJS proxies these via the 'runtime_request' bridge action.
    */
-  public async runtimeRequest(endpoint: string, payload: any = {}, method: 'GET' | 'POST' | 'DELETE' = 'POST'): Promise<any> {
+  public async runtimeRequest(endpoint: string, payload: any = {}, method: 'GET' | 'POST' | 'DELETE' = 'POST', timeoutMs = 30000): Promise<any> {
     const url = `http://127.0.0.1:17900${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
     if (this.hasWebKit) {
-      return this.postToHost('runtime_request', { url, method, payload });
+      return this.postToHost('runtime_request', { url, method, payload }, timeoutMs);
     }
     // Dev fallback: direct fetch
     const options: RequestInit = { method, headers: { 'Content-Type': 'application/json' } };

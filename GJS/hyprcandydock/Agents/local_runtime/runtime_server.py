@@ -17,6 +17,7 @@ from agent_loop import local_backend, run_agentic_turn
 from cloud_client import CLOUD_MODELS, stream_cloud, validate_license
 from byok_client import stream_byok, PROVIDERS, get_provider_models, fetch_remote_models
 from tools import TOOLS_SCHEMA
+import tools as tools_module
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="HyprCandy Local Runtime", version="1.1.0")
@@ -115,99 +116,58 @@ async def health():
     return {"status": "ok", "server": "hyprcandy-runtime"}
 
 
-# ── Model catalog ─────────────────────────────────────────────────────────────
+# ── Model catalog (Local GGUF deprecated in favor of BYOK/Cloud) ────────────
 
 @app.get("/api/models")
 async def get_models():
-    return {"models": llama_manager.list_models()}
+    return {"models": []}
 
 
 @app.post("/api/models/pull/start")
 async def pull_model_start(req: PullRequest):
-    """Start a background GGUF download. Returns {task_id} immediately."""
-    task_id = str(uuid.uuid4())
-    _download_tasks[task_id] = {"percent": 0, "text": "Starting download…", "done": False, "error": None}
-
-    async def _run():
-        try:
-            async for progress in llama_manager.download_model(req.url, req.filename):
-                _download_tasks[task_id].update({
-                    "percent": progress.get("percent", 0),
-                    "text": progress.get("text", ""),
-                    "done": progress.get("done", False),
-                    "path": progress.get("path"),
-                    "filename": progress.get("filename"),
-                    "error": None,
-                })
-                if progress.get("done"):
-                    break
-        except Exception as exc:
-            _download_tasks[task_id].update({"done": True, "error": str(exc)})
-
-    asyncio.create_task(_run())
-    return {"task_id": task_id}
+    return {"task_id": "noop", "status": "disabled"}
 
 
 @app.get("/api/models/pull/status/{task_id}")
 async def pull_model_status(task_id: str):
-    """Poll download progress for a given task_id."""
-    if task_id not in _download_tasks:
-        raise HTTPException(status_code=404, detail="Unknown task_id")
-    return _download_tasks[task_id]
+    return {"done": True, "percent": 100, "text": "Local models disabled"}
 
 
 @app.post("/api/models/pull")
 async def pull_model_legacy(req: PullRequest):
-    """Legacy SSE endpoint — use /pull/start + /pull/status instead."""
-    return await pull_model_start(req)
+    return {"task_id": "noop", "status": "disabled"}
 
 
 @app.post("/api/models/import")
 async def import_model(req: ImportRequest):
-    try:
-        result = llama_manager.import_model(req.path)
-        return result
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    return {"status": "disabled"}
 
 
 @app.post("/api/models/delete")
 async def delete_model(req: DeleteModelRequest):
-    try:
-        result = await llama_manager.delete_model(req.path)
-        return result
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    return {"status": "ok"}
 
 
 @app.post("/api/models/clear")
 async def clear_models():
-    try:
-        result = await llama_manager.clear_all_models()
-        return result
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    return {"status": "ok"}
 
 
-# ── llama-server lifecycle ────────────────────────────────────────────────────
+# ── llama-server lifecycle (no-op) ───────────────────────────────────────────
 
 @app.post("/api/server/start")
 async def start_server(req: ServerStartRequest):
-    try:
-        status = await llama_manager.start_server(req.model_path, req.ctx_size, req.max_tokens)
-        return status
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+    return {"running": False, "status": "disabled"}
 
 
 @app.post("/api/server/stop")
 async def stop_server():
-    return await llama_manager.stop_server()
+    return {"running": False, "status": "disabled"}
 
 
 @app.get("/api/server/status")
 async def server_status():
-    return llama_manager.server_status()
+    return {"running": False, "status": "disabled"}
 
 
 # ── Chat (agentic loop) ───────────────────────────────────────────────────────
@@ -242,32 +202,24 @@ async def chat_start(req: ChatRequest):
     byok_key = req.byok_key or _byok_keys.get(byok_provider or "", "")
     byok_model = req.byok_model
 
-    if inference_mode == "local":
-        endpoint = "local"
-    elif inference_mode == "byok":
-        endpoint = "byok" if (byok_provider and byok_key) else "local"
-    elif byok_provider and byok_key:
-        endpoint = "byok"
-    elif req.license_key or _cached_license_key:
+    if inference_mode == "cloud" or (not (byok_provider and byok_key) and (req.license_key or _cached_license_key)):
         endpoint = "cloud"
     else:
-        endpoint = "local"
+        endpoint = "byok"
 
     async def _run():
         try:
-            if endpoint == "local":
-                if not await llama_manager.health_check():
-                    _chat_tasks[task_id]["events"].append(
-                        {"type": "error", "data": {"message": "llama-server not running. Load a model first."}}
-                    )
-                    return
-                backend_fn = local_backend
-
-            elif endpoint == "byok":
-                provider = byok_provider
+            if endpoint == "byok":
+                provider = byok_provider or "openrouter"
                 default_model = "openrouter/free" if provider == "openrouter" else PROVIDERS.get(provider, {}).get("models", [{}])[0].get("id", "")
                 model = byok_model or default_model
                 key = byok_key
+
+                if not key and provider != "openrouter":
+                    _chat_tasks[task_id]["events"].append(
+                        {"type": "error", "data": {"message": f"Please configure your API key for {provider} in the Model Manager."}}
+                    )
+                    return
 
                 async def backend_fn(messages):
                     async for event in stream_byok(messages, provider, model, key, TOOLS_SCHEMA):
@@ -438,6 +390,44 @@ async def byok_revoke(provider: str):
     if _byok_active_provider == provider:
         _byok_active_provider = None
     return {"ok": True}
+
+
+# ── Pending file edits (write_file diff review) ──────────────────────────────
+# write_file stages a pre-edit snapshot rather than requiring a second
+# round-trip through the model to apply/undo a change. "Accept" just forgets
+# the snapshot (the file is already correct on disk); "reject" restores it.
+
+class PathBody(BaseModel):
+    path: str
+
+
+@app.get("/api/files/pending")
+async def files_pending():
+    return {"files": tools_module.list_pending_edits()}
+
+
+@app.post("/api/files/accept")
+async def files_accept(body: PathBody):
+    ok = tools_module.accept_edit(body.path)
+    return {"ok": ok}
+
+
+@app.post("/api/files/reject")
+async def files_reject(body: PathBody):
+    ok = tools_module.reject_edit(body.path)
+    return {"ok": ok}
+
+
+@app.post("/api/files/accept-all")
+async def files_accept_all():
+    count = tools_module.accept_all_edits()
+    return {"ok": True, "count": count}
+
+
+@app.post("/api/files/reject-all")
+async def files_reject_all():
+    count = tools_module.reject_all_edits()
+    return {"ok": True, "count": count}
 
 
 # ── License (Vercel managed cloud) ───────────────────────────────────────────

@@ -41,7 +41,7 @@ export const EditorPane: React.FC = () => {
         }}
         language={languageFor(path)}
         value={store.openFileContents[path] || ''}
-        options={{ minimap: { enabled: false }, fontSize: 12, wordWrap: 'on', automaticLayout: true, padding: { top: 12 } }}
+        options={{ minimap: { enabled: false }, fontSize: 12, wordWrap: 'on', automaticLayout: true, padding: { top: 12 }, accessibilitySupport: 'off', experimentalGpuAcceleration: 'off' }}
       />}
     </div>
   </div>;
