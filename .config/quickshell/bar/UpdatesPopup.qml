@@ -31,9 +31,9 @@ PanelWindow {
     // ── Tracks whether Candy_Update.sh is alive in the OS, even across QS reloads ──
     property bool _hcScriptRunning: false
 
-    // On every QS load (including reloads mid-update) check immediately whether
-    // the update script is already running so the button reflects reality.
-    Component.onCompleted: _hcPgrepProc.running = true
+    // On every QS load (including reloads mid-update), probe the sentinel files
+    // and process table so recovery and state transitions happen seamlessly.
+    Component.onCompleted: _hcSentinelCheckProc.running = true
 
     MouseArea {
         anchors.fill: parent
@@ -286,7 +286,8 @@ PanelWindow {
         id: _hcUpdateProc
         command: [
             "bash", "-ic",
-            "touch " + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel && " +
+            "touch \"" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel\" \"" +
+                         Quickshell.env("HOME") + "/.config/hyprcandy/.hc-agent-build-pending\" && " +
             "rm -rf ~/.hyprcandy/candyinstall && " + 
             "cd ~/.HCUpdates && " +
             "git pull && " +
@@ -307,8 +308,33 @@ PanelWindow {
             running = false
             _hcScriptRunning = false
             if (code === 0) {
-                _hcAgentBuildProc.running = true
+                if (!_hcAgentBuildProc.running)
+                    _hcAgentBuildProc.running = true
             }
+        }
+    }
+
+    // ── Sentinel probe — runs first on Component.onCompleted ─────────────────
+    // Checks if an update was initiated and has pending build/cleanup work.
+    // If a sentinel exists, pre-arms _hcScriptRunning = true before kicking off
+    // the pgrep check. This guarantees that if Candy_Update.sh already finished
+    // before or during reload, pgrep exiting non-zero will immediately transition
+    // into the agent build and cleanup chain.
+    Process {
+        id: _hcSentinelCheckProc
+        command: [
+            "bash", "-c",
+            "test -f \"" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel\" || " +
+            "test -f \"" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-agent-build-pending\""
+        ]
+        running: false
+        onExited: (code) => {
+            running = false
+            if (code === 0) {
+                _hcScriptRunning = true
+            }
+            if (!_hcPgrepProc.running)
+                _hcPgrepProc.running = true
         }
     }
 
@@ -326,10 +352,11 @@ PanelWindow {
                 // Still running — keep the "Running …" state alive.
                 _hcScriptRunning = true
             } else {
-                // Only clear state if script was previously running
+                // Only clear state if script was previously running or sentinel was detected
                 if (_hcScriptRunning) {
                     _hcScriptRunning = false
-                    _hcAgentBuildProc.running = true
+                    if (!_hcAgentBuildProc.running)
+                        _hcAgentBuildProc.running = true
                 }
             }
         }
@@ -375,6 +402,7 @@ PanelWindow {
             "bash", "-c",
             "bash \"" + Quickshell.env("HOME") + "/.config/hypr/scripts/notify.sh\"; " +
             "rm -f \"" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel\" \"" +
+                         Quickshell.env("HOME") + "/.config/hyprcandy/.hc-agent-build-pending\" \"" +
                          Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state\""
         ]
         running: false
@@ -393,7 +421,8 @@ PanelWindow {
         id: _hcSentinelProc
         command: [
             "bash", "-c",
-            "touch " + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel"
+            "touch \"" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel\" \"" +
+                         Quickshell.env("HOME") + "/.config/hyprcandy/.hc-agent-build-pending\""
         ]
         running: false
         onExited: running = false
