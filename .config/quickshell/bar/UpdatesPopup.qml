@@ -99,7 +99,7 @@ PanelWindow {
                 }
                 Text {
                     text: UpdatesPopupState.hasUpdates ? "Updates Available   " : "OS Is Up To Date    "
-                    color: UpdatesPopupState.hasUpdates ? Theme.cSurfaceTint : Theme. cOnSurf
+                    color: Theme. cOnSurf
                     font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1
                     font.weight:    Font.Medium
@@ -175,7 +175,7 @@ PanelWindow {
                 }
                 Text {
                     text: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? "HC+ Updates Available" : "HC+ Is Up To Date"
-                    color: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? Theme.cSurfaceTint : Theme. cOnSurf
+                    color: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? Theme. cOnSurf : Theme. cOnSurf
                     font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1
                     font.weight:    Font.Medium
