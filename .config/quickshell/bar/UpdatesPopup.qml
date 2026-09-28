@@ -350,17 +350,14 @@ PanelWindow {
     }
 
     // ── Agentic workspace builder — runs after HC+ update if workspace isn't built ──
-    // Runs Python venv setup + npm build in the user session (not root), so all
-    // paths resolve correctly. Always triggers _hcStateClearProc on exit.
+    // Delegates to hc-agent-build.sh which sources nvm/PATH properly so npm
+    // and python3 are found in Quickshell's non-interactive process environment.
+    // Always triggers _hcStateClearProc on exit regardless of build outcome.
     Process {
         id: _hcAgentBuildProc
         command: [
-            "bash", "-c",
-            "if [ ! -f \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app/dist/index.html\" ] || " +
-            "   [ ! -f \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/Agents/local_runtime/.venv/bin/uvicorn\" ]; then " +
-            "    cd \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app\" && " +
-            "    bash build.sh > /tmp/hc-agent-app-build.log 2>&1 || true; " +
-            "fi"
+            "bash", "--login", "-c",
+            "exec bash \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app/hc-agent-build.sh\""
         ]
         running: false
         onExited: {
