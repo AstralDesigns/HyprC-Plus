@@ -30,6 +30,8 @@ PanelWindow {
 
     // ── Tracks whether Candy_Update.sh is alive in the OS, even across QS reloads ──
     property bool _hcScriptRunning: false
+    // True while any phase of the HC+ update is active: launcher, script, agent build, state cleanup, recolor, or probe
+    readonly property bool _hcBusy: _hcUpdateProc.running || _hcScriptRunning || _hcAgentBuildProc.running || _hcStateClearProc.running || _hcReColorProc.running || _hcSentinelCheckProc.running
 
     // On every QS load (including reloads mid-update), probe the sentinel files
     // and process table so recovery and state transitions happen seamlessly.
@@ -165,29 +167,25 @@ PanelWindow {
                 spacing: 6
                 anchors.horizontalCenter: parent.horizontalCenter
                 Text {
-                    text: UpdatesPopupState.hcHasUpdates ? "󰏖" : "󰏗"
-                    color: UpdatesPopupState.hcHasUpdates ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00) : Theme.cOnSurfVar
+                    text: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? "󰏖" : "󰏗"
+                    color: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00) : Theme.cOnSurfVar
                     font.family:    Config.fontFamily
                     font.pixelSize: Config.fontSize + 2
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
-                    text: UpdatesPopupState.hcHasUpdates ? "HC+ Updates Available" : "HC+ Is Up To Date"
-                    color: UpdatesPopupState.hcHasUpdates ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00) : Theme.cPrimary
+                    text: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? "HC+ Updates Available" : "HC+ Is Up To Date"
+                    color: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00) : Theme.cPrimary
                     font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1
                     font.weight:    Font.Medium
                     anchors.verticalCenter: parent.verticalCenter
                 }
-                // Re-run button: shown only when HC is "up to date" so the user
-                // can force a fresh install even after an abrupt closure.
+                // Re-run button: shown only when HC is "up to date" and not currently updating
                 Text {
                     id: hcRerunBtn
-                    // _hcUpdateProc.running covers the git-clone phase;
-                    // _hcScriptRunning covers the detached Candy_Update.sh phase
-                    // (including across QS reloads).
-                    visible: !UpdatesPopupState.hcHasUpdates
-                    text: (_hcUpdateProc.running || _hcScriptRunning) ? "󰑓" : "󰇚"
+                    visible: !UpdatesPopupState.hcHasUpdates && !_hcBusy
+                    text: _hcBusy ? "󰑓" : "󰇚"
                     color: hcRerunHover.containsMouse
                         ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.75)
                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
@@ -201,7 +199,7 @@ PanelWindow {
                         hoverEnabled: true
                         cursorShape:  Qt.PointingHandCursor
                         onClicked: {
-                            if (!_hcUpdateProc.running && !_hcScriptRunning)
+                            if (!_hcBusy)
                                 _hcUpdateProc.running = true
                         }
                     }
@@ -215,8 +213,10 @@ PanelWindow {
 
             Text {
                 width: parent.width
-                visible: UpdatesPopupState.hcHasUpdates
-                text:  UpdatesPopupState.hcTooltip || ""
+                visible: UpdatesPopupState.hcHasUpdates || _hcBusy
+                text: (UpdatesPopupState.hcHasUpdates && UpdatesPopupState.hcTooltip)
+                    ? UpdatesPopupState.hcTooltip
+                    : (_hcBusy ? "Applying updates and workspace setup…" : "")
                 color: Theme.cOnSurfVar
                 font.family:    Config.labelFont
                 font.pixelSize: Config.labelFontSize
@@ -233,14 +233,13 @@ PanelWindow {
                     : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
-                visible: UpdatesPopupState.hcHasUpdates
+                visible: UpdatesPopupState.hcHasUpdates || _hcBusy
                 clip: true
                 Behavior on color  { ColorAnimation   { duration: 120 } }
                 Text {
                     anchors.centerIn: parent
-                    // Show "Running" during both the git-clone phase and the
-                    // detached Candy_Update.sh phase (even after a QS reload).
-                    text:  (_hcUpdateProc.running || _hcScriptRunning) ? "󰑓  Running …" : "󰇚 HC+ Updates"
+                    // Show "Running" whenever any phase of update or workspace setup is active
+                    text:  _hcBusy ? "󰑓  Running …" : "󰇚 HC+ Updates"
                     color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
                     font.family:    Config.labelFont
                     font.pixelSize: 13
@@ -251,7 +250,7 @@ PanelWindow {
                     hoverEnabled: true
                     cursorShape:  Qt.PointingHandCursor
                     onClicked: {
-                        if (!_hcUpdateProc.running && !_hcScriptRunning)
+                        if (!_hcBusy)
                             _hcUpdateProc.running = true
                     }
                 }

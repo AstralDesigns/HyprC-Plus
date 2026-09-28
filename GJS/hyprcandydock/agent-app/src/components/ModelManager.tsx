@@ -348,12 +348,17 @@ const CloudTab: FC = () => {
   const visibleProviders = getVisibleProviders();
 
   // Selected provider in the scrollable tab bar — resumes whichever provider
-  // was actually last active; otherwise defaults to the first visible provider.
+  // was actually last active (if keys are stored); otherwise defaults to AI/ML API
+  // ('aimlapi') when no provider's keys are stored yet, without activating any provider or model.
   const [selectedProviderId, setSelectedProviderId] = useState<string>(() => {
-    if (store.byokProvider && visibleProviders.some(p => p.id === store.byokProvider)) {
+    const hasAnyStoredKey = Object.values(store.byokKeys || {}).some(
+      k => !!k && typeof k === 'string' && k.trim().length > 0
+    );
+    if (hasAnyStoredKey && store.byokProvider && visibleProviders.some(p => p.id === store.byokProvider)) {
       return store.byokProvider;
     }
-    return visibleProviders[0]?.id || 'aimlapi';
+    const aiml = visibleProviders.find(p => p.id === 'aimlapi');
+    return aiml?.id || visibleProviders[0]?.id || 'aimlapi';
   });
 
   // Per-provider key input and control state
@@ -438,6 +443,9 @@ const CloudTab: FC = () => {
         setStore(prev => ({
           byokKeys: { ...prev.byokKeys, ...foundKeys }
         }));
+        if (store.byokProvider && foundKeys[store.byokProvider]) {
+          setSelectedProviderId(store.byokProvider);
+        }
       }
     })();
     return () => { isMounted = false; };

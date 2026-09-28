@@ -1224,7 +1224,7 @@ const HyprCandyDock = GObject.registerClass({
             const dlgCss = new Gtk.CssProvider();
             dlgCss.load_from_data(`
                 window.hc-trash-dialog {
-                    background-color: alpha(@on_secondary, 0.60);
+                    background-color: @blur_background;
                     border-radius: 20px;
                     border: 1px solid alpha(@primary, 0.15);
                     box-shadow: none;
@@ -1232,11 +1232,11 @@ const HyprCandyDock = GObject.registerClass({
                 .dlg-title {
                     font-size: 13px;
                     font-weight: bold;
-                    color: @primary;
+                    color: @on_surface;
                 }
                 .dlg-body {
                     font-size: 12px;
-                    color: alpha(@primary, 0.75);
+                    color: @on_surface;
                 }
                 .dlg-btn {
                     border-radius: 8px;
@@ -1246,7 +1246,7 @@ const HyprCandyDock = GObject.registerClass({
                 }
                 .dlg-btn-cancel {
                     background-color: alpha(@on_secondary, 0.65);
-                    color: @primary;
+                    color: @on_surface;
                 }
                 .dlg-btn-cancel:hover { background-color: alpha(@on-secondary, 0.85); }
                 .dlg-btn-confirm {

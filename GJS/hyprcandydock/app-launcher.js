@@ -1372,6 +1372,18 @@ window.hyprcandy-group-dialog {
     border-color: alpha(@primary, 0.30);
 }
 
+/* ── Trash confirmation dialog ─────────────────────────────────────────── */
+window.hc-trash-dialog {
+    background-color: @blur_background;
+    border-radius: 20px;
+    border: 1px solid alpha(@primary, 0.15);
+    color: @on_surface;
+}
+window.hc-trash-dialog .dlg-title,
+window.hc-trash-dialog .dlg-body {
+    color: @on_surface;
+}
+
 /* ── Running-app dot indicators (overlaid on tile) ───────────────────── */
 #launcher-indicator-dots {
     color: @color3;
@@ -2899,7 +2911,7 @@ const AppLauncherWindow = GObject.registerClass({
             } else if (this._activeTab === 'websearch') {
                 if (rawQ) {
                     const isUrl = /^(https?:\/\/|file:\/\/)/i.test(rawQ) ||
-                                  (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/i.test(rawQ) && !rawQ.includes(' '));
+                        (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/i.test(rawQ) && !rawQ.includes(' '));
                     if (isUrl) {
                         const targetUrl = /^(https?:\/\/|file:\/\/)/i.test(rawQ) ? rawQ : 'https://' + rawQ;
                         this._searxOpenUrl(targetUrl, targetUrl);
@@ -5069,7 +5081,7 @@ const AppLauncherWindow = GObject.registerClass({
             cr.stroke();
         });
 
-        cairoLoop._start = function() {
+        cairoLoop._start = function () {
             if (this._tickId) return;
             this.set_visible(true);
             this._tickId = this.add_tick_callback((widget) => {
@@ -5079,7 +5091,7 @@ const AppLauncherWindow = GObject.registerClass({
             });
         };
 
-        cairoLoop._stop = function() {
+        cairoLoop._stop = function () {
             if (this._tickId) {
                 this.remove_tick_callback(this._tickId);
                 this._tickId = null;
@@ -6610,7 +6622,7 @@ const AppLauncherWindow = GObject.registerClass({
         //    freed by GJS's GC rather than being kept alive by signal closures.
         if (targetTab._handlers && targetTab._handlers.length > 0) {
             for (const { obj, id } of targetTab._handlers) {
-                try { obj.disconnect(id); } catch (_) {}
+                try { obj.disconnect(id); } catch (_) { }
             }
             targetTab._handlers = [];
         }
@@ -6633,7 +6645,7 @@ const AppLauncherWindow = GObject.registerClass({
         GLib.idle_add(GLib.PRIORITY_LOW, () => {
             if (webViewRef && !webViewRef._hcClosed) {
                 webViewRef._hcClosed = true;
-                try { webViewRef.stop_loading(); } catch (_) {}
+                try { webViewRef.stop_loading(); } catch (_) { }
             }
             return GLib.SOURCE_REMOVE;
         });
@@ -7088,7 +7100,7 @@ const AppLauncherWindow = GObject.registerClass({
         // Direct URL navigation when immediate (e.g. from Enter key or action button)
         if (immediate && trimmed.length > 0) {
             const isUrl = /^(https?:\/\/|file:\/\/)/i.test(trimmed) ||
-                          (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/i.test(trimmed) && !trimmed.includes(' '));
+                (/^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/.*)?$/i.test(trimmed) && !trimmed.includes(' '));
             if (isUrl) {
                 const targetUrl = /^(https?:\/\/|file:\/\/)/i.test(trimmed) ? trimmed : 'https://' + trimmed;
                 this._searxOpenUrl(targetUrl, targetUrl);
