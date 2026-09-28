@@ -195,6 +195,17 @@ export interface AppState {
   chatVisible: boolean;
   chatWidth: number;
   modelManagerOpen: boolean;
+  profileOpen: boolean;
+  githubToken: string;
+  githubUser: {
+    login: string;
+    name: string;
+    avatar_url: string;
+    html_url: string;
+    bio?: string;
+    public_repos?: number;
+  } | null;
+  selectedRepo: string;
 
   // Mode in sidebar
   sidebarMode: 'files' | 'project';
@@ -332,6 +343,10 @@ function loadInitialState(): AppState {
     chatVisible: true,
     chatWidth: 380,
     modelManagerOpen: false,
+    profileOpen: false,
+    githubToken: '',
+    githubUser: null,
+    selectedRepo: '',
     sidebarMode: 'files',
     contextMode: 'minimal',
 
@@ -474,6 +489,9 @@ function persistStore() {
       byokProvider: next.byokProvider,
       byokModel: next.byokModel,
       cloudModel: next.cloudModel,
+      githubToken: next.githubToken,
+      githubUser: next.githubUser,
+      selectedRepo: next.selectedRepo,
     }));
   } catch (e) {
     console.warn('Failed to save to localStorage:', e);

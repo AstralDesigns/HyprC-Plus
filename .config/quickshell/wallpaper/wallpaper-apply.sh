@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # wallpaper-apply.sh
 # Called by the Quickshell wallpaper picker.
-# Usage: wallpaper-apply.sh <path> <type> <step> <angle> <duration> <fps>
+# Usage: wallpaper-apply.sh <path> <type> <step> <angle> <duration> <fps> <resize> <output>
 #
 # Place at: ~/.config/quickshell/wallpaper/wallpaper-apply.sh
 # Make executable: chmod +x ~/.config/quickshell/wallpaper/wallpaper-apply.sh
@@ -13,6 +13,7 @@ TRANS_ANGLE="${4:-0}"
 TRANS_DURATION="${5:-2}"
 TRANS_FPS="${6:-60}"
 RESIZE="${7:-crop}"
+OUTPUT="${8:-all}"
 
 if [[ -z "$WALLPAPER" || ! -f "$WALLPAPER" ]]; then
     echo "wallpaper-apply: invalid path: '$WALLPAPER'" >&2
@@ -26,6 +27,12 @@ if ! awww query &>/dev/null; then
     sleep 0.6
 fi
 
+# ── Prepare output arguments ──────────────────────────────────────────────────
+AWWW_ARGS=()
+if [[ -n "$OUTPUT" && "$OUTPUT" != "all" && "$OUTPUT" != "All" ]]; then
+    AWWW_ARGS+=(--outputs "$OUTPUT")
+fi
+
 # ── Apply ─────────────────────────────────────────────────────────────────────
 awww img "$WALLPAPER" \
     --transition-type     "$TRANS_TYPE"     \
@@ -33,7 +40,8 @@ awww img "$WALLPAPER" \
     --transition-angle    "$TRANS_ANGLE"    \
     --transition-duration "$TRANS_DURATION" \
     --transition-fps      "$TRANS_FPS"      \
-    --resize "$RESIZE"
+    --resize "$RESIZE" \
+    "${AWWW_ARGS[@]}"
 
 STATUS=$?
 if [[ $STATUS -ne 0 ]]; then
@@ -41,8 +49,9 @@ if [[ $STATUS -ne 0 ]]; then
     exit $STATUS
 fi
 
-# ── Persist to ~/.config/wallpaper/wallpaper.ini ──────────────────────────────
+# ── Persist to ~/.config/wallpaper/wallpaper.ini & monitors.json ──────────────
 WP_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper/wallpaper.ini"
+MON_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper/monitors.json"
 STORED="${WALLPAPER/$HOME/\~}"
 DIR_PATH="$(dirname "$WALLPAPER")"
 DIR_STORED="${DIR_PATH/$HOME/\~}"
@@ -53,19 +62,50 @@ if [[ ! -f "$WP_CONFIG" ]]; then
     printf '[Settings]\n' > "$WP_CONFIG"
 fi
 
-if grep -qE '^wallpaper' "$WP_CONFIG"; then
-    sed -i "s|^wallpaper[[:space:]]*=.*|wallpaper = $STORED|" "$WP_CONFIG"
+if [[ -n "$OUTPUT" && "$OUTPUT" != "all" && "$OUTPUT" != "All" ]]; then
+    MON_KEY="wallpaper_${OUTPUT}"
+    if grep -qE "^${MON_KEY}[[:space:]]*=" "$WP_CONFIG"; then
+        sed -i "s|^${MON_KEY}[[:space:]]*=.*|${MON_KEY} = $STORED|" "$WP_CONFIG"
+    else
+        echo "${MON_KEY} = $STORED" >> "$WP_CONFIG"
+    fi
+    python3 -c "
+import json, os
+p = os.path.expanduser('$MON_CONFIG')
+data = {}
+if os.path.exists(p):
+    try:
+        with open(p) as f: data = json.load(f)
+    except: pass
+data['$OUTPUT'] = '$WALLPAPER'
+with open(p, 'w') as f: json.dump(data, f, indent=2)
+" 2>/dev/null || true
 else
-    echo "wallpaper = $STORED" >> "$WP_CONFIG"
+    if grep -qE '^wallpaper[[:space:]]*=' "$WP_CONFIG"; then
+        sed -i "s|^wallpaper[[:space:]]*=.*|wallpaper = $STORED|" "$WP_CONFIG"
+    else
+        echo "wallpaper = $STORED" >> "$WP_CONFIG"
+    fi
+    python3 -c "
+import json, os
+p = os.path.expanduser('$MON_CONFIG')
+data = {}
+if os.path.exists(p):
+    try:
+        with open(p) as f: data = json.load(f)
+    except: pass
+data['all'] = '$WALLPAPER'
+with open(p, 'w') as f: json.dump(data, f, indent=2)
+" 2>/dev/null || true
 fi
 
-if grep -qE '^folder' "$WP_CONFIG"; then
+if grep -qE '^folder[[:space:]]*=' "$WP_CONFIG"; then
     sed -i "s|^folder[[:space:]]*=.*|folder = $DIR_STORED|" "$WP_CONFIG"
 else
     echo "folder = $DIR_STORED" >> "$WP_CONFIG"
 fi
 
-echo "wallpaper-apply: set → $STORED"
+echo "wallpaper-apply: set → $STORED (output: $OUTPUT)"
 
 # ── Trigger matugen color regeneration ────────────────────────────────────────
 INTEGRATION="${XDG_CONFIG_HOME:-$HOME/.config}/hyprcandy/hooks/wallpaper_integration.sh"

@@ -127,6 +127,15 @@ QtObject {
         v = _settings.value("ccGlyph"); if (v !== undefined && v !== null) ccGlyph = v
         v = _settings.value("ccGlyphColorA"); if (v !== undefined && v !== null) ccGlyphOpacity = Math.min(1, Math.max(0, parseFloat(v)))
         v = _settings.value("wsCount"); if (v !== undefined && v !== null) wsCount = Math.min(10, Math.max(1, parseInt(v)))
+        v = _settings.value("barMonitors");
+        if (v !== undefined && v !== null) {
+            try {
+                const parsed = typeof v === "string" ? JSON.parse(v) : v
+                if (Array.isArray(parsed) && parsed.length > 0) barMonitors = parsed
+            } catch (e) {
+                barMonitors = [0]
+            }
+        }
         v = _settings.value("wsIconMode"); if (v !== undefined && v !== null) wsIconMode = v
         v = _settings.value("wsGlyphSize"); if (v !== undefined && v !== null) wsGlyphSize = v
         v = _settings.value("wsSpacing"); if (v !== undefined && v !== null) wsSpacing = v
@@ -310,6 +319,7 @@ QtObject {
         _settings.setValue("ccGlyph", ccGlyph)
         _settings.setValue("ccGlyphColorA", ccGlyphOpacity)
         _settings.setValue("wsCount", wsCount)
+        _settings.setValue("barMonitors", JSON.stringify(barMonitors))
         _settings.setValue("wsIconMode", wsIconMode)
         _settings.setValue("wsGlyphSize", wsGlyphSize)
         _settings.setValue("wsSpacing", wsSpacing)
@@ -666,6 +676,10 @@ QtObject {
     // ═══════════════════════════════════════════════════════════════════════
     //  TAB 3 · Workspaces
     // ═══════════════════════════════════════════════════════════════════════
+
+    // ── Bar Monitor Display ───────────────────────────────────────────────
+    // Selected monitor indices for bar display (defaults to main monitor [0] when multiple exist)
+    property var barMonitors: [0]
 
     // ── Icon mode ────────────────────────────────────────────────────────
     //  "dot"    — wsDotActive / wsDotPersistent / wsDotEmpty per state

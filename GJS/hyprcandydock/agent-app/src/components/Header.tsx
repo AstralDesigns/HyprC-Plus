@@ -16,6 +16,7 @@ import {
   Video,
   Music,
   Files,
+  User,
 } from 'lucide-react';
 import { useStore, setStore, storeActions, PRESET_MODELS, FilePane } from '../store';
 import { bridge } from '../bridge';
@@ -229,6 +230,33 @@ export const Header: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Profile toggle with circular Matugen primary background and on-secondary user glyph icon */}
+        <button
+          type="button"
+          onClick={() => setStore({ profileOpen: !store.profileOpen })}
+          className="header-profile-btn"
+          title="User profile & GitHub integration"
+          style={{
+            width: '24px',
+            height: '24px',
+            borderRadius: '50%',
+            background: 'var(--matugen-primary, #a0c9dc)',
+            color: 'var(--matugen-on-secondary, #1d343c)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+            flexShrink: 0,
+            marginLeft: '2px',
+            boxShadow: store.profileOpen ? '0 0 8px var(--matugen-primary, #a0c9dc)' : 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <User size={13} color="var(--matugen-on-secondary, #1d343c)" />
+        </button>
       </div>
 
       {/* Center: Open Pane Tabs */}

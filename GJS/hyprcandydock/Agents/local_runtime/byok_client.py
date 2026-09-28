@@ -19,6 +19,23 @@ import httpx
 # ── Provider configs ──────────────────────────────────────────────────────────
 # Order: OpenRouter, Groq, Google, Anthropic, OpenAI, Grok
 PROVIDERS = {
+    "aimlapi": {
+        "name": "AI/ML API",
+        "key_hint": "aiml-...",
+        "api_key_url": "https://aimlapi.com/app/keys",
+        "models": [
+            {"id": "anthropic/claude-opus-4-5",                "name": "Claude Opus 4.5",          "desc": "Anthropic frontier model. Best demanding reasoning & long-horizon agentic work.",         "context": "1M tokens"},
+            {"id": "anthropic/claude-sonnet-4-5",              "name": "Claude Sonnet 4.5",         "desc": "Recommended default. Best balance of speed & intelligence for production coding.",        "context": "1M tokens"},
+            {"id": "openai/gpt-4o-2025-11",                    "name": "GPT-4o (Nov 2025)",         "desc": "OpenAI flagship omni-model. Versatile intelligence, reasoning & multimodal.",            "context": "128k tokens"},
+            {"id": "openai/o3-mini",                           "name": "o3-mini",                   "desc": "High-speed STEM, coding and math reasoning model from OpenAI.",                         "context": "200k tokens"},
+            {"id": "openai/o1",                                "name": "o1",                        "desc": "OpenAI advanced reasoning model for complex analytical & scientific tasks.",             "context": "200k tokens"},
+            {"id": "google/gemini-3.8-flash",                  "name": "Gemini 3.8 Flash",          "desc": "Google best Flash model — long-horizon coding & agents, 65K output.",                     "context": "1M tokens"},
+            {"id": "google/gemini-2.5-pro",                    "name": "Gemini 2.5 Pro",            "desc": "Most capable Gemini model. Deep reasoning & agentic coding.",                           "context": "1M tokens"},
+            {"id": "deepseek/deepseek-r1",                     "name": "DeepSeek R1",               "desc": "Leading open reasoning model for code, architecture & mathematics.",                    "context": "128k tokens"},
+            {"id": "meta-llama/llama-4-maverick",              "name": "Llama 4 Maverick",          "desc": "Meta open-weights multimodal flagship. High-speed versatile instructions.",             "context": "1M tokens"},
+            {"id": "mistralai/mistral-large-2411",             "name": "Mistral Large 2411",        "desc": "Mistral flagship with deep multilingual, reasoning & coding capabilities.",             "context": "128k tokens"},
+        ],
+    },
     "openrouter": {
         "name": "OpenRouter",
         "key_hint": "sk-or-v1-...",
@@ -111,7 +128,43 @@ async def fetch_remote_models(provider: str, api_key: str | None = None) -> list
 
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
-            if provider == "openrouter":
+            if provider == "aimlapi":
+                headers = {}
+                if clean_key:
+                    headers["Authorization"] = f"Bearer {clean_key}"
+                resp = await client.get("https://api.aimlapi.com/v1/models", headers=headers)
+                if resp.status_code == 200:
+                    data = resp.json().get("data", [])
+                    models = []
+                    for m in data:
+                        mtype = m.get("type", "")
+                        if mtype and "chat" not in mtype:
+                            continue
+                        mid = m.get("id", "")
+                        if any(x in mid.lower() for x in ("audio", "realtime", "tts", "whisper", "embed", "guard", "moderation")):
+                            continue
+                        info = m.get("info") or {}
+                        mname = info.get("name") or mid
+                        dev = info.get("developer")
+                        mdesc = f"{dev} model on AI/ML API." if dev else "AI/ML API chat model."
+                        ctx_len = info.get("contextLength") or 128000
+                        ctx_str = f"{ctx_len // 1000}k tokens" if ctx_len >= 1000 else f"{ctx_len} tokens"
+                        models.append({
+                            "id": mid,
+                            "name": mname,
+                            "desc": mdesc,
+                            "context": ctx_str,
+                            "has_tools": True,
+                        })
+                    priority_prefixes = ("anthropic/", "openai/", "deepseek/", "meta-llama/", "google/", "qwen/", "mistralai/")
+                    def aiml_sort(x):
+                        is_prio = any(x["id"].startswith(p) for p in priority_prefixes)
+                        return (0 if is_prio else 1, x["name"].lower())
+                    models.sort(key=aiml_sort)
+                    if models:
+                        return models
+
+            elif provider == "openrouter":
                 headers = {}
                 if clean_key:
                     headers["Authorization"] = f"Bearer {clean_key}"
@@ -672,7 +725,14 @@ async def stream_byok(
     """Route to the correct BYOK provider backend."""
     ts = tools_schema or []
 
-    if provider == "openrouter":
+    if provider == "aimlapi":
+        target_model = model.strip() if model and model.strip() else "anthropic/claude-3-7-sonnet"
+        async for event in _stream_openai_compat(
+            messages, target_model, api_key, "https://api.aimlapi.com/v1", ts
+        ):
+            yield event
+
+    elif provider == "openrouter":
         # Default to 'openrouter/free' if no specific model was selected
         target_model = model.strip() if model and model.strip() else "openrouter/free"
         extra = {

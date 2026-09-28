@@ -45,6 +45,15 @@ Item {
     property string _uptime:    "--"
     property string _load:      "--"
     property var    _prevCpu:   null
+    // Set true after the first successful _parse(); gates the popup enter-animation
+    // so dials never appear empty. Resets when popup/widget both go inactive.
+    property bool   _hasData:   false
+
+    on_ActiveChanged: {
+        // Fresh activation (neither widget nor popup was already running) — reset
+        // so the popup waits for the first data batch before animating in.
+        if (_active && !SystemMonitorPopupState.widgetVisible) _hasData = false
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────
     function _fmtBytes(b) {
@@ -267,6 +276,8 @@ Item {
         // show both so the user can see integrated workload separately.
         // Policy: always show dGPUs; show iGPUs always too (both are useful).
         _gpus = gpus
+        // Mark data as ready — unlocks the popup enter-animation
+        _hasData = true
     }
 
     Timer {
@@ -444,6 +455,7 @@ Item {
         readonly property int _rowCount: Math.ceil(_dials.length / 2)
 
         implicitWidth: 88 * 2 + 12 + 24
+        // Row stack + spacing + 24px internal padding (12 top + 12 bottom) + 28px footer
         implicitHeight: _rowCount * 112 + Math.max(0, _rowCount - 1) * 10 + 24 + 28
 
         ColumnLayout {
@@ -576,8 +588,10 @@ Item {
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                       Config.barBorderColor.b, Config.barBorderAlpha)
 
-        scale: popupMode && SystemMonitorPopupState.visible ? 1.0 : (popupMode ? 0.92 : 1.0)
-        opacity: popupMode ? (SystemMonitorPopupState.visible ? 1.0 : 0.0) : 1.0
+        // Gate on _hasData: popup stays invisible until the first poll completes,
+        // preventing empty-dial flash on first open.
+        scale: popupMode ? (SystemMonitorPopupState.visible && smPanel.root._hasData ? 1.0 : 0.92) : 1.0
+        opacity: popupMode ? (SystemMonitorPopupState.visible && smPanel.root._hasData ? 1.0 : 0.0) : 1.0
         transformOrigin: popupMode && Config.barPosition === "bottom" ? Item.BottomRight : Item.TopRight
         Behavior on scale   { enabled: popupMode; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Behavior on opacity { enabled: popupMode; NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }

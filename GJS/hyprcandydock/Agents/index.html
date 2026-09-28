@@ -1787,15 +1787,6 @@
                       <span class="badge-check">Preserves user settings ✅</span>
                     </td>
                   </tr>
-                  <tr>
-                    <td>
-                      <div class="feat-label">Screen &amp; Projection</div>
-                      <div class="feat-desc">Currently configured via nwg-displays</div>
-                    </td>
-                    <td style="text-align: right;">
-                      <span style="color: #f43f5e; font-family: var(--font-mono); font-size: 0.78rem; font-weight: 600; background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.25); padding: 3px 10px; border-radius: 9999px;">HC+ native implementation ❌</span>
-                    </td>
-                  </tr>
                 </tbody>
               </table>
             </div>
@@ -1972,26 +1963,9 @@
         <div class="container">
           <div class="section-heading">
             <div class="section-eyebrow">Integrated Development</div>
-            <h2 class="section-title workspace-title-row">
-              <span>HyprCandy Workspace</span>
-              <a
-                href="https://mirukai.gumroad.com/l/HyprCandy-Workspace"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="btn-workspace-title-pro"
-                id="btnWorkspaceTitlePro"
-                aria-label="BYOK free-trial"
-              >
-                <span>BYOK free-trial</span>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <circle cx="9" cy="21" r="1"></circle>
-                  <circle cx="20" cy="21" r="1"></circle>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                </svg>
-              </a>
-            </h2>
+            <h2 class="section-title">HyprCandy Workspace</h2>
             <p class="section-desc">
-              Custom HC+ editor seamlessly integrated into the overlay launcher with local models via Ollama and BYOK cloud model compatibility.
+              Custom HC+ editor seamlessly integrated into the overlay launcher, powered by cloud models via the AI/ML API multi-provider gateway and individual provider keys.
             </p>
           </div>
 
@@ -2018,73 +1992,62 @@
                 </div>
               </div>
 
-              <!-- Information & BYOK Action -->
+              <!-- Information & Provider Models -->
               <div class="workspace-details">
                 <div class="workspace-tags-row">
                   <span class="workspace-tag accent">HC+ Editor</span>
                   <span class="workspace-tag">Overlay Layered Launcher</span>
-                  <span class="workspace-tag">Local Ollama</span>
-                  <span class="workspace-tag">BYOK Cloud Models</span>
+                  <span class="workspace-tag">Cloud Models</span>
+                  <span class="workspace-tag">AI/ML API Gateway</span>
+                  <span class="workspace-tag">Direct Provider Keys</span>
                 </div>
 
                 <p class="workspace-desc">
-                  <strong>HyprCandy Workspace</strong> is a custom HC+ editor themed to match your desktop and directly integrated into the overlay layered launcher so it can be invoked over any active window. The workspace offers two dedicated mode options: <strong>Local models via Ollama</strong> in an always free tier with models' capability based on user hardware, and <strong>BYOK (bring your own key)</strong> for advanced users with their own API keys with a small charge to support consistent maintenance of the HyprCandy Agent Workspace's compatibility with cloud models from various providers.
+                  <strong>HyprCandy Workspace</strong> is a custom HC+ editor themed to match your desktop and directly integrated into the overlay layered launcher so it can be invoked seamlessly over any active window. Powered exclusively by cloud models, the workspace supports both unified multi-provider routing and direct individual provider integrations:
                 </p>
 
-                <!-- Call to action hint for BYOK users -->
+                <!-- Callout hint highlighting AI/ML API and direct keys -->
                 <div class="workspace-cta-hint">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
                     <circle cx="12" cy="12" r="10"></circle>
                     <line x1="12" y1="16" x2="12" y2="12"></line>
                     <line x1="12" y1="8" x2="12.01" y2="8"></line>
                   </svg>
-                  <span><strong>Note:</strong> Users intending to use the BYOK approach can grab a 1 week free trial license key via the <strong style="color: #ffffff;">'BYOK free-trial'</strong> cart buttons.</span>
+                  <span><strong>AI/ML API Gateway:</strong> Ideal for users seeking multiple models from different providers under one platform, alongside direct keys for <strong>Google</strong>, <strong>Anthropic</strong>, <strong>Grok</strong>, and <strong>OpenAI</strong>.</span>
                 </div>
 
-                <!-- Tier Cards -->
+                <!-- Provider Model Cards -->
                 <div class="workspace-tiers">
-                  <div class="tier-card">
-                    <div class="tier-card-header">
-                      <div class="tier-card-title-group">
-                        <span class="tier-indicator"></span>
-                        <span>Local Ollama</span>
-                      </div>
-                      <span class="tier-price-pill">Free</span>
-                    </div>
-                    <div class="tier-card-desc">
-                      Always free tier running local models via Ollama. Model capability is based on your local hardware with complete offline privacy and zero cost.
-                    </div>
-                  </div>
                   <div class="tier-card tier-pro">
                     <div class="tier-card-header">
                       <div class="tier-card-title-group">
                         <span class="tier-indicator"></span>
-                        <span>BYOK</span>
+                        <span>AI/ML API Gateway</span>
                       </div>
-                      <span class="tier-price-pill">$5/mo</span>
+                      <span class="tier-price-pill">Multi-Provider</span>
                     </div>
                     <div class="tier-card-desc">
-                      Bring your own key for $5/mo with full feature parity, prioritized support, and continuous maintenance of cloud model compatibility across various API providers.
+                      The all-in-one multi-provider gateway. Ideal for users seeking multiple models from different providers under one platform, letting you switch dynamically across frontier LLMs without managing multiple accounts.
                     </div>
                   </div>
-                </div>
-
-                <div class="workspace-actions">
-                  <a
-                    href="https://mirukai.gumroad.com/l/HyprCandy-Workspace"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="btn-workspace-pro"
-                    id="btnWorkspacePro"
-                    aria-label="BYOK free-trial"
-                  >
-                    <span>BYOK free-trial</span>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                      <circle cx="9" cy="21" r="1"></circle>
-                      <circle cx="20" cy="21" r="1"></circle>
-                      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                  </a>
+                  <div class="tier-card">
+                    <div class="tier-card-header">
+                      <div class="tier-card-title-group">
+                        <span class="tier-indicator"></span>
+                        <span>Individual Providers</span>
+                      </div>
+                      <span class="tier-price-pill">Direct Keys</span>
+                    </div>
+                    <div class="tier-card-desc">
+                      Direct integration for users who already have a specific provider's API key. Currently supports:
+                    </div>
+                    <div style="display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
+                      <span class="workspace-tag" style="padding: 2px 8px; font-size: 0.72rem; color: #ffffff; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15);">Google</span>
+                      <span class="workspace-tag" style="padding: 2px 8px; font-size: 0.72rem; color: #ffffff; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15);">Anthropic</span>
+                      <span class="workspace-tag" style="padding: 2px 8px; font-size: 0.72rem; color: #ffffff; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15);">Grok</span>
+                      <span class="workspace-tag" style="padding: 2px 8px; font-size: 0.72rem; color: #ffffff; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.15);">OpenAI</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -245,6 +245,7 @@ Item {
 
         // Inner analogue clock background card
         Rectangle {
+            id: cwpInnerBg
             anchors.centerIn: parent
             width: 110
             height: 110
@@ -255,9 +256,58 @@ Item {
             border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.45)
         }
 
+        // ── Hour digits inside the inner circle ───────────────────────────
+        // Rendered above the background but BELOW the canvas (hands are on canvas).
+        // The two digits are split above/below the center pivot dot.
+        // ── Hour digits inside the inner circle ── horizontal split ──────
+        // Digit 1 left of center pivot, Digit 2 right of center pivot.
+        // The pivot dot (drawn in canvas z:2) sits between them naturally.
+        Item {
+            id: cwpHourDigits
+            anchors.centerIn: parent
+            width: 76
+            height: 46
+            z: 1   // above background rect, below canvas (z:2)
+
+            readonly property string _hr24: Qt.formatDateTime(cwp.root._now, "HH")
+            readonly property string _d1:   _hr24.length >= 2 ? _hr24.charAt(0) : "0"
+            readonly property string _d2:   _hr24.length >= 2 ? _hr24.charAt(1) : _hr24
+
+            // First digit — left of center pivot
+            Text {
+                id: cwpHrLeft
+                anchors.right: parent.horizontalCenter
+                anchors.rightMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                text: cwpHourDigits._d1
+                color: Theme.cInversePrimary
+                font.family: "C059"
+                font.italic: true
+                font.weight: Font.Bold
+                font.pixelSize: 38
+                horizontalAlignment: Text.AlignRight
+            }
+
+            // Second digit — right of center pivot
+            Text {
+                id: cwpHrRight
+                anchors.left: parent.horizontalCenter
+                anchors.leftMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                text: cwpHourDigits._d2
+                color: Theme.cInversePrimary
+                font.family: "C059"
+                font.italic: true
+                font.weight: Font.Bold
+                font.pixelSize: 38
+                horizontalAlignment: Text.AlignLeft
+            }
+        }
+
         Canvas {
             anchors.fill: parent
             antialiasing: true
+            z: 2  // above the hour digit overlay
             property var time: cwp.root._now
             onTimeChanged: requestPaint()
 
@@ -343,29 +393,17 @@ Item {
                 ctx.arc(cx, cy, 1.5, 0, 2 * Math.PI)
                 ctx.fill()
 
-                // Padded region: pointing Hour and Minute text
-                const hrText = Qt.formatDateTime(time, "hh")
+                // Minute text only in the outer blur region (beyond the inner dial)
                 const minText = Qt.formatDateTime(time, "mm")
-
-                let diff = Math.abs(hrAngle - minAngle) % (2 * Math.PI)
-                if (diff > Math.PI) diff = 2 * Math.PI - diff
-                const rHr = (diff < 0.28) ? 62 : 66
-                const rMin = (diff < 0.28) ? 70 : 66
-
-                const hrX = cx + rHr * Math.sin(hrAngle)
-                const hrY = cy - rHr * Math.cos(hrAngle)
+                // Outer ring spans r=51 (inner dial edge) to r=78 (widget edge).
+                // Midpoint ≈ 63 — centers the minute text in the blurred ring region.
+                const rMin = 63
                 const minX = cx + rMin * Math.sin(minAngle)
                 const minY = cy - rMin * Math.cos(minAngle)
 
                 ctx.font = "bold 11px monospace"
                 ctx.textAlign = "center"
                 ctx.textBaseline = "middle"
-
-                // Hour text where hour hand points
-                ctx.fillStyle = Theme.cSurfaceTint.toString()
-                ctx.fillText(hrText, hrX, hrY)
-
-                // Minute text where minute hand points
                 ctx.fillStyle = Theme.cSecondary.toString()
                 ctx.fillText(minText, minX, minY)
             }

@@ -2323,6 +2323,65 @@ PanelWindow {
                                     ColumnLayout {
                                         width: parent.width; spacing: 5
 
+                                        CCSection {
+                                            text: "Bar Monitor Display"
+                                            visible: Quickshell.screens.length > 1
+                                        }
+                                        RowLayout {
+                                            visible: Quickshell.screens.length > 1
+                                            spacing: 8
+                                            Layout.fillWidth: true
+                                            Layout.bottomMargin: 4
+
+                                            Repeater {
+                                                model: Quickshell.screens.length
+                                                delegate: Rectangle {
+                                                    required property int index
+                                                    readonly property bool isSelected: {
+                                                        const list = Config.barMonitors || [0]
+                                                        return list.indexOf(index) !== -1 || (Quickshell.screens[index] && list.indexOf(Quickshell.screens[index].name) !== -1)
+                                                    }
+                                                    width: 32; height: 32; radius: 16
+                                                    color: isSelected ? Theme.cPrimary : Theme.cOnSecondary
+                                                    border.width: 1
+                                                    border.color: isSelected ? Theme.cPrimary : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                    scale: monMa.containsMouse ? (monMa.pressed ? 0.92 : 1.06) : 1.0
+                                                    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+                                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: (index + 1).toString()
+                                                        color: parent.isSelected ? Theme.cOnSecondary : Theme.cPrimary
+                                                        font.family: Config.labelFont
+                                                        font.pixelSize: 13
+                                                        font.weight: Font.Bold
+                                                    }
+
+                                                    MouseArea {
+                                                        id: monMa
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: {
+                                                            let list = (Config.barMonitors || [0]).slice()
+                                                            const idx = list.indexOf(index)
+                                                            if (idx !== -1) {
+                                                                if (list.length > 1) {
+                                                                    list.splice(idx, 1)
+                                                                }
+                                                            } else {
+                                                                list.push(index)
+                                                            }
+                                                            Config.barMonitors = list
+                                                            Config._settings.setValue("barMonitors", JSON.stringify(list))
+                                                            Config._settings.sync()
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         CCSection { text: "Workspace Slots" }
                                         CCSlider { label:"Slot Count"; from:1;to:10;stepSize:1;decimals:0; value:Config.wsCount; onMoved:function(v){Config.wsCount=v} }
 

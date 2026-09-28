@@ -12,6 +12,7 @@ import Quickshell.Io
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Effects
 import Qt.labs.settings 1.1
 
 ShellRoot {
@@ -45,6 +46,7 @@ ShellRoot {
     readonly property color cOnPrimary: Qt.color(_m3onPrimary)
     readonly property color cSecCont:   Qt.color(_m3secondaryContainer)
     readonly property color cOnSecCont: Qt.color(_m3onSecondaryContainer)
+    readonly property color cOnSecondary: Qt.color(_m3onSecondary)
     readonly property color cOutline:   Qt.color(_m3outline)
     readonly property color cOutlineVar:Qt.color(_m3outlineVariant)
     readonly property color cInvPrimary:Qt.color(_m3inversePrimary)
@@ -141,10 +143,28 @@ ShellRoot {
     property string transFps:       appSettings.transFps
 
     // ── File scanning ─────────────────────────────────────────────────────────
-    Component.onCompleted: { if (wallpaperDir) scanDir() }
+    Component.onCompleted: {
+        initWallpaperReader.running = true
+        whScanDownloadedProc.running = true
+        if (wallpaperDir) scanDir()
+    }
     onWallpaperDirChanged:  { if (wallpaperDir) scanDir() }
     onSearchTextChanged:    applyFilter()
     onSortModeChanged:      sortAndFilter()
+
+    Process {
+        id: initWallpaperReader
+        command: ["bash", "-c", "grep -E '^wallpaper\\s*=' \"${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper/wallpaper.ini\" 2>/dev/null | head -n1 | cut -d'=' -f2-"]
+        stdout: SplitParser {
+            onRead: function(line) {
+                const trimmed = line.trim()
+                if (trimmed) {
+                    const home = Quickshell.env("HOME") || "/home/king"
+                    root.currentWallpaper = trimmed.replace(/^~/, home)
+                }
+            }
+        }
+    }
 
     function scanDir() {
         scanProc._buf = []
@@ -247,6 +267,161 @@ ShellRoot {
         }
     }
 
+    // ── Multi-monitor wallpaper target ────────────────────────────────────────
+    property string selectedMonitor: "all"
+    readonly property string selectedMonitorOutput: {
+        if (selectedMonitor === "all" || Quickshell.screens.length <= 1) return "all"
+        const idx = parseInt(selectedMonitor)
+        if (!isNaN(idx) && Quickshell.screens[idx]) return Quickshell.screens[idx].name
+        return selectedMonitor
+    }
+
+    // ── Animation popup state ─────────────────────────────────────────────────
+    property bool animPopupOpen: false
+
+    // ── Wallhaven state & download pipeline ───────────────────────────────────
+    property string activeTab: "local" // "local" | "wallhaven"
+    property string wallhavenQuery: ""
+    property var    wallhavenResults: []
+    property bool   wallhavenLoading: false
+    property string wallhavenError: ""
+    property var    wallhavenDownloading: ({})
+    property var    wallhavenDownloaded: ({})
+    property bool   wallhavenGifOnly: false   // animated/GIF filter
+    property string wallhavenRatio: "all"     // "all" | "16x9" | "16x10" | "21x9" | "32x9" | "9x16" | "4x3" | "1x1"
+    property bool   ratioPopupOpen: false
+
+    function fetchWallhaven(query) {
+        wallhavenLoading = true
+        wallhavenError = ""
+        const q = (query !== undefined ? query : wallhavenQuery).trim()
+        let url = "https://wallhaven.cc/api/v1/search?categories=111&purity=100&page=1"
+        if (root.wallhavenRatio && root.wallhavenRatio !== "all") {
+            url += "&ratios=" + encodeURIComponent(root.wallhavenRatio)
+        }
+        if (root.wallhavenGifOnly) {
+            url += "&q=" + encodeURIComponent((q ? q + " " : "") + "gif")
+        } else if (q) {
+            url += "&q=" + encodeURIComponent(q) + "&sorting=relevance"
+        } else {
+            url += "&sorting=toplist"
+        }
+
+        const xhr = new XMLHttpRequest()
+        xhr.open("GET", url)
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                wallhavenLoading = false
+                if (xhr.status === 200) {
+                    try {
+                        const json = JSON.parse(xhr.responseText)
+                        wallhavenResults = json.data || []
+                    } catch (e) {
+                        wallhavenError = "Failed to parse Wallhaven results"
+                    }
+                } else {
+                    wallhavenError = "Wallhaven API error: " + xhr.status
+                }
+            }
+        }
+        xhr.send()
+    }
+
+    property string _dlItemPath: ""
+    property var    _whDlQueue: []
+    property bool   _whDlRunning: false
+
+    Process {
+        id: whScanDownloadedProc
+        command: ["bash", "-c", "mkdir -p \"$HOME/Pictures/Wallhaven\"; ls -1 \"$HOME/Pictures/Wallhaven\" 2>/dev/null"]
+        stdout: SplitParser {
+            onRead: function(line) {
+                const trimmed = line.trim()
+                const match = trimmed.match(/^wallhaven-([a-zA-Z0-9]+)\./)
+                if (match && match[1]) {
+                    const home = Quickshell.env("HOME") || "/home/king"
+                    let dlMap = Object.assign({}, root.wallhavenDownloaded)
+                    dlMap[match[1]] = home + "/Pictures/Wallhaven/" + trimmed
+                    root.wallhavenDownloaded = dlMap
+                }
+            }
+        }
+    }
+
+    Process {
+        id: wallhavenDownloader
+        property string targetId: ""
+        property string targetDest: ""
+        property string targetUrl: ""
+        property bool autoApply: true
+        property var cmdArgs: ["bash", "-c", "exit 0"]
+        command: cmdArgs
+
+        onExited: function(exitCode) {
+            const finishedId   = targetId
+            const finishedDest = targetDest
+            const shouldApply  = autoApply
+
+            let progMap = Object.assign({}, root.wallhavenDownloading)
+            delete progMap[finishedId]
+            root.wallhavenDownloading = progMap
+
+            if (exitCode === 0 && finishedDest) {
+                let dlMap = Object.assign({}, root.wallhavenDownloaded)
+                dlMap[finishedId] = finishedDest
+                root.wallhavenDownloaded = dlMap
+
+                if (shouldApply) {
+                    root.applyWallpaper(finishedDest)
+                }
+                // Auto-refresh wallpaper folder so downloaded image appears in Local tab immediately
+                root.scanDir()
+            }
+            targetDest = ""
+            targetId   = ""
+            root._whDlRunning = false
+            root._whDlDrain()
+        }
+    }
+
+    function _whDlDrain() {
+        if (root._whDlRunning || root._whDlQueue.length === 0) return
+        const job = root._whDlQueue.shift()
+        const item = job.item
+        const ext = (item.path.split('.').pop() || "jpg").toLowerCase()
+        const home = Quickshell.env("HOME") || "/home/king"
+        const dest = home + "/Pictures/Wallhaven/wallhaven-" + item.id + "." + ext
+        const url  = item.path
+        const script = home + "/.config/quickshell/wallpaper/wallhaven-download.sh"
+
+        root._whDlRunning = true
+        wallhavenDownloader.targetId   = item.id
+        wallhavenDownloader.targetDest = dest
+        wallhavenDownloader.targetUrl  = url
+        wallhavenDownloader.autoApply  = job.autoApply
+        wallhavenDownloader.cmdArgs    = ["bash", script, url, dest]
+        wallhavenDownloader.running    = true
+    }
+
+    function downloadWallhaven(item, autoApply) {
+        if (!item || !item.id || !item.path) return
+        const home = Quickshell.env("HOME") || "/home/king"
+        const ext = (item.path.split('.').pop() || "jpg").toLowerCase()
+        const dest = home + "/Pictures/Wallhaven/wallhaven-" + item.id + "." + ext
+
+        if (root.wallhavenDownloaded[item.id]) {
+            if (autoApply) root.applyWallpaper(dest)
+            return
+        }
+
+        let progMap = Object.assign({}, root.wallhavenDownloading)
+        progMap[item.id] = true
+        root.wallhavenDownloading = progMap
+
+        root._whDlQueue.push({ item: item, autoApply: !!autoApply })
+        root._whDlDrain()
+    }
+
     // ── Wallpaper application ─────────────────────────────────────────────────
     // Delegates to wallpaper-apply.sh (same directory as this QML file).
     // Using a script avoids all inline-bash quoting pitfalls and makes the
@@ -282,7 +457,8 @@ ShellRoot {
             root.transAngle,
             root.transDuration,
             root.transFps,
-            root.fillMode
+            root.fillMode,
+            root.selectedMonitorOutput
         ] : ["bash", "-c", "exit 0"]
 
         onExited: function(exitCode) {
@@ -432,7 +608,9 @@ ShellRoot {
             MouseArea {
                 anchors.fill: parent
                 onClicked: {
-                    if (root.sidebarOpen) root.sidebarOpen = false
+                    if (root.animPopupOpen) root.animPopupOpen = false
+                    else if (root.ratioPopupOpen) root.ratioPopupOpen = false
+                    else if (root.sidebarOpen) root.sidebarOpen = false
                     else root._quit()
                 }
             }
@@ -459,7 +637,13 @@ ShellRoot {
                     z: 99
                 }
 
-                MouseArea { anchors.fill: parent } // prevent scrim click-through
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        if (root.animPopupOpen) root.animPopupOpen = false
+                        if (root.ratioPopupOpen) root.ratioPopupOpen = false
+                    }
+                } // prevent scrim click-through and dismiss open popups
 
                 // ── Sidebar overlay (left-slide) ──────────────────────────────
                 Rectangle {
@@ -522,6 +706,31 @@ ShellRoot {
                                     color: root.cOnSurfVar
                                     font.pixelSize: 11
                                     elide: Text.ElideLeft
+                                }
+
+                                // Minimal Primary color 'x' close button
+                                Rectangle {
+                                    width: 24; height: 24; radius: 12
+                                    color: sbCloseHov.containsMouse
+                                        ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.2)
+                                        : "transparent"
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "󰅖"
+                                        color: root.cPrimary
+                                        font.pixelSize: 14
+                                        font.family: "Symbols Nerd Font Mono"
+                                    }
+
+                                    MouseArea {
+                                        id: sbCloseHov
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.sidebarOpen = false
+                                    }
                                 }
                             }
                         }
@@ -691,6 +900,7 @@ ShellRoot {
 
                             // Folder / sidebar toggle button
                             Rectangle {
+                                visible: root.activeTab === "local"
                                 width: 120; height: 34
                                 radius: root.rFull
                                 color: root.sidebarOpen
@@ -724,6 +934,55 @@ ShellRoot {
                                         color: root.sidebarOpen ? root.cPrimary : root.cOnSecCont
                                         font.pixelSize: 13
                                         font.weight: Font.Medium
+                                    }
+                                }
+                            }
+
+                            // Button to switch to 'https://wallhaven.cc/' search tab
+                            Rectangle {
+                                width: whTabRow.implicitWidth + 24; height: 34
+                                radius: root.rFull
+                                color: root.activeTab === "wallhaven"
+                                    ? root.cPrimary
+                                    : (whTabHov.containsMouse ? root.cSurfHiHi : root.cSecCont)
+                                border.color: root.activeTab === "wallhaven" ? root.cPrimary : root.cOutlineVar
+                                border.width: 1
+                                Behavior on color { ColorAnimation { duration: 130 } }
+
+                                RowLayout {
+                                    id: whTabRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+                                    Text {
+                                        text: root.activeTab === "wallhaven" ? "󰋩" : "󰖟"
+                                        color: root.activeTab === "wallhaven" ? root.cOnPrimary : root.cOnSecCont
+                                        font.pixelSize: 14
+                                        font.family: "Symbols Nerd Font Mono"
+                                    }
+                                    Text {
+                                        text: root.activeTab === "wallhaven" ? "Local" : "Wallhaven"
+                                        color: root.activeTab === "wallhaven" ? root.cOnPrimary : root.cOnSecCont
+                                        font.pixelSize: 13
+                                        font.weight: Font.Medium
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: whTabHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root.activeTab = (root.activeTab === "wallhaven") ? "local" : "wallhaven"
+                                        searchIn.text = ""
+                                        if (root.activeTab === "wallhaven") {
+                                            whScanDownloadedProc.running = true
+                                            if (root.wallhavenResults.length === 0) {
+                                                root.fetchWallhaven("")
+                                            }
+                                        } else {
+                                            root.scanDir()
+                                        }
                                     }
                                 }
                             }
@@ -764,17 +1023,24 @@ ShellRoot {
 
                                         Text {
                                             anchors.fill: parent
-                                            text: "Search wallpapers…"
+                                            text: root.activeTab === "wallhaven"
+                                                ? "Search Wallhaven (press Enter to search)…"
+                                                : "Search wallpapers…"
                                             color: root.cOutline
                                             font: parent.font
                                             visible: !parent.text
                                             verticalAlignment: Text.AlignVCenter
                                         }
 
-                                        onTextChanged: root.searchText = text
+                                        onTextChanged: {
+                                            if (root.activeTab === "local") root.searchText = text
+                                            else root.wallhavenQuery = text
+                                        }
                                         Component.onCompleted: forceActiveFocus()
                                         Keys.onEscapePressed: {
-                                            if (root.sidebarOpen) root.sidebarOpen = false
+                                            if (root.animPopupOpen) root.animPopupOpen = false
+                                            else if (root.ratioPopupOpen) root.ratioPopupOpen = false
+                                            else if (root.sidebarOpen) root.sidebarOpen = false
                                             else root._quit()
                                         }
                                         Keys.onUpPressed:    function(e) { root.moveFocus(-gridView.cols); e.accepted = true }
@@ -782,8 +1048,12 @@ ShellRoot {
                                         Keys.onLeftPressed:  function(e) { root.moveFocus(-1); e.accepted = true }
                                         Keys.onRightPressed: function(e) { root.moveFocus(+1); e.accepted = true }
                                         Keys.onReturnPressed: {
-                                            if (root.filtered.length > root.focusedIdx)
-                                                root.applyWallpaper(root.filtered[root.focusedIdx])
+                                            if (root.activeTab === "wallhaven") {
+                                                root.fetchWallhaven(searchIn.text)
+                                            } else {
+                                                if (root.filtered.length > root.focusedIdx)
+                                                    root.applyWallpaper(root.filtered[root.focusedIdx])
+                                            }
                                         }
                                     }
                                 }
@@ -791,7 +1061,7 @@ ShellRoot {
 
                             // Clear search
                             Rectangle {
-                                visible: root.searchText !== ""
+                                visible: root.activeTab === "wallhaven" ? searchIn.text !== "" : root.searchText !== ""
                                 width: 34; height: 34
                                 radius: root.rFull
                                 color: clrHov.containsMouse ? root.cSurfHiHi : "transparent"
@@ -869,7 +1139,7 @@ ShellRoot {
                                 border.color: root.cOutlineVar; border.width: 1
                                 Behavior on color { ColorAnimation { duration: 130 } }
                                 Text {
-                                    anchors.centerIn: parent; text: "󰒅"
+                                    anchors.centerIn: parent; text: ""
                                     color: root.cPrimary; font.pixelSize: 15; font.family: "Symbols Nerd Font Mono"
                                 }
                                 MouseArea {
@@ -897,7 +1167,7 @@ ShellRoot {
                                 // Default icon: broom (nf-md-broom)
                                 Text {
                                     anchors.centerIn: parent
-                                    text: "󱘗"
+                                    text: "󰃢"
                                     color: root.cOnSurfVar
                                     font.pixelSize: 15; font.family: "Symbols Nerd Font Mono"
                                     visible: !cacheSpinning.running
@@ -907,7 +1177,7 @@ ShellRoot {
                                 Text {
                                     id: cacheSpinner
                                     anchors.centerIn: parent
-                                    text: "󰑪"
+                                    text: "󱢉"
                                     color: root.cPrimary
                                     font.pixelSize: 15; font.family: "Symbols Nerd Font Mono"
                                     visible: cacheSpinning.running
@@ -944,23 +1214,189 @@ ShellRoot {
                                 }
                             }
 
+                            // Animated / GIF toggle (Wallhaven only)
+                            Rectangle {
+                                visible: root.activeTab === "wallhaven"
+                                width: 34; height: 34; radius: root.rFull
+                                color: root.wallhavenGifOnly
+                                    ? root.cPrimary
+                                    : (gifHov.containsMouse ? root.cSurfHiHi : Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.6))
+                                border.color: root.wallhavenGifOnly ? root.cPrimary : root.cOutlineVar
+                                border.width: 1
+                                Behavior on color { ColorAnimation { duration: 130 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "󰜏"
+                                    color: root.wallhavenGifOnly ? root.cOnPrimary : root.cOnSurfVar
+                                    font.pixelSize: 15
+                                    font.family: "Symbols Nerd Font Mono"
+                                }
+                                MouseArea {
+                                    id: gifHov
+                                    anchors.fill: parent; hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root.wallhavenGifOnly = !root.wallhavenGifOnly
+                                        root.fetchWallhaven(root.wallhavenQuery)
+                                    }
+                                }
+                            }
+
+                            // Ratio dropdown toggle button (Wallhaven only)
+                            Rectangle {
+                                id: ratioBtn
+                                visible: root.activeTab === "wallhaven"
+                                width: ratioBtnRow.implicitWidth + 20
+                                height: 34
+                                radius: root.rFull
+                                color: root.ratioPopupOpen || ratioHov.containsMouse
+                                    ? root.cSurfHiHi
+                                    : (root.wallhavenRatio !== "all" ? root.cPrimary : Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.6))
+                                border.color: root.ratioPopupOpen || root.wallhavenRatio !== "all" ? root.cPrimary : root.cOutlineVar
+                                border.width: 1
+                                Behavior on color { ColorAnimation { duration: 120 } }
+
+                                RowLayout {
+                                    id: ratioBtnRow
+                                    anchors.centerIn: parent
+                                    spacing: 5
+                                    Text {
+                                        text: "󰨤"
+                                        color: root.wallhavenRatio !== "all" && !root.ratioPopupOpen ? root.cOnPrimary : root.cPrimary
+                                        font.pixelSize: 14
+                                        font.family: "Symbols Nerd Font Mono"
+                                    }
+                                    Text {
+                                        text: {
+                                            switch (root.wallhavenRatio) {
+                                                case "16x9":  return "16:9"
+                                                case "16x10": return "16:10"
+                                                case "21x9":  return "21:9"
+                                                case "32x9":  return "32:9"
+                                                case "9x16":  return "9:16"
+                                                case "4x3":   return "4:3"
+                                                case "1x1":   return "1:1"
+                                                default:      return "Any Ratio"
+                                            }
+                                        }
+                                        color: root.wallhavenRatio !== "all" && !root.ratioPopupOpen ? root.cOnPrimary : root.cOnSurfVar
+                                        font.pixelSize: 12
+                                        font.weight: Font.Medium
+                                    }
+                                    Text {
+                                        text: root.ratioPopupOpen ? "󰅃" : "󰅀"
+                                        color: root.wallhavenRatio !== "all" && !root.ratioPopupOpen ? root.cOnPrimary : root.cOutline
+                                        font.pixelSize: 11
+                                        font.family: "Symbols Nerd Font Mono"
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: ratioHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.ratioPopupOpen = !root.ratioPopupOpen
+                                }
+                            }
+
                             // Count badge
                             Rectangle {
-                                visible: root.filtered.length > 0
+                                visible: root.activeTab === "wallhaven" ? root.wallhavenResults.length > 0 : root.filtered.length > 0
                                 width: Math.max(32, cntTxt.implicitWidth + 16); height: 34
                                 radius: root.rFull
                                 color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.7)
                                 Text {
                                     id: cntTxt; anchors.centerIn: parent
-                                    text: root.filtered.length
+                                    text: root.activeTab === "wallhaven" ? root.wallhavenResults.length : root.filtered.length
                                     color: root.cOnSecCont; font.pixelSize: 12
                                 }
                             }
                         }
 
+                        // ── Monitor Selection Row (only visible if multiple monitors detected) ──
+                        RowLayout {
+                            visible: Quickshell.screens.length > 1
+                            Layout.fillWidth: true
+                            spacing: 8
+
+                            Text {
+                                text: "Monitor:"
+                                color: root.cOutline
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+                            }
+
+                            // "All" button for unified application
+                            Rectangle {
+                                readonly property bool isSelected: root.selectedMonitor === "all"
+                                height: 28
+                                implicitWidth: allLbl.implicitWidth + 20
+                                radius: 14
+                                color: isSelected ? root.cPrimary : root.cOnSecondary
+                                border.width: 1
+                                border.color: isSelected ? root.cPrimary : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.25)
+                                scale: allMa.containsMouse ? 1.05 : 1.0
+                                Behavior on scale { NumberAnimation { duration: 120 } }
+                                Behavior on color { ColorAnimation { duration: 150 } }
+
+                                Text {
+                                    id: allLbl
+                                    anchors.centerIn: parent
+                                    text: "All"
+                                    color: parent.isSelected ? root.cOnSecondary : root.cPrimary
+                                    font.pixelSize: 12
+                                    font.weight: Font.Bold
+                                }
+
+                                MouseArea {
+                                    id: allMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.selectedMonitor = "all"
+                                }
+                            }
+
+                            // Numbered buttons for each detected monitor
+                            Repeater {
+                                model: Quickshell.screens.length
+                                delegate: Rectangle {
+                                    required property int index
+                                    readonly property bool isSelected: root.selectedMonitor === index.toString()
+                                    width: 28; height: 28; radius: 14
+                                    color: isSelected ? root.cPrimary : root.cOnSecondary
+                                    border.width: 1
+                                    border.color: isSelected ? root.cPrimary : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.25)
+                                    scale: monMa.containsMouse ? 1.06 : 1.0
+                                    Behavior on scale { NumberAnimation { duration: 120 } }
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: (index + 1).toString()
+                                        color: parent.isSelected ? root.cOnSecondary : root.cPrimary
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                    }
+
+                                    MouseArea {
+                                        id: monMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.selectedMonitor = index.toString()
+                                    }
+                                }
+                            }
+
+                            Item { Layout.fillWidth: true }
+                        }
+
                         // ── Wallpaper grid ────────────────────────────────────
                         GridView {
                             id: gridView
+                            visible: root.activeTab === "local"
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
@@ -1160,7 +1596,7 @@ ShellRoot {
                                     anchors.centerIn: parent; spacing: 14
                                     Text {
                                         anchors.horizontalCenter: parent.horizontalCenter
-                                        text: scanProc.running ? "󰑪"
+                                        text: scanProc.running ? "󱉶"
                                             : root.wallpaperDir ? "󰋩" : "󰉋"
                                         color: root.cOutlineVar; font.pixelSize: 52
                                         font.family: "Symbols Nerd Font Mono"
@@ -1184,116 +1620,554 @@ ShellRoot {
                             }
                         }
 
-                        // ── Bottom transition bar ─────────────────────────────
-                        Rectangle {
+                        // ── Wallhaven grid ─────────────────────────────────────
+                        GridView {
+                            id: whGridView
+                            visible: root.activeTab === "wallhaven"
                             Layout.fillWidth: true
-                            height: 42; radius: root.rSm
-                            color: Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.6)
-                            border.color: root.cOutlineVar; border.width: 1
+                            Layout.fillHeight: true
+                            clip: true
 
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 14; anchors.rightMargin: 14
-                                spacing: 8
+                            readonly property int thumbW: 160
+                            readonly property int thumbH: 100
+                            readonly property int btnH:   26
+                            readonly property int itemH:  thumbH + 6 + btnH
+                            readonly property int gap:    12
+                            readonly property int cols: Math.max(1,
+                                Math.floor((width + gap) / (thumbW + gap)))
 
-                                // Backend badge
-                                Rectangle {
-                                    width: 52; height: 26; radius: root.rFull
-                                    color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.8)
-                                    Text {
-                                        anchors.centerIn: parent; text: "awww"
-                                        color: root.cOnSecCont; font.pixelSize: 11; font.weight: Font.Medium
-                                    }
-                                }
+                            cellWidth:  Math.floor(width / cols)
+                            cellHeight: itemH + gap
+                            leftMargin: Math.floor((width - (cols * cellWidth)) / 2)
+                            rightMargin: leftMargin
+                            model: root.wallhavenResults
 
-                                // Transition type pills
-                                Repeater {
-                                    model: ["any","simple","fade","left","right","top","bottom",
-                                            "wipe","wave","grow","center","outer","random"]
-                                    delegate: Rectangle {
-                                        required property string modelData
-                                        visible: root.transType === modelData || ttHov.containsMouse
-                                        width: ttLbl.implicitWidth + 14; height: 26; radius: root.rFull
-                                        color: root.transType === modelData
-                                               ? root.cPrimary
-                                               : (ttHov.containsMouse ? root.cSurfHiHi : "transparent")
-                                        Behavior on color { ColorAnimation { duration: 100 } }
-                                        Text {
-                                            id: ttLbl; anchors.centerIn: parent
-                                            text: parent.modelData
-                                            color: root.transType === parent.modelData ? root.cOnPrimary : root.cOutline
-                                            font.pixelSize: 11
+                            delegate: Item {
+                                id: whThumb
+                                required property var modelData
+                                required property int index
+
+                                readonly property string whId: modelData.id || ""
+                                readonly property string whThumbUrl: (modelData.thumbs && modelData.thumbs.large) ? modelData.thumbs.large : (modelData.thumbs && modelData.thumbs.small ? modelData.thumbs.small : "")
+                                readonly property bool isDownloaded: !!root.wallhavenDownloaded[whId]
+                                readonly property bool isDownloading: !!root.wallhavenDownloading[whId]
+                                readonly property string downloadedPath: root.wallhavenDownloaded[whId] || ""
+                                readonly property bool isCurrent: isDownloaded && root.currentWallpaper !== "" && (root.currentWallpaper === downloadedPath || root.currentWallpaper.indexOf("wallhaven-" + whId) !== -1)
+                                property bool imgHovered: false
+                                property bool btnHovered: false
+
+                                width:  whGridView.cellWidth
+                                height: whGridView.cellHeight
+
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: 6
+                                    width: whGridView.thumbW
+
+                                    // 1. Image container (rounded with MultiEffect mask)
+                                    Item {
+                                        id: imgBox
+                                        width: whGridView.thumbW
+                                        height: whGridView.thumbH
+                                        scale: whThumb.imgHovered ? 1.03 : 1.0
+                                        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: 20
+                                            color: "#181818"
                                         }
+
+                                        // Masked image item
+                                        Item {
+                                            anchors.fill: parent
+                                            layer.enabled: true
+                                            layer.effect: MultiEffect {
+                                                maskEnabled: true
+                                                maskSource: imgMask
+                                                maskThresholdMin: 0.5
+                                                maskSpreadAtMin: 1.0
+                                            }
+
+                                            Rectangle {
+                                                id: imgMask
+                                                anchors.fill: parent
+                                                radius: 20
+                                                color: "white"
+                                                opacity: 0
+                                                layer.enabled: true
+                                            }
+
+                                            Image {
+                                                anchors.fill: parent
+                                                source: whThumb.whThumbUrl
+                                                fillMode: Image.PreserveAspectCrop
+                                                asynchronous: true
+                                                smooth: true
+                                                cache: true
+                                            }
+                                        }
+
+                                        // Border outline
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: 20
+                                            color: "transparent"
+                                            border.color: whThumb.isCurrent ? root.cPrimary : (whThumb.imgHovered ? root.cPrimary : root.cOutlineVar)
+                                            border.width: (whThumb.isCurrent || whThumb.imgHovered) ? 2 : 1
+                                            Behavior on border.color { ColorAnimation { duration: 150 } }
+                                        }
+
+                                        // Resolution badge (top-left)
+                                        Rectangle {
+                                            anchors.top: parent.top
+                                            anchors.left: parent.left
+                                            anchors.margins: 6
+                                            height: 18
+                                            implicitWidth: resTxt.implicitWidth + 8
+                                            radius: 5
+                                            color: Qt.rgba(0, 0, 0, 0.72)
+                                            Text {
+                                                id: resTxt
+                                                anchors.centerIn: parent
+                                                text: whThumb.modelData.resolution || ""
+                                                color: "white"
+                                                font.pixelSize: 10
+                                                font.weight: Font.Medium
+                                            }
+                                        }
+
+                                        // Active indicator badge (top-right)
+                                        Rectangle {
+                                            visible: whThumb.isCurrent
+                                            anchors.top: parent.top
+                                            anchors.right: parent.right
+                                            anchors.margins: 6
+                                            width: 22; height: 22
+                                            radius: 11
+                                            color: root.cPrimary
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "󰄬"
+                                                color: root.cOnPrimary
+                                                font.pixelSize: 13
+                                                font.family: "Symbols Nerd Font Mono"
+                                            }
+                                        }
+
+                                        // GIF badge (top-right, only if not current)
+                                        Rectangle {
+                                            visible: !whThumb.isCurrent && ((whThumb.modelData.file_type === "image/gif") || (whThumb.whThumbUrl.indexOf(".gif") !== -1))
+                                            anchors.top: parent.top
+                                            anchors.right: parent.right
+                                            anchors.margins: 6
+                                            height: 18
+                                            implicitWidth: 32
+                                            radius: 5
+                                            color: root.cPrimary
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "GIF"
+                                                color: root.cOnPrimary
+                                                font.pixelSize: 9
+                                                font.weight: Font.Bold
+                                            }
+                                        }
+
                                         MouseArea {
-                                            id: ttHov; anchors.fill: parent; hoverEnabled: true
+                                            anchors.fill: parent
+                                            hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
+                                            onEntered: whThumb.imgHovered = true
+                                            onExited:  whThumb.imgHovered = false
                                             onClicked: {
-                                                root.transType = parent.modelData
-                                                appSettings.transType = root.transType
+                                                if (whThumb.isDownloaded) {
+                                                    root.applyWallpaper(whThumb.downloadedPath)
+                                                } else {
+                                                    root.downloadWallhaven(whThumb.modelData, true)
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                Item { Layout.fillWidth: true }
+                                    // 2. Dedicated Action Button (Get / Downloading / Applied / Apply)
+                                    Rectangle {
+                                        id: getBtn
+                                        width: whGridView.thumbW
+                                        height: whGridView.btnH
+                                        radius: root.rFull
+                                        color: whThumb.isDownloading
+                                            ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.22)
+                                            : (whThumb.isCurrent
+                                                ? (whThumb.btnHovered ? Qt.lighter(root.cPrimary, 1.1) : root.cPrimary)
+                                                : (whThumb.isDownloaded
+                                                    ? (whThumb.btnHovered ? root.cSurfHiHi : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.12))
+                                                    : (whThumb.btnHovered ? root.cSurfHiHi : Qt.rgba(root.cSurfHi.r, root.cSurfHi.g, root.cSurfHi.b, 0.75))))
+                                        border.color: (whThumb.isDownloading || whThumb.isCurrent || whThumb.isDownloaded)
+                                            ? root.cPrimary
+                                            : (whThumb.btnHovered ? root.cPrimary : root.cOutlineVar)
+                                        border.width: 1
+                                        Behavior on color { ColorAnimation { duration: 130 } }
+                                        Behavior on border.color { ColorAnimation { duration: 130 } }
 
-                                // Editable fields: duration, angle, fps, steps
-                                Repeater {
-                                    model: [
-                                        { lbl: "durat…", prop: "transDuration" },
-                                        { lbl: "angle",  prop: "transAngle"    },
-                                        { lbl: "fps",    prop: "transFps"      },
-                                        { lbl: "steps",  prop: "transStep"     }
-                                    ]
-                                    delegate: RowLayout {
-                                        required property var modelData
-                                        spacing: 4
-                                        Text {
-                                            text: parent.modelData.lbl
-                                            color: root.cOutline; font.pixelSize: 11
+                                        RowLayout {
+                                            anchors.centerIn: parent
+                                            spacing: 5
+
+                                            Text {
+                                                text: whThumb.isDownloading ? "󰇚" : (whThumb.isCurrent ? "󰄬" : (whThumb.isDownloaded ? "󰄬" : "󰇚"))
+                                                color: whThumb.isCurrent
+                                                    ? root.cOnPrimary
+                                                    : ((whThumb.isDownloaded || whThumb.isDownloading) ? root.cPrimary : root.cOnSurfVar)
+                                                font.pixelSize: 11
+                                                font.family: "Symbols Nerd Font Mono"
+
+                                                //RotationAnimator on rotation {
+                                                    //from: 0; to: 360; duration: 900; loops: Animation.Infinite
+                                                    //running: whThumb.isDownloading
+                                                //}
+                                            }
+
+                                            Text {
+                                                text: whThumb.isDownloading
+                                                    ? "Downloading…"
+                                                    : (whThumb.isCurrent ? "Applied" : (whThumb.isDownloaded ? "Apply" : "Get"))
+                                                color: whThumb.isCurrent
+                                                    ? root.cOnPrimary
+                                                    : ((whThumb.isDownloaded || whThumb.isDownloading) ? root.cPrimary : root.cOnSurfVar)
+                                                font.pixelSize: 10
+                                                font.weight: Font.Medium
+                                            }
                                         }
-                                        Rectangle {
-                                            width: 46; height: 26; radius: root.rFull
-                                            color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.8)
-                                            TextInput {
-                                                anchors.centerIn: parent; width: parent.width - 10
-                                                text: root[parent.parent.modelData.prop]
-                                                color: root.cOnSecCont; font.pixelSize: 11
-                                                horizontalAlignment: TextInput.AlignHCenter
-                                                inputMethodHints: Qt.ImhFormattedNumbersOnly
-                                                onEditingFinished: {
-                                                    root[parent.parent.modelData.prop] = text
-                                                    appSettings[parent.parent.modelData.prop] = text
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onEntered: whThumb.btnHovered = true
+                                            onExited:  whThumb.btnHovered = false
+                                            onClicked: {
+                                                if (whThumb.isDownloaded) {
+                                                    root.applyWallpaper(whThumb.downloadedPath)
+                                                } else {
+                                                    root.downloadWallhaven(whThumb.modelData, true)
                                                 }
                                             }
                                         }
                                     }
                                 }
+                            }
 
-                                // Fill badge
-                                Rectangle {
-                                    width: 52; height: 26; radius: root.rFull
-                                    color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.8)
+                            // Empty / Loading state overlay
+                            Item {
+                                anchors.fill: parent
+                                visible: root.wallhavenLoading || root.wallhavenResults.length === 0
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: 14
                                     Text {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        text: root.wallhavenLoading ? "󱉶" : "󰍉"
+                                        color: root.cOutlineVar; font.pixelSize: 52
+                                        font.family: "Symbols Nerd Font Mono"
+                                        RotationAnimator on rotation {
+                                            from: 0; to: 360; duration: 1200
+                                            loops: Animation.Infinite
+                                            running: root.wallhavenLoading
+                                        }
+                                    }
+                                    Text {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        text: root.wallhavenLoading
+                                            ? "Searching Wallhaven…"
+                                            : "Search for wallpapers above"
+                                        color: root.cOutline; font.pixelSize: 15
+                                    }
+                                }
+                            }
+                        } // whGridView
+
+                        // ── Bottom bar ──────────────────────────────────────
+                        Rectangle {
+                            Layout.fillWidth: true
+                            height: 42
+                            radius: 99
+                            color: Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.3)
+                            border.color: root.cOutlineVar
+                            border.width: 1
+
+                            RowLayout {
+                            id: bottomBar
+                            anchors { fill: parent; leftMargin: 8; rightMargin: 8 }
+                            spacing: 8
+
+                            // Animation dropdown button
+                            Rectangle {
+                                id: animBtn
+                                height: 30
+                                implicitWidth: animBtnRow.implicitWidth + 20
+                                radius: root.rFull
+                                color: animHov.containsMouse || root.animPopupOpen
+                                    ? root.cSurfHiHi
+                                    : Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.85)
+                                border.color: root.animPopupOpen ? root.cPrimary : root.cOutlineVar
+                                border.width: 1
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Behavior on border.color { ColorAnimation { duration: 120 } }
+
+                                RowLayout {
+                                    id: animBtnRow
+                                    anchors.centerIn: parent
+                                    spacing: 6
+                                    Text {
+                                        text: "󰪏"
+                                        color: root.cPrimary
+                                        font.pixelSize: 14
+                                        font.family: "Symbols Nerd Font Mono"
+                                    }
+                                    Text {
+                                        text: root.transType
+                                        color: root.cOnSecCont
+                                        font.pixelSize: 12
+                                        font.weight: Font.Medium
+                                    }
+                                    Text {
+                                        text: root.animPopupOpen ? "󰅃" : "󰅀"
+                                        color: root.cOutline
+                                        font.pixelSize: 11
+                                        font.family: "Symbols Nerd Font Mono"
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: animHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.animPopupOpen = !root.animPopupOpen
+                                }
+                            }
+
+                            // Fill-mode pill
+                            Rectangle {
+                                height: 30
+                                implicitWidth: fillLbl.implicitWidth + 20
+                                radius: root.rFull
+                                color: fillHov.containsMouse
+                                    ? root.cSurfHiHi
+                                    : Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.85)
+                                border.color: root.cOutlineVar; border.width: 1
+                                Behavior on color { ColorAnimation { duration: 120 } }
+
+                                Text {
+                                    id: fillLbl
+                                    anchors.centerIn: parent
+                                    text: root.fillMode.charAt(0).toUpperCase() + root.fillMode.slice(1)
+                                    color: root.cOnSecCont; font.pixelSize: 12
+                                }
+                                MouseArea {
+                                    id: fillHov
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        const modes = ["no","crop","fit","stretch"]
+                                        const i = modes.indexOf(root.fillMode)
+                                        root.fillMode = modes[(i + 1) % modes.length]
+                                        appSettings.fillMode = root.fillMode
+                                    }
+                                }
+                            }
+
+                            Item { Layout.fillWidth: true }
+
+                            // duration / angle / fps / steps inputs
+                            Repeater {
+                                model: [
+                                    { lbl: "dur", prop: "transDuration" },
+                                    { lbl: "ang", prop: "transAngle"    },
+                                    { lbl: "fps", prop: "transFps"      },
+                                    { lbl: "stp", prop: "transStep"     }
+                                ]
+                                delegate: RowLayout {
+                                    required property var modelData
+                                    spacing: 4
+                                    Text {
+                                        text: modelData.lbl
+                                        color: root.cOutline; font.pixelSize: 11
+                                    }
+                                    Rectangle {
+                                        width: 46; height: 28; radius: root.rFull
+                                        color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.8)
+                                        border.color: tiFocus.activeFocus ? root.cPrimary : "transparent"
+                                        border.width: 1
+                                        Behavior on border.color { ColorAnimation { duration: 120 } }
+                                        TextInput {
+                                            id: tiFocus
+                                            anchors.centerIn: parent; width: parent.width - 10
+                                            text: root[modelData.prop]
+                                            color: root.cOnSecCont; font.pixelSize: 11
+                                            horizontalAlignment: TextInput.AlignHCenter
+                                            inputMethodHints: Qt.ImhFormattedNumbersOnly
+                                            onEditingFinished: {
+                                                root[modelData.prop] = text
+                                                appSettings[modelData.prop] = text
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            } // bottomBar RowLayout
+                        } // bottomBar Rectangle
+
+                    } // ColumnLayout mainCol
+
+                    // ── Animation-type popup overlay (floating above bottom bar, doesn't push layout) ──
+                    Rectangle {
+                        id: animPopup
+                        visible: root.animPopupOpen
+                        anchors {
+                            bottom: parent.bottom
+                            bottomMargin: 68
+                            left: parent.left
+                            leftMargin: parent.contentLeft + 20
+                        }
+                        width: Math.min(parent.width - parent.contentLeft - 40, 520)
+                        implicitHeight: animFlow.implicitHeight + 20
+                        radius: 14
+                        color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.96)
+                        border.color: root.cOutlineVar
+                        border.width: 1
+                        z: 120
+
+                        Flow {
+                            id: animFlow
+                            anchors {
+                                left: parent.left; right: parent.right; top: parent.top
+                                margins: 10
+                            }
+                            spacing: 6
+
+                            Repeater {
+                                model: ["any","simple","fade","left","right","top","bottom",
+                                        "wipe","wave","grow","center","outer","random"]
+                                delegate: Rectangle {
+                                    required property string modelData
+                                    readonly property bool isCurrent: root.transType === modelData
+                                    width: pillTxt.implicitWidth + 18; height: 28
+                                    radius: root.rFull
+                                    color: isCurrent
+                                        ? root.cPrimary
+                                        : (pillHov.containsMouse ? root.cSurfHiHi : "transparent")
+                                    border.color: isCurrent ? root.cPrimary : root.cOutlineVar
+                                    border.width: 1
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+
+                                    Text {
+                                        id: pillTxt
                                         anchors.centerIn: parent
-                                        text: root.fillMode.charAt(0).toUpperCase() + root.fillMode.slice(1)
-                                        color: root.cOnSecCont; font.pixelSize: 11
+                                        text: modelData
+                                        color: isCurrent ? root.cOnPrimary : root.cOnSecCont
+                                        font.pixelSize: 12
+                                        font.weight: isCurrent ? Font.Bold : Font.Normal
                                     }
                                     MouseArea {
-                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                        id: pillHov
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
                                         onClicked: {
-                                            const modes = ["no","crop","fit","stretch"]
-                                            const i = modes.indexOf(root.fillMode)
-                                            root.fillMode = modes[(i + 1) % modes.length]
-                                            appSettings.fillMode = root.fillMode
+                                            root.transType = modelData
+                                            appSettings.transType = root.transType
+                                            root.animPopupOpen = false
                                         }
                                     }
                                 }
                             }
                         }
-                    }
-                }
-            }
-        }
-    }
-}
+                    } // animPopup
+
+                    // ── Ratio dropdown popup overlay (floating below Ratio button) ──────
+                    Rectangle {
+                        id: ratioPopup
+                        visible: root.ratioPopupOpen && root.activeTab === "wallhaven"
+                        anchors {
+                            top: parent.top
+                            topMargin: 58
+                            right: parent.right
+                            rightMargin: 20
+                        }
+                        width: 220
+                        implicitHeight: ratioCol.implicitHeight + 16
+                        radius: 14
+                        color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.96)
+                        border.color: root.cOutlineVar
+                        border.width: 1
+                        z: 120
+
+                        Column {
+                            id: ratioCol
+                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 8 }
+                            spacing: 4
+
+                            Repeater {
+                                model: [
+                                    { id: "all",   label: "Any Ratio (All)" },
+                                    { id: "16x9",  label: "16:9 (Standard)" },
+                                    { id: "16x10", label: "16:10 (Productivity)" },
+                                    { id: "21x9",  label: "21:9 (Ultrawide)" },
+                                    { id: "32x9",  label: "32:9 (Super Ultrawide)" },
+                                    { id: "9x16",  label: "9:16 (Portrait / Phone)" },
+                                    { id: "4x3",   label: "4:3 (Classic)" },
+                                    { id: "1x1",   label: "1:1 (Square)" }
+                                ]
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    readonly property bool isSelected: root.wallhavenRatio === modelData.id
+                                    width: parent.width; height: 30
+                                    radius: 8
+                                    color: isSelected
+                                        ? root.cPrimary
+                                        : (rItemHov.containsMouse ? root.cSurfHiHi : "transparent")
+                                    Behavior on color { ColorAnimation { duration: 100 } }
+
+                                    RowLayout {
+                                        anchors { fill: parent; leftMargin: 10; rightMargin: 10 }
+                                        spacing: 8
+                                        Text {
+                                            text: modelData.label
+                                            color: isSelected ? root.cOnPrimary : root.cOnSecCont
+                                            font.pixelSize: 12
+                                            font.weight: isSelected ? Font.Bold : Font.Normal
+                                            Layout.fillWidth: true
+                                        }
+                                        Text {
+                                            visible: isSelected
+                                            text: "󰄬"
+                                            color: root.cOnPrimary
+                                            font.pixelSize: 12
+                                            font.family: "Symbols Nerd Font Mono"
+                                        }
+                                    }
+
+                                    MouseArea {
+                                        id: rItemHov
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            root.wallhavenRatio = modelData.id
+                                            root.ratioPopupOpen = false
+                                            root.fetchWallhaven(root.wallhavenQuery)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } // ratioPopup
+
+                } // Rectangle panelContent
+            } // Item mainWindow
+        } // popupContent
+    } // PanelWindow
+} // root

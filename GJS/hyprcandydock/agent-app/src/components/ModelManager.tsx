@@ -11,21 +11,47 @@ import { bridge } from '../bridge';
 // Set false before production shipping. In dev test mode, all providers are shown.
 const DEV_BYPASS_BYOK_LICENSE = true;
 
+// ── HIDE_PROVIDERS: Add provider IDs here to hide them from the UI ────────────
+// e.g. ["openrouter", "groq"]
+export const HIDE_PROVIDERS: string[] = [];
+
 // ── System Color Tokens (Matugen + Wallust) ───────────────────────────────────
 // The user explicitly requested:
 // - Buttons, active tabs, Candy Agent header icon: matugen primary bg + on-secondary fg
 // - Active states, text, borders, provider indicators: matugen primary (no neon blue)
 // - iOS toggle knob: wallust color5 when deactivated, matugen primary when activated
-const PRIMARY       = 'var(--matugen-primary, #a0c9dc)';
-const ON_PRIMARY    = 'var(--matugen-on-secondary, #1d343c)';
-const INVERSE_PRI   = 'var(--matugen-inverse-primary, #a0c9dc)';
-const COLOR5_AMBER  = 'var(--wallust-color5, #BA8C40)';
-const ERROR_COLOR   = 'var(--matugen-error, #ffb4ab)';
+const PRIMARY = 'var(--matugen-primary, #a0c9dc)';
+const ON_PRIMARY = 'var(--matugen-on-secondary, #1d343c)';
+const INVERSE_PRI = 'var(--matugen-inverse-primary, #a0c9dc)';
+const COLOR5_AMBER = 'var(--wallust-color5, #BA8C40)';
+const ERROR_COLOR = 'var(--matugen-error, #ffb4ab)';
 
-const LS_BYOK_PRODUCT_ID   = ''; // Fill in after Lemon Squeezy approval
+const LS_BYOK_PRODUCT_ID = ''; // Fill in after Lemon Squeezy approval
 const LS_BYOK_CHECKOUT_URL = 'https://mirukai.gumroad.com/l/HyprCandy-Workspace';
 
 // ── Official Provider SVG Icons ───────────────────────────────────────────────
+export const AIMLAPIIcon: FC<{ size?: number }> = ({ size = 16 }) => (
+  <svg width={size} height={Math.round((size * 32) / 36)} viewBox="0 0 36 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="aimlapi-gradient" x1="0" y1="0" x2="36" y2="32" gradientUnits="userSpaceOnUse">
+        <stop offset="0%" stopColor="#00AAF0" />
+        <stop offset="50%" stopColor="#9B00E8" />
+        <stop offset="100%" stopColor="#F900DA" />
+      </linearGradient>
+    </defs>
+    <path
+      d="M35.0532 14.3536C35.7205 15.5094 35.7205 16.9334 35.0532 18.0893L28.1327 30.0759C27.4654 31.2318 26.2321 31.9438 24.8975 31.9438L11.0565 31.9438C9.72183 31.9438 8.48856 31.2318 7.82124 30.0759L0.900737 18.0893C0.233413 16.9334 0.233417 15.5094 0.900741 14.3536L7.82124 2.36688C8.48856 1.21105 9.72183 0.499022 11.0565 0.499022L24.8975 0.499023C26.2321 0.499023 27.4654 1.21105 28.1327 2.36688L35.0532 14.3536Z"
+      fill="url(#aimlapi-gradient)"
+    />
+    <path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M10.3818 21.4998C10.1215 21.4998 9.85957 21.4168 9.63832 21.2476C9.10474 20.836 9.00388 20.0698 9.41546 19.5362L14.2844 13.2081C14.4829 12.9494 14.7773 12.7818 15.0994 12.7412C15.428 12.6989 15.7501 12.79 16.0055 12.9933L20.5931 16.5966L24.6063 11.4186C25.0195 10.8834 25.7841 10.7842 26.3177 11.2006C26.8513 11.6138 26.9489 12.38 26.5357 12.912L21.7692 19.0612C21.5707 19.3182 21.2779 19.4858 20.9558 19.5248C20.6305 19.5688 20.3084 19.4744 20.0513 19.2743L15.4671 15.6726L11.3497 21.0231C11.1089 21.3354 10.7478 21.4998 10.3818 21.4998Z"
+      fill="white"
+    />
+  </svg>
+);
+
 export const OpenRouterIcon: FC<{ size?: number }> = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="#6366F1" xmlns="http://www.w3.org/2000/svg">
     <path d="M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z" />
@@ -73,8 +99,30 @@ export const XAIIcon: FC<{ size?: number }> = ({ size = 16 }) => (
 );
 
 // ── BYOK provider definitions ─────────────────────────────────────────────────
-// Order: OpenRouter, Groq, Google, Anthropic, OpenAI, Grok
+// Order: AI/ML API, OpenRouter, Groq, Google, Anthropic, OpenAI, Grok
 export const BYOK_PROVIDERS = [
+  {
+    id: 'aimlapi',
+    name: 'AI/ML API',
+    IconComponent: AIMLAPIIcon,
+    keyHint: 'aiml-...',
+    apiKeyUrl: 'https://aimlapi.com/app/keys',
+    keyLabel: 'AI/ML API key',
+    hasSearch: true,
+    defaultModel: 'anthropic/claude-3-7-sonnet',
+    models: [
+      { id: 'anthropic/claude-3-7-sonnet', name: 'Claude 3.7 Sonnet', ctx: '200k tokens', desc: 'Anthropic hybrid reasoning & frontier agentic coding model.' },
+      { id: 'anthropic/claude-3-5-sonnet', name: 'Claude 3.5 Sonnet', ctx: '200k tokens', desc: 'Industry standard benchmark for agentic coding and complex tool use.' },
+      { id: 'openai/gpt-4o', name: 'GPT-4o', ctx: '128k tokens', desc: 'OpenAI flagship omni-model. Versatile intelligence & multimodal.' },
+      { id: 'openai/o3-mini', name: 'o3-mini', ctx: '200k tokens', desc: 'High-speed STEM, coding and math reasoning model from OpenAI.' },
+      { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', ctx: '128k tokens', desc: 'Leading open reasoning model for code, architecture & mathematics.' },
+      { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', ctx: '128k tokens', desc: 'Meta open-weights flagship. High-speed versatile instructions.' },
+      { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', ctx: '1M tokens', desc: 'Google best Flash model — long-horizon coding & agents, 65K output.' },
+      { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', ctx: '1M tokens', desc: 'Google ultra-fast multimodal model with 1M token context.' },
+      { id: 'qwen/qwen-2.5-coder-32b-instruct', name: 'Qwen 2.5 Coder 32B', ctx: '128k tokens', desc: 'Specialized open weights coding model from Alibaba Cloud.' },
+      { id: 'mistralai/mistral-large-2407', name: 'Mistral Large 2', ctx: '128k tokens', desc: 'Mistral flagship model with deep multilingual & reasoning capabilities.' },
+    ],
+  },
   {
     id: 'openrouter',
     name: 'OpenRouter',
@@ -85,15 +133,15 @@ export const BYOK_PROVIDERS = [
     hasSearch: true,
     defaultModel: 'openrouter/free',
     models: [
-      { id: 'openrouter/free',                        name: 'OpenRouter Free (Auto)',   ctx: '128k tokens', desc: 'Auto-cycles best available free models. NVIDIA Nemotron, Gemma 4, and other current free-tier models.' },
-      { id: 'anthropic/claude-fable-5-1',             name: 'Claude Fable 5.1',         ctx: '1M tokens',   desc: 'Anthropic flagship (Sep 2026). Best-in-class reasoning & long-horizon agentic work.' },
-      { id: 'anthropic/claude-sonnet-5',              name: 'Claude Sonnet 5',          ctx: '1M tokens',   desc: 'Best balance of speed & intelligence for production agentic coding.' },
-      { id: 'openai/gpt-6-astra',                     name: 'GPT-6 Astra',              ctx: '128k tokens', desc: 'OpenAI flagship (Sep 2026). Frontier reasoning, computer use & advanced agents.' },
-      { id: 'openai/gpt-5.6-sol',                     name: 'GPT-5.6 Sol',              ctx: '128k tokens', desc: 'High-capability flagship for complex professional work & reasoning.' },
-      { id: 'google/gemini-3.8-flash',                name: 'Gemini 3.8 Flash',         ctx: '1M tokens',   desc: 'Google best Flash model — long-horizon coding & agents, 65K output.' },
-      { id: 'x-ai/grok-4.6',                          name: 'Grok 4.6',                 ctx: '500k tokens', desc: 'xAI flagship (Aug 2026). Real-time knowledge, 500K context, advanced reasoning.' },
-      { id: 'deepseek/deepseek-r1',                   name: 'DeepSeek R1',              ctx: '128k tokens', desc: 'Top open reasoning model for complex code & math.' },
-      { id: 'meta-llama/llama-3.3-70b-instruct',      name: 'Llama 3.3 70B',            ctx: '128k tokens', desc: 'Meta open-weights flagship. High-speed versatile model.' },
+      { id: 'openrouter/free', name: 'OpenRouter Free (Auto)', ctx: '128k tokens', desc: 'Auto-cycles best available free models. NVIDIA Nemotron, Gemma 4, and other current free-tier models.' },
+      { id: 'anthropic/claude-fable-5-1', name: 'Claude Fable 5.1', ctx: '1M tokens', desc: 'Anthropic flagship (Sep 2026). Best-in-class reasoning & long-horizon agentic work.' },
+      { id: 'anthropic/claude-sonnet-5', name: 'Claude Sonnet 5', ctx: '1M tokens', desc: 'Best balance of speed & intelligence for production agentic coding.' },
+      { id: 'openai/gpt-6-astra', name: 'GPT-6 Astra', ctx: '128k tokens', desc: 'OpenAI flagship (Sep 2026). Frontier reasoning, computer use & advanced agents.' },
+      { id: 'openai/gpt-5.6-sol', name: 'GPT-5.6 Sol', ctx: '128k tokens', desc: 'High-capability flagship for complex professional work & reasoning.' },
+      { id: 'google/gemini-3.8-flash', name: 'Gemini 3.8 Flash', ctx: '1M tokens', desc: 'Google best Flash model — long-horizon coding & agents, 65K output.' },
+      { id: 'x-ai/grok-4.6', name: 'Grok 4.6', ctx: '500k tokens', desc: 'xAI flagship (Aug 2026). Real-time knowledge, 500K context, advanced reasoning.' },
+      { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', ctx: '128k tokens', desc: 'Top open reasoning model for complex code & math.' },
+      { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', ctx: '128k tokens', desc: 'Meta open-weights flagship. High-speed versatile model.' },
     ],
   },
   {
@@ -106,13 +154,13 @@ export const BYOK_PROVIDERS = [
     hasSearch: true,
     defaultModel: 'llama-3.3-70b-versatile',
     models: [
-      { id: 'openai/gpt-oss-120b',               name: 'GPT-OSS 120B',            ctx: '128k tokens', desc: 'OpenAI open-weights flagship on Groq LPU. Complex reasoning & agentic tasks. Recommended.' },
-      { id: 'openai/gpt-oss-20b',                name: 'GPT-OSS 20B',             ctx: '128k tokens', desc: 'Compact open-weights model. Fast inference, cost-efficient agentic workflows.' },
-      { id: 'llama-3.3-70b-versatile',           name: 'Llama 3.3 70B',           ctx: '128k tokens', desc: 'Ultra-fast LPU inference (~300 t/s). Meta open-weights flagship.' },
-      { id: 'llama-3.1-8b-instant',              name: 'Llama 3.1 8B Instant',    ctx: '128k tokens', desc: 'Blazing speed (~800 t/s). Best for low-latency quick answers.' },
-      { id: 'qwen/qwen3-32b',                    name: 'Qwen3 32B',               ctx: '128k tokens', desc: 'Alibaba open-weights high-speed coding & reasoning model on Groq.' },
-      { id: 'groq/compound',                     name: 'Groq Compound',           ctx: '128k tokens', desc: 'Groq compound model with integrated tool use & web search.' },
-      { id: 'groq/compound-mini',                name: 'Groq Compound Mini',      ctx: '128k tokens', desc: 'Fast, cost-efficient Groq compound model for everyday tasks.' },
+      { id: 'openai/gpt-oss-120b', name: 'GPT-OSS 120B', ctx: '128k tokens', desc: 'OpenAI open-weights flagship on Groq LPU. Complex reasoning & agentic tasks. Recommended.' },
+      { id: 'openai/gpt-oss-20b', name: 'GPT-OSS 20B', ctx: '128k tokens', desc: 'Compact open-weights model. Fast inference, cost-efficient agentic workflows.' },
+      { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', ctx: '128k tokens', desc: 'Ultra-fast LPU inference (~300 t/s). Meta open-weights flagship.' },
+      { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B Instant', ctx: '128k tokens', desc: 'Blazing speed (~800 t/s). Best for low-latency quick answers.' },
+      { id: 'qwen/qwen3-32b', name: 'Qwen3 32B', ctx: '128k tokens', desc: 'Alibaba open-weights high-speed coding & reasoning model on Groq.' },
+      { id: 'groq/compound', name: 'Groq Compound', ctx: '128k tokens', desc: 'Groq compound model with integrated tool use & web search.' },
+      { id: 'groq/compound-mini', name: 'Groq Compound Mini', ctx: '128k tokens', desc: 'Fast, cost-efficient Groq compound model for everyday tasks.' },
     ],
   },
   {
@@ -122,11 +170,12 @@ export const BYOK_PROVIDERS = [
     keyHint: 'AIzaSy...',
     apiKeyUrl: 'https://aistudio.google.com/apikey',
     keyLabel: 'Google AI Studio API key',
+    defaultModel: 'gemini-3.8-flash',
     models: [
-      { id: 'gemini-3.8-flash',                  name: 'Gemini 3.8 Flash',        ctx: '1M tokens',  desc: 'Best Flash — long-horizon coding & agents, 65K output. Recommended.' },
-      { id: 'gemini-3.6-flash',                  name: 'Gemini 3.6 Flash',        ctx: '1M tokens',  desc: 'Previous Flash generation — fast & capable.' },
-      { id: 'gemini-3.1-pro-preview',            name: 'Gemini 3.1 Pro',          ctx: '1M tokens',  desc: 'Most intelligent Gemini model. Paid tier only.' },
-      { id: 'gemini-3.1-flash-lite',             name: 'Gemini 3.1 Flash-Lite',   ctx: '1M tokens',  desc: 'Ultra-fast lightweight model. Free tier friendly.' },
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', ctx: '1M tokens', desc: 'Best Flash — long-horizon coding & agents, 65K output. Recommended.' },
+      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', ctx: '1M tokens', desc: 'Previous Flash generation — fast & capable.' },
+      { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro', ctx: '1M tokens', desc: 'Most intelligent Gemini model. Paid tier only.' },
+      { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite', ctx: '1M tokens', desc: 'Ultra-fast lightweight model. Free tier friendly.' },
     ],
   },
   {
@@ -136,11 +185,12 @@ export const BYOK_PROVIDERS = [
     keyHint: 'sk-ant-api03-...',
     apiKeyUrl: 'https://console.anthropic.com/settings/keys',
     keyLabel: 'Anthropic API key',
+    defaultModel: 'claude-sonnet-5',
     models: [
-      { id: 'claude-fable-5-1',                  name: 'Claude Fable 5.1',        ctx: '1M tokens',   desc: 'Anthropic flagship (Sep 2026). Best demanding reasoning & long-horizon agentic work.' },
-      { id: 'claude-opus-5',                     name: 'Claude Opus 5',           ctx: '1M tokens',   desc: 'Frontier agentic coding & enterprise-grade complex reasoning.' },
-      { id: 'claude-sonnet-5',                   name: 'Claude Sonnet 5',         ctx: '1M tokens',   desc: 'Recommended default. Best balance of speed & intelligence for production. Recommended.' },
-      { id: 'claude-haiku-4-5-20251001',              name: 'Claude Haiku 4.5',        ctx: '200k tokens', desc: 'Ultra-fast & cost-effective. Best for high-volume latency-sensitive tasks.' },
+      { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', ctx: '1M tokens', desc: 'Anthropic flagship (Sep 2026). Best demanding reasoning & long-horizon agentic work.' },
+      { id: 'claude-opus-5', name: 'Claude Opus 5', ctx: '1M tokens', desc: 'Frontier agentic coding & enterprise-grade complex reasoning.' },
+      { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', ctx: '1M tokens', desc: 'Recommended default. Best balance of speed & intelligence for production. Recommended.' },
+      { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', ctx: '200k tokens', desc: 'Ultra-fast & cost-effective. Best for high-volume latency-sensitive tasks.' },
     ],
   },
   {
@@ -150,13 +200,14 @@ export const BYOK_PROVIDERS = [
     keyHint: 'sk-proj-...',
     apiKeyUrl: 'https://platform.openai.com/api-keys',
     keyLabel: 'OpenAI API key',
+    defaultModel: 'gpt-5.6-sol',
     models: [
-      { id: 'gpt-6-astra',                       name: 'GPT-6 Astra',             ctx: '128k tokens', desc: 'OpenAI flagship (Sep 2026). Frontier reasoning, computer use & advanced agentic tasks.' },
-      { id: 'gpt-5.6-sol',                       name: 'GPT-5.6 Sol',             ctx: '128k tokens', desc: 'High-capability flagship for complex professional work. Also accessible as gpt-5.6.' },
-      { id: 'gpt-5.6-terra',                     name: 'GPT-5.6 Terra',           ctx: '128k tokens', desc: 'Balanced model for general production use. Performance vs. cost sweet spot.' },
-      { id: 'gpt-5.6-luna',                      name: 'GPT-5.6 Luna',            ctx: '128k tokens', desc: 'Cost-efficient model for high-volume workloads. Recommended for cost-sensitive tasks.' },
-      { id: 'o4-mini',                           name: 'o4-mini',                 ctx: '200k tokens', desc: 'Optimized reasoning model for fast math, coding & STEM.' },
-      { id: 'o3',                                name: 'o3',                      ctx: '200k tokens', desc: 'Advanced reasoning for complex analytical & scientific tasks.' },
+      { id: 'gpt-6-astra', name: 'GPT-6 Astra', ctx: '128k tokens', desc: 'OpenAI flagship (Sep 2026). Frontier reasoning, computer use & advanced agentic tasks.' },
+      { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', ctx: '128k tokens', desc: 'High-capability flagship for complex professional work. Also accessible as gpt-5.6.' },
+      { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', ctx: '128k tokens', desc: 'Balanced model for general production use. Performance vs. cost sweet spot.' },
+      { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', ctx: '128k tokens', desc: 'Cost-efficient model for high-volume workloads. Recommended for cost-sensitive tasks.' },
+      { id: 'o4-mini', name: 'o4-mini', ctx: '200k tokens', desc: 'Optimized reasoning model for fast math, coding & STEM.' },
+      { id: 'o3', name: 'o3', ctx: '200k tokens', desc: 'Advanced reasoning for complex analytical & scientific tasks.' },
     ],
   },
   {
@@ -166,13 +217,19 @@ export const BYOK_PROVIDERS = [
     keyHint: 'xai-...',
     apiKeyUrl: 'https://console.x.ai/',
     keyLabel: 'xAI API key',
+    defaultModel: 'grok-4.6',
     models: [
-      { id: 'grok-4.6',                          name: 'Grok 4.6',                ctx: '500k tokens', desc: 'xAI flagship (Aug 2026). Real-time knowledge, 500K context, advanced reasoning & tool use.' },
-      { id: 'grok-4.6-latest',                   name: 'Grok 4.6 Latest',         ctx: '500k tokens', desc: 'Auto-updated alias to the very latest Grok 4.6 build. Best for cutting-edge tasks.' },
-      { id: 'grok-3',                            name: 'Grok 3',                  ctx: '131k tokens', desc: 'Previous generation flagship. Stable, reliable general-purpose intelligence.' },
+      { id: 'grok-4.6', name: 'Grok 4.6', ctx: '500k tokens', desc: 'xAI flagship (Aug 2026). Real-time knowledge, 500K context, advanced reasoning & tool use.' },
+      { id: 'grok-4.6-latest', name: 'Grok 4.6 Latest', ctx: '500k tokens', desc: 'Auto-updated alias to the very latest Grok 4.6 build. Best for cutting-edge tasks.' },
+      { id: 'grok-3', name: 'Grok 3', ctx: '131k tokens', desc: 'Previous generation flagship. Stable, reliable general-purpose intelligence.' },
     ],
   },
 ] as const;
+
+export const getVisibleProviders = () =>
+  BYOK_PROVIDERS.filter(
+    p => !HIDE_PROVIDERS.map(h => h.trim().toLowerCase()).includes(p.id.toLowerCase())
+  );
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHARED PRIMITIVES
@@ -196,78 +253,78 @@ export const IosToggle: FC<{
   label,
   size = 'md',
 }) => {
-  const isSm = size === 'sm';
-  const width = isSm ? 32 : 38;
-  const height = isSm ? 18 : 22;
-  const knobSize = isSm ? 14 : 18;
-  const knobTravel = isSm ? 14 : 16;
+    const isSm = size === 'sm';
+    const width = isSm ? 32 : 38;
+    const height = isSm ? 18 : 22;
+    const knobSize = isSm ? 14 : 18;
+    const knobTravel = isSm ? 14 : 16;
 
-  // Exact user requirements:
-  // - Background: matugen inverse-primary
-  // - Knob circle: wallust color5 when deactivated, matugen primary when activated
-  const knobColor = checked ? PRIMARY : COLOR5_AMBER;
-  const trackBg = checked
-    ? INVERSE_PRI
-    : `color-mix(in srgb, ${INVERSE_PRI} 32%, transparent)`;
+    // Exact user requirements:
+    // - Background: matugen inverse-primary
+    // - Knob circle: wallust color5 when deactivated, matugen primary when activated
+    const knobColor = checked ? PRIMARY : COLOR5_AMBER;
+    const trackBg = checked
+      ? INVERSE_PRI
+      : `color-mix(in srgb, ${INVERSE_PRI} 32%, transparent)`;
 
-  return (
-    <div
-      onClick={e => {
-        e.stopPropagation();
-        if (!disabled) onChange(!checked);
-      }}
-      role="switch"
-      aria-checked={checked}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '8px',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.55 : 1,
-        userSelect: 'none',
-      }}
-    >
+    return (
       <div
+        onClick={e => {
+          e.stopPropagation();
+          if (!disabled) onChange(!checked);
+        }}
+        role="switch"
+        aria-checked={checked}
         style={{
-          width: `${width}px`,
-          height: `${height}px`,
-          borderRadius: `${height / 2}px`,
-          background: trackBg,
-          border: `1px solid ${checked ? PRIMARY : `color-mix(in srgb, ${INVERSE_PRI} 45%, transparent)`}`,
-          position: 'relative',
-          transition: 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
-          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '8px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.55 : 1,
+          userSelect: 'none',
         }}
       >
         <div
           style={{
-            position: 'absolute',
-            top: '1px',
-            left: checked ? `${knobTravel + 1}px` : '1px',
-            width: `${knobSize}px`,
-            height: `${knobSize}px`,
-            borderRadius: '50%',
-            background: knobColor,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-            transition: 'left 0.22s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease',
-          }}
-        />
-      </div>
-      {label && (
-        <span
-          style={{
-            fontSize: isSm ? '11px' : '11.5px',
-            fontWeight: 700,
-            color: checked ? PRIMARY : COLOR5_AMBER,
-            letterSpacing: '0.02em',
+            width: `${width}px`,
+            height: `${height}px`,
+            borderRadius: `${height / 2}px`,
+            background: trackBg,
+            border: `1px solid ${checked ? PRIMARY : `color-mix(in srgb, ${INVERSE_PRI} 45%, transparent)`}`,
+            position: 'relative',
+            transition: 'all 0.22s cubic-bezier(0.4, 0, 0.2, 1)',
+            flexShrink: 0,
           }}
         >
-          {label}
-        </span>
-      )}
-    </div>
-  );
-};
+          <div
+            style={{
+              position: 'absolute',
+              top: '1px',
+              left: checked ? `${knobTravel + 1}px` : '1px',
+              width: `${knobSize}px`,
+              height: `${knobSize}px`,
+              borderRadius: '50%',
+              background: knobColor,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+              transition: 'left 0.22s cubic-bezier(0.4, 0, 0.2, 1), background 0.2s ease',
+            }}
+          />
+        </div>
+        {label && (
+          <span
+            style={{
+              fontSize: isSm ? '11px' : '11.5px',
+              fontWeight: 700,
+              color: checked ? PRIMARY : COLOR5_AMBER,
+              letterSpacing: '0.02em',
+            }}
+          >
+            {label}
+          </span>
+        )}
+      </div>
+    );
+  };
 
 
 
@@ -278,29 +335,33 @@ const CloudTab: FC = () => {
   const [store] = useStore();
 
   // License gate state
-  const [licenseInput, setLicenseInput]     = useState('');
-  const [validatingLicense, setValidating]  = useState(false);
-  const [licenseError, setLicenseError]     = useState('');
+  const [licenseInput, setLicenseInput] = useState('');
+  const [validatingLicense, setValidating] = useState(false);
+  const [licenseError, setLicenseError] = useState('');
   const hasBYOKLicense = !!store.byokLicenseKey;
 
+  const visibleProviders = getVisibleProviders();
+
   // Selected provider in the scrollable tab bar — resumes whichever provider
-  // was actually last active; otherwise defaults to OpenRouter, the first
-  // (and free-tier-friendly) entry in the provider row.
-  const [selectedProviderId, setSelectedProviderId] = useState<string>(
-    store.byokProvider || 'openrouter'
-  );
+  // was actually last active; otherwise defaults to the first visible provider.
+  const [selectedProviderId, setSelectedProviderId] = useState<string>(() => {
+    if (store.byokProvider && visibleProviders.some(p => p.id === store.byokProvider)) {
+      return store.byokProvider;
+    }
+    return visibleProviders[0]?.id || 'aimlapi';
+  });
 
   // Per-provider key input and control state
-  const [keyInputs, setKeyInputs]       = useState<Record<string, string>>({});
-  const [showKey, setShowKey]           = useState<Record<string, boolean>>({});
-  const [saving, setSaving]             = useState<Record<string, boolean>>({});
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+  const [showKey, setShowKey] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [providerErrors, setProvErrors] = useState<Record<string, string>>({});
 
   // ── Dynamic models per provider ─────────────────────────────────────────────
   const [fetchedModels, setFetchedModels] = useState<Record<string, Array<{ id: string; name: string; desc: string; context?: string; ctx?: string; has_tools?: boolean }>>>({});
   const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
-  const [searchQuery, setSearchQuery]     = useState<Record<string, string>>({});
-  const [modelsLive, setModelsLive]       = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState<Record<string, string>>({});
+  const [modelsLive, setModelsLive] = useState<Record<string, boolean>>({});
   const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const providerTabsRef = useRef<HTMLDivElement>(null);
 
@@ -386,7 +447,7 @@ const CloudTab: FC = () => {
           try {
             const res = await bridge.runtimeRequest(`/api/byok/key/${selectedProviderId}`, {}, 'GET');
             if (res?.key) key = res.key;
-          } catch {}
+          } catch { }
         }
         if (key) {
           setStore(prev => ({
@@ -453,11 +514,17 @@ const CloudTab: FC = () => {
       });
 
       const providerDef = BYOK_PROVIDERS.find(p => p.id === providerId);
-      const chosenModel = store.byokModel || providerDef?.models[0]?.id || '';
+      const providerModels = fetchedModels[providerId] || providerDef?.models || [];
+      const currentModelMatches = providerModels.some(m => m.id === store.byokModel || m.id.endsWith('/' + store.byokModel) || store.byokModel.endsWith('/' + m.id));
+      const chosenModel = (store.byokProvider === providerId && store.byokModel)
+        || (currentModelMatches ? store.byokModel : null)
+        || (providerDef as any)?.defaultModel
+        || providerModels[0]?.id
+        || '';
 
       // If auto-activating, stop llama-server and deactivate local
       if (autoActivate) {
-        try { await bridge.runtimeRequest('/api/server/stop'); } catch {}
+        try { await bridge.runtimeRequest('/api/server/stop'); } catch { }
         bridge.notifyModelStatus(false);
       }
 
@@ -518,7 +585,7 @@ const CloudTab: FC = () => {
         try {
           const res = await bridge.runtimeRequest(`/api/byok/key/${providerId}`, {}, 'GET');
           if (res?.key) secret = res.key;
-        } catch {}
+        } catch { }
       }
       if (secret) {
         setStore(prev => ({
@@ -540,7 +607,7 @@ const CloudTab: FC = () => {
       }
       try {
         // Stop llama-server so local releases VRAM & deactivates
-        try { await bridge.runtimeRequest('/api/server/stop'); } catch {}
+        try { await bridge.runtimeRequest('/api/server/stop'); } catch { }
         bridge.notifyModelStatus(false);
 
         // Activate provider in backend
@@ -548,8 +615,11 @@ const CloudTab: FC = () => {
 
         const providerDef = BYOK_PROVIDERS.find(p => p.id === providerId);
         const providerModelsList = fetchedModels[providerId] || [...(providerDef?.models || [])] || [];
+        const currentModelMatches = providerModelsList.some(m => m.id === store.byokModel || m.id.endsWith('/' + store.byokModel) || store.byokModel.endsWith('/' + m.id));
         const selectedModel = overrideModel
           || (store.byokProvider === providerId && store.byokModel)
+          || (currentModelMatches ? store.byokModel : null)
+          || (providerDef as any)?.defaultModel
           || providerModelsList[0]?.id
           || '';
 
@@ -567,7 +637,7 @@ const CloudTab: FC = () => {
       // Deactivate this provider, keep keys in GNOME Secrets
       try {
         await bridge.runtimeRequest('/api/byok/deactivate');
-      } catch {}
+      } catch { }
       setStore({
         byokProvider: null,
         modelStatus: 'idle',
@@ -610,7 +680,7 @@ const CloudTab: FC = () => {
             A flat monthly fee for the agent UI &amp; orchestration. You supply your own API keys — model calls go <strong>straight from your machine to your provider</strong>, never through our servers.
           </div>
           <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {BYOK_PROVIDERS.map(p => (
+            {visibleProviders.map(p => (
               <span key={p.id} style={{
                 fontSize: '10px', padding: '3px 10px', borderRadius: 'var(--radius-full)',
                 background: `color-mix(in srgb, ${PRIMARY} 14%, transparent)`, color: PRIMARY, fontWeight: 600,
@@ -657,20 +727,39 @@ const CloudTab: FC = () => {
   }
 
   // ── Unlocked view — Rounded Pill Provider Tab-Bar + Selected Provider Pane ──
-  const currentProvider = BYOK_PROVIDERS.find(p => p.id === selectedProviderId) || BYOK_PROVIDERS[0];
+  const currentProvider = visibleProviders.find(p => p.id === selectedProviderId) || visibleProviders[0] || BYOK_PROVIDERS[0];
   const isCurrentActive = store.inferenceMode === 'byok' && store.byokProvider === currentProvider.id;
   const isCurrentConfigured = !!store.byokKeys[currentProvider.id];
 
-  const availableModels = fetchedModels[currentProvider.id] || [...(currentProvider.models || [])] || [];
+  const availableModels = (() => {
+    const raw = fetchedModels[currentProvider.id] || currentProvider.models || [];
+    const base = [...raw];
+    // Pin the currently active model to the top of the list
+    const activeModelId = isCurrentActive ? store.byokModel : (store.byokProvider === currentProvider.id ? store.byokModel : null);
+    if (activeModelId) {
+      let activeIdx = base.findIndex(m => m.id === activeModelId);
+      if (activeIdx === -1) {
+        activeIdx = base.findIndex(m => m.id.endsWith('/' + activeModelId) || activeModelId.endsWith('/' + m.id));
+      }
+      if (activeIdx > 0) {
+        const [pinned] = base.splice(activeIdx, 1);
+        base.unshift(pinned);
+      } else if (activeIdx === -1) {
+        // Model from live fetch not in base list — synthesize a minimal card
+        base.unshift({ id: activeModelId, name: activeModelId.split('/').pop() || activeModelId, desc: 'Currently active model', context: '' });
+      }
+    }
+    return base;
+  })();
   const isModelsLive = !!modelsLive[currentProvider.id];
   const currentQuery = (searchQuery[currentProvider.id] || '').trim().toLowerCase();
 
   const filteredModels = currentQuery
     ? availableModels.filter(m =>
-        m.id.toLowerCase().includes(currentQuery) ||
-        m.name.toLowerCase().includes(currentQuery) ||
-        (m.desc && m.desc.toLowerCase().includes(currentQuery))
-      )
+      m.id.toLowerCase().includes(currentQuery) ||
+      m.name.toLowerCase().includes(currentQuery) ||
+      (m.desc && m.desc.toLowerCase().includes(currentQuery))
+    )
     : availableModels;
 
   // Auto-scroll to first match when searching
@@ -739,7 +828,7 @@ const CloudTab: FC = () => {
             paddingBottom: '4px',
             scrollbarWidth: 'none',
           }}>
-          {BYOK_PROVIDERS.map(provider => {
+          {visibleProviders.map(provider => {
             const isTabSelected = selectedProviderId === provider.id;
             const isProvActive = store.inferenceMode === 'byok' && store.byokProvider === provider.id;
             const hasKeySaved = !!store.byokKeys[provider.id];
@@ -850,8 +939,8 @@ const CloudTab: FC = () => {
                 {isCurrentActive
                   ? `Active · streaming with ${store.byokModel || 'default model'}`
                   : isCurrentConfigured
-                  ? 'Key saved in GNOME Secrets — toggle to activate'
-                  : 'API key required to activate'}
+                    ? 'Key saved in GNOME Secrets — toggle to activate'
+                    : 'API key required to activate'}
               </div>
             </div>
           </div>
@@ -1099,7 +1188,11 @@ const CloudTab: FC = () => {
               </div>
             ) : (
               filteredModels.map((model, idx) => {
-                const selected = store.byokModel === model.id && isCurrentActive;
+                const selected = isCurrentActive && (
+                  store.byokModel === model.id ||
+                  model.id.endsWith('/' + store.byokModel) ||
+                  store.byokModel.endsWith('/' + model.id)
+                );
                 const isFirstMatch = !!currentQuery && idx === 0;
                 const ctxText = (model as any).ctx || (model as any).context || '';
 
@@ -1113,8 +1206,8 @@ const CloudTab: FC = () => {
                       background: selected
                         ? `color-mix(in srgb, ${PRIMARY} 14%, transparent)`
                         : isFirstMatch
-                        ? `color-mix(in srgb, ${PRIMARY} 8%, transparent)`
-                        : 'color-mix(in srgb, var(--matugen-surface, #0c1014) 20%, transparent)',
+                          ? `color-mix(in srgb, ${PRIMARY} 8%, transparent)`
+                          : 'color-mix(in srgb, var(--matugen-surface, #0c1014) 20%, transparent)',
                       border: `1px solid ${selected ? PRIMARY : isFirstMatch ? `color-mix(in srgb, ${PRIMARY} 55%, transparent)` : 'var(--border-subtle)'}`,
                       borderRadius: 'var(--radius-sm)', cursor: 'pointer', textAlign: 'left',
                       transition: 'all .12s ease',
@@ -1130,7 +1223,23 @@ const CloudTab: FC = () => {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                        <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{model.name}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                          <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{model.name}</span>
+                          {selected && (
+                            <span style={{
+                              fontSize: '9px',
+                              padding: '1px 6px',
+                              borderRadius: 'var(--radius-full)',
+                              background: `color-mix(in srgb, ${PRIMARY} 20%, transparent)`,
+                              border: `1px solid color-mix(in srgb, ${PRIMARY} 45%, transparent)`,
+                              color: PRIMARY,
+                              fontWeight: 700,
+                              lineHeight: '12px',
+                            }}>
+                              Active
+                            </span>
+                          )}
+                        </div>
                         {ctxText && (
                           <span style={{ fontSize: '10px', color: PRIMARY, flexShrink: 0 }}>{ctxText}</span>
                         )}
@@ -1162,8 +1271,8 @@ export const ModelManager: FC = () => {
     store.inferenceMode === 'byok' && store.byokProvider
       ? `BYOK · ${BYOK_PROVIDERS.find(p => p.id === store.byokProvider)?.name ?? store.byokProvider} active`
       : store.inferenceMode === 'cloud'
-      ? `Cloud Gateway · ${store.activeModel || 'active'}`
-      : 'Configure your inference backend';
+        ? `Cloud Gateway · ${store.activeModel || 'active'}`
+        : 'Configure your inference backend';
 
   return (
     <div

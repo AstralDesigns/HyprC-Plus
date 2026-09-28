@@ -268,7 +268,7 @@ Item {
             anchors.fill: parent
             radius: frosted.cornerRadius
             color: "white"
-            opacity: 0
+            visible: false
             layer.enabled: true
         }
 
@@ -649,6 +649,7 @@ Item {
         width: 380
         clip: true
         implicitHeight: Math.min(histPanel.implicitHeight, 560)
+        height: implicitHeight
         z: 2
 
         MouseArea {

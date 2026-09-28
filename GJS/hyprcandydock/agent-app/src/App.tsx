@@ -6,6 +6,7 @@ import { Sidebar } from './components/Sidebar';
 import { Canvas } from './components/Canvas';
 import { ChatPanel } from './components/ChatPanel';
 import { ModelManager } from './components/ModelManager';
+import { ProfileModal } from './components/ProfileModal';
 import { agentEngine } from './engine/agent-engine';
 
 interface ErrorBoundaryProps { children: ReactNode; }
@@ -244,6 +245,7 @@ export const App: React.FC = () => {
         </div>
 
         <ModelManager />
+        <ProfileModal />
       </div>
     </AppErrorBoundary>
   );

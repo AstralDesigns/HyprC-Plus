@@ -58,6 +58,20 @@ PanelWindow {
     implicitWidth:  _shellMode ? 0 : (_isHorizontal ? 0 : Config.barHeight)
     implicitHeight: _shellMode ? 0 : (_isHorizontal ? Config.barHeight : 0)
 
+    readonly property int _screenIndex: {
+        for (let i = 0; i < Quickshell.screens.length; i++) {
+            if (Quickshell.screens[i] === bar.screen || (bar.screen && Quickshell.screens[i].name === bar.screen.name))
+                return i
+        }
+        return 0
+    }
+    readonly property bool _barMonitorActive: {
+        if (Quickshell.screens.length <= 1) return true
+        const list = Config.barMonitors || [0]
+        return list.indexOf(_screenIndex) !== -1 || (bar.screen && list.indexOf(bar.screen.name) !== -1)
+    }
+    visible: _barMonitorActive
+
     exclusionMode: _shellMode ? ExclusionMode.Ignore : ExclusionMode.Auto
     exclusiveZone: _shellMode
                    ? -1
@@ -165,6 +179,9 @@ PanelWindow {
             }
         }
 
+        // ── Animate in/out like tri left: opacity + slide from left edge ───────
+        readonly property bool _shown: !bar._triLeftAhHidden || bar._triLeftPinned
+
         Rectangle {
             anchors.fill: parent
             topLeftRadius:     Config.barTopLeftRadius
@@ -178,6 +195,13 @@ PanelWindow {
                                    Config.barBorderColor.b,
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+
+            opacity: shellLeftPW._shown ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            transform: Translate {
+                x: shellLeftPW._shown ? 0 : -10
+                Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -257,6 +281,9 @@ PanelWindow {
             }
         }
 
+        // ── Animate in/out like tri right: opacity + slide from right edge ──────
+        readonly property bool _shown: !bar._triRightAhHidden || bar._triRightPinned
+
         Rectangle {
             anchors.fill: parent
             topLeftRadius:     Config.triRightTopLeftRadius
@@ -270,6 +297,13 @@ PanelWindow {
                                    Config.barBorderColor.b,
                                    Config.barBorderAlpha)
             Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+
+            opacity: shellRightPW._shown ? 1.0 : 0.0
+            Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            transform: Translate {
+                x: shellRightPW._shown ? 0 : 10
+                Behavior on x { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            }
 
             Rectangle {
                 anchors.fill: parent
@@ -316,6 +350,7 @@ PanelWindow {
             }
         }
     }
+
 
     // Shell mode spans the whole monitor, but only the arms and active modules should actually
     // be "there" as far as other layer-shell surfaces / windows / input are concerned.
