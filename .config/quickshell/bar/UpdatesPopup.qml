@@ -92,14 +92,14 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
                 Text {
                     text: UpdatesPopupState.hasUpdates ? "󰏖" : "󰏗"
-                    color: UpdatesPopupState.hasUpdates ? Theme.cPrimary : Theme.cOnSurfVar
+                    color: UpdatesPopupState.hasUpdates ? Theme.cOnSurf : Theme.cSurfaceTint
                     font.family:    Config.fontFamily
                     font.pixelSize: Config.fontSize + 2
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
                     text: UpdatesPopupState.hasUpdates ? "Updates Available   " : "OS Is Up To Date    "
-                    color: Theme.cPrimary
+                    color: UpdatesPopupState.hasUpdates ? Theme.cSurfaceTint : Theme. cOnSurf
                     font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1
                     font.weight:    Font.Medium
@@ -138,7 +138,7 @@ PanelWindow {
                 Text {
                     anchors.centerIn: parent
                     text:  _sysUpdateProc.running ? "󰑓  Running …" : "󰇚 System Updates"
-                    color: Theme.cPrimary
+                    color: Theme.cWc5
                     font.family:    Config.labelFont
                     font.pixelSize: 13
                 }
@@ -168,14 +168,14 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
                 Text {
                     text: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? "󰏖" : "󰏗"
-                    color: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00) : Theme.cOnSurfVar
+                    color: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? Theme.cOnSurf : Theme.cSurfaceTint
                     font.family:    Config.fontFamily
                     font.pixelSize: Config.fontSize + 2
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
                     text: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? "HC+ Updates Available" : "HC+ Is Up To Date"
-                    color: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00) : Theme.cPrimary
+                    color: (UpdatesPopupState.hcHasUpdates || _hcBusy) ? Theme.cSurfaceTint : Theme. cOnSurf
                     font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1
                     font.weight:    Font.Medium
@@ -187,8 +187,8 @@ PanelWindow {
                     visible: !UpdatesPopupState.hcHasUpdates && !_hcBusy
                     text: _hcBusy ? "󰑓" : "󰇚"
                     color: hcRerunHover.containsMouse
-                        ? Qt.rgba(Theme.cTertiary.r, Theme.cTertiary.g, Theme.cTertiary.b, 0.75)
-                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
+                        ? Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, 0.75)
+                        : Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, 0.35)
                     font.family:    Config.fontFamily
                     font.pixelSize: Config.fontSize + 2
                     anchors.verticalCenter: parent.verticalCenter
@@ -240,7 +240,7 @@ PanelWindow {
                     anchors.centerIn: parent
                     // Show "Running" whenever any phase of update or workspace setup is active
                     text:  _hcBusy ? "󰑓  Running …" : "󰇚 HC+ Updates"
-                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 1.00)
+                    color: Theme.cWc6
                     font.family:    Config.labelFont
                     font.pixelSize: 13
                 }
