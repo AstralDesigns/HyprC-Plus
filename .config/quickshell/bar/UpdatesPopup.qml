@@ -350,11 +350,14 @@ PanelWindow {
     }
 
     // ── HC state file cleanup process (runs after script finishes) ────────────
-    // Removes ~/.config/hyprcandy/hc-update-state and fires notify.sh
+    // Runs agentic workspace build if not yet built, removes sentinel/state files, and fires notify.sh
     Process {
         id: _hcStateClearProc
         command: [
             "bash", "-c",
+            "if [ ! -f \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app/dist/index.html\" ] || [ ! -f \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/Agents/local_runtime/.venv/bin/uvicorn\" ]; then " +
+            "    bash \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app/build.sh\" > /tmp/hc-agent-app-build.log 2>&1 || true; " +
+            "fi; " +
             "bash \"" + Quickshell.env("HOME") + "/.config/hypr/scripts/notify.sh\"; " +
             "rm -f \"" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel\" \"" +
                          Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state\""

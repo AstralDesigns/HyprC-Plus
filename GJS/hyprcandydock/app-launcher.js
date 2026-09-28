@@ -6882,7 +6882,7 @@ const AppLauncherWindow = GObject.registerClass({
         // Show the centered spinner loading state (no glyph, no body, no buttons)
         this._searxShowLoading('Starting SearXNG…');
 
-        const controlScript = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'searxng-control.sh']);
+        const controlScript = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'hyprcandy-docker.sh']);
         try {
             const proc = Gio.Subprocess.new(
                 [controlScript, 'start'],
@@ -6898,7 +6898,7 @@ const AppLauncherWindow = GObject.registerClass({
                 const verify = () => {
                     // While retrying, suppress the offline error card — keep the
                     // spinner visible until we know the final outcome.
-                    const isLastAttempt = attempts >= 6 || this._activeTab !== 'websearch';
+                    const isLastAttempt = attempts >= 15 || this._activeTab !== 'websearch';
                     this._checkSearxHealth((ok) => {
                         if (ok) {
                             this._searxDockerAutoStarted = true;
@@ -6923,14 +6923,14 @@ const AppLauncherWindow = GObject.registerClass({
             });
         } catch (e) {
             this._searxDockerStarting = false;
-            console.warn('[launcher] Failed to execute searxng-control.sh start:', e.message);
+            console.warn('[launcher] Failed to execute hyprcandy-docker.sh start:', e.message);
             this._checkSearxHealth(onDone);
         }
     }
 
     _searxStopDocker(onDone) {
         this._searxDockerAutoStarted = false;
-        const controlScript = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'searxng-control.sh']);
+        const controlScript = GLib.build_filenamev([HOME, '.hyprcandy', 'GJS', 'hyprcandydock', 'hyprcandy-docker.sh']);
         try {
             const proc = Gio.Subprocess.new(
                 [controlScript, 'stop'],
@@ -6941,7 +6941,7 @@ const AppLauncherWindow = GObject.registerClass({
                 if (onDone) onDone(true);
             });
         } catch (e) {
-            console.warn('[launcher] Failed to execute searxng-control.sh stop:', e.message);
+            console.warn('[launcher] Failed to execute hyprcandy-docker.sh stop:', e.message);
             if (onDone) onDone(false);
         }
     }

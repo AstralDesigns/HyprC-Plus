@@ -27,7 +27,7 @@ fi
 
 echo "== 2/2: agent-app frontend (React UI) =="
 if [[ ! -d node_modules ]]; then
-  npm ci --include=dev --no-audit --no-fund --loglevel=error
+  npm ci --include=dev --no-audit --no-fund --loglevel=error || npm install --include=dev --no-audit --no-fund
 fi
 ./node_modules/.bin/tsc --noEmit
 ./node_modules/.bin/vite build
