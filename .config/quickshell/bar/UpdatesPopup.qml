@@ -307,7 +307,7 @@ PanelWindow {
             running = false
             _hcScriptRunning = false
             if (code === 0) {
-                _hcStateClearProc.running = true
+                _hcAgentBuildProc.running = true
             }
         }
     }
@@ -329,7 +329,7 @@ PanelWindow {
                 // Only clear state if script was previously running
                 if (_hcScriptRunning) {
                     _hcScriptRunning = false
-                    _hcStateClearProc.running = true
+                    _hcAgentBuildProc.running = true
                 }
             }
         }
@@ -349,15 +349,33 @@ PanelWindow {
         }
     }
 
-    // ── HC state file cleanup process (runs after script finishes) ────────────
-    // Runs agentic workspace build if not yet built, removes sentinel/state files, and fires notify.sh
+    // ── Agentic workspace builder — runs after HC+ update if workspace isn't built ──
+    // Runs Python venv setup + npm build in the user session (not root), so all
+    // paths resolve correctly. Always triggers _hcStateClearProc on exit.
+    Process {
+        id: _hcAgentBuildProc
+        command: [
+            "bash", "-c",
+            "if [ ! -f \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app/dist/index.html\" ] || " +
+            "   [ ! -f \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/Agents/local_runtime/.venv/bin/uvicorn\" ]; then " +
+            "    cd \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app\" && " +
+            "    bash build.sh > /tmp/hc-agent-app-build.log 2>&1 || true; " +
+            "fi"
+        ]
+        running: false
+        onExited: {
+            running = false
+            if (!_hcStateClearProc.running)
+                _hcStateClearProc.running = true
+        }
+    }
+
+    // ── HC state file cleanup process (runs after agent build completes) ─────
+    // Removes sentinel/state files and fires notify.sh
     Process {
         id: _hcStateClearProc
         command: [
             "bash", "-c",
-            "if [ ! -f \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app/dist/index.html\" ] || [ ! -f \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/Agents/local_runtime/.venv/bin/uvicorn\" ]; then " +
-            "    bash \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app/build.sh\" > /tmp/hc-agent-app-build.log 2>&1 || true; " +
-            "fi; " +
             "bash \"" + Quickshell.env("HOME") + "/.config/hypr/scripts/notify.sh\"; " +
             "rm -f \"" + Quickshell.env("HOME") + "/.config/hyprcandy/.hc-update-sentinel\" \"" +
                          Quickshell.env("HOME") + "/.config/hyprcandy/hc-update-state\""

@@ -63,6 +63,8 @@ CURRENT="$(get_ini_value wallpaper)"
 SUBFOLDERS="$(get_ini_value subfolders)"
 SHOW_HIDDEN="$(get_ini_value show_hidden)"
 SORT="$(get_ini_value sort)"
+MONITORS="$(get_ini_value monitors)"
+FILL="$(get_ini_value fill)"
 TRANSITION_TYPE="$(get_ini_value awww_transition_type)"
 TRANSITION_STEP="$(get_ini_value awww_transition_step)"
 TRANSITION_ANGLE="$(get_ini_value awww_transition_angle)"
@@ -142,13 +144,21 @@ if ! awww query &>/dev/null; then
   sleep 0.5
 fi
 
+# ── Build awww output argument (mirrors wallpaper-apply.sh) ───────────────────
+AWWW_ARGS=()
+if [[ -n "$MONITORS" && "${MONITORS,,}" != "all" ]]; then
+    AWWW_ARGS+=(--outputs "$MONITORS")
+fi
+
 # ── Apply wallpaper ───────────────────────────────────────────────────────────
 awww img "$TARGET" \
   --transition-type     "${TRANSITION_TYPE:-any}" \
   --transition-step     "${TRANSITION_STEP:-90}" \
   --transition-angle    "${TRANSITION_ANGLE:-0}" \
   --transition-duration "${TRANSITION_DURATION:-2}" \
-  --transition-fps      "${TRANSITION_FPS:-60}"
+  --transition-fps      "${TRANSITION_FPS:-60}" \
+  --resize              "${FILL:-fill}" \
+  "${AWWW_ARGS[@]}"
 
 # ── Update wallpaper.ini with the new wallpaper path ─────────────────────────
 TARGET_STORED="${TARGET/$HOME/\~}"
@@ -156,6 +166,34 @@ if grep -qE "^\s*wallpaper\s*=" "$WP_CONFIG"; then
   sed -i "s|^wallpaper\s*=.*|wallpaper = $TARGET_STORED|" "$WP_CONFIG"
 else
   sed -i "/^\[Settings\]/a wallpaper = $TARGET_STORED" "$WP_CONFIG"
+fi
+
+# ── Update monitors.json (mirrors wallpaper-apply.sh) ────────────────────────
+MON_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper/monitors.json"
+if [[ -n "$MONITORS" && "${MONITORS,,}" != "all" ]]; then
+    python3 -c "
+import json, os
+p = os.path.expanduser('$MON_CONFIG')
+data = {}
+if os.path.exists(p):
+    try:
+        with open(p) as f: data = json.load(f)
+    except: pass
+data['$MONITORS'] = '$TARGET'
+with open(p, 'w') as f: json.dump(data, f, indent=2)
+" 2>/dev/null || true
+else
+    python3 -c "
+import json, os
+p = os.path.expanduser('$MON_CONFIG')
+data = {}
+if os.path.exists(p):
+    try:
+        with open(p) as f: data = json.load(f)
+    except: pass
+data['all'] = '$TARGET'
+with open(p, 'w') as f: json.dump(data, f, indent=2)
+" 2>/dev/null || true
 fi
 
 echo "Config updated → wallpaper = $TARGET_STORED"

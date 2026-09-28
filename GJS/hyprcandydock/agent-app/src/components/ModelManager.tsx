@@ -9,7 +9,12 @@ import { bridge } from '../bridge';
 
 // ── TESTING: set true to skip the BYOK Lemon Squeezy license gate ─────────────
 // Set false before production shipping. In dev test mode, all providers are shown.
-const DEV_BYPASS_BYOK_LICENSE = true;
+const DEV_BYPASS_BYOK_LICENSE = false;
+
+// ── LICENSE GATE: set false to re-enable Gumroad license requirement ───────────
+// Currently bypassed in anticipation of AI/ML referral partnership.
+// Set to false to re-enable Gumroad gating (e.g. if partnership doesn't happen).
+const BYPASS_BYOK_LICENSE_GATE = true;
 
 // ── HIDE_PROVIDERS: Add provider IDs here to hide them from the UI ────────────
 // e.g. ["openrouter", "groq"]
@@ -662,8 +667,8 @@ const CloudTab: FC = () => {
     }
   };
 
-  // ── Locked state — no license key in non-dev mode ───────────────────────────
-  if (!hasBYOKLicense && !DEV_BYPASS_BYOK_LICENSE) {
+  // ── Locked state — no license key in non-dev/non-bypass mode ──────────────
+  if (!hasBYOKLicense && !DEV_BYPASS_BYOK_LICENSE && !BYPASS_BYOK_LICENSE_GATE) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{
@@ -781,7 +786,7 @@ const CloudTab: FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Dev Testing Banner OR Subscription Status */}
+      {/* Dev Testing Banner | Open Access strip | Licensed strip */}
       {DEV_BYPASS_BYOK_LICENSE ? (
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
@@ -792,6 +797,17 @@ const CloudTab: FC = () => {
           <TestTube size={14} color={COLOR5_AMBER} style={{ flexShrink: 0 }} />
           <span style={{ fontSize: '11.5px', fontWeight: 700, color: COLOR5_AMBER }}>Dev Testing Mode</span>
           <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>— license gate bypassed · all providers enabled · remove before shipping</span>
+        </div>
+      ) : BYPASS_BYOK_LICENSE_GATE ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 12px',
+          background: `color-mix(in srgb, ${PRIMARY} 10%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${PRIMARY} 28%, transparent)`,
+          borderRadius: 'var(--radius-sm)',
+        }}>
+          <Zap size={13} color={PRIMARY} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '11.5px', fontWeight: 600, color: PRIMARY }}>BYOK Open Access</span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>— bring your own API keys · calls go directly to your provider</span>
         </div>
       ) : (
         <div style={{
