@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # wallpaper-cycle.sh
 # Cycles through wallpapers using awww. Reads/writes ~/.config/wallpaper/wallpaper.ini
+#
+# Transition/resize settings are kept in sync by shell.qml (which writes them
+# to wallpaper.ini whenever the picker settings change). This means the cycle
+# script always uses exactly what the wallpaper picker is configured to use.
 
 # ── Config path ───────────────────────────────────────────────────────────────
 WP_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper/wallpaper.ini"
@@ -22,7 +26,6 @@ if [[ ! -f "$WP_CONFIG" ]]; then
 folder = ~/Pictures
 wallpaper =
 monitors = All
-fill = fill
 sort = name
 subfolders = False
 show_hidden = False
@@ -31,24 +34,42 @@ awww_transition_step = 90
 awww_transition_angle = 0
 awww_transition_duration = 2
 awww_transition_fps = 60
+awww_resize = crop
 EOF
   echo "Created default config at $WP_CONFIG — set folder= before cycling."
   exit 0
 fi
 
 # ── Patch any missing keys into existing ini ──────────────────────────────────
-write_default monitors          All
-write_default fill              fill
-write_default sort              name
-write_default subfolders        False
-write_default show_hidden       False
-write_default awww_transition_type     any
-write_default awww_transition_step     90
-write_default awww_transition_angle    0
+write_default monitors              All
+write_default sort                  name
+write_default subfolders            False
+write_default show_hidden           False
+write_default awww_transition_type  any
+write_default awww_transition_step  90
+write_default awww_transition_angle 0
 write_default awww_transition_duration 2
-write_default awww_transition_fps      60
+write_default awww_transition_fps   60
+write_default awww_resize           crop
 
-# ── Read values from config.ini ───────────────────────────────────────────────
+# ── Migrate legacy 'fill' key → 'awww_resize' then remove it ─────────────────
+if grep -qE "^\s*fill\s*=" "$WP_CONFIG" 2>/dev/null; then
+  LEGACY_FILL="$(grep -E "^\s*fill\s*=" "$WP_CONFIG" | head -n1 | sed 's/[^=]*=\s*//' | xargs)"
+  case "${LEGACY_FILL,,}" in
+    fill|crop) MIGRATED_RESIZE="crop" ;;
+    fit)       MIGRATED_RESIZE="fit" ;;
+    stretch)   MIGRATED_RESIZE="stretch" ;;
+    no|none)   MIGRATED_RESIZE="no" ;;
+    *)         MIGRATED_RESIZE="crop" ;;
+  esac
+  # Write migrated value into awww_resize if not already set to a real value
+  sed -i "s|^\s*awww_resize\s*=.*|awww_resize = $MIGRATED_RESIZE|" "$WP_CONFIG"
+  # Remove legacy fill key
+  sed -i "/^\s*fill\s*=/d" "$WP_CONFIG"
+  echo "Migrated legacy 'fill = $LEGACY_FILL' → 'awww_resize = $MIGRATED_RESIZE'"
+fi
+
+# ── Read values from wallpaper.ini ────────────────────────────────────────────
 get_ini_value() {
   local key="$1"
   grep -E "^\s*${key}\s*=" "$WP_CONFIG" \
@@ -64,12 +85,12 @@ SUBFOLDERS="$(get_ini_value subfolders)"
 SHOW_HIDDEN="$(get_ini_value show_hidden)"
 SORT="$(get_ini_value sort)"
 MONITORS="$(get_ini_value monitors)"
-FILL="$(get_ini_value fill)"
 TRANSITION_TYPE="$(get_ini_value awww_transition_type)"
 TRANSITION_STEP="$(get_ini_value awww_transition_step)"
 TRANSITION_ANGLE="$(get_ini_value awww_transition_angle)"
 TRANSITION_DURATION="$(get_ini_value awww_transition_duration)"
 TRANSITION_FPS="$(get_ini_value awww_transition_fps)"
+AWWW_RESIZE="$(get_ini_value awww_resize)"
 
 # ── Validate folder ───────────────────────────────────────────────────────────
 if [[ ! -d "$FOLDER" ]]; then
@@ -106,7 +127,6 @@ DIRECTION="${1:---next}"
 TARGET=""
 
 if [[ "$DIRECTION" == "--prev" || "$DIRECTION" == "-p" ]]; then
-  # Go backwards — find the wallpaper before the current one
   PREV=""
   for WP in "${WALLPAPERS[@]}"; do
     if [[ "$WP" == "$CURRENT" ]]; then
@@ -114,12 +134,10 @@ if [[ "$DIRECTION" == "--prev" || "$DIRECTION" == "-p" ]]; then
     fi
     PREV="$WP"
   done
-  # Wrap to last if already at the beginning
   [[ -z "$PREV" ]] && PREV="${WALLPAPERS[-1]}"
   TARGET="$PREV"
   echo "Direction: prev"
 else
-  # Go forwards — default behavior
   NEXT=""
   FOUND=false
   for WP in "${WALLPAPERS[@]}"; do
@@ -144,7 +162,7 @@ if ! awww query &>/dev/null; then
   sleep 0.5
 fi
 
-# ── Build awww output argument (mirrors wallpaper-apply.sh) ───────────────────
+# ── Build awww output argument ────────────────────────────────────────────────
 AWWW_ARGS=()
 if [[ -n "$MONITORS" && "${MONITORS,,}" != "all" ]]; then
     AWWW_ARGS+=(--outputs "$MONITORS")
@@ -157,8 +175,14 @@ awww img "$TARGET" \
   --transition-angle    "${TRANSITION_ANGLE:-0}" \
   --transition-duration "${TRANSITION_DURATION:-2}" \
   --transition-fps      "${TRANSITION_FPS:-60}" \
-  --resize              "${FILL:-fill}" \
+  --resize              "${AWWW_RESIZE:-crop}" \
   "${AWWW_ARGS[@]}"
+
+STATUS=$?
+if [[ $STATUS -ne 0 ]]; then
+  echo "wallpaper-cycle: awww img failed (exit $STATUS)" >&2
+  exit $STATUS
+fi
 
 # ── Update wallpaper.ini with the new wallpaper path ─────────────────────────
 TARGET_STORED="${TARGET/$HOME/\~}"
@@ -168,38 +192,26 @@ else
   sed -i "/^\[Settings\]/a wallpaper = $TARGET_STORED" "$WP_CONFIG"
 fi
 
-# ── Update monitors.json (mirrors wallpaper-apply.sh) ────────────────────────
+# ── Update monitors.json ──────────────────────────────────────────────────────
 MON_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper/monitors.json"
-if [[ -n "$MONITORS" && "${MONITORS,,}" != "all" ]]; then
-    python3 -c "
+MON_KEY="all"
+[[ -n "$MONITORS" && "${MONITORS,,}" != "all" ]] && MON_KEY="$MONITORS"
+python3 - <<PYEOF 2>/dev/null || true
 import json, os
-p = os.path.expanduser('$MON_CONFIG')
+p = os.path.expanduser("$MON_CONFIG")
 data = {}
 if os.path.exists(p):
     try:
         with open(p) as f: data = json.load(f)
     except: pass
-data['$MONITORS'] = '$TARGET'
-with open(p, 'w') as f: json.dump(data, f, indent=2)
-" 2>/dev/null || true
-else
-    python3 -c "
-import json, os
-p = os.path.expanduser('$MON_CONFIG')
-data = {}
-if os.path.exists(p):
-    try:
-        with open(p) as f: data = json.load(f)
-    except: pass
-data['all'] = '$TARGET'
-with open(p, 'w') as f: json.dump(data, f, indent=2)
-" 2>/dev/null || true
-fi
+data["$MON_KEY"] = "$TARGET"
+with open(p, "w") as f: json.dump(data, f, indent=2)
+PYEOF
 
 echo "Config updated → wallpaper = $TARGET_STORED"
 
 # ── Trigger color regeneration ────────────────────────────────────────────────
-if [[ -x "$INTEGRATION" ]] ;then
+if [[ -x "$INTEGRATION" ]]; then
     nohup "$INTEGRATION" >/dev/null 2>&1 && sleep 10 && nohup "$INTEGRATION" >/dev/null 2>&1 &
 else
     pkill -f /usr/bin/bash "$INTEGRATION"

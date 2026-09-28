@@ -142,11 +142,62 @@ ShellRoot {
     property string transStep:      appSettings.transStep
     property string transFps:       appSettings.transFps
 
+    // ── Sync picker settings → wallpaper.ini ─────────────────────────────────
+    // wallpaper-cycle.sh reads transition/resize settings from wallpaper.ini so
+    // it always uses the exact same values the picker is configured to apply.
+    // We write on every change so ini stays in sync without a full restart.
+    Process {
+        id: iniSyncProc
+        property string _cmd: "true"
+        command: ["bash", "-c", iniSyncProc._cmd]
+        running: false
+        onExited: running = false
+    }
+
+    function _syncIni() {
+        const cfg = "${XDG_CONFIG_HOME:-$HOME/.config}/wallpaper/wallpaper.ini"
+        // fillMode is the picker's name; awww calls it 'crop'. Map it cleanly.
+        const resizeMap = { "crop": "crop", "fill": "crop", "fit": "fit", "stretch": "stretch", "no": "no" }
+        const resize = resizeMap[root.fillMode] || "crop"
+        // For each key, sed-replace if present or append if missing.
+        const keys = {
+            awww_resize:           resize,
+            awww_transition_type:  root.transType,
+            awww_transition_step:  root.transStep,
+            awww_transition_angle: root.transAngle,
+            awww_transition_duration: root.transDuration,
+            awww_transition_fps:   root.transFps,
+        }
+        let script = `CFG="${cfg}"\n`
+        script += `mkdir -p "$(dirname "$CFG")"\n`
+        script += `[[ ! -f "$CFG" ]] && { printf '[Settings]\\n' > "$CFG"; }\n`
+        for (const [k, v] of Object.entries(keys)) {
+            script += `if grep -qE "^\\s*${k}\\s*=" "$CFG"; then\n`
+            script += `  sed -i "s|^${k}\\s*=.*|${k} = ${v}|" "$CFG"\n`
+            script += `else\n`
+            script += `  echo "${k} = ${v}" >> "$CFG"\n`
+            script += `fi\n`
+        }
+        if (!iniSyncProc.running) {
+            iniSyncProc._cmd = script
+            iniSyncProc.running = true
+        }
+    }
+
+    onFillModeChanged:      Qt.callLater(_syncIni)
+    onTransTypeChanged:     Qt.callLater(_syncIni)
+    onTransStepChanged:     Qt.callLater(_syncIni)
+    onTransAngleChanged:    Qt.callLater(_syncIni)
+    onTransDurationChanged: Qt.callLater(_syncIni)
+    onTransFpsChanged:      Qt.callLater(_syncIni)
+
     // ── File scanning ─────────────────────────────────────────────────────────
     Component.onCompleted: {
         initWallpaperReader.running = true
         whScanDownloadedProc.running = true
         if (wallpaperDir) scanDir()
+        // Sync current picker settings to ini on first launch
+        Qt.callLater(_syncIni)
     }
     onWallpaperDirChanged:  { if (wallpaperDir) scanDir() }
     onSearchTextChanged:    applyFilter()
