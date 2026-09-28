@@ -16,6 +16,14 @@ input_path = '~/.config/matugen/templates/hyprland-colors.lua'
 output_path = '~/.config/hypr/colors.lua'
 post_hook = 'hyprctl reload'
 
+[templates.qt5ct]
+input_path = '~/.config/matugen/templates/qtct-colors.conf'
+output_path = '~/.config/qt5ct/colors/matugen.conf'
+
+[templates.qt6ct]
+input_path = '~/.config/matugen/templates/qtct-colors.conf'
+output_path = '~/.config/qt6ct/colors/matugen.conf'
+
 [templates.gtk3css]
 input_path = '~/.config/matugen/templates/gtk3.css'
 output_path = '~/.config/gtk-3.0/gtk.css'
@@ -58,14 +66,6 @@ output_path = '~/.config/rofi/rofi.rasi'
 input_path = '~/.config/matugen/templates/config'
 output_path = '~/.config/cava/config'
 post_hook = 'pkill -SIGUSR1 cava'
-
-[templates.qt5ct]
-input_path = '~/.config/matugen/templates/qtct-colors.conf'
-output_path = '~/.config/qt5ct/colors/matugen.conf'
-
-[templates.qt6ct]
-input_path = '~/.config/matugen/templates/qtct-colors.conf'
-output_path = '~/.config/qt6ct/colors/matugen.conf'
 
 [templates.kdescheme]
 input_path = '~/.config/matugen/templates/kde-colors.colors'
