@@ -1828,7 +1828,7 @@ webview.searx-webview {
     border-radius: 12px;
 }
 
-/* ── Agent WebKit embedded webview container (16px rounded) ───────────── */
+/* ── Agent WebKit embedded webview container (12px rounded) ───────────── */
 .agent-webview-box {
     border-radius: 10px;
     margin-top: 12px;
@@ -1837,7 +1837,7 @@ webview.searx-webview {
     margin-left: 6px;
 }
 .agent-webview-wrap {
-    border-radius: 16px;
+    border-radius: 12px;
 }
 .agent-webview-wrap webview,
 webview.agent-webview,
@@ -2075,7 +2075,7 @@ webview.agent-webview,
     background: transparent;
     background-color: transparent;
     border: 1px solid transparent;
-    border-radius: 99px;
+    border-radius: 12px;
     padding: 8px 12px;
     outline: none;
     box-shadow: none;
@@ -2121,6 +2121,7 @@ listbox.searx-list row:focus {
 /*Webkit-wrap*/
 .searx-webview-wrap {
     border-radius: 12px;
+    background-color: alpha(@inverse_primary, 0.25);
 }
 
 /* ── Bookmarks ─────────────────────────────────────────────────────── */
