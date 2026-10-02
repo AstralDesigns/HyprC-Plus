@@ -179,13 +179,18 @@ ShellRoot {
     }
 
     // ── qs app launcher (GJS app-launcher.js port) ─────────────────────
-    // Persistent: always loaded, hidden when closed. Keeping the window (and its
-    // single shared WebEngineView) alive across hide/show means the web-search
-    // and agent pages keep running instead of reloading — so the agent app never
-    // re-boots and resets its provider/model, and open tabs stay warm. Backend
-    // warm-up is deferred to the window's first show (see LauncherWindow), so an
-    // always-loaded window never starts docker/uvicorn while the launcher is shut.
-    Loader { id: launcherLoader; active: true; source: "LauncherWindow.qml" }
+    // Persistent across hide/show: gated on _desktopActive (not on launcher
+    // visibility), so keeping the window — and its single shared WebEngineView —
+    // alive means the web-search and agent pages keep running instead of
+    // reloading (the agent app never re-boots and resets its provider/model, and
+    // open tabs stay warm). Backend warm-up is deferred to the window's first
+    // show (see LauncherWindow), so an always-loaded window never starts
+    // docker/uvicorn while the launcher is shut.
+    // Sharing _desktopActive with DesktopLayer/DockWindow means an icon_theme
+    // change (qt6ct watcher) destroys + recreates the launcher too, so its app
+    // icons re-resolve via Quickshell.iconPath against the new theme. That reload
+    // is rare and, like the dock, briefly reboots the web view — acceptable.
+    Loader { id: launcherLoader; active: root._desktopActive; source: "LauncherWindow.qml" }
 
     Loader { active: ControlCenterState.visible;  source: "ControlCenterPopup.qml" }
     Loader { active: LicenseState.activated && (WeatherPopupState.visible || WeatherPopupState.widgetVisible); source: "WeatherPopup.qml" }

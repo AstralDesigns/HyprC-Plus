@@ -81,9 +81,18 @@ Item {
             property bool favCollapsed: true
             property bool selectMode: false
             property var selectedIds: []
+            // "Add to:" popup state (selection mode) — adds the selected apps to
+            // an existing group / Favorites instead of creating a new group.
+            property bool _addToOpen: false
+            property var _addToGroups: []
             property var expandedGroups: ({})
             readonly property bool _anyGroupExpanded:
                 Object.values(expandedGroups).some(v => v === true)
+            // Collapsed group tiles are uniform squares: a 2×2 preview-icon
+            // cluster (groupPrevIcon each) plus the name row, inset from the
+            // rounded border by even padding on all sides.
+            readonly property int groupPrevIcon: 32      // ~1.33× the old 24px preview
+            readonly property int groupCardSize: 116     // square collapsed group tile
             property int focusIdx: -1               // keyboard grid selection
 
             // Context-menu / dialog state
@@ -555,7 +564,11 @@ Item {
                 const out = []
                 for (const a of win.allApps) {
                     if (qs !== "" && !String(a.name).toLowerCase().includes(qs)) continue
-                    if (!qs && favs.includes(a.cls)) continue   // shown in Favorites
+                    // Favorites live in their own section, so drop them from the
+                    // main grid — except while searching (they must appear in the
+                    // relevant results) or in selection mode (the grid is then the
+                    // single place to pick from, so favorites stay selectable).
+                    if (!qs && !win.selectMode && favs.includes(a.cls)) continue
                     out.push(a)
                 }
                 return out
@@ -1160,6 +1173,7 @@ Item {
             function _openAppMenu(rec, gx, gy, groupCtx) {
                 win._menuRec = rec
                 win._menuGroupCtx = groupCtx ?? ""
+                win._addToOpen = false
                 const rows = []
                 const inst = win.clientsFor(rec.cls)
                 if (inst.length > 0) {
@@ -1241,6 +1255,27 @@ Item {
                 win._menuGroupCtx = ""
             }
 
+            // ── "Add to:" popup (selection mode) ──────────────────
+            // Builds the group list on open (avoids relying on GroupsState change
+            // notifications) and adds every selected app to the picked target.
+            // Favorites is handled specially (toggle-on only when absent).
+            function toggleAddTo() {
+                if (win._addToOpen) { win._addToOpen = false; return }
+                win._addToGroups = Object.keys(GroupsState.groups)
+                win._addToOpen = true
+            }
+            function addSelectedTo(isFav, group) {
+                const ids = win.selectedIds.slice()
+                if (isFav) {
+                    for (const c of ids) if (!GroupsState.isFavorite(c)) GroupsState.toggleFavorite(c)
+                } else {
+                    for (const c of ids) GroupsState.addAppToGroup(group, c)
+                }
+                win._addToOpen = false
+                win.selectedIds = []
+                win.selectMode = false
+            }
+
             function _menuActivate(row) {
                 const rec = win._menuRec
                 const key = row.key ?? ""
@@ -1313,6 +1348,7 @@ Item {
                 searchInput.text = ""
                 win.focusIdx = -1
                 win._hideMenu()
+                win._addToOpen = false
                 if (id === "clipboard") ClipboardState.refresh()
                 if (id === "emoji") win.ensureGlyphData()
                 if (id === "websearch" && win.webEnabled) win.webEnsureUp()
@@ -1329,10 +1365,12 @@ Item {
                 win.switchTab(tabs[((i === -1 ? 0 : i) + dir + tabs.length) % tabs.length])
             }
             function dismiss() {
+                if (win._addToOpen) { win._addToOpen = false; return }
                 if (win._menuOpen) { win._hideMenu(); return }
                 if (win._dlg.open) { win._dlg = { open: false }; return }
                 HCCLauncherState.close()
             }
+            onSelectModeChanged: if (!win.selectMode) win._addToOpen = false
 
             onTabChanged: {
                 if (HCCLauncherState.activeTab !== win.tab) HCCLauncherState.setTab(win.tab)
@@ -1364,7 +1402,7 @@ Item {
                     win.focusIdx = -1
                     win._hideMenu()
                     win._dlg = { open: false }
-                    win.selectMode = false; win.selectedIds = []
+                    win.selectMode = false; win.selectedIds = []; win._addToOpen = false
                     win.tab = HCCLauncherState.activeTab
                     if (win.tab === "clipboard") ClipboardState.refresh()
                     if (win.tab === "emoji") win.ensureGlyphData()
@@ -1570,7 +1608,7 @@ Item {
                             cursorVisible: searchInput.activeFocus
                             font.pixelSize: 13
                             clip: true
-                            onTextChanged: { win.query = text; win.focusIdx = -1 }
+                            onTextChanged: { win.query = text; win.focusIdx = -1; win._addToOpen = false }
 
                             Text {
                                 anchors.fill: parent
@@ -1793,6 +1831,7 @@ Item {
                             height: parent.height
                             visible: win.subTab === "apps"
                                      && win.favoriteApps.length > 0
+                                     && !win.selectMode
                             width: Math.max(0, (launcherSubRow.width - favPill.width) / 2
                                             - appsGroupsSeg.width
                                             - 2 * launcherSubRow.spacing)
@@ -1802,6 +1841,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             visible: win.subTab === "apps"
                                      && win.favoriteApps.length > 0
+                                     && !win.selectMode
                             width: favHeaderRow.implicitWidth + 24
                             height: 26
                             radius: 99
@@ -1887,6 +1927,7 @@ Item {
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
+                                win._addToOpen = false
                                 if (selectBtn.creating) {
                                     win._dlg = {
                                         open: true, mode: "newgroup",
@@ -1898,6 +1939,197 @@ Item {
                                     win.selectedIds = []
                                 } else {
                                     win.selectMode = true
+                                }
+                            }
+                        }
+                    }
+
+                    // ── Selection-mode actions (left of the Select/Create pill) ──
+                    // "Unselect all" clears the selection; "Add to:" opens a popup
+                    // listing Favorites + every existing group so the selected apps
+                    // can be added without creating a new group. Both show only in
+                    // selection mode; the popup mirrors the right-click menu styling
+                    // (OnSecondary bg, scrim border, Primary-tinted row hover).
+                    Rectangle {
+                        id: unselectBtn
+                        visible: win.tab === "launcher" && win.subTab === "apps"
+                                 && win.selectMode && win.selectedIds.length > 0
+                        anchors.right: addToBtn.left
+                        anchors.rightMargin: 6
+                        anchors.top: parent.top
+                        anchors.topMargin: 8
+                        z: 6
+                        width: unselectText.implicitWidth + 24
+                        height: 28
+                        radius: 14
+                        color: unselectMa.containsMouse
+                               ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                               : "transparent"
+                        border.width: 1
+                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Text {
+                            id: unselectText
+                            anchors.centerIn: parent
+                            text: "Unselect all"
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: Theme.cPrimary
+                        }
+                        MouseArea {
+                            id: unselectMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: win.selectedIds = []
+                        }
+                    }
+
+                    Rectangle {
+                        id: addToBtn
+                        visible: win.tab === "launcher" && win.subTab === "apps" && win.selectMode
+                        anchors.right: selectBtn.left
+                        anchors.rightMargin: 6
+                        anchors.top: parent.top
+                        anchors.topMargin: 8
+                        z: 6
+                        opacity: win.selectedIds.length > 0 ? 1 : 0.45
+                        width: addToText.implicitWidth + 24
+                        height: 28
+                        radius: 14
+                        color: win._addToOpen ? Theme.cOnSecondary
+                               : addToMa.containsMouse
+                                 ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                 : "transparent"
+                        border.width: 1
+                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                        Behavior on color { ColorAnimation { duration: 140 } }
+                        Text {
+                            id: addToText
+                            anchors.centerIn: parent
+                            text: "Add to:  \u{F0140}"
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            font.bold: true
+                            color: Theme.cPrimary
+                        }
+                        MouseArea {
+                            id: addToMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            enabled: win.selectedIds.length > 0
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: win.toggleAddTo()
+                        }
+                    }
+
+                    // Click-away scrim for the "Add to:" popup.
+                    MouseArea {
+                        id: addToScrim
+                        anchors.fill: parent
+                        visible: win._addToOpen
+                        z: 39
+                        onClicked: win._addToOpen = false
+                    }
+
+                    // ── "Add to:" popup — Favorites + existing groups ──────
+                    Rectangle {
+                        id: addToMenu
+                        visible: win._addToOpen
+                        z: 40
+                        anchors.top: addToBtn.bottom
+                        anchors.topMargin: 6
+                        anchors.right: addToBtn.right
+                        width: 220
+                        height: Math.min(addToCol.implicitHeight + 12, listFrame.height - 16)
+                        radius: 14
+                        color: Theme.cOnSecondary
+                        border.width: 1
+                        border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.5)
+                        clip: true
+
+                        Flickable {
+                            anchors.fill: parent
+                            anchors.margins: 6
+                            contentHeight: addToCol.implicitHeight
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            Column {
+                                id: addToCol
+                                width: parent.width
+                                spacing: 0
+
+                                Item {
+                                    width: parent.width; height: 22
+                                    Text {
+                                        anchors.left: parent.left; anchors.leftMargin: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: "Add " + win.selectedIds.length + " app"
+                                              + (win.selectedIds.length === 1 ? "" : "s") + " to"
+                                        font.pixelSize: 10; font.bold: true
+                                        color: Qt.alpha(Theme.cPrimary, 0.7)
+                                    }
+                                }
+
+                                // Favorites target
+                                Rectangle {
+                                    width: addToCol.width; height: 30; radius: 8
+                                    color: favRowMa.containsMouse
+                                           ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
+                                           : "transparent"
+                                    Behavior on color { ColorAnimation { duration: 110 } }
+                                    Row {
+                                        anchors.left: parent.left; anchors.leftMargin: 8
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 6
+                                        Text { anchors.verticalCenter: parent.verticalCenter; text: "\u{F06D0}"; font.family: Theme.fontFamily; font.pixelSize: 13; color: Theme.cPrimary }
+                                        Text { anchors.verticalCenter: parent.verticalCenter; text: "Favorites"; font.pixelSize: 12; color: Theme.cOnSurf }
+                                    }
+                                    MouseArea {
+                                        id: favRowMa
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: win.addSelectedTo(true, "")
+                                    }
+                                }
+
+                                Item {
+                                    width: addToCol.width; height: 9
+                                    visible: addToRepeater.count > 0
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: parent.width - 12; height: 1
+                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                    }
+                                }
+
+                                Repeater {
+                                    id: addToRepeater
+                                    model: win._addToGroups
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        width: addToCol.width; height: 30; radius: 8
+                                        color: grpRowMa.containsMouse
+                                               ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
+                                               : "transparent"
+                                        Behavior on color { ColorAnimation { duration: 110 } }
+                                        Text {
+                                            anchors.left: parent.left; anchors.leftMargin: 8
+                                            anchors.right: parent.right; anchors.rightMargin: 8
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            text: modelData
+                                            font.pixelSize: 12; color: Theme.cOnSurf
+                                            elide: Text.ElideRight
+                                        }
+                                        MouseArea {
+                                            id: grpRowMa
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: win.addSelectedTo(false, modelData)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1937,7 +2169,13 @@ Item {
                                 // pill in launcherSubRow, collapsed default)
                                 Column {
                                     width: parent.width
+                                    // Hidden during a search (the filtered grid already
+                                    // includes matching favorites, so this would only add
+                                    // unfiltered clutter) and in selection mode (the grid
+                                    // then lists every app — favorites included — so all are
+                                    // selectable in one place).
                                     visible: win.favoriteApps.length > 0
+                                             && win.q === "" && !win.selectMode
                                     Grid {
                                         visible: !win.favCollapsed
                                         columns: card.cols
@@ -2007,7 +2245,7 @@ Item {
                                 id: groupsGrid
                                 x: 2; y: 2
                                 columns: Math.max(1, Math.floor(
-                                    (pageArea.width + 8) / (Config.launcherFixedTileWidth * 2 + 14)))
+                                    (pageArea.width + 8) / (win.groupCardSize + 8)))
                                 spacing: 8
                                 Repeater {
                                     model: win.groupCards
@@ -3307,9 +3545,11 @@ Item {
                     }
                 }
 
-                // Multi-select checkbox
+                // Multi-select checkbox — shown in selection mode even while
+                // searching, so filtered results carry the same empty/checked
+                // indicator as the unfiltered grid.
                 Rectangle {
-                    visible: win.selectMode && !win.q
+                    visible: win.selectMode
                     width: 18; height: 18
                     radius: 9
                     anchors.top: parent.top
@@ -3342,7 +3582,7 @@ Item {
                             win._openAppMenu(tile.rec, pt.x, pt.y, tile.groupCtx)
                             return
                         }
-                        if (win.selectMode && !win.q) {
+                        if (win.selectMode) {
                             const cur = win.selectedIds.slice()
                             const i = cur.indexOf(tile.rec.cls)
                             if (i === -1) cur.push(tile.rec.cls)
@@ -3365,8 +3605,8 @@ Item {
                 // Lightbox: the grid footprint always stays at the collapsed
                 // size; the expanded body renders in the foreground expander
                 // box, overlapping the collapsed neighbours behind it.
-                width: Config.launcherFixedTileWidth * 2 + 10
-                height: 76
+                width: win.groupCardSize
+                height: win.groupCardSize
                 z: expanded ? 20 : 0
                 radius: 14
                 color: expanded ? "transparent"
@@ -3392,17 +3632,17 @@ Item {
                     Grid {
                         anchors.horizontalCenter: parent.horizontalCenter
                         columns: 2
-                        spacing: 4
+                        spacing: 6
                         Repeater {
                             model: gcard.cardApps.slice(0, 4)
                             delegate: Item {
                                 required property var modelData
-                                width: 24; height: 24
+                                width: win.groupPrevIcon; height: win.groupPrevIcon
                                 Image {
                                     id: prevIcon
                                     anchors.fill: parent
                                     source: win.iconSource(modelData)
-                                    sourceSize: Qt.size(24, 24)
+                                    sourceSize: Qt.size(win.groupPrevIcon, win.groupPrevIcon)
                                     asynchronous: true
                                     fillMode: Image.PreserveAspectFit
                                     smooth: true
@@ -3430,10 +3670,14 @@ Item {
                         }
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
+                            // Cap + elide long names so they stay inside the square
+                            // tile; short names keep their natural (centered) width.
+                            width: Math.min(implicitWidth, gcard.width - 44)
                             text: gcard.cardName
                             font.pixelSize: 11
                             font.bold: true
                             color: Theme.cPrimary
+                            elide: Text.ElideRight
                         }
                     }
                 }

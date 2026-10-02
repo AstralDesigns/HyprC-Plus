@@ -149,6 +149,7 @@ PanelWindow {
         _tlRefresh.restart()
         _tlRefreshLate.restart()
         _pixmapScan.running = true
+        _steamScan.running = true
     }
 
     function _allToplevels() {
@@ -236,6 +237,37 @@ PanelWindow {
             _lines = []
             dock._pixmapIcons = map
             running = false
+        }
+    }
+
+    // ── Steam game shortcut icon map (~/Desktop) ─────────────────────────
+    // Steam shortcuts live on ~/Desktop, outside the XDG app dirs, so neither
+    // DesktopEntries nor Quickshell.iconPath can see them and pinned/running
+    // Steam games fell through to the ghost glyph. DesktopLayer sidesteps this
+    // by running tray-icon-resolve.py (which has a ~/Desktop step); the dock
+    // gets the same reach via a boot-time scan: lowercase desktop basename
+    // (the class we pin Steam games by) → the shortcut's Icon= field.
+    property var _steamIcons: ({})
+    Process {
+        id: _steamScan
+        running: false
+        command: ["python3", "-c",
+            "import os,glob,json,re\n" +
+            "out={}\n" +
+            "d=os.path.expanduser('~/Desktop')\n" +
+            "for f in glob.glob(d+'/*.desktop'):\n" +
+            "    try: txt=open(f,encoding='utf-8',errors='ignore').read()\n" +
+            "    except: continue\n" +
+            "    if not re.search(r'^Type=Application$',txt,re.M): continue\n" +
+            "    m=re.search(r'^Exec=(.*)$',txt,re.M)\n" +
+            "    if not m or 'steam://rungameid' not in m.group(1): continue\n" +
+            "    ic=re.search(r'^Icon=(.*)$',txt,re.M)\n" +
+            "    out[os.path.basename(f)[:-8].lower()]=(ic.group(1) if ic else 'steam')\n" +
+            "print(json.dumps(out))"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try { dock._steamIcons = JSON.parse(text) } catch (_) { dock._steamIcons = ({}) }
+            }
         }
     }
 
@@ -586,6 +618,21 @@ PanelWindow {
             if (!c) continue
             const p = pm[c.toLowerCase()]
             if (p) return p
+        }
+        // Steam shortcuts live on ~/Desktop (outside XDG app dirs) so the tiers
+        // above never see them; consult the boot-time scan map keyed by the
+        // lowercase desktop basename we pin Steam games by.
+        const sm = dock._steamIcons
+        for (const key of [String(a.class || "").toLowerCase(),
+                           String(a.id || "").toLowerCase(),
+                           base.toLowerCase()]) {
+            const f = sm[key]
+            if (!f) continue
+            if (f.startsWith("/")) return f
+            const p = Quickshell.iconPath(f, true)
+            if (p) return p
+            const pp = pm[f.toLowerCase()]
+            if (pp) return pp
         }
         return ""
     }
@@ -1622,16 +1669,16 @@ PanelWindow {
         }
 
         // Fallback nerd-font glyph (U+F165D) when there is no icon —
-        // surface-tint coloured, sized at iconSize * 1.0 to match the launcher
-        // ghost exactly, so the same unresolved-icon glyph reads identically in
-        // both surfaces (1.25 read too large beside the themed app icons).
+        // surface-tint coloured at the SAME factor the start/trash DockBadge
+        // glyphs use (iconD * 0.62), so the ghost reads at scale 1 beside those
+        // badges instead of towering over them (1.0 was app-icon sized).
         Text {
             visible: icon.status !== Image.Ready
             anchors.centerIn: icon
             text: "\u200a\u200a\u200a\u200a\u{F165D}\u200a\u200a\u200a\u200a"
             color: Theme.cSurfaceTint
             font.family: Theme.fontFamily
-            font.pixelSize: Math.round(btn.iconSize * 1.0)
+            font.pixelSize: Math.round(btn.iconSize * 0.62)
         }
 
         // Indicator dots: radius 2.5, gap 2, max 2, cSurfaceTint. Placed

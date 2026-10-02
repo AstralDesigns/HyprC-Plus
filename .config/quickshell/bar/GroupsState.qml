@@ -147,20 +147,36 @@ QtObject {
         root._selfWriteFavs = true
         root._selfWriteReset.restart()
         root.favorites = list
-        _writeFile._path = root.favoritesPath
-        _writeFile._content = list.join("\n") + (list.length ? "\n" : "")
-        _writeFile.running = true
+        _enqueue(root.favoritesPath, list.join("\n") + (list.length ? "\n" : ""))
     }
 
-    // ── Writers (shared single Process; set path+content before running) ──
+    // ── Writers ───────────────────────────────────────────────────────────
+    // A single shared Process, but SERIALIZED through a queue: group mutations
+    // often fire in a loop (multi-select "Add to:" calls addAppToGroup once per
+    // id), and re-arming an already-running Process silently drops the write —
+    // which is how Steam-game group members never reached the groups file.
+    property var _writeQueue: []
+    property bool _writeBusy: false
+
+    function _enqueue(path, content) {
+        root._writeQueue.push([path, content])
+        root._pumpWrites()
+    }
+
+    function _pumpWrites() {
+        if (root._writeBusy || root._writeQueue.length === 0) return
+        const job = root._writeQueue.shift()
+        root._writeBusy = true
+        _writeFile._path = job[0]
+        _writeFile._content = job[1]
+        _writeFile.running = true
+    }
 
     function _writeGroups(g) {
         root._selfWriteGroups = true
         root._selfWriteReset.restart()
         root.groups = g
-        _writeFile._path = root.groupsPath
-        _writeFile._content = JSON.stringify(g, null, 2) + "\n"
-        _writeFile.running = true
+        _enqueue(root.groupsPath, JSON.stringify(g, null, 2) + "\n")
     }
 
     property Process _writeFile: Process {
@@ -169,5 +185,9 @@ QtObject {
         command: ["python3", "-c",
             "import sys; open(sys.argv[1],'w').write(sys.argv[2])",
             _writeFile._path, _writeFile._content]
+        onExited: {
+            root._writeBusy = false
+            root._pumpWrites()
+        }
     }
 }
