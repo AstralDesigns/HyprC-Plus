@@ -244,18 +244,19 @@ Item {
             property bool agentStarting: false
             property bool agentMissing: false
 
-            // ── Shared single-view web surface ────────────────────────────
-            // This QtWebEngine build cannot keep a second live WebEngineView
-            // (second WebContentsAdapter) in-process: the renderer dies and the
-            // whole shell SIGTRAPs ~16-24s later (proven via isolation tests).
-            // So the ONE webView below serves BOTH the websearch tab-strip and
-            // the workspace (agent). Websearch "tabs" are a LOGICAL model: the
-            // single view renders the active tab and switching navigates/reloads
-            // it. The on-the-record profile (cookies/localStorage persist to disk)
-            // plus a per-tab last URL keep logins + destinations across switches
-            // and restarts. That is the best achievable stability without a crash,
-            // and it is also why QtWebEngine's own persistent profile (not
-            // libsecret, which it has no backend for) is used for credentials.
+            // ── Per-tab persistent web surfaces ────────────────────────────
+            // Two live WebEngineViews coexist in this patched Qt 6.11 build
+            // (validated: two views alive 45s+, no SIGTRAP) PROVIDED they share
+            // the ONE win.webProfile -- a second in-process WebEngineProfile is
+            // still the abort trigger. So webView renders the websearch tab-strip
+            // and agentView renders the agent workspace, both on webProfile.
+            // Websearch "tabs" stay a LOGICAL model over the single webView (a
+            // per-tab last URL + on-the-record profile keep logins/destinations
+            // across switches/restarts); agentView loads its url ONCE (bound only
+            // to agentReady, never re-navigated on tab switch) so the React+Monaco
+            // workspace persists across tab round-trips instead of reloading like
+            // a browser tab. It still uses QtWebEngine's own persistent profile
+            // (no libsecret backend) for credentials.
             property var webTabs: [{ url: searxBase, title: "" }]
             property int activeWebTab: 0
             property int webRev: 0
@@ -311,18 +312,17 @@ Item {
                 win._webTouch()
                 win.webSaveTabsState()
             }
-            // Point the single shared view at whatever the active tab should show.
+            // Point the websearch view at whatever the active logical tab should
+            // show. The agent tab has its OWN persistent view (agentView) whose url
+            // is bound only to agentReady, so this never touches the agent session.
             function syncWebSurface() {
                 if (!webView) return
-                if (win.tab === "agent") {
-                    webView.url = win.agentReady ? win.agentUrl : "about:blank"
-                } else if (win.tab === "websearch") {
+                if (win.tab === "websearch") {
                     if (!win.webEnabled) return   // dormant: keep the view parked
                     const t = win._webTab()
                     const u = (t && t.url && t.url.length) ? t.url : win.searxBase
                     // Only navigate when the destination actually changed. Returning to a
-                    // tab whose page is already loaded must NOT reload it (that was wiping
-                    // an already-open workspace / site on every tab round-trip).
+                    // tab whose page is already loaded must NOT reload it.
                     if (!webView.url || webView.url.toString() !== u) webView.url = u
                 }
             }
@@ -2882,6 +2882,7 @@ Item {
                                         WebEngineView {
                                             id: webView
                                             anchors.fill: parent
+                                            visible: win.tab === "websearch"
                                             focus: true
                                             profile: win.webProfile
                                             url: win.searxBase
@@ -2892,6 +2893,28 @@ Item {
                                                 win.webShowError = !!loadRequest.error
                                             }
                                             Component.onCompleted: forceActiveFocus()
+                                        }
+
+                                        // ── Agent workspace: dedicated persistent view ──
+                                        // A SECOND live WebEngineView is safe on this patched
+                                        // Qt 6.11 build (validated 45s+, no SIGTRAP) provided
+                                        // it shares the single win.webProfile -- a second
+                                        // PROFILE still aborts. Its url is bound ONLY to
+                                        // agentReady (never re-navigated on tab switch), so the
+                                        // React+Monaco app loads once and the workspace state
+                                        // survives hide/show + tab round-trips without a reload.
+                                        // Hidden (parent webSearchPage off the agent/websearch
+                                        // tabs) the page stays loaded, just not rendered.
+                                        WebEngineView {
+                                            id: agentView
+                                            anchors.fill: parent
+                                            visible: win.tab === "agent"
+                                            focus: true
+                                            profile: win.webProfile
+                                            url: win.agentReady ? win.agentUrl : "about:blank"
+                                            backgroundColor: Theme.cSurface
+                                            settings.javascriptEnabled: true
+                                            onVisibleChanged: if (visible) forceActiveFocus()
                                         }
 
                                         // ── Bookmarks dropdown (websearch header) ──────────
