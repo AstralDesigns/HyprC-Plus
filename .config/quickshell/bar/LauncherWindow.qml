@@ -2507,8 +2507,8 @@ Item {
                             height: listFrame.height - 2 * win.ip
                             radius: 14
                             color: Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.2)
-                            border.width: 1
-                            border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.22)
+                            //border.width: 1
+                            //border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.22)
                             ColumnLayout {
                                 anchors.centerIn: parent
                                 spacing: 12
@@ -2886,7 +2886,7 @@ Item {
                                             focus: true
                                             profile: win.webProfile
                                             url: win.searxBase
-                                            backgroundColor: Theme.cSurface
+                                            backgroundColor: "transparent"
                                             settings.javascriptEnabled: true
                                             settings.forceDarkMode: true
                                             onLoadingChanged: function (loadRequest) {
@@ -2912,7 +2912,7 @@ Item {
                                             focus: true
                                             profile: win.webProfile
                                             url: win.agentReady ? win.agentUrl : "about:blank"
-                                            backgroundColor: Theme.cSurface
+                                            backgroundColor: "transparent"
                                             settings.javascriptEnabled: true
                                             onVisibleChanged: if (visible) forceActiveFocus()
                                         }
