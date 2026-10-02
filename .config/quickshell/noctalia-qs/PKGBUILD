@@ -40,7 +40,7 @@ depends=(
     'wayland'
 )
 makedepends=(
-    'git' 'cmake' 'ninja' 'pkgconf' 'python'
+    'git' 'cmake' 'ninja' 'pkgconf' 'python' 'cli11'
     'qt6-shadertools' 'spirv-tools' 'glslang' 'vulkan-headers'
 )
 provides=('quickshell' 'quickshell-git')

@@ -179,9 +179,13 @@ ShellRoot {
     }
 
     // ── qs app launcher (GJS app-launcher.js port) ─────────────────────
-    // Transient surface — recreated on every open, so icon theme changes are
-    // always picked up naturally.
-    Loader { id: launcherLoader; active: HCCLauncherState.visible; source: "LauncherWindow.qml" }
+    // Persistent: always loaded, hidden when closed. Keeping the window (and its
+    // single shared WebEngineView) alive across hide/show means the web-search
+    // and agent pages keep running instead of reloading — so the agent app never
+    // re-boots and resets its provider/model, and open tabs stay warm. Backend
+    // warm-up is deferred to the window's first show (see LauncherWindow), so an
+    // always-loaded window never starts docker/uvicorn while the launcher is shut.
+    Loader { id: launcherLoader; active: true; source: "LauncherWindow.qml" }
 
     Loader { active: ControlCenterState.visible;  source: "ControlCenterPopup.qml" }
     Loader { active: LicenseState.activated && (WeatherPopupState.visible || WeatherPopupState.widgetVisible); source: "WeatherPopup.qml" }
