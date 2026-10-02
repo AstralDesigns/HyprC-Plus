@@ -748,15 +748,9 @@ Item {
                 running: false
             }
 
-            Connections {
-                target: DesktopPinnedState
-                function onSaveRequested(newList) {
-                    const scriptPath = Config.barDir + "/scripts/desktop-pinned-write.sh"
-                    _writeProc.command = [scriptPath, ...newList]
-                    _writeProc.running = false
-                    _writeProc.running = true
-                }
-            }
+            // NOTE: desktop-pinned persistence moved into DesktopPinnedState
+            // itself (singleton-owned Process on saveRequested) so the qs dock
+            // can pin to desktop even while this layer is unloaded.
         }
     }
 }

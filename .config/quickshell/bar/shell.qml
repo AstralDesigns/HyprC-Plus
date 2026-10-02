@@ -160,6 +160,29 @@ ShellRoot {
         active: root._desktopActive
         source: "DesktopLayer.qml"
     }
+    // ── Phase-0 QtWebEngine layer-surface spike (env-gated, dormant by default) ──
+    Loader { active: Quickshell.env("HYPRCANDY_QS_WEBENGINE_SMOKE") === "1"; source: "WebEngineTest.qml" }
+
+    // ── qs dock (GJS hyprcandydock port) — one instance per screen ────────
+    // Shares _desktopActive with DesktopLayer: destroyed + recreated whenever
+    // qt6ct icon_theme changes, so Quickshell.iconPath re-resolves against the
+    // new theme (otherwise the dock keeps stale paths from boot).
+    Loader {
+        active: DockState.visible && root._desktopActive
+        sourceComponent: Variants {
+            model: Quickshell.screens
+            DockWindow {
+                required property var modelData
+                screen: modelData
+            }
+        }
+    }
+
+    // ── qs app launcher (GJS app-launcher.js port) ─────────────────────
+    // Transient surface — recreated on every open, so icon theme changes are
+    // always picked up naturally.
+    Loader { id: launcherLoader; active: HCCLauncherState.visible; source: "LauncherWindow.qml" }
+
     Loader { active: ControlCenterState.visible;  source: "ControlCenterPopup.qml" }
     Loader { active: LicenseState.activated && (WeatherPopupState.visible || WeatherPopupState.widgetVisible); source: "WeatherPopup.qml" }
     Loader { active: LicenseState.activated && (SystemMonitorPopupState.visible || SystemMonitorPopupState.widgetVisible); source: "SystemMonitorPopup.qml" }
@@ -275,5 +298,15 @@ ShellRoot {
         function toggleScreenshot() { if (LicenseState.activated) ScreenshotPopupState.toggle() }
         // Recorder
         function toggleRecorder()   { if (LicenseState.activated) (RecorderPopupState.isRecording ? RecorderPopupState.stopRecording() : RecorderPopupState.toggle()) }
+
+        // ── qs dock + launcher (GJS port) ─────────────────────────────────
+        function toggleDock()          { DockState.toggle() }
+        function openDock()            { DockState.open() }
+        function closeDock()           { DockState.close() }
+        function setDockPosition(pos: string) { DockState.setPosition(pos) }
+        function cycleDockPosition()   { DockState.cyclePosition() }
+        function toggleLauncher()      { if (LicenseState.activated) HCCLauncherState.toggle() }
+        function openLauncher(tab: string) { if (LicenseState.activated) HCCLauncherState.open(tab) }
+        function closeLauncher()       { HCCLauncherState.close() }
     }
 }

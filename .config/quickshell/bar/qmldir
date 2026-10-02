@@ -68,3 +68,16 @@ WorkspacesPopup 1.0 WorkspacesPopup.qml
 
 singleton LockTransitionState 1.0 LockTransitionState.qml
 LockTransitionOverlay 1.0 LockTransitionOverlay.qml
+
+# ── qs dock + launcher migration (GJS port) ──
+singleton PinnedAppsState 1.0 PinnedAppsState.qml
+singleton DockState 1.0 DockState.qml
+singleton HCCLauncherState 1.0 HCCLauncherState.qml
+singleton ClipboardState 1.0 ClipboardState.qml
+singleton GroupsState 1.0 GroupsState.qml
+singleton WebBookmarksState 1.0 WebBookmarksState.qml
+singleton TrashState 1.0 TrashState.qml
+CCSegmented 1.0 CCSegmented.qml
+DockWindow 1.0 DockWindow.qml
+LauncherWindow 1.0 LauncherWindow.qml
+TrashDialog 1.0 TrashDialog.qml

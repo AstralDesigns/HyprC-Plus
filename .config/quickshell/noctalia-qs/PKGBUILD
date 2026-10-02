@@ -1,0 +1,91 @@
+# Maintainer: AstralDesigns <ianomiruka@gmail.com>
+#
+# HyprCandy+ patched build of noctalia-qs (the Quickshell fork that powers the DE).
+#
+# WHY THIS EXISTS
+#   Upstream noctalia-qs constructs QGuiApplication/QApplication with argc = 0
+#   (src/launch/launch.cpp: "auto qArgC = 0;"). QtWebEngine is Chromium, which
+#   reads argv[0] during early startup and aborts / fails to render when argc is
+#   0, so the stock repo/CachyOS package cannot host an embedded WebEngineView.
+#   We maintain a fork (github.com/AstralDesigns/noctalia-qs, branch "hyprcandy",
+#   tag v0.0.12-hc1) that carries the one-line argc=1 fix as a real commit, so
+#   this build simply compiles that pinned tag -- no fragile string-patching at
+#   build time. qt6-webengine is a runtime dep so the QtWebEngine QML plugin
+#   (QtWebEngine + libQt6WebEngineCore) exists; the plugin loads at runtime, so
+#   there is no WebEngine build flag to set. Required by the HyprCandy+ launcher's
+#   embedded browser tab.
+#
+#   The crash handler is disabled (-DCRASH_HANDLER=OFF) to keep the automated
+#   build lean: it would otherwise require cpptrace/libdwarf/libunwind (AUR /
+#   exotic) which complicates a one-command install. Functionally the bar/launcher
+#   are unaffected; the only loss is the auto-restart-on-crash watchdog.
+#
+#   Installed with epoch=1 so it transparently replaces the repo noctalia-qs
+#   (0.0.12-2, epoch 0). provides keeps it a drop-in for the "quickshell" dep.
+
+_pkg=noctalia-qs
+pkgname=noctalia-qs
+pkgver=0.0.12
+pkgrel=1
+epoch=1
+pkgdesc="Quickshell (noctalia fork) rebuilt with QtWebEngine support for the HyprCandy+ launcher"
+arch=('x86_64')
+url="https://github.com/AstralDesigns/noctalia-qs"
+license=('custom')
+
+depends=(
+    'gcc-libs' 'glibc' 'hicolor-icon-theme' 'jemalloc' 'libdrm' 'libglvnd'
+    'libpipewire' 'libxcb' 'mesa' 'pam' 'polkit'
+    'qt6-base' 'qt6-declarative' 'qt6-svg' 'qt6-wayland' 'qt6-webengine'
+    'wayland'
+)
+makedepends=(
+    'git' 'cmake' 'ninja' 'pkgconf' 'python'
+    'qt6-shadertools' 'spirv-tools' 'glslang' 'vulkan-headers'
+)
+provides=('quickshell' 'quickshell-git')
+conflicts=('quickshell' 'quickshell-git')
+# !lto: CachyOS's makepkg.conf enables full LTO (-flto=auto) whose link-time
+# relink of this large statically-linked Qt binary takes ~15+ min on low-core
+# CPUs and buys nothing for a QML shell. Disabling it cuts the build to minutes.
+options=('!lto' '!debug' 'strip')
+
+# Pinned to our fork's patched tag (argc=1 committed upstream in the fork).
+_srctag="v0.0.12-hc1"
+source=("git+${url}.git#tag=${_srctag}")
+sha256sums=('SKIP')
+
+_distributor="HyprCandy+ (noctalia-qs fork + QtWebEngine)"
+
+build() {
+    cd "$_pkg"
+    # BUILD.md: a UTF-8 locale keeps real diagnostics from being buried by Qt warnings.
+    export LC_ALL=C.UTF-8 LANG=C.UTF-8
+    # Belt-and-suspenders: strip any LTO that a distro makepkg.conf injected into
+    # the flags (options=(!lto) alone doesn't always remove a literal -flto).
+    export CXXFLAGS="${CXXFLAGS/-flto=auto/} ${CXXFLAGS/-flto/}"
+    export CFLAGS="${CFLAGS/-flto=auto/} ${CFLAGS/-flto/}"
+    export LDFLAGS="${LDFLAGS/-flto=auto/} ${LDFLAGS/-flto/}"
+    # Portable binary for the prebuilt release asset: CachyOS makepkg.conf injects
+    # -march=native (or an x86-64-vN level) that ties the .pkg.tar.zst to the build
+    # box's CPU. Since this package is downloaded and installed directly on every
+    # user's machine, neutralize any arch/tuning flag down to the widely-safe
+    # x86-64-v2 baseline (SSE4.2 + POPCNT, ~2009+) so it never SIGILLs elsewhere.
+    CFLAGS=$(printf '%s' "$CFLAGS"   | sed -E 's/-march=[^[:space:]]+/-march=x86-64-v2/g; s/-mtune=[^[:space:]]+/-mtune=generic/g')
+    CXXFLAGS=$(printf '%s' "$CXXFLAGS" | sed -E 's/-march=[^[:space:]]+/-march=x86-64-v2/g; s/-mtune=[^[:space:]]+/-mtune=generic/g')
+    export CFLAGS CXXFLAGS
+    cmake -GNinja -B build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX=/usr \
+        -DDISTRIBUTOR="$_distributor" \
+        -DCRASH_HANDLER=OFF
+    cmake --build build
+}
+
+package() {
+    cd "$_pkg"
+    DESTDIR="$pkgdir" cmake --install build
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE" 2>/dev/null || true
+    [ -f LICENSE-GPL ] && install -Dm644 LICENSE-GPL "$pkgdir/usr/share/licenses/$pkgname/LICENSE-GPL" 2>/dev/null
+    return 0
+}

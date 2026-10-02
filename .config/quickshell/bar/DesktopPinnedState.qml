@@ -89,7 +89,7 @@ QtObject {
         ]
 
         for (const v of variants) {
-            const e = DesktopEntries.byId(v)
+            const e = DesktopEntries.byId(v) || DesktopEntries.byId(v + ".desktop")
             if (e) return e
         }
 
@@ -186,18 +186,40 @@ QtObject {
 
     // ── Write helpers ────────────────────────────────────────────────────
 
-    // Emitted when the class list changes so DesktopLayer can persist it.
+    // Emitted when the class list changes so external consumers can react.
     signal saveRequested(var newList)
 
+    // Singleton-owned persistence: the write script runs here instead of in
+    // DesktopLayer so the qs dock / launcher can pin-to-desktop even when the
+    // DesktopLayer loader is inactive.
+    property Process _writeProc: Process {
+        running: false
+    }
+    property Connections _selfSave: Connections {
+        target: root
+        function onSaveRequested(newList) {
+            const scriptPath = Config.barDir + "/scripts/desktop-pinned-write.sh"
+            root._writeProc.command = [scriptPath, ...newList]
+            root._writeProc.running = false
+            root._writeProc.running = true
+        }
+    }
+
     // Write newList — update in-memory state immediately, emit signal so
-    // DesktopLayer's Process (a direct PanelWindow child) does the disk write.
+    // the singleton Process above does the disk write.
     function _saveClassList(newList) {
         _classList = newList
         _resolveApps()
         saveRequested(newList)
     }
 
-    // Remove app by class name — called from DesktopLayer context menu
+    // Add app by class name — called from the dock "Pin to Desktop" menu.
+    function addApp(cls) {
+        if (!cls || _classList.indexOf(cls) !== -1) return
+        _saveClassList(_classList.concat([cls]))
+    }
+
+    // Remove app by class name — called from DesktopLayer / dock menus.
     function removeApp(cls) {
         const newList = _classList.filter(c => c !== cls)
         _saveClassList(newList)

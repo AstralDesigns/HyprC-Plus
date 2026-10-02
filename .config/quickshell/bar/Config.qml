@@ -242,6 +242,24 @@ QtObject {
         v = _settings.value("dockAutoHide");     if (v !== undefined && v !== null) dockAutoHide     = _toBool(v)
         v = _settings.value("dockAutoHideDelay");if (v !== undefined && v !== null) dockAutoHideDelay= parseInt(v)
         v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v)
+        // ── Dock appearance (qs-native dock — source of truth, replaces GJS config.js) ──
+        v = _settings.value("dockIconSize");       if (v !== undefined && v !== null) dockIconSize       = parseInt(v)
+        v = _settings.value("dockButtonSpacing");  if (v !== undefined && v !== null) dockButtonSpacing  = parseInt(v)
+        v = _settings.value("dockInnerPadding");   if (v !== undefined && v !== null) dockInnerPadding   = parseInt(v)
+        v = _settings.value("dockPadding");        if (v !== undefined && v !== null) dockPadding        = parseInt(v)
+        v = _settings.value("dockRadius");         if (v !== undefined && v !== null) dockRadius         = parseInt(v)
+        v = _settings.value("dockTopLeftRadius");    if (v !== undefined && v !== null) dockTopLeftRadius    = parseInt(v)
+        v = _settings.value("dockTopRightRadius");   if (v !== undefined && v !== null) dockTopRightRadius   = parseInt(v)
+        v = _settings.value("dockBottomLeftRadius"); if (v !== undefined && v !== null) dockBottomLeftRadius = parseInt(v)
+        v = _settings.value("dockBottomRightRadius");if (v !== undefined && v !== null) dockBottomRightRadius= parseInt(v)
+        v = _settings.value("dockBorderWidth");    if (v !== undefined && v !== null) dockBorderWidth    = parseInt(v)
+        v = _settings.value("dockBorderAlpha");    if (v !== undefined && v !== null) dockBorderAlpha    = v
+        v = _settings.value("dockBorderColorVar"); if (v !== undefined && v !== null) dockBorderColorVar = v
+        v = _settings.value("dockBackgroundStyle");if (v !== undefined && v !== null) dockBackgroundStyle= v
+        v = _settings.value("dockPosition");       if (v !== undefined && v !== null) dockPosition       = v
+        v = _settings.value("dockStartIcon");      if (v !== undefined && v !== null) dockStartIcon      = v
+        v = _settings.value("dockLayer");          if (v !== undefined && v !== null) dockLayer          = v
+        v = _settings.value("dockReserveSpace");   if (v !== undefined && v !== null) dockReserveSpace   = _toBool(v)
         v = _settings.value("desktopIconSize");    if (v !== undefined && v !== null) desktopIconSize    = parseInt(v)
         v = _settings.value("desktopLabelSize");   if (v !== undefined && v !== null) desktopLabelSize   = parseInt(v)
         v = _settings.value("desktopLabelRadius"); if (v !== undefined && v !== null) desktopLabelRadius = parseInt(v)
@@ -427,6 +445,24 @@ QtObject {
         _settings.setValue("dockAutoHide",     dockAutoHide)
         _settings.setValue("dockAutoHideDelay",dockAutoHideDelay)
         _settings.setValue("dockMargin",       dockMargin)
+        // ── Dock appearance (qs-native dock) ──
+        _settings.setValue("dockIconSize",        dockIconSize)
+        _settings.setValue("dockButtonSpacing",   dockButtonSpacing)
+        _settings.setValue("dockInnerPadding",    dockInnerPadding)
+        _settings.setValue("dockPadding",         dockPadding)
+        _settings.setValue("dockRadius",          dockRadius)
+        _settings.setValue("dockTopLeftRadius",   dockTopLeftRadius)
+        _settings.setValue("dockTopRightRadius",  dockTopRightRadius)
+        _settings.setValue("dockBottomLeftRadius",dockBottomLeftRadius)
+        _settings.setValue("dockBottomRightRadius",dockBottomRightRadius)
+        _settings.setValue("dockBorderWidth",     dockBorderWidth)
+        _settings.setValue("dockBorderAlpha",     dockBorderAlpha)
+        _settings.setValue("dockBorderColorVar",  dockBorderColorVar)
+        _settings.setValue("dockBackgroundStyle", dockBackgroundStyle)
+        _settings.setValue("dockPosition",        dockPosition)
+        _settings.setValue("dockStartIcon",       dockStartIcon)
+        _settings.setValue("dockLayer",           dockLayer)
+        _settings.setValue("dockReserveSpace",    dockReserveSpace)
         _settings.setValue("desktopIconSize",    desktopIconSize)
         _settings.setValue("desktopLabelSize",   desktopLabelSize)
         _settings.setValue("desktopLabelRadius", desktopLabelRadius)
@@ -1121,13 +1157,34 @@ QtObject {
     // shellModuleAutoHide / shellModuleAutoHideDelay live above with the shell geometry props
 
     // ═══════════════════════════════════════════════════════════════════════
-    //  Dock runtime state (source of truth for CC display; GJS dock reads
-    //  hyprcandy-bar.conf directly, but CC persists state here so the
-    //  toggles show the correct value when the CC reopens)
+    //  Dock (qs-native dock window) — appearance + behaviour.
+    //  These are now the single source of truth for the dock: the GJS dock's
+    //  config.js @HCD sed/respawn plumbing is retired. Values persist in
+    //  [qs-bar-config-v1] of ~/.config/hyprcandy/hyprcandy-bar.conf.
     // ═══════════════════════════════════════════════════════════════════════
     property bool   dockAutoHide:      false
     property int    dockAutoHideDelay: 5       // seconds
     property int    dockMargin:        6       // px — screen-edge gap
+    property int    dockIconSize:      24      // px — app icon size
+    property int    dockButtonSpacing: 4       // px — gap between dock buttons
+    property int    dockInnerPadding:  16      // px — padding inside dock rect
+    property int    dockPadding:       4       // px — legacy extra padding
+    property int    dockRadius:        30      // px — default corner radius
+    property int    dockTopLeftRadius:     22
+    property int    dockTopRightRadius:    22
+    property int    dockBottomLeftRadius:  22
+    property int    dockBottomRightRadius: 22
+    property int    dockBorderWidth:   1       // px — dock rect border
+    property real   dockBorderAlpha:   0.45    // 0–1
+    property string dockBorderColorVar: "on_secondary"  // matugen var, $ optional
+    property string dockBackgroundStyle: "glass"        // "glass" | "gradient"
+    property string dockPosition:      "bottom"         // bottom|left|right|top
+    property string dockStartIcon:     ""               // glyph override (empty → 󰚾)
+    property string dockLayer:         "top"            // "top" | "overlay"
+    property bool   dockReserveSpace:  false            // exclusive zone on/off
+    // Resolved border color — accepts "on_secondary" or "$on_secondary".
+    readonly property color dockBorderColor: _cavaThemeColor(
+        dockBorderColorVar.startsWith("$") ? dockBorderColorVar : "$" + dockBorderColorVar)
 
     // ── Desktop icon layer ───────────────────────────────────────────────
     property int  desktopIconSize:    36   // px — app icon size
@@ -1157,7 +1214,9 @@ QtObject {
     //  Runtime paths
     // ═══════════════════════════════════════════════════════════════════════
 
-    readonly property string home:        StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    // StandardPaths returns a file:// URI — strip the scheme so the value is
+    // usable as a plain path in Process argv (python3/sh receive it raw).
+    readonly property string home:        StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
     readonly property string barDir:      home + "/.config/quickshell/bar"
     readonly property string scriptsDir:  home + "/.config/hyprcandy/scripts"
     readonly property string hyprScripts: home + "/.config/hypr/scripts"

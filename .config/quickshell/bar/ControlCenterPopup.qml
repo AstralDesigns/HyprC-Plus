@@ -73,23 +73,6 @@ PanelWindow {
     property string _rofiBorderVal:  "2"
     property string _rofiRadiusVal:  "1.0"
 
-    // ── App Launcher (launcher-config.state) current values ───────────────
-    property string _lcIconSizeVal:       "48"
-    property string _lcTextFontSizeVal:   "11"
-    property string _lcFixedTileWVal:     "90"
-    property string _lcFixedTileHVal:     "78"
-    property string _lcFrameWidthVal:     "500"
-    property string _lcFrameHeightVal:    "480"
-    property string _lcFrameWVertVal:     "380"
-    property string _lcFrameHVertVal:     "560"
-    property string _lcBorderRadiusVal:   "20"
-    property string _lcBorderWidthVal:    "2"
-    property string _lcSearchRadiusVal:   "12"
-    property string _lcListRadiusVal:     "12"
-    property string _lcInnerBorderWVal:   "1"
-    property string _lcInnerPaddingVal:   "10"
-    property string _lcSearchFracVal:     "1.0"
-
     // ── SDDM current values ───────────────────────────────────────────────
     property string _sddmHeaderVal:  "󰫣󰫣󰫣"
     property string _sddmFormVal:    "center"
@@ -319,9 +302,7 @@ PanelWindow {
                     ccTabSettings.activeTab = 6
                     return
                 }
-                _dockValReader.running = true
                 _rofiValReader.running = true
-                _lcValReader.running   = true
                 _sddmValReader.running = true
                 _weatherLocReader.running = true
                 _hyprlandValReader.running = true
@@ -337,13 +318,10 @@ PanelWindow {
     // Component.onCompleted fires each time the CC opens).
     Component.onCompleted: {
         // Bar autohide state comes from Config — already bound via property defaults above.
-        // Run _confReadProc to sync dock values (autohide/layer/margin) from conf file.
-        _confReadProc.running      = true
+        // Dock values are Config-driven outright now (qs dock) — no conf readers.
         _hyprlandValReader.running = true
         _layoutReader.running      = true
-        _dockValReader.running     = true
         _rofiValReader.running     = true
-        _lcValReader.running       = true
         _sddmValReader.running     = true
         _weatherLocReader.running  = true
         _hyprStateReader.running   = true
@@ -700,71 +678,10 @@ PanelWindow {
             _rofiRadiusVal = (ls[1] !== undefined && ls[1]) ? ls[1] : "1.0"
         }
     }
-    // Read launcher config directly from launcherConfig.js — the single source
-    // of truth. No state file detour: whatever launcherConfig.js holds is what
-    // the sliders show, and launcher-config-set.sh writes back into that same file.
-    Process {
-        id: _lcValReader
-        command: ["bash", "-c",
-            'lc="$HOME/.hyprcandy/GJS/hyprcandydock/launcherConfig.js"; ' +
-            '[ -f "$lc" ] || { echo "{}"; exit 0; }; ' +
-            'python3 -c \'' +
-            'import re, json, sys\n' +
-            't = open(sys.argv[1]).read()\n' +
-            'keys = [\n' +
-            '  "searchWidthFraction",\n' +
-            '  "iconSize",\n' +
-            '  "textFontSize",\n' +
-            '  "fixedTileWidth",\n' +
-            '  "fixedTileHeight",\n' +
-            '  "frameWidth",\n' +
-            '  "frameHeight",\n' +
-            '  "frameWidthVert",\n' +
-            '  "frameHeightVert",\n' +
-            '  "borderRadius",\n' +
-            '  "borderWidth",\n' +
-            '  "searchRadius",\n' +
-            '  "listRadius",\n' +
-            '  "innerBorderWidth",\n' +
-            '  "innerPadding",\n' +
-            ']\n' +
-            'obj = {}\n' +
-            'for k in keys:\n' +
-            '  m = re.search(rf"\\b{k}:\\s*([0-9][0-9.]*)", t)\n' +
-            '  if m: obj[k] = float(m.group(1)) if "." in m.group(1) else int(m.group(1))\n' +
-            'print(json.dumps(obj))\n' +
-            '\' "$lc"']
-        running: false
-        // _buf MUST be reset to "" before each run so stale output from a
-        // previous CC open cannot corrupt the JSON.parse on the next open.
-        property string _buf: ""
-        onRunningChanged: { if (running) _buf = "" }
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: function(l) { _lcValReader._buf += l }
-        }
-        onExited: {
-            try {
-                const obj = JSON.parse(_lcValReader._buf)
-                if (obj.searchWidthFraction !== undefined) _lcSearchFracVal   = obj.searchWidthFraction.toFixed(2)
-                if (obj.iconSize            !== undefined) _lcIconSizeVal     = Math.round(obj.iconSize).toString()
-                if (obj.textFontSize        !== undefined) _lcTextFontSizeVal = Math.round(obj.textFontSize).toString()
-                if (obj.fixedTileWidth      !== undefined) _lcFixedTileWVal   = Math.round(obj.fixedTileWidth).toString()
-                if (obj.fixedTileHeight     !== undefined) _lcFixedTileHVal   = Math.round(obj.fixedTileHeight).toString()
-                if (obj.frameWidth          !== undefined) _lcFrameWidthVal   = Math.round(obj.frameWidth).toString()
-                if (obj.frameHeight         !== undefined) _lcFrameHeightVal  = Math.round(obj.frameHeight).toString()
-                if (obj.frameWidthVert      !== undefined) _lcFrameWVertVal   = Math.round(obj.frameWidthVert).toString()
-                if (obj.frameHeightVert     !== undefined) _lcFrameHVertVal   = Math.round(obj.frameHeightVert).toString()
-                if (obj.borderRadius        !== undefined) _lcBorderRadiusVal = Math.round(obj.borderRadius).toString()
-                if (obj.borderWidth         !== undefined) _lcBorderWidthVal  = Math.round(obj.borderWidth).toString()
-                if (obj.searchRadius        !== undefined) _lcSearchRadiusVal = Math.round(obj.searchRadius).toString()
-                if (obj.listRadius          !== undefined) _lcListRadiusVal   = Math.round(obj.listRadius).toString()
-                if (obj.innerBorderWidth    !== undefined) _lcInnerBorderWVal = Math.round(obj.innerBorderWidth).toString()
-                if (obj.innerPadding        !== undefined) _lcInnerPaddingVal = Math.round(obj.innerPadding).toString()
-            } catch(e) { console.warn("[CC] _lcValReader: JSON parse failed:", e, "buf:", _lcValReader._buf) }
-            _lcValReader._buf = ""
-        }
-    }
+    // Launcher slider values now live in Config.launcher* (persisted via
+    // Settings) — the qs launcher reads them reactively, so no external
+    // reader/writer for GJS launcherConfig.js is needed anymore.
+    
     // Individual SDDM value readers — mirror the dock pattern so each field
     // reads directly from theme.conf (world-readable, no sudo needed) and
     // updates its property independently before the TextInput renders.
@@ -1143,9 +1060,7 @@ PanelWindow {
                             ccLicenseSettings.lastVerified  = now
                             // Key already persisted in _verifyLicense() before the curl call.
                             LicenseState.activate()
-                            _dockValReader.running = true
                             _rofiValReader.running = true
-                            _lcValReader.running   = true
                             _sddmValReader.running = true
                             _weatherLocReader.running = true
                             _hyprlandValReader.running = true
@@ -1881,9 +1796,6 @@ PanelWindow {
                                                      "printf '%s\\n' '" + v.toString() + "' > \"$f\""
                                                  ]
                                                  Config.launcherBorderWidth = Math.round(v)
-                                                 _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                                     "borderWidth", Math.round(v).toString()]
-                                                 _lcWrite.running = true
                                                  _barBorderWStateWrite.running = true   
                                             }
                                          }
@@ -2928,6 +2840,7 @@ PanelWindow {
                                             current: Config.barRectBgStyle
                                             onPicked: function(v) {
                                                 Config.barRectBgStyle = v
+                                                Config.dockBackgroundStyle = v
                                                 _dockRectBgStyle = v
                                                 // Write rectBgStyle and borderWidth in one sed pass so the dock
                                                 // reloads once with both values already in place — no stagger.
@@ -3998,350 +3911,92 @@ PanelWindow {
                             CCSlider {
                                 label: "Edge Gap"
                                 from: 0; to: 40; stepSize: 1
-                                value: _dockMarginVal
-                                onMoved: function(v) {
-                                    _dockMarginVal = v
-                                    Config.dockMargin = v
-                                    // Dedicated queued process — decoupled from both
-                                    // _confWriteProc (Hyprland Lua state writer) and
-                                    // _dockWrite (config.js writer). Queue ensures rapid
-                                    // slider drags never drop the final value.
-                                    const args = [scriptDir + "/dock-set.sh", "marginFromEdge", v.toString()]
-                                    if (_dockMarginWrite.running) {
-                                        _dockMarginWrite._pending = args
-                                    } else {
-                                        _dockMarginWrite.command = args
-                                        _dockMarginWrite.running = true
-                                    }
-                                }
-                            }
-                            Process {
-                                id: _dockMarginWrite
-                                property var _pending: null
-                                running: false
-                                onExited: {
-                                    running = false
-                                    if (_pending !== null) {
-                                        command = _pending
-                                        _pending = null
-                                        running = true
-                                    }
-                                }
+                                value: Config.dockMargin
+                                onMoved: function(v) { Config.dockMargin = v }
                             }
 
                             CCSection { text: "Dock Auto-Hide" }
-
                             CCToggle {
-                                id: _dockAhToggle
                                 label: "Auto-Hide Dock"
-                                value: _dockAhEnabled
-                                onToggled: function(v) {
-                                    _dockAhEnabled = v
-                                    Config.dockAutoHide = v
-                                    const cmd =
-                                        "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
-                                        "mkdir -p \"$(dirname $f)\"; " +
-                                        "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
-                                        "grep -q '^\\[dock\\]' \"$f\" || printf '\\n[dock]\\nautohide=false\\nautohide_delay=5\\nlayer=top\\nmargin_from_edge=6\\n' >> \"$f\"; " +
-                                        "grep -q '^autohide=' <(awk '/^\\[dock\\]/{s=1;next}/^\\[/{s=0}s' \"$f\") || sed -i '/^\\[dock\\]/a autohide=false' \"$f\"; " +
-                                        "sed -i '/^\\[dock\\]/,/^\\[/{s/^autohide=.*/autohide=" + (v ? "true" : "false") + "/}' \"$f\"; " +
-                                        "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
-                                    if (_confWriteProc.running) {
-                                        _confWriteProc._pendingCmd = cmd
-                                    } else {
-                                        _confWriteProc._cmd = cmd
-                                        _confWriteProc.running = true
-                                    }
-                                }
+                                value: Config.dockAutoHide
+                                onToggled: function(v) { Config.dockAutoHide = v }
                             }
 
                             CCSlider {
                                 label: "Delay (s)"
                                 from: 1; to: 60; stepSize: 1
                                 value: Config.dockAutoHideDelay
-                                opacity: _dockAhEnabled ? 1.0 : 0.4
+                                opacity: Config.dockAutoHide ? 1.0 : 0.4
                                 Behavior on opacity { NumberAnimation { duration: 120 } }
-                                onMoved: function(v) {
-                                    _dockAhDelay = v.toString()
-                                    Config.dockAutoHideDelay = v
-                                    const cmd =
-                                        "f=\"$HOME/.config/hyprcandy/hyprcandy-bar.conf\"; " +
-                                        "mkdir -p \"$(dirname $f)\"; " +
-                                        "[ -f \"$f\" ] || printf '[bar]\nautohide=false\nautohide_delay=5\n\n[dock]\nautohide=false\nautohide_delay=5\nlayer=top\nmargin_from_edge=6\n' > \"$f\"; " +
-                                        "grep -q '^\\[dock\\]' \"$f\" || printf '\\n[dock]\\nautohide=false\\nautohide_delay=5\\nlayer=top\\nmargin_from_edge=6\\n' >> \"$f\"; " +
-                                        "grep -q '^autohide_delay=' <(awk '/^\\[dock\\]/{s=1;next}/^\\[/{s=0}s' \"$f\") || sed -i '/^\\[dock\\]/a autohide_delay=5' \"$f\"; " +
-                                        "sed -i '/^\\[dock\\]/,/^\\[/{s/^autohide_delay=.*/autohide_delay=" + v + "/}' \"$f\"; " +
-                                        "pkill -12 -f 'gjs dock-main.js' 2>/dev/null; true"
-                                    if (_confWriteProc.running) {
-                                        _confWriteProc._pendingCmd = cmd
-                                    } else {
-                                        _confWriteProc._cmd = cmd
-                                        _confWriteProc.running = true
+                                onMoved: function(v) { Config.dockAutoHideDelay = v }
+                            }
+
+                            CCSection { text: "Position" }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 6
+                                Repeater {
+                                    model: ["bottom", "left", "top", "right"]
+                                    delegate: CCPillBtn {
+                                        required property var modelData
+                                        text: (DockState.position === modelData ? "● " : "○ ") +
+                                              modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                        onClicked: DockState.setPosition(modelData)
                                     }
                                 }
                             }
+                            // No cycle pill — the position pills above are the
+                            // direct per-position controls (dock menu mirrors).
 
-                            // Cycle position — calls dock-cycle.sh which setsid-detaches from QS
-                            CCPillBtn {
-                                text: "󰶘 Cycle Position"
-                                onClicked: {
-                                    _dockCycle.command = [scriptDir + "/dock-cycle.sh"]
-                                    _dockCycle.running = true
-                                }
+                            CCSection { text: "Shape" }
+                            CCSlider {
+                                label: "Icon Size"
+                                from: 18; to: 60; stepSize: 1
+                                value: Config.dockIconSize
+                                onMoved: function(v) { Config.dockIconSize = v }
                             }
-                            Process { id: _dockCycle; running: false; onExited: running = false }
-
-                            // Spacing — sliders write directly via dock-set.sh
                             CCSlider {
                                 label: "Spacing"
                                 from: 0; to: 30; stepSize: 1
-                                value: parseInt(_dockSpacingVal) || 0
-                                onMoved: function(v) {
-                                    _dockSpacingVal = v.toString()
-                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "buttonSpacing", v.toString()]
-                                    _dockWrite.running = true
-                                }
+                                value: Config.dockButtonSpacing
+                                onMoved: function(v) { Config.dockButtonSpacing = v }
                             }
                             CCSlider {
                                 label: "Padding"
-                                from: 0; to: 20; stepSize: 1
-                                value: parseInt(_dockPaddingVal) || 0
-                                onMoved: function(v) {
-                                    _dockPaddingVal = v.toString()
-                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "innerPadding", v.toString()]
-                                    _dockWrite.running = true
-                                }
+                                from: 8; to: 20; stepSize: 1   // <8 clips indicator dots
+                                value: Config.dockInnerPadding
+                                onMoved: function(v) { Config.dockInnerPadding = v }
                             }
                             CCSection { text: "Corner Radius" }
                             CCSlider {
                                 label: "Top-Left"
                                 from: 0; to: 60; stepSize: 1
-                                value: parseInt(_dockBorderTLVal) || 0
-                                onMoved: function(v) {
-                                    _dockBorderTLVal = v.toString()
-                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderTopLeftRadius", v.toString()]
-                                    _dockWrite.running = true
-                                }
+                                value: Config.dockTopLeftRadius
+                                onMoved: function(v) { Config.dockTopLeftRadius = v }
                             }
                             CCSlider {
                                 label: "Top-Right"
                                 from: 0; to: 60; stepSize: 1
-                                value: parseInt(_dockBorderTRVal) || 0
-                                onMoved: function(v) {
-                                    _dockBorderTRVal = v.toString()
-                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderTopRightRadius", v.toString()]
-                                    _dockWrite.running = true
-                                }
+                                value: Config.dockTopRightRadius
+                                onMoved: function(v) { Config.dockTopRightRadius = v }
                             }
                             CCSlider {
                                 label: "Bottom-Left"
                                 from: 0; to: 60; stepSize: 1
-                                value: parseInt(_dockBorderBLVal) || 0
-                                onMoved: function(v) {
-                                    _dockBorderBLVal = v.toString()
-                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderBottomLeftRadius", v.toString()]
-                                    _dockWrite.running = true
-                                }
+                                value: Config.dockBottomLeftRadius
+                                onMoved: function(v) { Config.dockBottomLeftRadius = v }
                             }
                             CCSlider {
                                 label: "Bottom-Right"
                                 from: 0; to: 60; stepSize: 1
-                                value: parseInt(_dockBorderBRVal) || 0
-                                onMoved: function(v) {
-                                    _dockBorderBRVal = v.toString()
-                                    _dockWrite.command = [scriptDir + "/dock-set.sh", "borderBottomRightRadius", v.toString()]
-                                    _dockWrite.running = true
-                                }
-                            }
-                            Process {
-                                id: _dockWrite
-                                property var _pending: null
-                                running: false
-                                onExited: {
-                                    running = false
-                                    if (_pending !== null) {
-                                        command = _pending
-                                        _pending = null
-                                        running = true
-                                    }
-                                }
-                            }
-                            Process {
-                                id: _dockBorderColorWrite
-                                property var _pending: null
-                                running: false
-                                onExited: {
-                                    running = false
-                                    if (_pending !== null) {
-                                        command = _pending
-                                        _pending = null
-                                        running = true
-                                    } else {
-                                        _dockReadBorderColor.running = true
-                                    }
-                                }
+                                value: Config.dockBottomRightRadius
+                                onMoved: function(v) { Config.dockBottomRightRadius = v }
                             }
 
-                            // Read dock config values on load
-                            Process { id: _dockReadSpacing; command: [scriptDir+"/dock-get.sh", "buttonSpacing"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockSpacingVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadPadding; command: [scriptDir+"/dock-get.sh", "innerPadding"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockPaddingVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadBorderW; command: [scriptDir+"/dock-get.sh", "borderWidth"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockBorderWVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadBorderTL; command: [scriptDir+"/dock-get.sh", "borderTopLeftRadius"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockBorderTLVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadBorderTR; command: [scriptDir+"/dock-get.sh", "borderTopRightRadius"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockBorderTRVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadBorderBL; command: [scriptDir+"/dock-get.sh", "borderBottomLeftRadius"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockBorderBLVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadBorderBR; command: [scriptDir+"/dock-get.sh", "borderBottomRightRadius"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockBorderBRVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadIconSize; command: [scriptDir+"/dock-get.sh", "appIconSize"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v && !isNaN(parseInt(v))) _dockIconSizeVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadStartIcon; command: [scriptDir+"/dock-get.sh", "startIcon"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v) _dockStartIconVal = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadBorderColor; command: [scriptDir+"/dock-border-get.sh"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v) _dockBorderColorVar = v
-                                    }
-                                }
-                            }
-                            Process { id: _dockReadRectBg; command: [scriptDir+"/dock-get.sh", "rectBgStyle"]; running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) {
-                                        const v = l.trim()
-                                        if (v === "glass" || v === "gradient") _dockRectBgStyle = v
-                                    }
-                                }
-                            }
-
-                            // Start all dock reads on component complete
-                            Timer {
-                                interval: 100; running: true; repeat: false
-                                onTriggered: {
-                                    _dockReadSpacing.running  = true
-                                    _dockReadPadding.running  = true
-                                    _dockReadBorderW.running  = true
-                                    _dockReadBorderTL.running = true
-                                    _dockReadBorderTR.running = true
-                                    _dockReadBorderBL.running = true
-                                    _dockReadBorderBR.running = true
-                                    _dockReadBorderColor.running = true
-                                    _dockReadIconSize.running = true
-                                    _dockReadStartIcon.running = true
-                                    _dockReadRectBg.running   = true
-                                    _confReadProc.running     = true
-                                }
-                            }
-                            
-                            Text {
-                                Layout.fillWidth: true
-                                text: "Toggle the 'Dock Reload' button when you're done making icon size changes"
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.48)
-                                font.family: Config.labelFont; font.pixelSize: 11
-                                wrapMode: Text.Wrap
-                            }
-
-                            CCSlider {
-                                label: "Icon Size"
-                                from: 18; to: 60; stepSize: 1
-                                value: parseInt(_dockIconSizeVal) || 24
-                                onMoved: function(v) {
-                                    _dockIconSizeVal = v.toString()
-                                    _dockIcon.command = [scriptDir + "/dock-icon-size.sh", v.toString()]
-                                    _dockIcon.running = true
-                                }
-                            }
-                            Process { id: _dockIcon; running: false; onExited: running = false }
-                            
-                            CCPillBtn {
-                                text: "󰑓 Dock Reload"
-                                onClicked: {
-                                    _dockReload.command = [scriptDir + "/dock-reload.sh"]
-                                    _dockReload.running = true
-                                }
-                            }
-                            Process { id: _dockReload; running: false; onExited: running = false }
-
-                            CCEntryRow {
-                                label: "Start Icon"
-                                value: _dockStartIconVal
-                                onApplied: function(val) {
-                                    if (val) {
-                                        _dockStartIcon.command = [scriptDir + "/dock-start-icon.sh", val]
-                                        _dockStartIcon.running = true
-                                    }
-                                }
-                            }
-                            Process { id: _dockStartIcon; running: false; onExited: running = false }
+                            // Behaviour section removed: Reserve Space is
+                            // applied internally (dock always overlays, GJS
+                            // parity) and hide-dock is now a one-shot row in
+                            // the start-button popup; auto-hide stays above.
                             Item { height: 10 }
                         }
                     }
@@ -4358,21 +4013,17 @@ PanelWindow {
                             CCSection { text: "Application Launcher" }
 
                             // Search bar width fraction (0.2–1.0) shown as a slider
-                            // Sliders bind directly to Config.launcher* — same pattern as
-                            // every other CC tab. onMoved sets the Config property (reactive,
-                            // survives re-opens) AND calls launcher-config-set.sh to write the
-                            // value back into launcherConfig.js for the GJS launcher to pick up.
-                            //CCSlider {
-                                //label: "Search Width"
-                                //from: 0.2; to: 1.0; stepSize: 0.05; decimals: 2
-                                //value: Config.launcherSearchWidth
-                                //onMoved: function(v) {
-                                    //Config.launcherSearchWidth = v
-                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        //"searchWidthFraction", v.toFixed(2)]
-                                    //_lcWrite.running = true
-                                //}
-                            //}
+                            // Sliders bind directly to Config.launcher* — the qs launcher
+                            // reads those reactively (same pattern as every other CC tab);
+                            // values persist via Config's Settings store.
+                            CCSlider {
+                                label: "Search Width"
+                                from: 0.2; to: 1.0; stepSize: 0.05; decimals: 2
+                                value: Config.launcherSearchWidth
+                                onMoved: function(v) {
+                                    Config.launcherSearchWidth = v
+                                }
+                            }
 
                             CCSection { text: "Icon" }
                             CCSlider {
@@ -4381,9 +4032,6 @@ PanelWindow {
                                 value: Config.launcherIconSize
                                 onMoved: function(v) {
                                     Config.launcherIconSize = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "iconSize", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
                             CCSlider {
@@ -4392,9 +4040,6 @@ PanelWindow {
                                 value: Config.launcherTextFontSize
                                 onMoved: function(v) {
                                     Config.launcherTextFontSize = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "textFontSize", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
 
@@ -4405,9 +4050,6 @@ PanelWindow {
                                 value: Config.launcherFixedTileWidth
                                 onMoved: function(v) {
                                     Config.launcherFixedTileWidth = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "fixedTileWidth", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
                             CCSlider {
@@ -4416,9 +4058,6 @@ PanelWindow {
                                 value: Config.launcherFixedTileHeight
                                 onMoved: function(v) {
                                     Config.launcherFixedTileHeight = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "fixedTileHeight", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
 
@@ -4429,9 +4068,6 @@ PanelWindow {
                                 value: Config.launcherFrameWidth
                                 onMoved: function(v) {
                                     Config.launcherFrameWidth = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "frameWidth", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
                             CCSlider {
@@ -4440,9 +4076,6 @@ PanelWindow {
                                 value: Config.launcherFrameHeight
                                 onMoved: function(v) {
                                     Config.launcherFrameHeight = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "frameHeight", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
 
@@ -4453,9 +4086,6 @@ PanelWindow {
                                 value: Config.launcherFrameWidthVert
                                 onMoved: function(v) {
                                     Config.launcherFrameWidthVert = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "frameWidthVert", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
                             CCSlider {
@@ -4464,68 +4094,44 @@ PanelWindow {
                                 value: Config.launcherFrameHeightVert
                                 onMoved: function(v) {
                                     Config.launcherFrameHeightVert = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "frameHeightVert", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
 
-                            //CCSection { text: "Borders" }
-                            //CCSlider {
-                                //label: "Outer Radius"
-                                //from: 0; to: 40
-                                //value: Config.launcherBorderRadius
-                                //onMoved: function(v) {
-                                    //Config.launcherBorderRadius = Math.round(v)
-                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        //"borderRadius", Math.round(v).toString()]
-                                    //_lcWrite.running = true
-                                //}
-                            //}
-                            //CCSlider {
-                                //label: "Outer Width"
-                                //from: 0; to: 8
-                                //value: Config.launcherBorderWidth
-                                //onMoved: function(v) {
-                                    //Config.launcherBorderWidth = Math.round(v)
-                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        //"borderWidth", Math.round(v).toString()]
-                                    //_lcWrite.running = true
-                                //}
-                            //}
-                            //CCSlider {
-                                //label: "Search Radius"
-                                //from: 0; to: 30
-                                //value: Config.launcherSearchRadius
-                                //onMoved: function(v) {
-                                    //Config.launcherSearchRadius = Math.round(v)
-                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        //"searchRadius", Math.round(v).toString()]
-                                    //_lcWrite.running = true
-                                //}
-                            //}
-                            //CCSlider {
-                                //label: "List Radius"
-                                //from: 0; to: 30
-                                //value: Config.launcherListRadius
-                                //onMoved: function(v) {
-                                    //Config.launcherListRadius = Math.round(v)
-                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        //"listRadius", Math.round(v).toString()]
-                                    //_lcWrite.running = true
-                                //}
-                            //}
-                            //CCSlider {
-                                //label: "Inner Border W"
-                                //from: 0; to: 4
-                                //value: Config.launcherInnerBorderWidth
-                                //onMoved: function(v) {
-                                    //Config.launcherInnerBorderWidth = Math.round(v)
-                                    //_lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        //"innerBorderWidth", Math.round(v).toString()]
-                                    //_lcWrite.running = true
-                                //}
-                            //}
+                            CCSection { text: "Borders" }
+                            CCSlider {
+                                label: "Outer Radius"
+                                from: 0; to: 40
+                                value: Config.launcherBorderRadius
+                                onMoved: function(v) {
+                                    Config.launcherBorderRadius = Math.round(v)
+                                }
+                            }
+                            CCSlider {
+                                label: "Outer Width"
+                                from: 0; to: 8
+                                value: Config.launcherBorderWidth
+                                onMoved: function(v) {
+                                    Config.launcherBorderWidth = Math.round(v)
+                                }
+                            }
+                            // Search Radius slider stays off — the qs search field is a
+                            // fixed 99px pill (GJS .search-frame parity).
+                            CCSlider {
+                                label: "List Radius"
+                                from: 0; to: 30
+                                value: Config.launcherListRadius
+                                onMoved: function(v) {
+                                    Config.launcherListRadius = Math.round(v)
+                                }
+                            }
+                            CCSlider {
+                                label: "Inner Border W"
+                                from: 0; to: 4
+                                value: Config.launcherInnerBorderWidth
+                                onMoved: function(v) {
+                                    Config.launcherInnerBorderWidth = Math.round(v)
+                                }
+                            }
 
                             CCSection { text: "Padding" }
                             CCSlider {
@@ -4534,15 +4140,8 @@ PanelWindow {
                                 value: Config.launcherInnerPadding
                                 onMoved: function(v) {
                                     Config.launcherInnerPadding = Math.round(v)
-                                    _lcWrite.command = [scriptDir + "/launcher-config-set.sh",
-                                        "innerPadding", Math.round(v).toString()]
-                                    _lcWrite.running = true
                                 }
                             }
-
-                            // Shared writer — calls launcher-config-set.sh which writes
-                            // directly into launcherConfig.js (the GJS launcher's source of truth).
-                            Process { id: _lcWrite; running: false; onExited: running = false }
 
                             // ── Rofi (other menus — drun replaced by App Launcher) ──
                             CCSection { text: "Rofi (Other Menus)" }
