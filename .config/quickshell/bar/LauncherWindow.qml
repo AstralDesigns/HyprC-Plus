@@ -132,18 +132,61 @@ Item {
             // across launches. webShowError drives the SearXNG-down overlay.
             property bool webShowError: false
             property bool webShowBookmarks: false
-            property WebEngineProfile webProfile: WebEngineProfile {
-                storageName: "hyprcandy-launcher"   // persistent on-disk profile
-                // Pin on-disk storage + cache to a stable path. The agent React app
-                // has no WebKit host in QtWebEngine, so its bridge falls back to
-                // localStorage for EVERYTHING it persists — including the last
-                // provider/model and the BYOK key (secret_hyprcandy_byok_<provider>).
-                // QtWebEngine's default profile path is not flushed reliably when a
-                // transient window is torn down, which is why the workspace kept
-                // resetting to openrouter/free. Storage is origin-scoped, so SearXNG
-                // (127.0.0.1:8080) and the agent (127.0.0.1:17842) stay separate.
+            property bool webShowCredentials: false
+            // Search-box text for the bookmarks / credentials dropdowns (they
+            // can outgrow the scroll height, so both are filterable).
+            property string webBookmarkQuery: ""
+            property string webCredentialQuery: ""
+            // Origins (domains) that currently hold stored cookies, accumulated
+            // from the profile's cookie store; feeds the clear-credentials menu.
+            property var webCredOrigins: []
+            // QtWebEngine will NOT mkdir -p a nested persistentStoragePath/cache
+            // path: if the directory is absent when the (isFinal, creation-time)
+            // profile initialises, on-the-record storage silently no-ops and
+            // cookies/localStorage never reach disk -- which is exactly why site
+            // logins were not surviving across launches. Create both roots up
+            // front so the profile below actually persists to them.
+            Process {
+                id: webStorageInitProc
+                command: ["mkdir", "-p",
+                          Config.home + "/.local/share/hyprcandy/webengine",
+                          Config.home + "/.local/share/hyprcandy/webengine/Default",
+                          Config.home + "/.cache/hyprcandy/webengine"]
+                Component.onCompleted: running = true
+            }
+            // Persistent (on-the-record) profile via WebEngineProfilePrototype.
+            // Qt 6.9+ deprecated the inline `WebEngineProfile {}` element: it now
+            // silently stays OFF-THE-RECORD (ignores storageName/cachePath, so the
+            // Chromium cookie DB is never written) -- the exact "login dropped on
+            // restart / empty credentials menu" symptom. The prototype's instance()
+            // DOES persist, but calling it as a property BINDING during component
+            // init SIGSEGVs this patched noctalia-qs build; resolving it ONCE in
+            // win.Component.onCompleted (post-init) is crash-free (validated in an
+            // isolated probe: otr=false, Cookies DB written + survives a restart).
+            // profile is isFinal (creation-time only), so every WebEngineView is
+            // created only AFTER win.webProfile is set (agentView via a gated
+            // Loader, tab views via _ensureView). All views share this ONE profile
+            // -- a second in-process WebEngineProfile aborts this build.
+            WebEngineProfilePrototype {
+                id: webProfileProto
+                storageName: "hyprcandy-launcher"
                 persistentStoragePath: Config.home + "/.local/share/hyprcandy/webengine"
                 cachePath: Config.home + "/.cache/hyprcandy/webengine"
+                httpCacheType: WebEngineProfile.DiskHttpCache
+                persistentCookiesPolicy: WebEngineProfile.ForcePersistentCookies
+            }
+            property WebEngineProfile webProfile: null
+
+            // activeView re-pins (tab switch/create/close) are not observable
+            // through a normal binding on the pooled per-view signals, so
+            // re-emit the shared chrome properties whenever the handle moves —
+            // toolbar enabled-state, address text, progress, overlay, header.
+            Connections {
+                target: win.activeView
+                function onLoadingChanged() { win.webRev++ }
+                function onTitleChanged() { win.webRev++ }
+                function onUrlChanged() { win.webRev++ }
+                ignoreUnknownSignals: true
             }
 
             // ── Web-Search startup policy (SearXNG container ON/OFF) ──────
@@ -157,6 +200,12 @@ Item {
             readonly property string webStatePath: Config.home
                 + "/.local/share/hyprcandy/websearch-startup-state.json"
             property bool webEnabled: true
+            property bool webAdBlockEnabled: true
+            // Ad/tracker blocker source, loaded from scripts/webscripts/adblock.js
+            // so the blocklist is user-editable without touching QML. Empty until
+            // the FileView reads it; views made before then get no blocker until
+            // re-injected on the next tab open or a shield toggle.
+            property string webAdBlockScript: ""
             property bool _webResolved: false
             // The launcher window is now kept loaded (hidden) so the shared
             // WebEngineView survives hide/show. Defer backend warm-up until the
@@ -166,8 +215,9 @@ Item {
 
             // ── Collapsible web header (tab strip + nav toolbar) ─────────
             // The two chrome rows collapse to a thin rounded hotspot so sites get
-            // maximum render space; hovering the hotspot (or pinning it) expands
-            // them, and drifting into the page collapses them again after a beat.
+            // maximum render space; hovering the hotspot (or double-clicking it)
+            // expands them, and the chevron-up glyph folds them back explicitly.
+            // (No auto-collapse: the native view swallows pointer-exit events.)
             property bool webHeaderHover: false
             property bool webHeaderPinned: false
             readonly property bool webHeaderShown: win.tab === "websearch" && win.webEnabled
@@ -179,8 +229,33 @@ Item {
                 watchChanges: false
                 onLoaded: {
                     win.webEnabled = win.readWebStartupState()
+                    win.webAdBlockEnabled = win.readAdBlockState()
                     win._webResolved = true
-                    if (win.webEnabled && win.visible) win.webEnsureUp()
+                    // Only warm once the policy is resolved (2a): a persisted
+                    // OFF must never be raced by a docker warm-up.
+                    if (win.webEnabled && win.visible && win._webResolved) win.webEnsureUp()
+                }
+                Component.onCompleted: reload()
+            }
+
+            // Load the ad-block user script (read once at startup; watchChanges
+            // false). A late load re-injects into any tabs already open.
+            FileView {
+                id: adBlockScriptFile
+                path: Config.barDir + "/scripts/webscripts/adblock.js"
+                watchChanges: false
+                onLoaded: {
+                    // NOTE: FileView.exists is undefined in this Quickshell build, so
+                    // it must NOT gate the read -- text() is the content (empty when
+                    // unreadable) and onLoaded only fires on a successful load.
+                    win.webAdBlockScript = adBlockScriptFile.text() || ""
+                    // Re-inject into any views built before this async load finished
+                    // (restored tabs) and reload them -- setting the collection alone
+                    // does not re-run DocumentCreation on an already-loaded page.
+                    for (var k in win._views) {
+                        var v = win._views[k]
+                        if (v) { win._applyUserScripts(v); v.reload() }
+                    }
                 }
                 Component.onCompleted: reload()
             }
@@ -193,17 +268,27 @@ Item {
                           win.webStatePath, webWriteProc._content]
             }
 
-            function writeWebStartupState(enabled) {
-                webWriteProc._content = JSON.stringify({ enabled: !!enabled }) + "\n"
+            function writeWebStartupState() {
+                webWriteProc._content = JSON.stringify({ enabled: !!win.webEnabled, adblock: !!win.webAdBlockEnabled }) + "\n"
                 webWriteProc.running = false
                 webWriteProc.running = true
             }
 
             function readWebStartupState() {
                 try {
-                    if (!webStateFile.exists) return true
-                    const o = JSON.parse(webStateFile.text())
+                    const t = webStateFile.text()
+                    if (!t) return true
+                    const o = JSON.parse(t)
                     return (o && typeof o.enabled === "boolean") ? o.enabled : true
+                } catch (e) { return true }
+            }
+
+            function readAdBlockState() {
+                try {
+                    const t = webStateFile.text()
+                    if (!t) return true
+                    const o = JSON.parse(t)
+                    return (o && typeof o.adblock === "boolean") ? o.adblock : true
                 } catch (e) { return true }
             }
 
@@ -212,18 +297,22 @@ Item {
             function webToggleEnabled() {
                 const next = !win.webEnabled
                 win.webEnabled = next
-                win.writeWebStartupState(next)
+                win.writeWebStartupState()
                 if (next) {
                     if (win.tab !== "websearch") win.switchTab("websearch")
                     else win.webEnsureUp()
                 } else {
-                    win.webTabs = [{ url: win.searxBase, title: "" }]
+                    // OFF: destroy every tab view (releasing renderers) and reset
+                    // to a single home tab with a fresh id.
+                    win._destroyAllViews()
+                    win.webTabs = [{ url: win.searxBase, title: "", _id: win._nextTabId++ }]
                     win.activeWebTab = 0
+                    win._setActiveView(null)
                     win._webTouch()
                     win.searxStopDocker()
                     win.webShowError = false
+                    win.searxDown = false
                     win.webShowBookmarks = false
-                    if (webView) webView.url = "about:blank"
                     if (win.tab === "websearch") win.switchTab("launcher")
                 }
             }
@@ -244,44 +333,220 @@ Item {
             property bool agentStarting: false
             property bool agentMissing: false
 
-            // ── Per-tab persistent web surfaces ────────────────────────────
+            // ── Per-tab persistent view pool (imperative, tab-id keyed) ────
             // Two live WebEngineViews coexist in this patched Qt 6.11 build
             // (validated: two views alive 45s+, no SIGTRAP) PROVIDED they share
             // the ONE win.webProfile -- a second in-process WebEngineProfile is
-            // still the abort trigger. So webView renders the websearch tab-strip
-            // and agentView renders the agent workspace, both on webProfile.
-            // Websearch "tabs" stay a LOGICAL model over the single webView (a
-            // per-tab last URL + on-the-record profile keep logins/destinations
-            // across switches/restarts); agentView loads its url ONCE (bound only
-            // to agentReady, never re-navigated on tab switch) so the React+Monaco
-            // workspace persists across tab round-trips instead of reloading like
-            // a browser tab. It still uses QtWebEngine's own persistent profile
-            // (no libsecret backend) for credentials.
-            property var webTabs: [{ url: searxBase, title: "" }]
+            // still the abort trigger. Each websearch tab owns exactly ONE
+            // WebEngineView, created imperatively (tabViewProto -> webViewContainer)
+            // and keyed by a stable tab id. A view loads its URL ONCE and is
+            // NEVER re-navigated by model churn, so creating / closing /
+            // reordering / switching tabs leaves every OTHER tab's page (and its
+            // in-page state) completely untouched -- only the explicit reload
+            // button or the address bar navigates a page. Only the active tab's
+            // view is visible; the rest stay loaded. Closing a tab destroys just
+            // that tab's view (releasing its renderer). agentView (the workspace)
+            // is a separate persistent view on the same profile.
+            property var webTabs: [{ url: searxBase, title: "", _id: 1 }]
             property int activeWebTab: 0
             property int webRev: 0
+            // The view of the ACTIVE tab (null until it exists). Chrome rows
+            // bind through this handle; re-emitted via webRev when it moves.
+            property var activeView: null
+            // Background truth about the SearXNG container (health checks set
+            // it); deliberately NOT what paints the overlay anymore (2c).
+            property bool searxDown: false
+            // tabId -> WebEngineView, managed imperatively (a Repeater would
+            // re-navigate reused delegates when the array shifts on removal).
+            property var _views: ({})
+            property int _nextTabId: 2
+            // Tab whose view is in HTML5 fullscreen (-1 = none): its view stays
+            // inside webViewContainer and the launcher chrome folds, so the
+            // media fills only the tab's web-view area (other tabs and the
+            // desktop stay reachable) rather than taking over the whole window.
+            property int webFullscreenTabId: -1
+
+            // Modern Chrome UA (QtWebEngine token stripped) injected as a
+            // document-creation script into every web tab so sites that gate on
+            // navigator.userAgent serve the desktop app. WhatsApp Web's "needs
+            // Chrome 100+" wall trips on the "QtWebEngine" marker, not the
+            // version -- this Chromium already reports Chrome/140, so we only
+            // drop the toolkit token. httpUserAgent is isFinal/absent from the
+            // prototype and the --user-agent flag is ignored by this build, so a
+            // MainWorld DocumentCreation user script is the only working lever.
+            readonly property string webUserAgent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
+            readonly property string webUserScriptSource: "try{var B=[{brand:'Not_A Brand',version:'8'},{brand:'Chromium',version:'140'},{brand:'Google Chrome',version:'140'}];var U=\"" + webUserAgent + "\";var A=U.replace(/^Mozilla\\//,'');Object.defineProperty(navigator,'userAgent',{configurable:true,get:function(){return U;}});Object.defineProperty(navigator,'appVersion',{configurable:true,get:function(){return A;}});Object.defineProperty(navigator,'userAgentData',{configurable:true,get:function(){return {brands:B,mobile:false,platform:'Linux',getHighEntropyValues:function(){return Promise.resolve({brands:B,mobile:false,platform:'Linux',platformVersion:'6.5.0',architecture:'x86',bitness:'64',model:'',uaFullVersion:'140.0.0.0',fullVersionList:B});}};}});}catch(e){}"
 
             function _webTouch() { win.webTabs = win.webTabs.slice(); win.webRev++ }
             function _webTab() { return win.webTabs[win.activeWebTab] || win.webTabs[0] }
+            function _webTabAt(i) { return win.webTabs[i] || null }
+            function _activeTabObj() { return win.webTabs[win.activeWebTab] || null }
+            function _tabById(id) {
+                for (var i = 0; i < win.webTabs.length; i++)
+                    if (win.webTabs[i]._id === id) return win.webTabs[i]
+                return null
+            }
+            function _setActiveView(v) { win.activeView = v; win.webRev++ }
+            function _urlBarText() {
+                return (win.activeView && win.activeView.url)
+                       ? win.activeView.url.toString() : win.searxBase
+            }
+            // Compact, browser-style display form of the address bar (scheme +
+            // trailing slash stripped) shown only while the field is UNFOCUSED.
+            // Focusing swaps back to the full URL (_urlBarText) so editing and
+            // any selection/copy always operate on the complete URL.
+            function _urlDisplayText() {
+                const u = win._urlBarText()
+                if (!u || u === "about:blank") return ""
+                return u.replace(/^https?:\/\//, "").replace(/\/$/, "")
+            }
+
+            // Compose a view's user scripts: the Chrome-UA spoof always, plus the
+            // ad/tracker blocker when enabled and its source is loaded. Both run at
+            // DocumentCreation in the MainWorld so they beat the page's own scripts.
+            function _applyUserScripts(v) {
+                if (!v) return
+                // This patched build's non-standard userScripts.collection only
+                // reliably injects a SINGLE entry: a second (11KB) source was silently
+                // dropped -- the blocker never ran (no HCAB-RUN, doubleclick XHRs
+                // reached CORS) while the first UA script did. So merge the UA spoof
+                // and the ad/tracker blocker into ONE DocumentCreation source.
+                // adblock.js is a self-contained IIFE, so concatenation is safe.
+                var src = win.webUserScriptSource
+                if (win.webAdBlockEnabled && win.webAdBlockScript && win.webAdBlockScript.length)
+                    src += "\n;" + win.webAdBlockScript
+                v.userScripts.collection = [{
+                    name: "hyprcandy-inject", sourceCode: src,
+                    injectionPoint: 2, worldId: 0, runsOnSubFrames: true
+                }]
+            }
+
+            // Shield toggle: flip + persist, then re-inject into every live tab and
+            // reload so the change takes effect immediately.
+            function webToggleAdBlock() {
+                win.webAdBlockEnabled = !win.webAdBlockEnabled
+                win.writeWebStartupState()
+                for (var k in win._views) {
+                    var v = win._views[k]
+                    if (v) { win._applyUserScripts(v); v.reload() }
+                }
+                win.webRev++
+            }
+
+            // Create the tab's view once (loading its stored URL); never here.
+            function _ensureView(tab) {
+                if (!tab) return null
+                // Never create a view before the shared profile is resolved (a view
+                // built with a null profile would fall back to a SECOND in-process
+                // profile and abort this build). onCompleted sets it first, so this
+                // is just a defensive guard for the very earliest restore path.
+                if (!win.webProfile) return null
+                var id = tab._id
+                var v = win._views[id]
+                if (!v) {
+                    if (!webViewContainer || !tabViewProto) return null
+                    v = tabViewProto.createObject(webViewContainer, { tabId: id })
+                    if (!v) return null
+                    win._views[id] = v
+                    v.url = (tab.url && tab.url.length) ? tab.url : win.searxBase
+                }
+                return v
+            }
+            function _destroyView(id) {
+                var v = win._views[id]
+                if (!v) return
+                if (win.webFullscreenTabId === id) win.webFullscreenTabId = -1
+                v.visible = false
+                v.destroy()
+                delete win._views[id]
+            }
+            function _destroyAllViews() {
+                for (var k in win._views) { if (win._views[k]) win._views[k].destroy() }
+                win._views = ({})
+                win.webFullscreenTabId = -1
+            }
+            function _syncViewVisibility() {
+                var t = win._activeTabObj()
+                var activeId = t ? t._id : -1
+                for (var i = 0; i < win.webTabs.length; i++) {
+                    var v = win._views[win.webTabs[i]._id]
+                    if (v) v.visible = (win.webTabs[i]._id === activeId
+                                        && win.tab === "websearch")
+                }
+                var av = activeId >= 0 ? (win._views[activeId] || null) : null
+                if (av !== win.activeView) win._setActiveView(av)
+            }
+            function _syncActiveView() { Qt.callLater(function () { win._syncViewVisibility() }) }
+
+            // ── Per-view signal handlers (routed by the view's stable tabId) ──
+            function _onViewLoad(id, loadRequest) {
+                const dest = String(loadRequest.url ? loadRequest.url.toString() : "")
+                const t = win._tabById(id)
+                if (t && dest && dest !== "about:blank") t.url = dest
+                if (win._activeTabObj() && win._activeTabObj()._id === id) {
+                    const err = (loadRequest.errorString !== "" && loadRequest.error)
+                    if (err && dest.indexOf(win.searxBase) === 0) win.webShowError = true
+                    else if (dest.indexOf(win.searxBase) !== 0) win.webShowError = false
+                }
+                win.webRev++
+            }
+            function _onViewTitle(id, title) {
+                const t = win._tabById(id); if (t) t.title = title; win.webRev++
+            }
+            function _onViewUrl(id, url) {
+                const t = win._tabById(id); if (t && url) t.url = url.toString(); win.webRev++
+            }
+            // HTML5 fullscreen (Qt6 API: onFullScreenRequested, not the
+            // non-existent featureRequested): when a page (e.g. a YouTube
+            // player) requests it, accept but keep the view inside
+            // webViewContainer -- its anchors.fill:parent already covers the
+            // web-search area, and folding the chrome (webFullscreenTabId)
+            // lets the media expand to fill just that area. This is the
+            // deliberate "contained fullscreen" quirk: the video grows into
+            // the tab's web view while the tab pills, the rest of the launcher
+            // and the desktop behind it all remain interactive. No reparenting.
+            function _onViewFullScreen(id, request) {
+                const v = win._views[id]
+                if (!v) { request.reject(); return }
+                request.accept()
+                win.webFullscreenTabId = request.toggleOn ? id : -1
+                win.webRev++
+            }
+
+            function webNavigateActive(url) {
+                const u = String(url ?? win.searxBase)
+                const t = win._activeTabObj()
+                if (t) t.url = u
+                const v = t ? win._views[t._id] : win.activeView
+                if (v) v.url = u
+                else win.syncWebSurface()
+            }
+
+            // Persist the active tab's live url/title into the model (views
+            // already report changes live via _onViewUrl/_onViewTitle; this is
+            // just belt-and-braces before a switch/hide).
             function webSaveActive() {
-                if (win.tab !== "websearch" || !webView) return
-                const t = win._webTab()
+                if (win.tab !== "websearch") return
+                const t = win._activeTabObj()
                 if (!t) return
-                t.url = webView.url ? webView.url.toString() : t.url
-                t.title = webView.title || t.title
                 win._webTouch()
             }
             function webNewTab(url) {
-                win.webSaveActive()
-                win.webTabs.push({ url: (url && url.length) ? String(url) : win.searxBase, title: "" })
+                const tab = { url: (url && url.length) ? String(url) : win.searxBase,
+                              title: "", _id: win._nextTabId++ }
+                win.webTabs.push(tab)
                 win.activeWebTab = win.webTabs.length - 1
                 win._webTouch()
-                win.syncWebSurface()
+                win._ensureView(tab)
+                win._syncViewVisibility()
                 win.webSaveTabsState()
             }
             function webCloseTab(i) {
+                // Destroy ONLY this tab's view; surviving tabs keep theirs.
+                const t = win.webTabs[i]
+                if (t) win._destroyView(t._id)
                 if (win.webTabs.length <= 1) {
-                    win.webTabs = [{ url: win.searxBase, title: "" }]
+                    win.webTabs = [{ url: win.searxBase, title: "", _id: win._nextTabId++ }]
                     win.activeWebTab = 0
                 } else {
                     win.webTabs.splice(i, 1)
@@ -289,18 +554,19 @@ Item {
                     if (win.activeWebTab >= win.webTabs.length) win.activeWebTab = win.webTabs.length - 1
                 }
                 win._webTouch()
-                win.syncWebSurface()
+                win._ensureView(win._activeTabObj())
+                win._syncViewVisibility()
                 win.webSaveTabsState()
             }
             function webSwitchTab(i) {
                 if (i === win.activeWebTab) return
-                win.webSaveActive()
                 win.activeWebTab = i
-                win.syncWebSurface()
+                win._webTouch()
+                win._ensureView(win._activeTabObj())
+                win._syncViewVisibility()
                 win.webSaveTabsState()
             }
-            // Drag-to-reorder: move a tab from one slot to another, keeping the
-            // active-tab pointer attached to the tab that is actually active.
+            // Drag-to-reorder: move a tab slot; views are untouched (keyed by id).
             function webMoveTab(from, to) {
                 if (from === to || from < 0 || to < 0) return
                 if (from >= win.webTabs.length || to >= win.webTabs.length) return
@@ -310,21 +576,18 @@ Item {
                 else if (from < win.activeWebTab && to >= win.activeWebTab) win.activeWebTab--
                 else if (from > win.activeWebTab && to <= win.activeWebTab) win.activeWebTab++
                 win._webTouch()
+                win._syncViewVisibility()
                 win.webSaveTabsState()
             }
-            // Point the websearch view at whatever the active logical tab should
-            // show. The agent tab has its OWN persistent view (agentView) whose url
-            // is bound only to agentReady, so this never touches the agent session.
+            // Ensure the active tab has a materialised view (defaulting a blank
+            // tab to SearXNG home, 2b) and re-pin the chrome handle. Called on
+            // tab switch / page show / restore. Never re-navigates a live view.
             function syncWebSurface() {
-                if (!webView) return
-                if (win.tab === "websearch") {
-                    if (!win.webEnabled) return   // dormant: keep the view parked
-                    const t = win._webTab()
-                    const u = (t && t.url && t.url.length) ? t.url : win.searxBase
-                    // Only navigate when the destination actually changed. Returning to a
-                    // tab whose page is already loaded must NOT reload it.
-                    if (!webView.url || webView.url.toString() !== u) webView.url = u
-                }
+                const t = win._activeTabObj()
+                if (!t) return
+                if (!t.url || t.url === "about:blank") t.url = win.searxBase
+                win._ensureView(t)
+                win._syncViewVisibility()
             }
 
             // ── Web tab persistence across launcher hide/show ───────────
@@ -343,7 +606,8 @@ Item {
                         const o = JSON.parse(webTabsFile.text())
                         if (o && Array.isArray(o.tabs) && o.tabs.length) {
                             win.webTabs = o.tabs.map(function (t) {
-                                return { url: String(t.url || win.searxBase), title: String(t.title || "") }
+                                return { url: String(t.url || win.searxBase),
+                                         title: String(t.title || ""), _id: win._nextTabId++ }
                             })
                             win.activeWebTab = Math.min(Math.max(0, o.active | 0), win.webTabs.length - 1)
                             win.webRev++
@@ -368,6 +632,73 @@ Item {
                 }) + "\n"
                 webTabsWriteProc.running = false
                 webTabsWriteProc.running = true
+            }
+
+            // ── Clear-credentials menu data ──────────────────────────────
+            // This Qt build exposes NO cookieStore/deleteAllCookies API to QML
+            // (verified against QtWebEngine/plugins.qmltypes: only the
+            // persistentCookiesPolicy enum + persistentStoragePath exist), so
+            // the list of sites holding stored credentials is read straight from
+            // the profile's on-disk Chromium cookie DB (column host_key), opened
+            // read-only so it is safe while the browser process holds it open.
+            readonly property string webProfileDir: Config.home
+                + "/.local/share/hyprcandy/webengine"
+            Process {
+                id: webCredListProc
+                property string _buf: ""
+                command: ["python3", "-c",
+                    "import sqlite3,glob,json,sys\n" +
+                    "base=sys.argv[1]; out=[]; s=set()\n" +
+                    "for db in glob.glob(base+'/**/Cookies',recursive=True)+glob.glob(base+'/**/cookies',recursive=True):\n" +
+                    "  try:\n" +
+                    "    c=sqlite3.connect('file:'+db+'?mode=ro',uri=True)\n" +
+                    "    for row in c.execute('select distinct host_key from cookies order by host_key'):\n" +
+                    "      h=row[0]\n" +
+                    "      if h and h not in s: s.add(h); out.append(h)\n" +
+                    "    c.close()\n" +
+                    "  except Exception: pass\n" +
+                    "print(json.dumps(out))",
+                    win.webProfileDir]
+                stdout: SplitParser {
+                    onRead: function (line) { webCredListProc._buf += line + "\n" }
+                }
+                onExited: {
+                    try { win.webCredOrigins = JSON.parse(webCredListProc._buf.trim()) }
+                    catch (e) { win.webCredOrigins = [] }
+                    webCredListProc._buf = ""
+                    webCredListProc.running = false
+                }
+            }
+            function webRefreshCredOrigins() {
+                webCredListProc.running = false
+                webCredListProc._buf = ""
+                webCredListProc.running = true
+            }
+            // Clearing has no QML API either, so it is done with a DELETE on the
+            // cookie DB (host_key-scoped or all). Chromium caches cookies in the
+            // running profile, so removal takes full effect when the web tab /
+            // profile is next recycled (websearch OFF-ON toggle or relaunch).
+            Process {
+                id: webCredClearProc
+                property string _host: ""
+                command: ["python3", "-c",
+                    "import sqlite3,glob,sys\n" +
+                    "base=sys.argv[1]; host=sys.argv[2]\n" +
+                    "for db in glob.glob(base+'/**/Cookies',recursive=True)+glob.glob(base+'/**/cookies',recursive=True):\n" +
+                    "  try:\n" +
+                    "    c=sqlite3.connect(db)\n" +
+                    "    if host: c.execute('delete from cookies where host_key=?',(host,))\n" +
+                    "    else: c.execute('delete from cookies')\n" +
+                    "    c.commit(); c.close()\n" +
+                    "  except Exception: pass",
+                    win.webProfileDir, webCredClearProc._host]
+            }
+            function webClearCredential(host) {
+                webCredClearProc._host = host || ""
+                webCredClearProc.running = false
+                webCredClearProc.running = true
+                if (win.webProfile) win.webProfile.clearHttpCache()
+                Qt.callLater(win.webRefreshCredOrigins)
             }
 
             Process {
@@ -456,7 +787,8 @@ Item {
                 onLoaded: {
                     win.wsEnabled = win.readWorkspaceStartupState()
                     win._wsResolved = true
-                    if (win.wsEnabled && win.visible) win.ensureRuntimeBackend()
+                    // Same resolved-gate as the web policy (3a).
+                    if (win.wsEnabled && win.visible && win._wsResolved) win.ensureRuntimeBackend()
                 }
                 Component.onCompleted: reload()
             }
@@ -843,14 +1175,21 @@ Item {
                             healthRetry.stop()
                             win.searxDockerStarting = false
                             win.searxDockerAutoStarted = true
-                            // SearXNG came up after a docker start: re-cover the
-                            // overlay and (re)load the in-page webview.
-                            if (win.webShowError) webView.url = win.searxBase
+                            win.searxDown = false
+                            // SearXNG came up after a docker start: recover only an
+                            // ACTIVE tab that actually errored on the searx origin.
+                            const t = win._activeTabObj()
+                            if (win.webShowError && win.tab === "websearch" && t
+                                    && String(t.url || "").indexOf(win.searxBase) === 0) {
+                                win.webNavigateActive(win.searxBase)
+                            }
                             win.webShowError = false
                         } else if (healthRetry.attempts >= 25 || win.tab !== "websearch") {
                             healthRetry.stop()
                             win.searxDockerStarting = false
-                            win.webShowError = true
+                            // Background truth only — never paints the overlay over
+                            // a working page (2c); the view's own load error does.
+                            win.searxDown = true
                         } else {
                             healthRetry.attempts++
                         }
@@ -908,8 +1247,16 @@ Item {
             function webEnsureUp() {
                 win.checkSearxHealth(function(ok) {
                     if (ok) {
-                        if (win.webShowError) webView.url = win.searxBase
+                        win.searxDown = false
+                        const t = win._activeTabObj()
+                        if (win.webShowError && t
+                                && String(t.url || "").indexOf(win.searxBase) === 0) {
+                            win.webNavigateActive(win.searxBase)
+                        }
                         win.webShowError = false
+                        // Fresh session: make sure the active tab has a view and
+                        // defaults to the SearXNG home, not about:blank (2b).
+                        win.syncWebSurface()
                     } else {
                         win.searxStartDocker()
                     }
@@ -1355,7 +1702,7 @@ Item {
                 if (id === "agent") win.agentEnsureUp()
                 win.syncWebSurface()
                 Qt.callLater(function() {
-                    if (win.tab === "websearch" || win.tab === "agent") { if (webView) webView.forceActiveFocus() }
+                    if (win.tab === "websearch" || win.tab === "agent") { if (win.activeView) win.activeView.forceActiveFocus() }
                     else searchInput.forceActiveFocus()
                 })
             }
@@ -1406,11 +1753,13 @@ Item {
                     win.tab = HCCLauncherState.activeTab
                     if (win.tab === "clipboard") ClipboardState.refresh()
                     if (win.tab === "emoji") win.ensureGlyphData()
-                    if (win.tab === "websearch" && win.webEnabled) win.webEnsureUp()
-                    if (win.tab === "agent") win.agentEnsureUp()
+                    // Warm-up only once the persisted startup policies have been
+                    // resolved, so a stored OFF is never raced (2a/3a).
+                    if (win.tab === "websearch" && win.webEnabled && win._webResolved) win.webEnsureUp()
+                    if (win.tab === "agent" && win._wsResolved) win.agentEnsureUp()
                     win.syncWebSurface()
                     Qt.callLater(function() {
-                        if (win.tab === "websearch" || win.tab === "agent") { if (webView) webView.forceActiveFocus() }
+                        if (win.tab === "websearch" || win.tab === "agent") { if (win.activeView) win.activeView.forceActiveFocus() }
                         else searchInput.forceActiveFocus()
                     })
                 }
@@ -1452,7 +1801,13 @@ Item {
             }
             // Boot is deferred to the first show (see onVisibleChanged) — the
             // window stays loaded across hide/show so web/agent pages keep running.
-            Component.onCompleted: { }
+            Component.onCompleted: {
+                // Resolve the single persistent profile exactly once, post-init
+                // (calling instance() during component init SIGSEGVs -- see the
+                // webProfileProto block). Setting win.webProfile flips the gated
+                // agentViewLoader active and lets _ensureView build tab views.
+                win.webProfile = webProfileProto.instance()
+            }
 
             // ── Backdrop: click outside the card dismisses ────────────────
             MouseArea {
@@ -2571,11 +2926,13 @@ Item {
                         Item {
                             id: webSearchPage
                             anchors.fill: parent
-                            // Shared single-view surface: hosts the ONE webView for BOTH
-                            // the websearch and the workspace tabs (a 2nd live view crashes
-                            // this QtWebEngine build). On the websearch tab it only shows
-                            // when the container policy is ON; a dormant websearch shows the
-                            // enable card instead. Chrome overlays gate to websearch.
+                            // Per-tab view pool surface: hosts ONE WebEngineView per
+                            // websearch tab (plus the separate persistent agentView for
+                            // the workspace) — all sharing the single win.webProfile, so
+                            // switching tabs/round-tripping never reloads a page. On the
+                            // websearch tab only the active tab's view renders; a dormant
+                            // websearch shows the enable card instead. Chrome overlays
+                            // gate to websearch.
                             visible: win.tab === "agent" || (win.tab === "websearch" && win.webEnabled)
                             onVisibleChanged: if (visible) win.syncWebSurface()
 
@@ -2584,6 +2941,7 @@ Item {
                                 required property string glyph
                                 required property color tint
                                 required property var handler
+                                property int glyphSize: 15
                                 width: 34; height: 30; radius: 8
                                 color: wnMa.containsMouse
                                        ? Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.70)
@@ -2594,7 +2952,7 @@ Item {
                                     anchors.centerIn: parent
                                     text: parent.glyph
                                     font.family: Theme.fontFamily
-                                    font.pixelSize: 15
+                                    font.pixelSize: parent.glyphSize
                                     color: parent.tint
                                 }
                                 MouseArea {
@@ -2603,8 +2961,6 @@ Item {
                                     hoverEnabled: true
                                     enabled: parent.enabled
                                     cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                    onEntered: webHeaderCollapse.stop()
-                                    onExited: webHeaderCollapse.restart()
                                     onClicked: parent.handler()
                                 }
                             }
@@ -2629,18 +2985,12 @@ Item {
                                     anchors.margins: 0
                                     spacing: 6
 
-                                    // Collapse timer: after the pointer leaves the header and
-                                    // settles in the page, fold the chrome rows back away.
-                                    Timer {
-                                        id: webHeaderCollapse
-                                        interval: 1000
-                                        repeat: false
-                                        onTriggered: { if (!win.webHeaderPinned) win.webHeaderHover = false }
-                                    }
-
-                                    // ── Collapsed-header hotspot (websearch) ─────────
-                                    // When the chrome rows are folded this thin rounded handle
-                                    // is all that shows; hover expands, double-click pins open.
+                                    // ── Collapsed-header REVEAL hotspot (websearch) ─────
+                                    // When the chrome rows are folded this thin rounded
+                                    // handle is all that shows; hover expands, double-click
+                                    // pins open. Collapse is EXPLICIT only (chevron-up) —
+                                    // the old auto-collapse-on-exit raced the native view's
+                                    // event grabbing and folded the header unexpectedly.
                                     Rectangle {
                                         visible: win.tab === "websearch" && win.webEnabled
                                                  && !win.webHeaderShown
@@ -2655,20 +3005,19 @@ Item {
                                             anchors.fill: parent
                                             hoverEnabled: true
                                             cursorShape: Qt.PointingHandCursor
-                                            onEntered: { win.webHeaderHover = true; webHeaderCollapse.stop() }
-                                            onExited: webHeaderCollapse.restart()
+                                            onEntered: win.webHeaderHover = true
                                             onDoubleClicked: win.webHeaderPinned = !win.webHeaderPinned
                                         }
                                     }
 
                                     // ── Tab strip (websearch only) ───────────────
-                                    // Logical browser-style tabs over the ONE shared
-                                    // view: clicking navigates it to that tab's last
-                                    // URL; "+" opens SearXNG in a new tab; the trailing
-                                    // glyph closes a tab. The active tab shows the live
-                                    // webView title so it updates without array churn.
+                                    // Real browser-style tabs — each tab owns a pooled
+                                    // WebEngineView (below): clicking switches the visible
+                                    // view; "+" opens SearXNG in a new tab; the trailing
+                                    // glyph closes one (tearing its view down). The active
+                                    // tab shows the live view title via win.activeView.
                                     RowLayout {
-                                        visible: win.webHeaderShown
+                                        visible: win.webHeaderShown && win.webFullscreenTabId < 0
                                         Layout.fillWidth: true
                                         Layout.leftMargin: 8
                                         Layout.rightMargin: 8
@@ -2698,8 +3047,8 @@ Item {
                                                     Text {
                                                         id: tabLbl
                                                         Layout.fillWidth: true
-                                                        text: (index === win.activeWebTab && win.tab === "websearch" && webView)
-                                                              ? (webView.title || (webView.url ? webView.url.toString() : "New Tab"))
+                                                        text: (win.webRev, index === win.activeWebTab && win.tab === "websearch" && win.activeView)
+                                                              ? (win.activeView.title || (win.activeView.url ? win.activeView.url.toString() : "New Tab"))
                                                               : (modelData.title || modelData.url || "New Tab")
                                                         elide: Text.ElideRight
                                                         font.pixelSize: 11
@@ -2709,15 +3058,13 @@ Item {
                                                         Layout.preferredWidth: 18; Layout.preferredHeight: 18
                                                         visible: win.webTabs.length > 1
                                                         Text { anchors.centerIn: parent; text: "\u{F0156}"; font.family: Theme.fontFamily; font.pixelSize: 11; color: Qt.alpha(Theme.cOnSurf, 0.6) }
-                                                        MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onEntered: webHeaderCollapse.stop(); onExited: webHeaderCollapse.restart(); onClicked: win.webCloseTab(index) }
+                                                        MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: win.webCloseTab(index) }
                                                     }
                                                 }
                                                 MouseArea {
                                                     anchors.fill: parent
                                                     hoverEnabled: true
                                                     cursorShape: Qt.PointingHandCursor
-                                                    onEntered: webHeaderCollapse.stop()
-                                                    onExited: webHeaderCollapse.restart()
                                                     // Click switches tab; press-and-drag horizontally
                                                     // past ~60% of a tab reorders it (webMoveTab).
                                                     property real _sx: 0
@@ -2747,17 +3094,15 @@ Item {
                                             border.width: 1
                                             border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.18)
                                             Text { anchors.centerIn: parent; text: "\u{F0415}"; font.family: Theme.fontFamily; font.pixelSize: 14; color: Theme.cOnSurf }
-                                            MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onEntered: webHeaderCollapse.stop(); onExited: webHeaderCollapse.restart(); onClicked: win.webNewTab("") }
+                                            MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: win.webNewTab("") }
                                         }
                                         Item { Layout.fillWidth: true }
 
                                         // ── Collapse-header toggle (chevron-up) ──────────
-                                        // Auto-collapse on pointer-exit is unreliable: the native
-                                        // WebEngineView swallows hover, so onExited never fires when
-                                        // the cursor drifts down into the page and the collapse timer
-                                        // never restarts. This sits at the top-right of the tabs row
-                                        // (just above the bookmarks toggle in the nav row) and folds
-                                        // the chrome away explicitly. Re-expand via the hotspot above.
+                                        // The single explicit way to fold the chrome: the
+                                        // native WebEngineView swallows hover so auto-collapse
+                                        // on pointer-exit never worked reliably anyway. Fold
+                                        // here, re-expand via the reveal hotspot above.
                                         Rectangle {
                                             Layout.preferredWidth: 28; Layout.preferredHeight: 28; radius: 8
                                             color: collapseMa.containsMouse
@@ -2771,9 +3116,7 @@ Item {
                                                 anchors.fill: parent
                                                 hoverEnabled: true
                                                 cursorShape: Qt.PointingHandCursor
-                                                onEntered: webHeaderCollapse.stop()
                                                 onClicked: {
-                                                    webHeaderCollapse.stop()
                                                     win.webHeaderPinned = false
                                                     win.webHeaderHover = false
                                                 }
@@ -2782,69 +3125,155 @@ Item {
                                     }
 
                                     // ── Nav toolbar ──────────────────────────────
+                                    // Order: home · reload · back · address bar ·
+                                    // forward · bookmark toggle · bookmarks library ·
+                                    // clear-credentials. The old leading "back to
+                                    // launcher" glyph is gone (the tab-pill already
+                                    // carries the apps toggle). back/forward/home use
+                                    // a larger glyph so they match the reload circle.
                                     RowLayout {
-                                        visible: win.webHeaderShown
+                                        visible: win.webHeaderShown && win.webFullscreenTabId < 0
                                         Layout.fillWidth: true
                                         Layout.leftMargin: 10
                                         Layout.rightMargin: 10
                                         Layout.topMargin: 10
                                         Layout.bottomMargin: 2
                                         spacing: 6
-                                        // Leave websearch → back to the launcher tab.
-                                        WebNavBtn { glyph: "\u{2190}"; tint: Theme.cPrimary; handler: function () { win.switchTab("launcher") } }
+                                        WebNavBtn { glyphSize: 19; glyph: "\u{2302}"; tint: Theme.cOnSurf; handler: function () { win.webNavigateActive(win.searxBase) } }
+                                        WebNavBtn { glyph: "\u{F0453}"; tint: Theme.cOnSurf; handler: function () { if (win.activeView) win.activeView.reload() } }
                                         WebNavBtn {
-                                            glyph: "\u{21B6}"; enabled: webView.canGoBack
-                                            tint: webView.canGoBack ? Theme.cOnSurf : Qt.alpha(Theme.cOnSurf, 0.35)
-                                            handler: function () { if (webView.canGoBack) webView.goBack() }
+                                            glyphSize: 19
+                                            glyph: "\u{21B6}"; enabled: win.activeView ? win.activeView.canGoBack : false
+                                            tint: (win.webRev, win.activeView && win.activeView.canGoBack) ? Theme.cOnSurf : Qt.alpha(Theme.cOnSurf, 0.35)
+                                            handler: function () { if (win.activeView && win.activeView.canGoBack) win.activeView.goBack() }
                                         }
-                                        WebNavBtn {
-                                            glyph: "\u{21B7}"; enabled: webView.canGoForward
-                                            tint: webView.canGoForward ? Theme.cOnSurf : Qt.alpha(Theme.cOnSurf, 0.35)
-                                            handler: function () { if (webView.canGoForward) webView.goForward() }
-                                        }
-                                        WebNavBtn { glyph: "\u{27F3}"; tint: Theme.cOnSurf; handler: function () { webView.reload() } }
-                                        WebNavBtn { glyph: "\u{2302}"; tint: Theme.cOnSurf; handler: function () { webView.url = win.searxBase } }
 
-                                        // Address display (read-only current URL).
+                                        // Editable address bar: shows the live URL, but
+                                        // the user can type/paste a URL (or a search)
+                                        // and press Enter / the go-arrow to navigate.
                                         Rectangle {
                                             Layout.fillWidth: true; Layout.preferredHeight: 30; radius: 8
-                                            color: Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.55)
+                                            color: urlInput.activeFocus
+                                                   ? Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.82)
+                                                   : Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.55)
                                             border.width: 1
-                                            border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.20)
-                                            Text {
-                                                anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 10 }
-                                                text: webView.url ? webView.url.toString() : win.searxBase
-                                                font.pixelSize: 11
-                                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.75)
-                                                elide: Text.ElideMiddle
+                                            border.color: urlInput.activeFocus ? Theme.cPrimary
+                                                       : Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.20)
+                                            RowLayout {
+                                                anchors { fill: parent; leftMargin: 10; rightMargin: 6 }
+                                                spacing: 4
+                                                TextInput {
+                                                    id: urlInput
+                                                    Layout.fillWidth: true
+                                                    Layout.alignment: Qt.AlignVCenter
+                                                    color: Theme.cOnSurf
+                                                    font.pixelSize: 11
+                                                    verticalAlignment: TextInput.AlignVCenter
+                                                    clip: true
+                                                    selectByMouse: true
+                                                    persistentSelection: false
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.1)
+                                                    function _sync() { urlInput.text = win._urlDisplayText() }
+                                                    function _go() {
+                                                        var raw = urlInput.text.trim()
+                                                        urlInput.focus = false
+                                                        if (!raw) { urlInput._sync(); return }
+                                                        if (!/^[a-zA-Z][a-zA-Z0-9+.\-]*:\/\//.test(raw)) {
+                                                            if (/^(localhost|\d{1,3}(\.\d{1,3}){3})(:\d+)?(\/.*)?$/.test(raw)
+                                                                || /^[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}(:\d+)?(\/.*)?$/.test(raw))
+                                                                raw = "https://" + raw
+                                                            else
+                                                                raw = win.searxBase + "?q=" + encodeURIComponent(raw)
+                                                        }
+                                                        win.webNavigateActive(raw)
+                                                    }
+                                                    Component.onCompleted: urlInput._sync()
+                                                    onActiveFocusChanged: {
+                                                        if (activeFocus) { urlInput.text = win._urlBarText(); urlInput.selectAll() }
+                                                        else urlInput._sync()
+                                                    }
+                                                    onAccepted: urlInput._go()
+                                                    Keys.onEscapePressed: { urlInput._sync(); urlInput.focus = false }
+                                                    Connections {
+                                                        target: win
+                                                        function onWebRevChanged() { if (!urlInput.activeFocus) urlInput._sync() }
+                                                    }
+                                                }
+                                                // Go arrow — only while editing the field.
+                                                Item {
+                                                    Layout.preferredWidth: 22; Layout.preferredHeight: 22
+                                                    visible: urlInput.activeFocus
+                                                    Text { anchors.centerIn: parent; text: "\u{EA9F}"; font.family: Theme.fontFamily; font.pixelSize: 15; color: Theme.cPrimary }
+                                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: urlInput._go() }
+                                                }
                                             }
                                         }
 
-                                        // Bookmark the page currently shown.
                                         WebNavBtn {
-                                            glyph: WebBookmarksState.isBookmarked(webView.url) ? "\u{F00C2}" : "\u{F00C0}"
-                                            tint: WebBookmarksState.isBookmarked(webView.url) ? Theme.cPrimary : Theme.cOnSurf
-                                            handler: function () { win.webToggleBookmark(webView.url, webView.title) }
+                                            glyphSize: 19
+                                            glyph: "\u{21B7}"; enabled: win.activeView ? win.activeView.canGoForward : false
+                                            tint: (win.webRev, win.activeView && win.activeView.canGoForward) ? Theme.cOnSurf : Qt.alpha(Theme.cOnSurf, 0.35)
+                                            handler: function () { if (win.activeView && win.activeView.canGoForward) win.activeView.goForward() }
+                                        }
+
+                                        // Bookmark the page currently shown (checked when saved).
+                                        WebNavBtn {
+                                            glyph: (win.webRev, WebBookmarksState.isBookmarked(win.activeView ? win.activeView.url : "")) ? "\u{F00C1}" : "\u{F00C0}"
+                                            tint: (win.webRev, WebBookmarksState.isBookmarked(win.activeView ? win.activeView.url : "")) ? Theme.cPrimary : Theme.cOnSurf
+                                            handler: function () { if (win.activeView) win.webToggleBookmark(win.activeView.url, win.activeView.title) }
                                         }
 
                                         // Open the saved-bookmarks library.
                                         WebNavBtn {
                                             glyph: "\u{F00C3}"
                                             tint: win.webShowBookmarks ? Theme.cPrimary : Theme.cOnSurf
-                                            handler: function () { win.webShowBookmarks = !win.webShowBookmarks }
+                                            handler: function () { win.webShowBookmarks = !win.webShowBookmarks; win.webShowCredentials = false }
+                                        }
+
+                                        // Open the saved-credentials (cookies) library.
+                                        WebNavBtn {
+                                            glyph: "\u{EDE4}"
+                                            tint: win.webShowCredentials ? Theme.cPrimary : Theme.cOnSurf
+                                            handler: function () {
+                                                win.webShowCredentials = !win.webShowCredentials
+                                                win.webShowBookmarks = false
+                                                if (win.webShowCredentials) win.webRefreshCredOrigins()
+                                            }
+                                        }
+
+                                        // Ad/tracker blocker toggle (shield-check ON /
+                                        // shield-off dim). Re-injects the blocker into
+                                        // every live tab and reloads them.
+                                        WebNavBtn {
+                                            glyph: win.webAdBlockEnabled ? "\u{F0565}" : "\u{F099E}"
+                                            tint: win.webAdBlockEnabled ? Theme.cPrimary : Qt.alpha(Theme.cOnSurf, 0.4)
+                                            handler: function () { win.webToggleAdBlock() }
+                                        }
+
+                                        // Open the current page in the system default
+                                        // browser (nf-md-web) -- handy for sites that want
+                                        // a real Chrome, WebAuthn, or downloads the
+                                        // embedded view can't handle.
+                                        WebNavBtn {
+                                            glyph: "\u{F059F}"
+                                            tint: Theme.cOnSurf
+                                            handler: function () {
+                                                var v = win.activeView
+                                                if (v && v.url) Qt.openUrlExternally(v.url.toString())
+                                            }
                                         }
                                     }
 
-                                    // Thin progress bar while loading.
+                                    // Thin progress bar while loading (active view).
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: webView.loading ? 3 : 0
-                                        visible: webView.loading
+                                        Layout.preferredHeight: (win.webRev, win.webFullscreenTabId < 0 && win.activeView && win.activeView.loading) ? 3 : 0
+                                        visible: (win.webRev, win.webFullscreenTabId < 0 && !!(win.activeView && win.activeView.loading))
                                         radius: 2
                                         color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                         Rectangle {
                                             anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                                            width: parent.width * (webView.loadProgress / 100)
+                                            width: parent.width * ((win.webRev, win.activeView ? win.activeView.loadProgress : 0) / 100)
                                             radius: 2
                                             color: Theme.cPrimary
                                         }
@@ -2879,20 +3308,56 @@ Item {
                                             }
                                         }
 
-                                        WebEngineView {
-                                            id: webView
+                                        // ── Per-tab view pool (imperative) ───────────────────
+                                        // webViewContainer hosts one WebEngineView per
+                                        // websearch tab, created on demand by _ensureView()
+                                        // from tabViewProto and keyed by the tab's stable id.
+                                        // A view loads its URL once and is never re-bound to
+                                        // model data, so tab churn never reloads a page. Only
+                                        // the active tab's view is visible; closing a tab
+                                        // destroys just its view (releasing the renderer).
+                                        Item {
+                                            id: webViewContainer
                                             anchors.fill: parent
-                                            visible: win.tab === "websearch"
-                                            focus: true
-                                            profile: win.webProfile
-                                            url: win.searxBase
-                                            backgroundColor: "transparent"
-                                            settings.javascriptEnabled: true
-                                            settings.forceDarkMode: true
-                                            onLoadingChanged: function (loadRequest) {
-                                                win.webShowError = !!loadRequest.error
+                                        }
+                                        Component {
+                                            id: tabViewProto
+                                            WebEngineView {
+                                                id: tabView
+                                                property int tabId: -1
+                                                // Spoof a clean Chrome UA (always) and
+                                                // inject the ad/tracker blocker (when
+                                                // enabled) before any page script runs.
+                                                Component.onCompleted: win._applyUserScripts(tabView)
+                                                anchors.fill: parent
+                                                visible: false
+                                                focus: true
+                                                profile: win.webProfile
+                                                backgroundColor: "transparent"
+                                                settings.javascriptEnabled: true
+                                                settings.forceDarkMode: true
+                                                // Qt6 exposes fullscreen on the
+                                                // settings object; the request
+                                                // signal + isFullScreen live on
+                                                // the view itself.
+                                                settings.fullScreenSupportEnabled: true
+                                                onLoadingChanged: function (loadRequest) { win._onViewLoad(tabId, loadRequest) }
+                                                onTitleChanged: win._onViewTitle(tabId, title)
+                                                onUrlChanged: win._onViewUrl(tabId, url)
+                                                onFullScreenRequested: function (request) { win._onViewFullScreen(tabId, request) }
+                                                // Installing this handler stops QtWebEngine forwarding every page
+                                                // console message to the log. Chromium + third-party pages emit a lot
+                                                // of benign noise we cannot act on (unused link-preload, WebGPU
+                                                // context, Permissions-Policy). Drop info/warning wholesale and the
+                                                // recurring harmless errors, but surface any other real JS error.
+                                                onJavaScriptConsoleMessage: function (level, message, lineNumber, sourceID) {
+                                                    if (level < 2) return
+                                                    if (message.indexOf("allow-scripts") > -1) return
+                                                    if (message.indexOf("ResizeObserver loop") > -1) return
+                                                    if (message.indexOf("storage bucket") > -1 || message.indexOf("persistent-storage") > -1) return
+                                                    console.error("js: " + message + " (" + sourceID + ":" + lineNumber + ")")
+                                                }
                                             }
-                                            Component.onCompleted: forceActiveFocus()
                                         }
 
                                         // ── Agent workspace: dedicated persistent view ──
@@ -2905,16 +3370,53 @@ Item {
                                         // survives hide/show + tab round-trips without a reload.
                                         // Hidden (parent webSearchPage off the agent/websearch
                                         // tabs) the page stays loaded, just not rendered.
-                                        WebEngineView {
-                                            id: agentView
+                                        Component {
+                                            id: agentViewProto
+                                            WebEngineView {
+                                                id: agentView
+                                                anchors.fill: parent
+                                                visible: win.tab === "agent"
+                                                focus: true
+                                                profile: win.webProfile
+                                                url: win.agentReady ? win.agentUrl : "about:blank"
+                                                backgroundColor: "transparent"
+                                                settings.javascriptEnabled: true
+                                                onVisibleChanged: if (visible) forceActiveFocus()
+                                            }
+                                        }
+                                        // Gated so the agent view is only instantiated
+                                        // AFTER win.webProfile resolves (profile is
+                                        // creation-time only); keeps it sharing the one
+                                        // persistent profile instead of a null/2nd one.
+                                        Loader {
+                                            id: agentViewLoader
                                             anchors.fill: parent
-                                            visible: win.tab === "agent"
-                                            focus: true
-                                            profile: win.webProfile
-                                            url: win.agentReady ? win.agentUrl : "about:blank"
-                                            backgroundColor: "transparent"
-                                            settings.javascriptEnabled: true
-                                            onVisibleChanged: if (visible) forceActiveFocus()
+                                            active: win.webProfile !== null
+                                            sourceComponent: agentViewProto
+                                        }
+
+                                        // ── Agent live theme (3c) ──────────────────────────
+                                        // matugen rewrites ~/.config/gtk-4.0/colors.css and
+                                        // Theme re-applies; the agent page (an in-process
+                                        // view) never notices. Re-fetch through the app's own
+                                        // bridge (server 'theme' action → theme_update
+                                        // dispatch) with NO reload. Debounced so a burst of
+                                        // matugen writes coalesces into one push.
+                                        Timer {
+                                            id: agentThemePush
+                                            interval: 400
+                                            repeat: false
+                                            onTriggered: {
+                                                var av = agentViewLoader.item
+                                                if (!win.agentReady || !av) return
+                                                av.runJavaScript(
+                                                    "window.webkit.messageHandlers.agent.postMessage("
+                                                    + "JSON.stringify({action:'theme'}));")
+                                            }
+                                        }
+                                        Connections {
+                                            target: Theme
+                                            function onRevisionChanged() { agentThemePush.restart() }
                                         }
 
                                         // ── Bookmarks dropdown (websearch header) ──────────
@@ -2959,6 +3461,29 @@ Item {
                                                         MouseArea { id: bmCloseMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: win.webShowBookmarks = false }
                                                     }
                                                 }
+                                                // Search box (the list can outgrow the scroll).
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: 30; radius: 8
+                                                    color: Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.55)
+                                                    border.width: 1
+                                                    border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.20)
+                                                    RowLayout {
+                                                        anchors { fill: parent; leftMargin: 10; rightMargin: 8 }
+                                                        spacing: 6
+                                                        Text { text: "\u{F0349}"; font.family: Theme.fontFamily; font.pixelSize: 13; color: Qt.alpha(Theme.cOnSurf, 0.6) }
+                                                        TextInput {
+                                                            id: bmSearchInput
+                                                            Layout.fillWidth: true
+                                                            verticalAlignment: TextInput.AlignVCenter
+                                                            color: Theme.cOnSurf; font.pixelSize: 12; clip: true
+                                                            selectByMouse: true
+                                                            text: win.webBookmarkQuery
+                                                            onTextChanged: win.webBookmarkQuery = text
+                                                            Keys.onEscapePressed: { win.webBookmarkQuery = ""; bmSearchInput.focus = false }
+                                                        }
+                                                    }
+                                                }
                                                 Text {
                                                     Layout.fillWidth: true
                                                     visible: WebBookmarksState.bookmarks.length === 0
@@ -2972,7 +3497,11 @@ Item {
                                                     Layout.fillHeight: true
                                                     clip: true
                                                     spacing: 6
-                                                    model: WebBookmarksState.bookmarks
+                                                    model: WebBookmarksState.bookmarks.filter(function (b) {
+                                                        var q = win.webBookmarkQuery.toLowerCase()
+                                                        return !q || String(b.title || "").toLowerCase().indexOf(q) >= 0
+                                                                   || String(b.url || "").toLowerCase().indexOf(q) >= 0
+                                                    })
                                                     delegate: Rectangle {
                                                         required property var modelData
                                                         required property int index
@@ -3007,7 +3536,7 @@ Item {
                                                             Rectangle {
                                                                 Layout.preferredWidth: 26; Layout.preferredHeight: 26; radius: 7
                                                                 color: bmDelMa.containsMouse ? Qt.alpha(Theme.cErr, 0.22) : "transparent"
-                                                                Text { anchors.centerIn: parent; text: "\u{F1B8B}"; font.family: Theme.fontFamily; font.pixelSize: 13; color: Theme.cErr }
+                                                                Text { anchors.centerIn: parent; text: "\u{F09CC}"; font.family: Theme.fontFamily; font.pixelSize: 13; color: Theme.cErr }
                                                                 MouseArea {
                                                                     id: bmDelMa
                                                                     anchors.fill: parent
@@ -3023,10 +3552,147 @@ Item {
                                                             hoverEnabled: true
                                                             cursorShape: Qt.PointingHandCursor
                                                             onClicked: {
-                                                                webView.url = modelData.url
+                                                                win.webNavigateActive(modelData.url)
                                                                 win.webShowBookmarks = false
                                                             }
                                                         }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // ── Credentials dropdown (websearch header) ──────
+                                        // Same scrim+card pattern as bookmarks: a
+                                        // scrollable, filterable list of the sites that
+                                        // currently hold stored cookies (read from the
+                                        // profile's cookie DB). A leading "clear all" and
+                                        // a per-row broom delete the stored credential.
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            visible: win.webShowCredentials && win.tab === "websearch"
+                                            z: 199
+                                            onClicked: win.webShowCredentials = false
+                                        }
+                                        Rectangle {
+                                            anchors { top: parent.top; right: parent.right; margins: 8 }
+                                            width: Math.min(320, parent.width - 16)
+                                            height: Math.min(380, parent.height - 16)
+                                            radius: 10
+                                            visible: win.webShowCredentials && win.tab === "websearch"
+                                            z: 200
+                                            clip: true
+                                            color: Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.98)
+                                            border.width: 1
+                                            border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.25)
+                                            ColumnLayout {
+                                                anchors { fill: parent; margins: 12 }
+                                                spacing: 8
+                                                RowLayout {
+                                                    Layout.fillWidth: true
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text: "\u{EDE4}  Credentials" + (win.webCredOrigins.length ? "  (" + win.webCredOrigins.length + ")" : "")
+                                                        font.family: Theme.fontFamily
+                                                        font.pixelSize: 15
+                                                        font.bold: true
+                                                        color: Theme.cOnSurf
+                                                    }
+                                                    Rectangle {
+                                                        Layout.preferredWidth: 28; Layout.preferredHeight: 28; radius: 8
+                                                        color: credCloseMa.containsMouse ? Qt.alpha(Theme.cOnSurf, 0.14) : "transparent"
+                                                        Text { anchors.centerIn: parent; text: "\u{F0156}"; font.family: Theme.fontFamily; font.pixelSize: 15; color: Theme.cOnSurf }
+                                                        MouseArea { id: credCloseMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: win.webShowCredentials = false }
+                                                    }
+                                                }
+                                                // Search box (the list can outgrow the scroll).
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: 30; radius: 8
+                                                    color: Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.55)
+                                                    border.width: 1
+                                                    border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.20)
+                                                    RowLayout {
+                                                        anchors { fill: parent; leftMargin: 10; rightMargin: 8 }
+                                                        spacing: 6
+                                                        Text { text: "\u{F0349}"; font.family: Theme.fontFamily; font.pixelSize: 13; color: Qt.alpha(Theme.cOnSurf, 0.6) }
+                                                        TextInput {
+                                                            id: credSearchInput
+                                                            Layout.fillWidth: true
+                                                            verticalAlignment: TextInput.AlignVCenter
+                                                            color: Theme.cOnSurf; font.pixelSize: 12; clip: true
+                                                            selectByMouse: true
+                                                            text: win.webCredentialQuery
+                                                            onTextChanged: win.webCredentialQuery = text
+                                                            Keys.onEscapePressed: { win.webCredentialQuery = ""; credSearchInput.focus = false }
+                                                        }
+                                                    }
+                                                }
+                                                // Clear-all affordance (only when something is stored).
+                                                Rectangle {
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: 30; radius: 8
+                                                    visible: win.webCredOrigins.length > 0
+                                                    color: credClearAllMa.containsMouse ? Qt.alpha(Theme.cErr, 0.20) : Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.08)
+                                                    border.width: 1
+                                                    border.color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.35)
+                                                    RowLayout {
+                                                        anchors { fill: parent; leftMargin: 12; rightMargin: 8 }
+                                                        spacing: 8
+                                                        Text { text: "\u{EDE4}"; font.family: Theme.fontFamily; font.pixelSize: 14; color: Theme.cErr }
+                                                        Text { Layout.fillWidth: true; text: "Clear all credentials"; font.pixelSize: 12; font.bold: true; color: Theme.cErr }
+                                                    }
+                                                    MouseArea { id: credClearAllMa; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: win.webClearCredential("") }
+                                                }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    visible: win.webCredOrigins.length === 0
+                                                    text: "No stored site credentials yet. Log into a site in the web view and it will appear here."
+                                                    wrapMode: Text.WordWrap
+                                                    font.pixelSize: 12
+                                                    color: Qt.alpha(Theme.cOnSurf, 0.7)
+                                                }
+                                                ListView {
+                                                    Layout.fillWidth: true
+                                                    Layout.fillHeight: true
+                                                    clip: true
+                                                    spacing: 6
+                                                    model: win.webCredOrigins.filter(function (h) {
+                                                        var q = win.webCredentialQuery.toLowerCase()
+                                                        return !q || String(h).toLowerCase().indexOf(q) >= 0
+                                                    })
+                                                    delegate: Rectangle {
+                                                        required property var modelData
+                                                        required property int index
+                                                        width: ListView.view.width
+                                                        height: 40
+                                                        radius: 10
+                                                        color: credRowMa.containsMouse ? Qt.alpha(win.wColor3, 0.16) : Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.55)
+                                                        border.width: 1
+                                                        border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.18)
+                                                        RowLayout {
+                                                            anchors { fill: parent; leftMargin: 12; rightMargin: 8; verticalCenter: parent.verticalCenter }
+                                                            spacing: 10
+                                                            Text {
+                                                                Layout.fillWidth: true
+                                                                text: modelData
+                                                                elide: Text.ElideMiddle
+                                                                font.pixelSize: 13
+                                                                color: Theme.cOnSurf
+                                                            }
+                                                            Rectangle {
+                                                                Layout.preferredWidth: 26; Layout.preferredHeight: 26; radius: 7
+                                                                color: credDelMa.containsMouse ? Qt.alpha(Theme.cErr, 0.22) : "transparent"
+                                                                Text { anchors.centerIn: parent; text: "\u{EDE4}"; font.family: Theme.fontFamily; font.pixelSize: 13; color: Theme.cErr }
+                                                                MouseArea {
+                                                                    id: credDelMa
+                                                                    anchors.fill: parent
+                                                                    hoverEnabled: true
+                                                                    cursorShape: Qt.PointingHandCursor
+                                                                    onClicked: win.webClearCredential(modelData)
+                                                                }
+                                                            }
+                                                        }
+                                                        MouseArea { id: credRowMa; anchors.fill: parent; hoverEnabled: true; z: -1 }
                                                     }
                                                 }
                                             }
@@ -3090,12 +3756,14 @@ Item {
                             }
                         }
                         // ── Workspace (agent) tab ───────────────────────────
-                        // The agent shares the ONE webView above (a second live
-                        // WebEngineView SIGTRAPs this QtWebEngine build). Its frame
-                        // geometry + chrome are handled inside webSearchPage; the
-                        // circular ON/OFF workspace toggle (agentWsToggle) and
-                        // agentEnsureUp()/syncWebSurface() drive navigation onto
-                        // win.agentUrl once the loopback server answers.
+                        // The agent renders in its OWN persistent view (agentView,
+                        // inside the pool surface above) sharing the single
+                        // win.webProfile — two live views are validated on this
+                        // patched build. Its frame geometry + chrome are handled
+                        // inside webSearchPage; the circular ON/OFF workspace
+                        // toggle (agentWsToggle) and agentEnsureUp() drive the
+                        // one-shot load of win.agentUrl once the loopback server
+                        // answers.
                     }
                 }
 

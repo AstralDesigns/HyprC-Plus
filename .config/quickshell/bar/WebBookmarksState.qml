@@ -21,7 +21,9 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    // Strip the file:// scheme StandardPaths returns in Qt6 so the python3
+    // writer targets the real ~/.cache/hyprcandy state file.
+    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
     readonly property string statePath: _home + "/.cache/hyprcandy/launcher_web_state.json"
 
     // Full parsed state object — other keys are preserved across writes.

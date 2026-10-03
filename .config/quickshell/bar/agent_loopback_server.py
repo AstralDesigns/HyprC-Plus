@@ -59,6 +59,12 @@ RUNTIME_URL = os.environ.get("HC_RUNTIME_URL", "http://127.0.0.1:17900")
 DEFAULT_PROJECT_ROOT = os.path.join(
     HOME, ".hyprcandy", "GJS", "hyprcandydock")
 COLORS_CSS = os.path.join(HOME, ".config", "gtk-4.0", "colors.css")
+# Durable agent-store blob (provider/model/sessions). The app mirrors its
+# localStorage payload here through the store_persist bridge action and
+# rehydrates from it at bootstrap, so a hard kill can no longer reset the
+# workspace to the openrouter/free default.
+AGENT_STORE_PATH = os.path.join(HOME, ".local", "share", "hyprcandy",
+                                "agent-state.json")
 # libsecret attributes the GJS launcher writes keys under. We don't pass
 # xdg:schema on lookup so items stored by either side are found.
 SECRET_SCHEMA = "org.hyprcandy.LauncherCredentials"
@@ -99,6 +105,9 @@ BRIDGE_SHIM = """<script>
   window.webkit.messageHandlers.agent = { postMessage: post };
   // Cold start: pull theme + runtime config the same way _agentInjectTheme
   // pushed them under WebKit, and rehydrate via __hyprcandy_agent_dispatch.
+  // store_state is the durable JSON blob the app mirrors to disk via the
+  // store_persist action — the authoritative hydrate source (localStorage is
+  // only a cache; Chromium does not flush it on a hard kill).
   fetch('/bridge', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -106,6 +115,7 @@ BRIDGE_SHIM = """<script>
   }).then(function (r) { return r.json(); })
     .then(function (o) {
       if (!o) return;
+      if (o.store_state) dispatchWhenReady({ type: 'store_state', payload: o.store_state }, 0);
       if (o.theme) dispatchWhenReady({ type: 'theme_update', payload: o.theme }, 0);
       if (o.runtime_config) dispatchWhenReady({ type: 'runtime_config', payload: o.runtime_config }, 0);
     })
@@ -367,6 +377,43 @@ def handle_file_dialog(id_, payload):
         return {"id": id_, "type": "response", "error": str(err)}
 
 
+# ── Durable store + live theme (Quickshell parity with the GJS launcher) ───
+def handle_store_persist(id_, payload):
+    """Atomically mirror the app's store blob to AGENT_STORE_PATH.
+
+    The payload is written verbatim (it is already a JSON string from the
+    app's persist path); temp+rename keeps a hard kill from truncating it."""
+    try:
+        raw = payload if isinstance(payload, str) else json.dumps(payload)
+        os.makedirs(os.path.dirname(AGENT_STORE_PATH), exist_ok=True)
+        tmp = AGENT_STORE_PATH + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(raw)
+        os.replace(tmp, AGENT_STORE_PATH)
+        return {"id": id_, "type": "response", "payload": {"ok": True}}
+    except Exception as err:  # noqa: BLE001
+        return {"id": id_, "type": "response", "error": str(err)}
+
+
+def read_store_state():
+    """Current durable blob parsed, or None (bootstrap omits it when absent)."""
+    try:
+        with open(AGENT_STORE_PATH, "r", encoding="utf-8") as f:
+            return json.loads(f.read())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def handle_theme(id_, _payload):
+    """Re-read colors.css so QML can push a live theme_update after matugen.
+
+    Returned as a ``theme_update`` DISPATCH (not a request/response) because
+    the QML caller posts {action:'theme'} with no id and never registers a
+    pending request — the shim dispatches whatever comes back straight into
+    __hyprcandy_agent_dispatch, which only acts on the theme_update type."""
+    return {"type": "theme_update", "payload": read_theme_map()}
+
+
 ACTIONS = {
     "runtime_request": handle_runtime_request,
     "list_directory": handle_list_directory,
@@ -383,6 +430,8 @@ ACTIONS = {
     "web_search": handle_web_search,
     "searxng_status": handle_searxng_status,
     "open_external_url": handle_open_external,
+    "store_persist": handle_store_persist,
+    "theme": handle_theme,
 }
 
 
@@ -528,6 +577,7 @@ class Handler(BaseHTTPRequestHandler):
         if action == "bootstrap":
             body = json.dumps({
                 "theme": read_theme_map(),
+                "store_state": read_store_state(),
                 "runtime_config": {
                     "homeDir": HOME,
                     "defaultProjectRoot": DEFAULT_PROJECT_ROOT,

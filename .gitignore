@@ -1,2 +1,6 @@
 /.config/hypr/hyprviz.conf
 /.config/wlogout/style.css
+# Artifacts of the Qt6 file:// home-URL bug (literal 'file:' dirs); fixed in
+# the state singletons but keep ignoring them so they never get committed.
+**/file:/
+**/file:

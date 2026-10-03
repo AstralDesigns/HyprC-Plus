@@ -18,7 +18,7 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
     readonly property string _filesDir: _home + "/.local/share/Trash/files"
     readonly property string _script: Config.barDir + "/scripts/trash-count.py"
 

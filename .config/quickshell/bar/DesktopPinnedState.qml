@@ -8,7 +8,8 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    // Strip the file:// scheme StandardPaths returns in Qt6 for a clean path.
+    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
     readonly property string _statePath: root._home + "/.config/desktop-pinned"
 
     property var apps: []

@@ -14,8 +14,10 @@ import Quickshell.Io
 QtObject {
     id: root
 
+    // Strip the file:// scheme StandardPaths returns in Qt6 so the
+    // notif-running-apps writer targets the real ~/.config path.
     readonly property string _path: StandardPaths.writableLocation(
-                                        StandardPaths.HomeLocation) + "/.config/notif-running-apps"
+                                        StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "") + "/.config/notif-running-apps"
 
     // Map: lowercased appName → { cls, desktopId, url }
     property var _map: ({})

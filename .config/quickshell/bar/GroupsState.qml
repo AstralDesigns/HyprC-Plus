@@ -20,7 +20,9 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    // StandardPaths returns a file:// URL in Qt6; strip it so the python3
+    // writers target the real ~/.config path (not a literal "file:/" tree).
+    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
     readonly property string groupsPath: _home + "/.config/hyprcandy-launcher-groups"
     readonly property string favoritesPath: _home + "/.config/hyprcandy-launcher-favorites"
 
@@ -183,7 +185,7 @@ QtObject {
         property string _path: ""
         property string _content: ""
         command: ["python3", "-c",
-            "import sys; open(sys.argv[1],'w').write(sys.argv[2])",
+            "import sys,os; os.makedirs(os.path.dirname(sys.argv[1]),exist_ok=True); open(sys.argv[1],'w').write(sys.argv[2])",
             _writeFile._path, _writeFile._content]
         onExited: {
             root._writeBusy = false

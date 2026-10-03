@@ -72,7 +72,11 @@ Rectangle {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        root.current = seg.key
+                        // Emit only — never assign root.current here. The parent's
+                        // `current:` binding is the single source of truth; an
+                        // imperative write would break it so later programmatic
+                        // changes (e.g. win.subTab after group create) stop
+                        // moving the highlight.
                         root.picked(seg.key)
                     }
                 }

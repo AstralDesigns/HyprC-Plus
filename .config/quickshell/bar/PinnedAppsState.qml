@@ -17,7 +17,9 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    // Strip the file:// scheme StandardPaths returns in Qt6 so the python3
+    // writer targets the real ~/.config/pinned (not a literal "file:/" tree).
+    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
     readonly property string _pinnedPath: root._home + "/.config/pinned"
 
     // Raw id list in file order + resolved app records (same shape as
@@ -136,7 +138,7 @@ QtObject {
     // content passed via argv (no shell-quoting hazards).
     property Process _writeProc: Process {
         command: ["python3", "-c",
-            "import sys; open(sys.argv[1],'w').write(sys.argv[2])",
+            "import sys,os; os.makedirs(os.path.dirname(sys.argv[1]),exist_ok=True); open(sys.argv[1],'w').write(sys.argv[2])",
             root._pinnedPath,
             root._writeProc._content]
         property string _content: ""

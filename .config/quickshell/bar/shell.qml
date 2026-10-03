@@ -3,6 +3,47 @@
 //@ pragma Env QT_QUICK_CONTROLS_STYLE=Basic
 //@ pragma Env QS_NO_RELOAD_POPUP=1
 
+// ── WebEngine GPU / hardware-acceleration policy ───────────────────────────
+// Ported from the GJS launcher's hybrid-graphics handling, reworked for
+// Chromium/QtWebEngine. quickshell qputenv()s these Env pragmas at process
+// start — BEFORE QtWebEngine spawns its GPU/WebProcess children — so the
+// children inherit them. This is the launcher's own concern, not the
+// compositor autostart's (hyprviz.lua), which is why it lives here.
+//
+// Backend = ANGLE-on-GL (PINNED, known-good). We deliberately tried letting
+// Mesa/ANGLE auto-pick a backend (no --use-gl/--use-angle) so it could choose
+// Vulkan; on this Ivy Bridge + AMD-OLAND hybrid the default resolved to
+// ANGLE-on-Vulkan and its native-pixmap / DMA-BUF zero-copy path fails to
+// import the shared buffer (eglCreateImage 0x3009 -> ProduceSkia() failed ->
+// "RasterDecoderImpl: Context lost during MakeCurrent" -> every page renders
+// blank). So we pin the ANGLE-on-OpenGL path that actually composites here.
+// DRI_PRIME=1 offloads GL to the discrete GPU on a hybrid box and is a
+// harmless no-op on single-GPU machines. --ignore-gpu-blocklist keeps the
+// old-but-working GPUs on the hardware path. WebGPU stays disabled because it
+// only kicks off unstable Mesa Vulkan probes (the "Failed to create WebGPU
+// Context Provider" log spam).
+//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--use-gl=angle --use-angle=gl --enable-gpu-rasterization --ignore-gpu-blocklist --disable-features=WebGPU
+//@ pragma Env DRI_PRIME=1
+
+// ── Qt logging filter (keep errors, drop benign chatter) ────────────────────
+// qt.svg: Humanity icon theme probing a printer.svg that isn't installed.
+// qt.qpa.services: duplicate portal app-ID registration under our Wayland setup.
+// scene: the launcher-tab FileView read (a transient /run IPC file that is
+//   unlinked right after each read, so "File does not exist" is expected) and
+//   the compositor's occasional null-texture debug. None are actionable.
+// *.debug=false drops DEBUG lines (e.g. "Compositor returned null texture").
+// NOTE: the two "MESA-INTEL: Ivy Bridge Vulkan support is incomplete" lines come
+// straight from Mesa to stderr (not a Qt category) so QT_LOGGING_RULES cannot
+// filter them; they are harmless and unrelated to the GL compositing path.
+//@ pragma Env QT_LOGGING_RULES=*.debug=false;qt.svg.enabled=false;qt.qpa.services.enabled=false;scene.enabled=false
+
+// VA-API video-decode driver. This Ivy Bridge iGPU is only driven by the
+// classic "i965" backend; without a hint Chromium/VA-API probes the newer
+// iHD driver first, which fails to init on Gen7 and spams
+// "libva error: /usr/lib/dri/iHD_drv_video.so init failed". Pinning i965
+// (confirmed present via vainfo) selects the working driver and silences it.
+//@ pragma Env LIBVA_DRIVER_NAME=i965
+
 pragma ComponentBehavior: Bound
 
 import QtQuick
@@ -101,7 +142,7 @@ ShellRoot {
 
     FileView {
         id: qt6ctWatch
-        path: StandardPaths.writableLocation(StandardPaths.HomeLocation) + "/.config/qt6ct/qt6ct.conf"
+        path: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "") + "/.config/qt6ct/qt6ct.conf"
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
@@ -133,12 +174,12 @@ ShellRoot {
         onTriggered: root._desktopActive = true
     }
 
-    // ── Wallpaper color watcher — reload SysTray for QT native menu colors ──
+    // ── Wallpaper color watcher — reload SysTray for QT native menu colors ── 
     // pywal writes ~/.cache/wal/colors-hyprland.conf on every wallpaper change.
     // Toggling _sysTrayActive destroys and recreates SysTrayPopup so Qt picks
     // up the new palette for its native right-click popup menus.
     FileView {
-        path: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+        path: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
               + "/.cache/wal/colors-hyprland.conf"
         watchChanges: true
         onFileChanged: {

@@ -229,6 +229,7 @@ QtObject {
             }
         }
         wallustColors = result
+        root._bumpRevision()
     }
 
     // ── Pywal colors (from ~/.cache/wal/colors-hyprland.conf) ────────────────
@@ -261,9 +262,17 @@ QtObject {
         walColors = result
     }
 
+    // ── Palette revision ────────────────────────────────────────────────
+    // Bumped whenever any watched color source re-applies. Consumers that
+    // mirror the palette OUTSIDE QML (the agent WebEngineView fetches
+    // gtk-4.0/colors.css server-side) bind their triggers to this.
+    property int revision: 0
+    function _bumpRevision() { root.revision++ }
+
     // ── Live file watcher ─────────────────────────────────────────────────
-    // HOME resolved via StandardPaths — no Process needed, no startup-path warning.
-    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    // HOME resolved via StandardPaths (file:// scheme stripped) — no Process
+    // needed, no startup-path warning.
+    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
 
     property var _colorFile: FileView {
         path: root._home + "/.cache/quickshell/wallpaper/MatugenColors.qml"
@@ -320,5 +329,6 @@ QtObject {
                 case "onPrimaryFixedVariant":      root._onPrimaryFixedVariant = hex; break
             }
         }
+        root._bumpRevision()
     }
 }

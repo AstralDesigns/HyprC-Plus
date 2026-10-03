@@ -21,7 +21,9 @@ import Quickshell.Io
 QtObject {
     id: root
 
-    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+    // Strip the file:// scheme StandardPaths returns in Qt6 so the
+    // launcher.state writer targets the real ~/.cache/hyprcandy path.
+    readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
     readonly property string _runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
     readonly property string _tabSelectPath: _runtimeDir + "/hyprcandy-launcher-tab"
     readonly property string _statePath: _home + "/.cache/hyprcandy/launcher.state"

@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+# ── hcproxy: opt-in MITM layer for the HyprCandy launcher web tab ────────────
+#   hcproxy enable   install deps + trust CA + run service + point launcher at it
+#   hcproxy disable  stop service + remove the launcher proxy flag (CA left in place)
+#   hcproxy status   show service / CA / flag state
+#   hcproxy refresh  force re-download the filter lists (restarts the service)
+#
+# Everything lives in the launcher's own config dir; it never touches the system
+# proxy or other browsers. The proxy is launcher-scoped via --proxy-server.
+set -euo pipefail
+
+BASE="$HOME/.config/quickshell/bar/scripts/webproxy"
+ADDON="$BASE/hcproxy_addon.py"
+SHELL_QML="$HOME/.config/quickshell/bar/shell.qml"
+UNIT_DIR="$HOME/.config/systemd/user"
+UNIT="$UNIT_DIR/hcproxy.service"
+CONFDIR="$HOME/.mitmproxy"
+CA="$CONFDIR/mitmproxy-ca-cert.pem"
+NSSDB="$HOME/.pki/nssdb"
+PORT=8888
+FLAG="--proxy-server=http://127.0.0.1:$PORT"
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+install_deps() {
+    local pkgs=()
+    have mitmdump || pkgs+=("mitmproxy")
+    python -c "import adblock" 2>/dev/null || pkgs+=("python-adblock")
+    if [ ${#pkgs[@]} -gt 0 ]; then
+        echo "==> installing (official repos): ${pkgs[*]}"
+        sudo pacman -S --needed "${pkgs[@]}"
+    fi
+}
+
+gen_ca() {
+    [ -f "$CA" ] && return 0
+    echo "==> generating mitmproxy CA in $CONFDIR"
+    mkdir -p "$CONFDIR"
+    # A brief headless run creates the CA files, then we stop it.
+    timeout 4 mitmdump --set confdir="$CONFDIR" --listen-port "$PORT" >/dev/null 2>&1 || true
+    [ -f "$CA" ] || { echo "!! CA not generated"; exit 1; }
+}
+
+import_ca() {
+    mkdir -p "$NSSDB"
+    if certutil -d "sql:$NSSDB" -L 2>/dev/null | grep -q "hcproxy-mitm"; then
+        echo "==> CA already trusted"
+    else
+        echo "==> importing CA into the user NSS store (QtWebEngine trusts it)"
+        certutil -d "sql:$NSSDB" -A -t C,, -n "hcproxy-mitm" -i "$CA"
+    fi
+}
+
+write_unit() {
+    mkdir -p "$UNIT_DIR"
+    cat > "$UNIT" <<EOF
+[Unit]
+Description=HyprCandy launcher MITM ad-block / UA proxy (opt-in)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/mitmdump -s "$ADDON" --set confdir="$CONFDIR" \\
+    --listen-host 127.0.0.1 --listen-port $PORT \\
+    --set connection_strategy=lazy --set stream_large_bodies=1m \\
+    --set termlog_verbosity=warn
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+EOF
+}
+
+flag_on() {
+    grep -q "proxy-server" "$SHELL_QML" && return 0
+    echo "==> adding proxy flag to shell.qml"
+    sed -i "s#\(--disable-features=WebGPU\)#\1 $FLAG#" "$SHELL_QML"
+}
+
+link_cli() {
+    # Make `hcproxy ...` callable directly (it otherwise only runs by full path).
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$BASE/hcproxy" "$HOME/.local/bin/hcproxy"
+}
+
+flag_off() {
+    grep -q "proxy-server" "$SHELL_QML" || return 0
+    echo "==> removing proxy flag from shell.qml"
+    sed -i "s# --proxy-server=http://127\.0\.0\.1:[0-9]*##g" "$SHELL_QML"
+}
+
+enable() {
+    install_deps
+    gen_ca
+    import_ca
+    write_unit
+    link_cli
+    systemctl --user daemon-reload
+    systemctl --user enable --now hcproxy
+    flag_on
+    echo
+    echo "✅ hcproxy enabled. RELAUNCH the bar for the proxy flag to apply:"
+    echo "     pkill -f 'qs -c bar'; sleep 1; qs -c bar &"
+    echo "   Verify:  systemctl --user status hcproxy --no-pager"
+    echo "   (hcproxy is now on PATH via ~/.local/bin; if not found, log out/in or"
+    echo "    run it by full path: $BASE/hcproxy)"
+}
+
+disable() {
+    systemctl --user disable --now hcproxy 2>/dev/null || true
+    flag_off
+    echo "✅ hcproxy disabled (CA left trusted; remove with:"
+    echo "   certutil -d sql:$NSSDB -D -n hcproxy-mitm )"
+}
+
+status() {
+    echo "service: $(systemctl --user is-active hcproxy 2>/dev/null || echo inactive)"
+    echo "CA file: $CA $([ -f "$CA" ] && echo present || echo MISSING)"
+    echo "NSS trust: $(certutil -d "sql:$NSSDB" -L 2>/dev/null | grep -q hcproxy-mitm && echo yes || echo no)"
+    echo "launcher flag: $(grep -q proxy-server "$SHELL_QML" && echo on || echo off)"
+}
+
+refresh() {
+    rm -f "$HOME/.cache/hcproxy/"*.txt
+    systemctl --user restart hcproxy
+    echo "✅ lists cleared; service restarted (it re-downloads on start)"
+}
+
+case "${1:-}" in
+    enable) enable ;;
+    disable) disable ;;
+    status) status ;;
+    refresh) refresh ;;
+    *) echo "usage: hcproxy {enable|disable|status|refresh}"; exit 1 ;;
+esac

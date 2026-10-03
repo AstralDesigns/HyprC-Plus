@@ -67,6 +67,15 @@ class AgentBridge {
       return;
     }
 
+    if (msg.type === 'store_state' && msg.payload) {
+      // Durable store blob from the loopback server's bootstrap reply. The
+      // store module may not have registered its listener yet (module init
+      // order), so stash it on window as well as re-emitting.
+      (window as any).__hyprcandyPendingStoreState = msg.payload;
+      window.dispatchEvent(new CustomEvent('agent_store_state', { detail: msg.payload }));
+      return;
+    }
+
     if (msg.type === 'user_prompt' && msg.payload) {
       window.dispatchEvent(new CustomEvent('agent_user_prompt', { detail: msg.payload }));
       return;
@@ -301,6 +310,15 @@ class AgentBridge {
 
   public setWorkspaceStartupState(enabled: boolean): Promise<{ enabled: boolean }> {
     return this.postToHost('workspace_startup_state', { enabled });
+  }
+
+  /**
+   * Mirror the durable store blob to the host (quickshell loopback server
+   * writes ~/.local/share/hyprcandy/agent-state.json; the GJS host ignores
+   * unknown actions). Fire-in-foreground promise; callers swallow errors.
+   */
+  public storePersist(payload: string): Promise<{ ok: boolean }> {
+    return this.postToHost('store_persist', payload, 8000);
   }
 
   /**

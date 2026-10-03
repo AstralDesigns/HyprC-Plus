@@ -386,70 +386,121 @@ function loadInitialState(): AppState {
     byokLicenseInstanceId: '',
   };
 
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('hyprcandy_agent_state_v1');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.sessions && parsed.sessions.length > 0) {
-        return {
-          ...defaultState,
-          ...parsed,
-          sessions: Array.isArray(parsed.sessions)
-            ? parsed.sessions.map((s: Session) => ({
-                ...s,
-                messages: Array.isArray(s.messages)
-                  ? s.messages.filter((m: any) => m.id !== 'msg_welcome')
-                  : []
-              }))
-            : [defSession],
-          monacoTheme: 'matugen',
-          projectFiles: Array.isArray(parsed.projectFiles) ? parsed.projectFiles : [],
-          activeModel: (() => {
-            if (parsed.inferenceMode === 'cloud') {
-              return (typeof parsed.cloudModel === 'string' && parsed.cloudModel)
-                ? parsed.cloudModel
-                : (typeof parsed.activeModel === 'string' ? parsed.activeModel : 'google/gemini-2.5-flash');
-            }
-            if (parsed.inferenceMode === 'byok') {
-              return (typeof parsed.byokModel === 'string' && parsed.byokModel)
-                ? parsed.byokModel
-                : (typeof parsed.activeModel === 'string' ? parsed.activeModel : 'openrouter/free');
-            }
-            return (typeof parsed.byokModel === 'string' && parsed.byokModel) || 'openrouter/free';
-          })(),
-          modelStatus: 'ready',
-          downloadProgress: { progress: 0, text: '' },
-          agentRunning: false,
-          selectedFile: null,
-          selectedFileContent: null,
-          workspaceStartupEnabled: typeof parsed.workspaceStartupEnabled === 'boolean' ? parsed.workspaceStartupEnabled : true,
-          panes: Array.isArray(parsed.panes) ? parsed.panes : [],
-          activePaneId: parsed.activePaneId || null,
-          sidebarVisible: typeof parsed.sidebarVisible === 'boolean' ? parsed.sidebarVisible : true,
-          chatVisible: true,
-          contextMode: 'minimal',
-          sidebarWidth: typeof parsed.sidebarWidth === 'number' ? parsed.sidebarWidth : 260,
-          chatWidth: typeof parsed.chatWidth === 'number' ? parsed.chatWidth : 380,
-          customModels: Array.isArray(parsed.customModels)
-            ? parsed.customModels.filter((model: ModelInfo) => model?.id)
-            : [],
-          inferenceMode: parsed.inferenceMode === 'cloud' ? 'cloud' : 'byok',
-          byokProvider: typeof parsed.byokProvider === 'string' && parsed.byokProvider ? parsed.byokProvider : 'openrouter',
-          byokModel: typeof parsed.byokModel === 'string' && parsed.byokModel ? parsed.byokModel : 'openrouter/free',
-          cloudModel: typeof parsed.cloudModel === 'string' ? parsed.cloudModel : defaultState.cloudModel,
-          modelManagerTab: 'cloud',
-        };
-      }
-    }
-  } catch (e) {
-    console.warn('Failed to parse localStorage state:', e);
-  }
+  const persisted = readPersistedBlob();
+  if (persisted) return sanitizePersisted(defaultState, defSession, persisted);
 
   return defaultState;
 }
 
+// The exact subset of state the durable mirror (localStorage + the bridge's
+// store_persist file) carries. Shared by both persist sinks so the on-disk
+// JSON stays byte-compatible with the historical localStorage payload.
+function persistedSnapshot() {
+  const next = currentState;
+  return {
+    sessions: next.sessions,
+    activeSessionId: next.activeSessionId,
+    activeModel: next.activeModel,
+    projectPath: next.projectPath,
+    projectFiles: next.projectFiles,
+    sidebarVisible: next.sidebarVisible,
+    sidebarWidth: next.sidebarWidth,
+    chatVisible: next.chatVisible,
+    chatWidth: next.chatWidth,
+    sidebarMode: next.sidebarMode,
+    contextMode: next.contextMode,
+    customModels: next.customModels,
+    contextFiles: next.contextFiles,
+    contextImages: next.contextImages,
+    currentPath: next.currentPath,
+    panes: next.panes.map(p => ({ ...p, isUnsaved: false })),
+    activePaneId: next.activePaneId,
+    workspaceStartupEnabled: next.workspaceStartupEnabled,
+    // Which backend was active — restored on next launch so the header
+    // chip and Model Manager tab reflect it instead of resetting to
+    // 'local'. Secrets themselves (byokKeys, licenseKey) stay out of the
+    // blob; they're synced through secret-tool/libsecret instead.
+    inferenceMode: next.inferenceMode,
+    byokProvider: next.byokProvider,
+    byokModel: next.byokModel,
+    cloudModel: next.cloudModel,
+    githubToken: next.githubToken,
+    githubUser: next.githubUser,
+    selectedRepo: next.selectedRepo,
+  };
+}
+
+function readPersistedBlob(): any | null {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('hyprcandy_agent_state_v1');
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed && Array.isArray(parsed.sessions) && parsed.sessions.length > 0) return parsed;
+  } catch (e) {
+    console.warn('Failed to parse localStorage state:', e);
+  }
+  return null;
+}
+
+function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: any): AppState {
+  return {
+    ...defaultState,
+    ...parsed,
+    sessions: Array.isArray(parsed.sessions)
+      ? parsed.sessions.map((s: Session) => ({
+          ...s,
+          messages: Array.isArray(s.messages)
+            ? s.messages.filter((m: any) => m.id !== 'msg_welcome')
+            : []
+        }))
+      : [defSession],
+    monacoTheme: 'matugen',
+    projectFiles: Array.isArray(parsed.projectFiles) ? parsed.projectFiles : [],
+    activeModel: (() => {
+      if (parsed.inferenceMode === 'cloud') {
+        return (typeof parsed.cloudModel === 'string' && parsed.cloudModel)
+          ? parsed.cloudModel
+          : (typeof parsed.activeModel === 'string' ? parsed.activeModel : 'google/gemini-2.5-flash');
+      }
+      if (parsed.inferenceMode === 'byok') {
+        return (typeof parsed.byokModel === 'string' && parsed.byokModel)
+          ? parsed.byokModel
+          : (typeof parsed.activeModel === 'string' ? parsed.activeModel : 'openrouter/free');
+      }
+      return (typeof parsed.byokModel === 'string' && parsed.byokModel) || 'openrouter/free';
+    })(),
+    modelStatus: 'ready',
+    downloadProgress: { progress: 0, text: '' },
+    agentRunning: false,
+    selectedFile: null,
+    selectedFileContent: null,
+    workspaceStartupEnabled: typeof parsed.workspaceStartupEnabled === 'boolean' ? parsed.workspaceStartupEnabled : true,
+    panes: Array.isArray(parsed.panes) ? parsed.panes : [],
+    activePaneId: parsed.activePaneId || null,
+    sidebarVisible: typeof parsed.sidebarVisible === 'boolean' ? parsed.sidebarVisible : true,
+    chatVisible: true,
+    contextMode: 'minimal',
+    sidebarWidth: typeof parsed.sidebarWidth === 'number' ? parsed.sidebarWidth : 260,
+    chatWidth: typeof parsed.chatWidth === 'number' ? parsed.chatWidth : 380,
+    customModels: Array.isArray(parsed.customModels)
+      ? parsed.customModels.filter((model: ModelInfo) => model?.id)
+      : [],
+    inferenceMode: parsed.inferenceMode === 'cloud' ? 'cloud' : 'byok',
+    byokProvider: typeof parsed.byokProvider === 'string' && parsed.byokProvider ? parsed.byokProvider : 'openrouter',
+    byokModel: typeof parsed.byokModel === 'string' && parsed.byokModel ? parsed.byokModel : 'openrouter/free',
+    cloudModel: typeof parsed.cloudModel === 'string' ? parsed.cloudModel : defaultState.cloudModel,
+    modelManagerTab: 'cloud',
+  };
+}
+
 let currentState: AppState = loadInitialState();
 const listeners = new Set<(state: AppState) => void>();
+
+// True once anything changed the store locally. The bridge's durable
+// store_state (mirrored from agent-state.json) is authoritative at boot, but
+// if the session already diverged (e.g. runtime_config set projectPath) a
+// late arrival must not clobber that — it merges only over an untouched store.
+let localMutated = false;
 
 let storeDirty = false;
 let storePersistScheduled = false;
@@ -460,42 +511,16 @@ function persistStore() {
   storePersistScheduled = false;
   if (!storeDirty) return;
   storeDirty = false;
+  const blob = JSON.stringify(persistedSnapshot());
   try {
-    const next = currentState;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      sessions: next.sessions,
-      activeSessionId: next.activeSessionId,
-      activeModel: next.activeModel,
-      projectPath: next.projectPath,
-      projectFiles: next.projectFiles,
-      sidebarVisible: next.sidebarVisible,
-      sidebarWidth: next.sidebarWidth,
-      chatVisible: next.chatVisible,
-      chatWidth: next.chatWidth,
-      sidebarMode: next.sidebarMode,
-      contextMode: next.contextMode,
-      customModels: next.customModels,
-      contextFiles: next.contextFiles,
-      contextImages: next.contextImages,
-      currentPath: next.currentPath,
-      panes: next.panes.map(p => ({ ...p, isUnsaved: false })),
-      activePaneId: next.activePaneId,
-      workspaceStartupEnabled: next.workspaceStartupEnabled,
-      // Which backend was active — restored on next launch so the header
-      // chip and Model Manager tab reflect it instead of resetting to
-      // 'local'. Secrets themselves (byokKeys, licenseKey) stay out of
-      // localStorage; they're synced through GJS libsecret instead.
-      inferenceMode: next.inferenceMode,
-      byokProvider: next.byokProvider,
-      byokModel: next.byokModel,
-      cloudModel: next.cloudModel,
-      githubToken: next.githubToken,
-      githubUser: next.githubUser,
-      selectedRepo: next.selectedRepo,
-    }));
+    localStorage.setItem(STORAGE_KEY, blob);
   } catch (e) {
     console.warn('Failed to save to localStorage:', e);
   }
+  // Durable mirror: the quickshell loopback server writes this blob to
+  // ~/.local/share/hyprcandy/agent-state.json immediately, so a hard kill
+  // (which never flushes Chromium leveldb) can no longer reset the store.
+  bridge.storePersist(blob).catch(() => {});
 }
 
 function schedulePersist() {
@@ -520,11 +545,39 @@ export function getStore(): AppState {
   return currentState;
 }
 
+// ── Bridge-backed durable hydration ────────────────────────────────────
+// The loopback shim dispatches {type:'store_state'} from the bootstrap reply
+// (bridge.ts re-emits it as the agent_store_state event). localStorage may be
+// empty on a fresh session (Chromium flush timing); the server file is not.
+function hydrateFromDurable(parsed: any) {
+  try {
+    if (!parsed || !Array.isArray(parsed.sessions) || parsed.sessions.length === 0) return;
+    if (localMutated) return;
+    const defSession = createDefaultSession();
+    currentState = sanitizePersisted({ ...currentState, sessions: [defSession], activeSessionId: defSession.id }, defSession, parsed);
+    listeners.forEach(fn => { fn(currentState); });
+  } catch (e) {
+    console.warn('Failed to hydrate from bridge store_state:', e);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('agent_store_state', (e: any) => {
+    if (e.detail) hydrateFromDurable(e.detail);
+  });
+  const pending = (window as any).__hyprcandyPendingStoreState;
+  if (pending) {
+    (window as any).__hyprcandyPendingStoreState = null;
+    hydrateFromDurable(pending);
+  }
+}
+
 export function setStore(updater: Partial<AppState> | ((prev: AppState) => Partial<AppState>)) {
   const partial = typeof updater === 'function' ? updater(currentState) : updater;
   const next: AppState = { ...currentState, ...partial };
   currentState = next;
 
+  localMutated = true;
   schedulePersist();
 
   try {
