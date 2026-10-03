@@ -21,9 +21,9 @@
 // harmless no-op on single-GPU machines. --ignore-gpu-blocklist keeps the
 // old-but-working GPUs on the hardware path. WebGPU stays disabled because it
 // only kicks off unstable Mesa Vulkan probes (the "Failed to create WebGPU
-// Context Provider" log spam).
-//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--use-gl=angle --use-angle=gl --enable-gpu-rasterization --ignore-gpu-blocklist --disable-features=WebGPU
-//@ pragma Env DRI_PRIME=1
+// Context Provider" log spam). ── //@ pragma Env DRI_PRIME=1 ── --use-gl=angle --use-angle=gl / --use-angle=vulkan / --enable-features=Vulkan --use-vulkan=native --use-gl=stub --disable-features=WebGPU 
+//@ pragma Env QSG_RHI_BACKEND = opengl
+//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS= --enable-gpu-rasterization --ignore-gpu-blocklist --enable-zero-copy
 
 // ── Qt logging filter (keep errors, drop benign chatter) ────────────────────
 // qt.svg: Humanity icon theme probing a printer.svg that isn't installed.
@@ -43,6 +43,16 @@
 // "libva error: /usr/lib/dri/iHD_drv_video.so init failed". Pinning i965
 // (confirmed present via vainfo) selects the working driver and silences it.
 //@ pragma Env LIBVA_DRIVER_NAME=i965
+
+// ── glibc heap-arena cap (RSS / thread-count trim) ──────────────────────────
+// A long-lived, many-threaded process gets one malloc arena per competing thread
+// up to 8 * CPU-cores; each arena reserves its own heap, so idle arenas show up
+// as resident memory and as kernel-side per-arena bookkeeping. Capping arenas at
+// 4 makes glibc funnel allocations onto fewer heaps that are reused instead of
+// growing, lowering steady-state RSS of this process (Qt/QML + quickshell; the
+// Chromium child processes manage their own allocators). Pure allocator tuning --
+// no functional or rendering change.
+//@ pragma Env MALLOC_ARENA_MAX=4
 
 pragma ComponentBehavior: Bound
 

@@ -174,8 +174,38 @@ Item {
                 cachePath: Config.home + "/.cache/hyprcandy/webengine"
                 httpCacheType: WebEngineProfile.DiskHttpCache
                 persistentCookiesPolicy: WebEngineProfile.ForcePersistentCookies
+                // Bound the on-disk HTTP cache so it cannot grow without limit;
+                // Qt prunes toward this ceiling automatically. 128 MiB is ample
+                // for SearXNG + a handful of sites and keeps the cache small.
+                httpCacheMaximumSize: 128 * 1024 * 1024
             }
             property WebEngineProfile webProfile: null
+
+            // Build the single shared WebEngine profile on FIRST use, never
+            // destroy it. instance() must run after component init (calling it
+            // during init SIGSEGVs) and only once, so every entry point about to
+            // create a WebEngineView calls this first. A launcher-only session
+            // that never opens websearch/agent therefore never boots Chromium
+            // -- no browser/GPU/network threads, no renderer -- the single
+            // largest thread + memory saving available on this design.
+            function _ensureWebProfile() {
+                if (!win.webProfile)
+                    win.webProfile = webProfileProto.instance()
+                return win.webProfile
+            }
+
+            // Reclaim WebEngine memory the ways THIS Qt build exposes to QML.
+            // There is no QML cookie/website-data wipe (those are C++-only) and
+            // no way to GC or destroy a renderer here (a recreated
+            // WebContentsAdapter crashes this build), so the safe lever is
+            // clearing the bounded HTTP disk cache -- re-downloadable, zero UX
+            // impact. Live page heaps are instead freed by the existing OFF
+            // paths: web OFF destroys tab views, agent OFF navigates the
+            // workspace to about:blank (agentReady=false).
+            function _webClearCache() {
+                if (win.webProfile)
+                    win.webProfile.clearHttpCache()
+            }
 
             // activeView re-pins (tab switch/create/close) are not observable
             // through a normal binding on the pooled per-view signals, so
@@ -310,6 +340,7 @@ Item {
                     win._setActiveView(null)
                     win._webTouch()
                     win.searxStopDocker()
+                    win._webClearCache()
                     win.webShowError = false
                     win.searxDown = false
                     win.webShowBookmarks = false
@@ -751,6 +782,7 @@ Item {
 
             function agentEnsureUp() {
                 if (!win.wsEnabled) return
+                win._ensureWebProfile()
                 win.ensureRuntimeBackend()
                 if (win.agentReady) return
                 win.checkAgentHealth(function(ok) {
@@ -812,8 +844,15 @@ Item {
 
             function readWorkspaceStartupState() {
                 try {
-                    if (!wsStateFile.exists) return true
-                    const o = JSON.parse(wsStateFile.text())
+                    // NOTE: FileView.exists is undefined in this Quickshell build,
+                    // so it must NOT gate the read (that silently forced wsEnabled
+                    // always-ON and made the agent tab autostart despite a persisted
+                    // OFF). text() is the content (empty when unreadable) and
+                    // onLoaded only fires on a successful load -- same as the web
+                    // state readers above.
+                    const t = wsStateFile.text()
+                    if (!t) return true
+                    const o = JSON.parse(t)
                     return (o && typeof o.enabled === "boolean") ? o.enabled : true
                 } catch (e) { return true }
             }
@@ -878,6 +917,7 @@ Item {
                 } else {
                     win.agentReady = false
                     win.agentStarting = false
+                    win._webClearCache()
                     win.switchTab("launcher")
                 }
             }
@@ -1245,6 +1285,7 @@ Item {
             // errored out); otherwise kick off the docker start and let healthRetry
             // finish the boot and recover the view.
             function webEnsureUp() {
+                win._ensureWebProfile()
                 win.checkSearxHealth(function(ok) {
                     if (ok) {
                         win.searxDown = false
@@ -1733,6 +1774,7 @@ Item {
             }
             onVisibleChanged: {
                 if (visible) {
+                    idleCacheTrim.stop()
                     // First show of the (now persistent) window: resolve the
                     // startup policies and warm any enabled backend. Deferred here
                     // rather than Component.onCompleted so a hidden-at-boot window
@@ -1766,7 +1808,12 @@ Item {
                 // else: keep the SearXNG container warm (no teardown) so re-show
                 // returns instantly and autostart can't wedge mid-toggle; persist the
                 // open-tab model so the strip survives the transient-Loader teardown.
-                else { win.webSaveActive(); win.webSaveTabsState() }
+                else {
+                    win.webSaveActive(); win.webSaveTabsState()
+                    // Hidden = idle: start the cooldown after which the bounded HTTP
+                    // disk cache is reclaimed (live pages keep in-memory state).
+                    idleCacheTrim.restart()
+                }
             }
 
             // Resolve the persisted workspace startup policy at session start and
@@ -1799,14 +1846,24 @@ Item {
                     }
                 }
             }
+            // Idle HTTP-cache reclamation: fires once per hide, only acting if the
+            // window is still hidden when it elapses. clearHttpCache is async
+            // (emits clearHttpCacheCompleted) and safe to call repeatedly.
+            Timer {
+                id: idleCacheTrim
+                interval: 10 * 60 * 1000   // 10 min after the launcher is hidden
+                repeat: false
+                onTriggered: { if (!win.visible) win._webClearCache() }
+            }
+
             // Boot is deferred to the first show (see onVisibleChanged) — the
             // window stays loaded across hide/show so web/agent pages keep running.
             Component.onCompleted: {
-                // Resolve the single persistent profile exactly once, post-init
-                // (calling instance() during component init SIGSEGVs -- see the
-                // webProfileProto block). Setting win.webProfile flips the gated
-                // agentViewLoader active and lets _ensureView build tab views.
-                win.webProfile = webProfileProto.instance()
+                // Deliberately does NOT create the WebEngine profile: it is built
+                // lazily via _ensureWebProfile() the first time websearch or the
+                // agent tab is actually used, so an idle launcher never boots
+                // Chromium's browser/GPU/network threads or a renderer. (instance()
+                // must also not run during component init -- it SIGSEGVs.)
             }
 
             // ── Backdrop: click outside the card dismisses ────────────────
