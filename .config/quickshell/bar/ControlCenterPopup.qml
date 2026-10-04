@@ -7,6 +7,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Io
+import "scripts/cavapaint.js" as CP
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  Control Center — hyprcandy quickshell edition.
@@ -1459,7 +1460,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["General","Icons","Workspaces","Media","Cava","Background","Visibility"]
+                                    model: ["General","Borders","Icons","Workspaces","Media","Cava","Background","Visibility"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -1775,6 +1776,20 @@ PanelWindow {
                                          CCSlider { visible: Config.barMode === "shell";                            label:"Side Margin (Shell)"; from:0;to:200; value:Config.shellModuleSideMargin;onMoved:function(v){Config.shellModuleSideMargin=v} }
                                          CCSlider { label:"Edge Pad Left"; from:0;to:30; value:Config.barEdgePaddingLeft; onMoved:function(v){Config.barEdgePaddingLeft=v} }
                                          CCSlider { label:"Edge Pad Right";from:0;to:30; value:Config.barEdgePaddingRight;onMoved:function(v){Config.barEdgePaddingRight=v} }
+
+                                        CCSection { text: "Spacing & Padding" }
+                                        CCSlider { label:"Island Spacing";  from:0;to:24; value:Config.islandSpacing;  onMoved:function(v){Config.islandSpacing=v} }
+                                        CCSlider { label:"Grouped Spacing"; from:0;to:12; value:Config.groupedSpacing; onMoved:function(v){Config.groupedSpacing=v} }
+                                        CCSlider { label:"Module Pad H";    from:3;to:20; value:Config.modPadH;        onMoved:function(v){Config.modPadH=v} }
+
+                                        Item { height: 10 }
+                                    }
+                                }
+
+                                // ── Borders ───────────────────────────────────
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        width: parent.width; spacing: 5
 
                                          CCSection { text: "Border" }
                                          CCSlider {
@@ -2169,10 +2184,25 @@ PanelWindow {
                                             }
                                         }
 
-                                        CCSection { text: "Spacing & Padding" }
-                                        CCSlider { label:"Island Spacing";  from:0;to:24; value:Config.islandSpacing;  onMoved:function(v){Config.islandSpacing=v} }
-                                        CCSlider { label:"Grouped Spacing"; from:0;to:12; value:Config.groupedSpacing; onMoved:function(v){Config.groupedSpacing=v} }
-                                        CCSlider { label:"Module Pad H";    from:3;to:20; value:Config.modPadH;        onMoved:function(v){Config.modPadH=v} }
+                                        CCSection { text: "Per-Island Borders" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Toggle each pill to show/hide that island’s border • all share the Island B-W / B-α settings above"
+                                            color: Theme.cOnSurf
+                                            opacity: 0.65
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                            wrapMode: Text.Wrap
+                                        }
+                                        CCToggle { label:"Workspaces"; value:Config.borderWs; onToggled:function(v){Config.borderWs=v} }
+                                        CCToggle { label:"Clock & Date"; value:Config.borderClockDate; onToggled:function(v){Config.borderClockDate=v} }
+                                        CCToggle { label:"Weather & Bat"; value:Config.borderWeatherBat; onToggled:function(v){Config.borderWeatherBat=v} }
+                                        CCToggle { label:"Left Group"; value:Config.borderLeftGroup; onToggled:function(v){Config.borderLeftGroup=v} }
+                                        CCToggle { label:"Right Group"; value:Config.borderRightGroup; onToggled:function(v){Config.borderRightGroup=v} }
+                                        CCToggle { label:"Start Menu"; value:Config.borderStartMenu; onToggled:function(v){Config.borderStartMenu=v} }
+                                        CCToggle { label:"Media"; value:Config.borderMedia; onToggled:function(v){Config.borderMedia=v} }
+                                        CCToggle { label:"Cava"; value:Config.borderCava; onToggled:function(v){Config.borderCava=v} }
+                                        CCToggle { label:"Distro"; value:Config.borderDistro; onToggled:function(v){Config.borderDistro=v} }
+                                        CCToggle { label:"Start & Trash"; value:Config.borderStartTrash; onToggled:function(v){Config.borderStartTrash=v} }
 
                                         Item { height: 10 }
                                     }
@@ -2352,7 +2382,8 @@ PanelWindow {
                                 }
 
                                 // ── Cava ───────────────────────────────────
-                                ColumnLayout {
+                                CCScrollPane {
+                                    ColumnLayout {
                                         width: parent.width; spacing: 5
 
                                         CCSection { text: "Style" }
@@ -2361,12 +2392,15 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             spacing: 6
                                             Repeater {
-                                                model: Object.keys(Config.cavaStyleMap)
+                                                model: Object.keys(Config.cavaStyleMap).concat(Object.keys(Config.cavaPaintMap))
                                                 delegate: Item {
                                                     required property string modelData
                                                     required property int    index
                                                     // Fixed width so all cells align uniformly
                                                     width: 72; height: 52
+                                                    // the user's chosen cava colour (matugen/pywal/wallust)
+                                                    readonly property color _cavaCol: Config.cavaGradientEnabled
+                                                        ? Config.cavaGradientStartColor : Config.cavaGlyphColor
 
                                                     Column {
                                                         anchors.fill: parent
@@ -2382,16 +2416,45 @@ PanelWindow {
                                                                 : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
                                                                           Theme.cOnSecondary.b, 0.45)
                                                             Behavior on color { ColorAnimation { duration: 120 } }
+
+                                                            // ascii preset -> glyph-ramp preview
                                                             Text {
                                                                 anchors.centerIn: parent
+                                                                visible: !Config.cavaPaintMap[modelData]
                                                                 text: Config.cavaStyleMap[modelData] || ""
                                                                 font.family: Config.fontFamily
                                                                 font.pixelSize: 11
                                                                 color: Config.cavaStyle === modelData
-                                                                    ? Theme.cPrimary
-                                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                                              Theme.cPrimary.b, 0.55)
+                                                                    ? _cavaCol
+                                                                    : Qt.rgba(_cavaCol.r, _cavaCol.g,
+                                                                              _cavaCol.b, 0.55)
                                                                 Behavior on color { ColorAnimation { duration: 120 } }
+                                                            }
+
+                                                            // paint preset -> live Canvas thumbnail
+                                                            Canvas {
+                                                                anchors.fill: parent
+                                                                anchors.margins: 5
+                                                                visible: !!Config.cavaPaintMap[modelData]
+                                                                property color pen: Config.cavaStyle === modelData
+                                                                    ? _cavaCol
+                                                                    : Qt.rgba(_cavaCol.r, _cavaCol.g,
+                                                                              _cavaCol.b, 0.55)
+                                                                onPenChanged: requestPaint()
+                                                                onWidthChanged: requestPaint()
+                                                                onHeightChanged: requestPaint()
+                                                                onVisibleChanged: if (visible) requestPaint()
+                                                                onPaint: {
+                                                                    if (!visible) return
+                                                                    var ctx = getContext("2d")
+                                                                    ctx.reset()
+                                                                    var c = "rgba(" + Math.round(pen.r * 255) + "," +
+                                                                          Math.round(pen.g * 255) + "," +
+                                                                          Math.round(pen.b * 255) + "," + pen.a + ")"
+                                                                    CP.paint(ctx, Config.cavaPaintMap[modelData],
+                                                                             CP.test(22), width, height,
+                                                                             { c0: c, c1: c, thickness: 1.4, smooth: true })
+                                                                }
                                                             }
                                                         }
 
@@ -2428,6 +2491,10 @@ PanelWindow {
                                                 }
                                             }
                                         }
+
+                                        CCSection { text: "Mirror & Area" }
+                                        CCSlider { label:"Line Width";  from:1;to:6;stepSize:1;  value:Config.cavaWaveThickness; onMoved:function(v){Config.cavaWaveThickness=v} }
+                                        CCToggle { label:"Smooth Curve"; value:Config.cavaWaveSmooth; onToggled:function(v){Config.cavaWaveSmooth=v} }
 
                                         CCSection { text: "Dimensions & Behavior" }
                                         CCSlider { label:"Bar Count";   from:5;to:200;stepSize:1;   value:Config.cavaWidth;      onMoved:function(v){Config.cavaWidth=v} }
@@ -2794,6 +2861,7 @@ PanelWindow {
                                         }
 
                                         Item { height: 10 }
+                                    }
                                 }
 
                                 // ── Background ─────────────────────────────

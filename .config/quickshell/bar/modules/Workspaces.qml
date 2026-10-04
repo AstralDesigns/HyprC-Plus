@@ -211,7 +211,7 @@ Item {
                         border.width: Config.islandBorder
                         border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
                                               Config.islandBorderColor.b, Config.islandBorderAlpha)
-                        visible: Config.islandBorder > 0 && Config.islandBorderAlpha > 0
+                        visible: Config.borderWs && Config.islandBorder > 0 && Config.islandBorderAlpha > 0
                     }
 
                     Text {
@@ -305,7 +305,7 @@ Item {
                     border.width: Config.islandBorder
                     border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
                                           Config.islandBorderColor.b, Config.islandBorderAlpha)
-                    visible: Config.islandBorder > 0 && Config.islandBorderAlpha > 0
+                    visible: Config.borderWs && Config.islandBorder > 0 && Config.islandBorderAlpha > 0
                 }
 
                 Text {

@@ -10,20 +10,35 @@
 // children inherit them. This is the launcher's own concern, not the
 // compositor autostart's (hyprviz.lua), which is why it lives here.
 //
-// Backend = ANGLE-on-GL (PINNED, known-good). We deliberately tried letting
-// Mesa/ANGLE auto-pick a backend (no --use-gl/--use-angle) so it could choose
-// Vulkan; on this Ivy Bridge + AMD-OLAND hybrid the default resolved to
-// ANGLE-on-Vulkan and its native-pixmap / DMA-BUF zero-copy path fails to
-// import the shared buffer (eglCreateImage 0x3009 -> ProduceSkia() failed ->
-// "RasterDecoderImpl: Context lost during MakeCurrent" -> every page renders
-// blank). So we pin the ANGLE-on-OpenGL path that actually composites here.
-// DRI_PRIME=1 offloads GL to the discrete GPU on a hybrid box and is a
-// harmless no-op on single-GPU machines. --ignore-gpu-blocklist keeps the
-// old-but-working GPUs on the hardware path. WebGPU stays disabled because it
-// only kicks off unstable Mesa Vulkan probes (the "Failed to create WebGPU
-// Context Provider" log spam). ── //@ pragma Env DRI_PRIME=1 ── --use-gl=angle --use-angle=gl / --use-angle=vulkan / --enable-features=Vulkan --use-vulkan=native --use-gl=stub --disable-features=WebGPU 
-//@ pragma Env QSG_RHI_BACKEND = opengl
-//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS= --enable-gpu-rasterization --ignore-gpu-blocklist --enable-zero-copy
+// GL backend: NATIVE OpenGL (user-chosen 2026-10, verified rendering fine).
+// We previously PINNED ANGLE-on-GL (--use-gl=angle --use-angle=gl) to dodge an
+// ANGLE-on-Vulkan DMA-BUF failure (eglCreateImage 0x3009 -> ProduceSkia failed
+// -> "RasterDecoderImpl: Context lost" -> blank pages) on this Ivy Bridge +
+// AMD-OLAND hybrid. Those pins are now REMOVED to skip ANGLE's translation
+// overhead and let Chromium use desktop GL directly.
+//   !! If blank pages / context-lost ever come back, re-add `--use-gl=angle
+//   --use-angle=gl` to the flags line below -- that is the known-good fix. !!
+//
+// QSG_RHI_BACKEND controls Qt's OWN scene graph (the QML layer), NOT the
+// Chromium compositor; the web content's GL path is governed only by the
+// --use-gl/--use-angle flags (absent here = Chromium's own default). Kept at
+// opengl (no spaces -- "KEY = val" would set a malformed var and do nothing).
+//@ pragma Env QSG_RHI_BACKEND=opengl
+//
+// Flags: gpu-rasterization + ignore-gpu-blocklist keep the hardware path;
+// zero-copy shares GPU buffers (the very DMA-BUF path that failed under ANGLE-
+// on-Vulkan -- benign on native GL, but the FIRST thing to drop if blank pages
+// return); disable-background-timer-throttling + disable-renderer-backgrounding
+// keep the YouTube ad-skip interval and the agent hot while backgrounded
+// (costs a little idle CPU); no-pings drops link beacon tracking;
+// renderer-process-limit=2 caps Chromium renderer processes (the main per-tab
+// RAM lever). WebGPU is left ENABLED: the old "Vulkan probe" log spam it caused
+// came from the ANGLE-on-Vulkan path, which we no longer use (native GL), so
+// enabling it is now silent. proxy-server routes websearch through the opt-in
+// hcproxy (its lifecycle is tied to the websearch toggle in LauncherWindow.qml
+// -- see proxyOptIn; run `hcproxy disable` to strip this flag and stop the
+// launcher managing it).
+//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--enable-gpu-rasterization --ignore-gpu-blocklist --enable-zero-copy --disable-background-timer-throttling --disable-renderer-backgrounding --no-pings --renderer-process-limit=2 --proxy-server=http://127.0.0.1:8888
 
 // ── Qt logging filter (keep errors, drop benign chatter) ────────────────────
 // qt.svg: Humanity icon theme probing a printer.svg that isn't installed.

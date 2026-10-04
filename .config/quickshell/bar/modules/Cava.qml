@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import ".."
+import "../scripts/cavapaint.js" as CP
 
 // Cava visualizer — one cava child per side.
 // Keeps a light cava proc alive whenever the module is visible so level-0 ASCII
@@ -32,6 +33,24 @@ Item {
     property string _text:   ""
     property bool   _active: false
 
+    // Per-band amplitude 0..1 — the numeric render source for the Canvas wave
+    // (the ascii path keeps using _text). Populated every cava frame in onRead.
+    property var    _bands:  []
+
+    // Value range cava emits: paint mode asks for a finer 0..200 ramp; ascii
+    // derives it from the glyph-count of the active preset (as before).
+    readonly property int _maxRange: Config.cavaIsPaint
+        ? 200
+        : Math.max(1, Math.floor((Config.cavaEffectiveBars.length - 1) * 1.5))
+
+    // colour -> CSS rgba string for the Canvas 2D context (Canvas can't take a
+    // QML color directly). `mul` optionally scales alpha (used for the fill).
+    function _rgba(c, mul) {
+        const a = Math.max(0, Math.min(1, c.a * (mul === undefined ? 1 : mul)))
+        return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) +
+               "," + Math.round(c.b * 255) + "," + a + ")"
+    }
+
     function _syncCavaProc() {
         if (root._procShouldRun) {
             if (!cavaProc.running) cavaProc.running = true
@@ -57,8 +76,7 @@ Item {
     Process {
         id: cavaProc
         command: {
-            const bars    = Config.cavaEffectiveBars
-            const maxR    = Math.max(0, Math.floor((bars.length - 1) * 1.5))
+            const maxR    = root._maxRange
             const rev     = root.side === "right" ? 1 : 0
             const cfgPath = "/tmp/qs-cava-" + root.side + ".ini"
             const lines = [
@@ -86,18 +104,23 @@ Item {
                 if (!t || t.startsWith("[")) return
                 const vals    = t.split(";")
                 const barsStr = Config.cavaEffectiveBars
-                const maxR    = Math.max(0, Math.floor((barsStr.length - 1) * 1.5))
+                const maxR    = root._maxRange
+                const isPaint = Config.cavaIsPaint
+                const bands   = []
                 let   result  = ""
                 let   allZero = true
                 for (let i = 0; i < vals.length; i++) {
                     const v = parseInt(vals[i])
-                    if (!isNaN(v)) {
-                        if (v > 0) allZero = false
+                    if (isNaN(v)) continue
+                    if (v > 0) allZero = false
+                    bands.push(Math.max(0, Math.min(1, v / maxR)))
+                    if (!isPaint) {
                         const scaledV = Math.floor(v * (barsStr.length - 1) / maxR)
                         result += barsStr[Math.min(scaledV, barsStr.length - 1)]
                     }
                 }
-                root._text   = result
+                root._text   = isPaint ? "" : result
+                root._bands  = bands
                 root._active = !allZero
             }
         }
@@ -185,6 +208,7 @@ Item {
 
         Text {
             id: cavaTop
+            visible: !Config.cavaIsPaint
             anchors.top: parent.top
             width: parent.width
             height: parent.height * Config.cavaGradientSplit
@@ -200,6 +224,7 @@ Item {
 
         Text {
             id: cavaBot
+            visible: !Config.cavaIsPaint
             anchors.bottom: parent.bottom
             width:  parent.width
             height: parent.height * (1.0 - Config.cavaGradientSplit)
@@ -211,6 +236,55 @@ Item {
             font.pixelSize:   Config.glyphSize
             font.letterSpacing: Config.cavaBarSpacing
             Behavior on color { ColorAnimation { duration: 300 } }
+        }
+
+        // -- Canvas paint styles (Config.cavaIsPaint) -------------------
+        // Draws the selected paint style from root._bands via the shared
+        // cavapaint.js painter. A repaint Timer drives the animation (the
+        // per-band signal arrives every cava frame; the underscored
+        // _bands/_active change signals are not reliably emitted, so we
+        // simply repaint on a fixed tick while the canvas is shown).
+        Canvas {
+            id: waveCanvas
+            anchors.centerIn: parent
+            width:  parent.width
+            height: Config.moduleHeight
+            visible: Config.cavaIsPaint
+            renderStrategy: Canvas.Cooperative
+
+            onVisibleChanged: if (visible) requestPaint()
+            onWidthChanged: requestPaint()
+            onHeightChanged: requestPaint()
+
+            Connections {
+                target: Config
+                function onCavaStyleChanged()           { if (waveCanvas.visible) waveCanvas.requestPaint() }
+                function onCavaWaveThicknessChanged()   { if (waveCanvas.visible) waveCanvas.requestPaint() }
+                function onCavaWaveSmoothChanged()      { if (waveCanvas.visible) waveCanvas.requestPaint() }
+                function onModuleHeightChanged()         { if (waveCanvas.visible) waveCanvas.requestPaint() }
+                function onCavaGradientEnabledChanged() { if (waveCanvas.visible) waveCanvas.requestPaint() }
+                function onCavaActiveOpacityChanged()   { if (waveCanvas.visible) waveCanvas.requestPaint() }
+                function onCavaInactiveOpacityChanged() { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            }
+
+            onPaint: {
+                if (!visible) return
+                const ctx = getContext("2d")
+                ctx.reset()
+                CP.paint(ctx, Config.cavaPaintMap[Config.cavaStyle], root._bands,
+                         width, height,
+                         { c0: root._rgba(root._colorTop),
+                           c1: root._rgba(root._colorBot),
+                           thickness: Config.cavaWaveThickness,
+                           smooth: Config.cavaWaveSmooth })
+            }
+        }
+
+        Timer {
+            interval: 16
+            repeat: true
+            running: waveCanvas.visible && root._procShouldRun
+            onTriggered: waveCanvas.requestPaint()
         }
     }
 }

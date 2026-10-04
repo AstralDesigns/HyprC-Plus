@@ -1193,6 +1193,24 @@ PanelWindow {
 
         readonly property real _bgOpacity: _effectiveBgOpacity
 
+        // Per-island border on/off — keyed by bgType so each group's pill
+        // border toggles independently (all share islandBorder width + alpha).
+        // "workspace" is handled by the border Rectangle below (its ring lives
+        // in Workspaces.qml, gated by Config.borderWs).
+        readonly property bool _borderOn: {
+            switch (bgType) {
+                case "clockdate":  return Config.borderClockDate
+                case "weatherbat": return Config.borderWeatherBat
+                case "leftgroup":  return Config.borderLeftGroup
+                case "rightgroup": return Config.borderRightGroup
+                case "startmenu":  return Config.borderStartMenu
+                case "media":      return Config.borderMedia
+                case "cava":       return Config.borderCava
+                case "distro":     return Config.borderDistro
+                default:           return true
+            }
+        }
+
         Rectangle {
             id: islFill
             anchors.fill: parent
@@ -1227,7 +1245,7 @@ PanelWindow {
             anchors.fill: parent
             radius: Config.islandRadius
             color: "transparent"
-            border.width: isl.bgType === "workspace" ? 0 : Config.islandBorder
+            border.width: isl.bgType === "workspace" ? 0 : (isl._borderOn ? Config.islandBorder : 0)
             border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
                                   Config.islandBorderColor.b, Config.islandBorderAlpha)
             z: 1

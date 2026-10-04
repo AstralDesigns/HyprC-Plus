@@ -25,6 +25,8 @@ import os
 import time
 import json
 import shutil
+import fcntl
+import signal
 import threading
 import dbus
 import dbus.service
@@ -43,6 +45,7 @@ OBEX_MGR_IFACE   = "org.bluez.obex.AgentManager1"
 OBEX_MGR_PATH    = "/org/bluez/obex"
 
 PIDFILE = "/tmp/qs_bt_agent.pid"
+LOCKFILE = "/tmp/qs_bt_agent.lock"
 
 def emit(obj):
     print(json.dumps(obj), flush=True)
@@ -481,18 +484,42 @@ def stdin_reader(loop, bt_agent, obex_agent, session_bus):
             time.sleep(1)
 
 
-def main():
-    # Kill previous instance
+def _sole_instance():
+    """Race-free single-instance guard with deterministic takeover.
+
+    The previous logic (read pidfile -> kill -> write pidfile) lost when several
+    agents launched in the same instant: they all read the SAME stale pid, each
+    wrote its own, and none reliably killed the others, so multiple agents briefly
+    coexisted (the '4x device connection' burst on startup). A bootstrap flock
+    serialises newcomers, so each one takes over cleanly from the incumbent
+    recorded in the pidfile. A SIGTERM'd incumbent dies on its default handler
+    WITHOUT touching the pidfile (so it can't clobber the newcomer's pid), and
+    dying auto-releases the flock, so there is no deadlock. Net result: exactly
+    one live agent, extras cleared on every reload.
+    """
+    boot = open(LOCKFILE, "w")
+    fcntl.flock(boot, fcntl.LOCK_EX)          # blocking: newcomers queue, one at a time
     try:
-        if os.path.exists(PIDFILE):
-            with open(PIDFILE, "r") as f:
-                old_pid = int(f.read().strip())
-            os.kill(old_pid, 15)
-            time.sleep(0.3)
-    except Exception: pass
-    
+        with open(PIDFILE) as f:
+            old = int(f.read().strip())
+        if old != os.getpid():
+            try:
+                os.kill(old, signal.SIGTERM)
+                time.sleep(0.4)               # give the incumbent a beat to exit
+            except ProcessLookupError:
+                pass                          # already gone
+            except PermissionError:
+                pass                          # not ours to kill
+    except (FileNotFoundError, ValueError):
+        pass                                  # no / corrupt pidfile -> nothing to kill
     with open(PIDFILE, "w") as f:
         f.write(str(os.getpid()))
+    fcntl.flock(boot, fcntl.LOCK_UN)
+    boot.close()
+
+
+def main():
+    _sole_instance()
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
     system_bus = dbus.SystemBus()
@@ -500,29 +527,40 @@ def main():
 
     bt_agent = QuickshellBTAgent(system_bus, AGENT_PATH)
     
-    # System-wide device connection monitor
+    # System-wide device connection monitor. Deduped on real state transitions:
+    # BlueZ re-fires Connected=true several times while a device settles (and did
+    # so once per duplicate agent process), which is what surfaced as the 4x
+    # "connected" burst. NOTE: we filter to /org/bluez device objects IN-HANDLER
+    # (interface + dev_ prefix checks below) rather than via add_signal_receiver's
+    # path_namespace kwarg -- this dbus-python build rejects that keyword.
+    _conn_state = {}
     def device_prop_changed(interface, changed, invalidated, path):
         if interface != "org.bluez.Device1": return
-        if "Connected" in changed:
-            connected = bool(changed["Connected"])
-            # Extract MAC and name
+        if "Connected" not in changed: return
+        path = str(path)
+        last = path.split("/")[-1]
+        if not last.startswith("dev_"): return          # ignore adapter/root objects
+        mac = last[4:].replace("_", ":")
+        connected = bool(changed["Connected"])
+        if _conn_state.get(path) == connected:
+            return                                       # no transition -> skip
+        _conn_state[path] = connected
+        try:
+            dev_obj = system_bus.get_object(BLUEZ_SERVICE, path)
+            props = dbus.Interface(dev_obj, "org.freedesktop.DBus.Properties")
             try:
-                part = path.split("/")[-1]
-                mac = part.replace("dev_","").replace("_",":")
-                # Try to get real name from props
-                try:
-                    dev_obj = system_bus.get_object(BLUEZ_SERVICE, path)
-                    props = dbus.Interface(dev_obj, "org.freedesktop.DBus.Properties")
-                    name = str(props.Get("org.bluez.Device1", "Name"))
-                except:
-                    name = mac
-                emit({"type": "device_connection", "mac": mac, "name": name, "connected": connected})
-            except: pass
+                name = str(props.Get("org.bluez.Device1", "Name"))
+            except Exception:
+                name = mac
+        except Exception:
+            name = mac
+        emit({"type": "device_connection", "mac": mac, "name": name, "connected": connected})
 
     system_bus.add_signal_receiver(device_prop_changed,
                                    dbus_interface="org.freedesktop.DBus.Properties",
                                    signal_name="PropertiesChanged",
                                    path_keyword="path")
+
 
     try:
         mgr = dbus.Interface(system_bus.get_object(BLUEZ_SERVICE, MANAGER_PATH), MANAGER_IFACE)
@@ -553,7 +591,14 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        if os.path.exists(PIDFILE): os.unlink(PIDFILE)
+        # Only remove the pidfile if it still points at us; if a newcomer already
+        # took over (and rewrote it) we must not delete theirs.
+        try:
+            with open(PIDFILE) as f:
+                if int(f.read().strip()) == os.getpid():
+                    os.unlink(PIDFILE)
+        except Exception:
+            pass
 
 if __name__ == "__main__":
     main()

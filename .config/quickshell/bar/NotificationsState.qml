@@ -592,11 +592,13 @@ Item {
         }}
         // Only run when activated
         running: LicenseState.activated
-        onRunningChanged: {
-            if (running) return
-            ns.btAgentReady = false
+        onRunningChanged: if (!running) ns.btAgentReady = false
+        // Exit code is only available as the onExited signal parameter, NOT as a
+        // bare `exitCode` inside onRunningChanged (that raised
+        // "ReferenceError: exitCode is not defined" on every agent restart).
+        onExited: function(code) {
             if (LicenseState.activated) {
-                console.warn("bt-agent exited code=" + exitCode)
+                console.warn("bt-agent exited code=" + code)
                 btAgentRestartTimer.restart()
             }
         }

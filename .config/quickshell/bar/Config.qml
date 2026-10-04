@@ -95,6 +95,16 @@ QtObject {
         v = _settings.value("islandRadius"); if (v !== undefined && v !== null) islandRadius = v
         v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
         v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
+        v = _settings.value("borderWs"); if (v !== undefined && v !== null) borderWs = _toBool(v)
+        v = _settings.value("borderClockDate"); if (v !== undefined && v !== null) borderClockDate = _toBool(v)
+        v = _settings.value("borderWeatherBat"); if (v !== undefined && v !== null) borderWeatherBat = _toBool(v)
+        v = _settings.value("borderLeftGroup"); if (v !== undefined && v !== null) borderLeftGroup = _toBool(v)
+        v = _settings.value("borderRightGroup"); if (v !== undefined && v !== null) borderRightGroup = _toBool(v)
+        v = _settings.value("borderStartMenu"); if (v !== undefined && v !== null) borderStartMenu = _toBool(v)
+        v = _settings.value("borderMedia"); if (v !== undefined && v !== null) borderMedia = _toBool(v)
+        v = _settings.value("borderCava"); if (v !== undefined && v !== null) borderCava = _toBool(v)
+        v = _settings.value("borderDistro"); if (v !== undefined && v !== null) borderDistro = _toBool(v)
+        v = _settings.value("borderStartTrash"); if (v !== undefined && v !== null) borderStartTrash = _toBool(v)
         v = _settings.value("islandBorderVar"); if (v !== undefined && v !== null) islandBorderVar = v
         v = _settings.value("islandBorderMode"); if (v !== undefined && v !== null) islandBorderMode = v
         v = _settings.value("islandBorderWallustVar"); if (v !== undefined && v !== null) islandBorderWallustVar = v
@@ -166,6 +176,8 @@ QtObject {
         v = _settings.value("cavaWidth"); if (v !== undefined && v !== null) cavaWidth = v
         v = _settings.value("cavaBarSpacing"); if (v !== undefined && v !== null) cavaBarSpacing = v
         v = _settings.value("cavaStyle"); if (v !== undefined && v !== null) cavaStyle = v
+        v = _settings.value("cavaWaveThickness"); if (v !== undefined && v !== null) cavaWaveThickness = v
+        v = _settings.value("cavaWaveSmooth"); if (v !== undefined && v !== null) cavaWaveSmooth = _toBool(v)
         v = _settings.value("cavaTransparentWhenInactive"); if (v !== undefined && v !== null) cavaTransparentWhenInactive = _toBool(v)
         v = _settings.value("cavaActiveOpacity"); if (v !== undefined && v !== null) cavaActiveOpacity = v
         v = _settings.value("cavaInactiveOpacity"); if (v !== undefined && v !== null) cavaInactiveOpacity = v
@@ -305,6 +317,16 @@ QtObject {
         _settings.setValue("islandRadius", islandRadius)
         _settings.setValue("islandBorder", islandBorder)
         _settings.setValue("islandBorderAlpha", islandBorderAlpha)
+        _settings.setValue("borderWs", borderWs)
+        _settings.setValue("borderClockDate", borderClockDate)
+        _settings.setValue("borderWeatherBat", borderWeatherBat)
+        _settings.setValue("borderLeftGroup", borderLeftGroup)
+        _settings.setValue("borderRightGroup", borderRightGroup)
+        _settings.setValue("borderStartMenu", borderStartMenu)
+        _settings.setValue("borderMedia", borderMedia)
+        _settings.setValue("borderCava", borderCava)
+        _settings.setValue("borderDistro", borderDistro)
+        _settings.setValue("borderStartTrash", borderStartTrash)
         _settings.setValue("islandBorderVar", islandBorderVar)
         _settings.setValue("islandBorderMode", islandBorderMode)
         _settings.setValue("islandBorderWallustVar", islandBorderWallustVar)
@@ -368,6 +390,8 @@ QtObject {
         _settings.setValue("cavaWidth", cavaWidth)
         _settings.setValue("cavaBarSpacing", cavaBarSpacing)
         _settings.setValue("cavaStyle", cavaStyle)
+        _settings.setValue("cavaWaveThickness", cavaWaveThickness)
+        _settings.setValue("cavaWaveSmooth", cavaWaveSmooth)
         _settings.setValue("cavaTransparentWhenInactive", cavaTransparentWhenInactive)
         _settings.setValue("cavaActiveOpacity", cavaActiveOpacity)
         _settings.setValue("cavaInactiveOpacity", cavaInactiveOpacity)
@@ -589,6 +613,20 @@ QtObject {
         ? _wallustThemeColor(islandBorderWallustVar)
         : _cavaThemeColor(islandBorderVar)
 
+    // ── Per-island border on/off toggles — each gates whether that
+    //  island draws the border; all share the global islandBorder width
+    //  (Island B-W) and islandBorderAlpha (Island B-α) above.
+    property bool borderWs: true
+    property bool borderClockDate: true
+    property bool borderWeatherBat: true
+    property bool borderLeftGroup: true
+    property bool borderRightGroup: true
+    property bool borderStartMenu: true
+    property bool borderMedia: true
+    property bool borderCava: true
+    property bool borderDistro: true
+    property bool borderStartTrash: true
+
     // ── Main bar border (bar mode only) ──────────────────────────────────
     property int  barBorderWidth: 2    // px — 0 to hide
     property real barBorderAlpha: 1.0  // opacity
@@ -776,7 +814,7 @@ QtObject {
     property bool   wsSeparators:        false  // show glyph separator between buttons
     property string wsSeparatorGlyph:    ""
     property real   wsSeparatorOpacity:  0.3
-    readonly property color wsSeparatorColor: Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, wsSeparatorOpacity)
+    readonly property color wsSeparatorColor: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, wsSeparatorOpacity)
     property int    wsSeparatorSize:     10    // px — font size of the separator glyph
     property int    wsSeparatorPadLeft:  2     // px — space between left ws button and separator
     property int    wsSeparatorPadRight: 2     // px — space between separator and right ws button
@@ -812,9 +850,11 @@ QtObject {
     property int cavaWidth: 25      // ASCII bar count (number of columns rendered by cava)
     property real cavaBarSpacing: 0  // px — letter-spacing between bars (0 = no gap; fine increments)
 
-    //  cavaStyle selects a named preset. Set to "" to use cavaBars directly.
-    //  Presets:  "dots" | "bars" | "braille_fill" | "braille_hollow" |
-    //            "blocks" | "thin_bars"
+    //  cavaStyle selects a preset — either an ASCII glyph ramp (cavaStyleMap)
+    //  or a Canvas paint style (cavaPaintMap). Set to "" to use cavaBars.
+    //  ASCII presets are amplitude RAMPS (index 0 = quiet -> last = loud); one
+    //  glyph is picked per band, so the string must grow monotonically in
+    //  density/height. Paint presets are drawn live by bar/scripts/cavapaint.js.
     property string cavaStyle: "dots"
 
     readonly property var cavaStyleMap: ({
@@ -823,11 +863,29 @@ QtObject {
         "braille_fill":   "⠂⠃⠇⡇⣇⣧⣷⣿",
         "braille_hollow": "⠂⠂⠃⠃⡃⡇⡇⣇",
         "blocks":         "░░▒▒▓▓██",
-        "thin_bars":      "⡀⡄⡆⡇⣇⣧⣷⣿"
+        "thin_bars":      "⡀⡄⡆⡇⣇⣧⣷⣿",
+        "braille_soft":   "⣀⣀⣄⣤⣦⣶⣷⣿", // smooth flowing braille ramp
     })
+
+    //  Canvas paint styles - keys are the picker labels, values the onPaint
+    //  id handled by cavapaint.js. All drawn live from the same per-band
+    //  signal: envelope, silhouette, bars and a dot-matrix.
+    readonly property var cavaPaintMap: ({
+        "mirror":  "mirror",   // symmetric envelope + translucent fill
+        "area":    "area",     // filled silhouette (wave line + fill)
+        "columns": "bars",     // vertical bars rising from the floor
+        "matrix":  "dots"      // LED dot-matrix columns
+    })
+
+    //  true when the selected cavaStyle is a Canvas paint style (else ascii)
+    readonly property bool cavaIsPaint: typeof cavaPaintMap[cavaStyle] !== "undefined"
 
     //  cavaBars — raw string; used when cavaStyle === ""
     property string cavaBars: "⣀⣄⣤⣦⣶⣷⣿"
+
+    //  Paint renderer params (shared by every Canvas style)
+    property int  cavaWaveThickness: 2     // px - stroke width / dot size scale
+    property bool cavaWaveSmooth:    true  // smooth curves vs straight segments
 
     //  cavaEffectiveBars — resolved bars string (use this in Cava.qml)
     readonly property string cavaEffectiveBars: {

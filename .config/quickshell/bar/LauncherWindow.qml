@@ -196,15 +196,52 @@ Item {
 
             // Reclaim WebEngine memory the ways THIS Qt build exposes to QML.
             // There is no QML cookie/website-data wipe (those are C++-only) and
-            // no way to GC or destroy a renderer here (a recreated
-            // WebContentsAdapter crashes this build), so the safe lever is
-            // clearing the bounded HTTP disk cache -- re-downloadable, zero UX
-            // impact. Live page heaps are instead freed by the existing OFF
-            // paths: web OFF destroys tab views, agent OFF navigates the
-            // workspace to about:blank (agentReady=false).
+            // no JS GC, but a live RENDERER can be reaped safely by destroying
+            // its WebEngineView -- the same create/destroy path the websearch
+            // tab views already use on open/close without crashing. So the OFF
+            // paths now free the big per-page heaps directly: web OFF destroys
+            // the tab views, agent OFF deactivates agentViewLoader (view ->
+            // destroyed). The shared browser core (zygote/utility/GPU) still
+            // can't be torn down from QML once Chromium boots -- it only exists
+            // because a tab used it, and the lazy profile keeps a never-used
+            // session paying zero. Disk cache (re-downloadable, zero UX impact)
+            // is the remaining safe lever:
             function _webClearCache() {
                 if (win.webProfile)
                     win.webProfile.clearHttpCache()
+            }
+
+            // ── hcproxy lifecycle (opt-in MITM proxy, tied to websearch) ────
+            // mitmdump + python-adblock idles at ~180MB, so it must NOT run
+            // while the websearch tab is OFF. The agent tab is loopback-only and
+            // never uses it. Only managed when the user opted in -- detected by
+            // the --proxy-server flag baked into QTWEBENGINE_CHROMIUM_FLAGS by
+            // `hcproxy enable`; otherwise every call is a no-op, so dotfile
+            // users who never enabled the proxy are completely untouched.
+            readonly property bool proxyOptIn:
+                String(Quickshell.env("QTWEBENGINE_CHROMIUM_FLAGS") || "").indexOf("proxy-server") > -1
+            property string _proxyWanted: ""   // "" unknown | "on" | "off" (last commanded)
+
+            Process {
+                id: hcproxyStartProc
+                command: ["systemctl", "--user", "start", "hcproxy"]
+            }
+            Process {
+                id: hcproxyStopProc
+                command: ["systemctl", "--user", "stop", "hcproxy"]
+            }
+            // Bring the service up/down to match the websearch enabled state.
+            // User-scoped systemctl (no sudo); idempotent and only fires on a
+            // desired-state change. Cold start caveat: after an OFF->ON flip the
+            // adblock engine takes a few seconds to build, so the very first
+            // page load may need a reload.
+            function _syncProxy(want) {
+                if (!win.proxyOptIn) return
+                const next = want ? "on" : "off"
+                if (win._proxyWanted === next) return
+                win._proxyWanted = next
+                if (want) hcproxyStartProc.running = true
+                else hcproxyStopProc.running = true
             }
 
             // activeView re-pins (tab switch/create/close) are not observable
@@ -264,6 +301,10 @@ Item {
                     // Only warm once the policy is resolved (2a): a persisted
                     // OFF must never be raced by a docker warm-up.
                     if (win.webEnabled && win.visible && win._webResolved) win.webEnsureUp()
+                    // Persisted OFF: stop the login-autostarted hcproxy so its
+                    // ~180MB is freed for the whole session until websearch is
+                    // turned back on (no-op unless the proxy flag is present).
+                    else if (!win.webEnabled) win._syncProxy(false)
                 }
                 Component.onCompleted: reload()
             }
@@ -341,6 +382,7 @@ Item {
                     win._webTouch()
                     win.searxStopDocker()
                     win._webClearCache()
+                    win._syncProxy(false)
                     win.webShowError = false
                     win.searxDown = false
                     win.webShowBookmarks = false
@@ -1286,6 +1328,7 @@ Item {
             // finish the boot and recover the view.
             function webEnsureUp() {
                 win._ensureWebProfile()
+                win._syncProxy(true)
                 win.checkSearxHealth(function(ok) {
                     if (ok) {
                         win.searxDown = false
@@ -2917,59 +2960,10 @@ Item {
                             y: win.ip - pageArea.y
                             width: listFrame.width - tabPill.x - tabPill.width - 2 * win.ip
                             height: listFrame.height - 2 * win.ip
-                            radius: 14
+                            radius: 12
                             color: Qt.rgba(Theme.cSurface.r, Theme.cSurface.g, Theme.cSurface.b, 0.2)
                             //border.width: 1
                             //border.color: Qt.rgba(win.wColor3.r, win.wColor3.g, win.wColor3.b, 0.22)
-                            ColumnLayout {
-                                anchors.centerIn: parent
-                                spacing: 12
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "\u{F059F}"
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 34
-                                    color: Theme.cPrimary
-                                    opacity: 0.7
-                                }
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "Web search is off"
-                                    font.pixelSize: 14
-                                    font.bold: true
-                                    color: Theme.cOnSurf
-                                }
-                                Text {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    text: "Turn the eye toggle on to start SearXNG and browse."
-                                    font.pixelSize: 11
-                                    color: Theme.cOnSurf
-                                    opacity: 0.7
-                                }
-                                Rectangle {
-                                    Layout.alignment: Qt.AlignHCenter
-                                    Layout.topMargin: 4
-                                    width: webEnableLbl.implicitWidth + 28
-                                    height: 32
-                                    radius: 16
-                                    color: webEnableMa.containsMouse ? Theme.cOnSecondary : Theme.cSecondaryContainer
-                                    Text {
-                                        id: webEnableLbl
-                                        anchors.centerIn: parent
-                                        text: "\u{F04F5}  Enable web search"
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 12
-                                        color: Theme.cPrimary
-                                    }
-                                    MouseArea {
-                                        id: webEnableMa
-                                        anchors.fill: parent
-                                        hoverEnabled: true
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: win.webToggleEnabled()
-                                    }
-                                }
-                            }
                         }
                         // ── Web-Search tab: persistent embedded SearXNG webview ──
                         // No native list-mode. SearXNG (docker @ searxBase) renders its
@@ -3322,10 +3316,12 @@ Item {
                                     }
 
                                     // Thin progress bar while loading (active view).
+                                    // Websearch tab only — the agent workspace lives in
+                                    // its own tab and has no header / URL bar to fill.
                                     Rectangle {
                                         Layout.fillWidth: true
-                                        Layout.preferredHeight: (win.webRev, win.webFullscreenTabId < 0 && win.activeView && win.activeView.loading) ? 3 : 0
-                                        visible: (win.webRev, win.webFullscreenTabId < 0 && !!(win.activeView && win.activeView.loading))
+                                        Layout.preferredHeight: (win.webRev, win.tab === "websearch" && win.webFullscreenTabId < 0 && win.activeView && win.activeView.loading) ? 3 : 0
+                                        visible: (win.webRev, win.tab === "websearch" && win.webFullscreenTabId < 0 && !!(win.activeView && win.activeView.loading))
                                         radius: 2
                                         color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
                                         Rectangle {
@@ -3441,14 +3437,23 @@ Item {
                                                 onVisibleChanged: if (visible) forceActiveFocus()
                                             }
                                         }
-                                        // Gated so the agent view is only instantiated
+                                        // Gated so the agent view is instantiated only
                                         // AFTER win.webProfile resolves (profile is
-                                        // creation-time only); keeps it sharing the one
-                                        // persistent profile instead of a null/2nd one.
+                                        // creation-time only -> keeps it sharing the one
+                                        // persistent profile, never a null/2nd one) AND
+                                        // only while the workspace is enabled. Turning the
+                                        // agent OFF deactivates the Loader -> the view is
+                                        // destroyed -> its RENDERER process is reclaimed
+                                        // (~60MB) instead of lingering on about:blank.
+                                        // Re-enabling recreates it fresh (url rebinds via
+                                        // agentReady), which is fine because OFF was an
+                                        // explicit user choice. Destroying a WebEngineView
+                                        // (never the profile) is the same create/destroy
+                                        // path the websearch tab views already use safely.
                                         Loader {
                                             id: agentViewLoader
                                             anchors.fill: parent
-                                            active: win.webProfile !== null
+                                            active: win.webProfile !== null && win.wsEnabled
                                             sourceComponent: agentViewProto
                                         }
 

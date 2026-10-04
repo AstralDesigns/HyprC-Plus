@@ -75,7 +75,11 @@ EOF
 flag_on() {
     grep -q "proxy-server" "$SHELL_QML" && return 0
     echo "==> adding proxy flag to shell.qml"
-    sed -i "s#\(--disable-features=WebGPU\)#\1 $FLAG#" "$SHELL_QML"
+    # Append at end of the QTWEBENGINE_CHROMIUM_FLAGS pragma line. (We used to
+    # anchor the insert on `--disable-features=WebGPU`, but WebGPU is now left
+    # enabled, so that token no longer exists; matching the pragma line itself
+    # is stable regardless of which other flags are present.)
+    sed -i "/QTWEBENGINE_CHROMIUM_FLAGS=/ s#\(\$\)# $FLAG#" "$SHELL_QML"
 }
 
 link_cli() {

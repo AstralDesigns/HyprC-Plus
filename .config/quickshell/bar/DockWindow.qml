@@ -1586,7 +1586,7 @@ PanelWindow {
         height: width
         radius: 999
         color: Config.islandBgStyle === "gradient" ? "transparent" : Theme.cSurfaceTint
-        border.width: Config.islandBorder
+        border.width: Config.borderStartTrash ? Config.islandBorder : 0
         border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
                               Config.islandBorderColor.b, Config.islandBorderAlpha)
         opacity: hover.hovered ? 0.45 : 1.0

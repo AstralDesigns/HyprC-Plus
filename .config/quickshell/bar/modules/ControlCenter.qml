@@ -26,13 +26,56 @@ Item {
         }
     }
 
+    // Island background — mirrors StartMenu.qml so the two bar buttons match:
+    // glass/flat = SurfaceTint fill, gradient = InversePrimary→SurfaceTint→InversePrimary.
+    Rectangle {
+        id: ccBg
+        anchors.fill: parent
+        radius: Config.islandRadius
+        clip: true
+        z: 0
+
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            visible: Config.islandBgStyle !== "gradient"
+            color: Theme.cSurfaceTint
+            Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            visible: Config.islandBgStyle === "gradient"
+            gradient: Gradient {
+                orientation: Gradient.Vertical
+                GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                GradientStop { position: 0.35; color: Theme.cSurfaceTint }
+                GradientStop { position: 0.7; color: Theme.cSurfaceTint }
+                GradientStop { position: 1.0; color: Theme.cInversePrimary }
+            }
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        radius: Config.islandRadius
+        color: "transparent"
+        border.width: Config.islandBorder
+        border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
+                              Config.islandBorderColor.b, Config.islandBorderAlpha)
+        visible: Config.borderDistro && Config.islandBorder > 0 && Config.islandBorderAlpha > 0
+        z: 1
+    }
+
     Text {
         id: ccIcon
         anchors.centerIn: parent
         text: root._glyph
-        color: Config.ccGlyphColor
+        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, Config.ccGlyphOpacity)
         font.family: Config.fontFamily
         font.pixelSize: Config.glyphSize + 2
+        z: 2
         Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
     }
 
@@ -44,6 +87,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        z: 3
         onClicked: ControlCenterState.toggle()
     }
 }
