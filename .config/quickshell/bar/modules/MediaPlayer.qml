@@ -150,7 +150,7 @@ Item {
                                         : (ctlMa.containsMouse ? Config.textColor : Theme.cWc9)
                                     opacity: 0.8
                                     font.family:    Config.fontFamily
-                                    font.pixelSize: Config.mediaCtlSize
+                                    font.pixelSize: Config.mediaGlyphSize
                                     font.weight:    Config.fontWeight
                                     Behavior on color { ColorAnimation { duration: 80 } }
                                 }

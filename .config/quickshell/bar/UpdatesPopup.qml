@@ -128,8 +128,8 @@ PanelWindow {
                 height: 36
                 radius: 10
                 color: sysUpdateHover.containsMouse
-                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
-                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
+                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                    : Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, 0.35)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 visible: UpdatesPopupState.hasUpdates
@@ -138,7 +138,7 @@ PanelWindow {
                 Text {
                     anchors.centerIn: parent
                     text:  _sysUpdateProc.running ? "󰑓  Running …" : "󰇚 System Updates"
-                    color: Theme.cWc5
+                    color: Theme.cSurfaceTint
                     font.family:    Config.labelFont
                     font.pixelSize: 13
                 }
@@ -187,8 +187,8 @@ PanelWindow {
                     visible: !UpdatesPopupState.hcHasUpdates && !_hcBusy
                     text: _hcBusy ? "󰑓" : "󰇚"
                     color: hcRerunHover.containsMouse
-                        ? Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, 0.75)
-                        : Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, 0.35)
+                        ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.75)
+                        : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.35)
                     font.family:    Config.fontFamily
                     font.pixelSize: Config.fontSize + 2
                     anchors.verticalCenter: parent.verticalCenter
@@ -229,8 +229,8 @@ PanelWindow {
                 height: 36
                 radius: 10
                 color: hcUpdateHover.containsMouse
-                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimaryContainer.g, Theme.cPrimaryContainer.b, 0.12)
-                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
+                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                    : Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, 0.35)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
                 visible: UpdatesPopupState.hcHasUpdates || _hcBusy
@@ -240,7 +240,7 @@ PanelWindow {
                     anchors.centerIn: parent
                     // Show "Running" whenever any phase of update or workspace setup is active
                     text:  _hcBusy ? "󰑓  Running …" : "󰇚 HC+ Updates"
-                    color: Theme.cWc6
+                    color: Theme.cSurfaceTint
                     font.family:    Config.labelFont
                     font.pixelSize: 13
                 }

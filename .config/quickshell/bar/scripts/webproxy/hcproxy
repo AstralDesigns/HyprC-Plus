@@ -63,6 +63,7 @@ Type=simple
 ExecStart=/usr/bin/mitmdump -s "$ADDON" --set confdir="$CONFDIR" \\
     --listen-host 127.0.0.1 --listen-port $PORT \\
     --set connection_strategy=lazy --set stream_large_bodies=1m \\
+    --set ignore_hosts=googlevideo \\
     --set termlog_verbosity=warn
 Restart=on-failure
 RestartSec=2
@@ -73,7 +74,9 @@ EOF
 }
 
 flag_on() {
-    grep -q "proxy-server" "$SHELL_QML" && return 0
+    # Anchor on the EXACT flag syntax: a bare "proxy-server" substring
+    # can appear in shell.qml comments and fool this check into skipping the insert.
+    grep -qF "--proxy-server=" "$SHELL_QML" && return 0
     echo "==> adding proxy flag to shell.qml"
     # Append at end of the QTWEBENGINE_CHROMIUM_FLAGS pragma line. (We used to
     # anchor the insert on `--disable-features=WebGPU`, but WebGPU is now left
@@ -89,7 +92,7 @@ link_cli() {
 }
 
 flag_off() {
-    grep -q "proxy-server" "$SHELL_QML" || return 0
+    grep -qF "--proxy-server=" "$SHELL_QML" || return 0
     echo "==> removing proxy flag from shell.qml"
     sed -i "s# --proxy-server=http://127\.0\.0\.1:[0-9]*##g" "$SHELL_QML"
 }
@@ -122,7 +125,7 @@ status() {
     echo "service: $(systemctl --user is-active hcproxy 2>/dev/null || echo inactive)"
     echo "CA file: $CA $([ -f "$CA" ] && echo present || echo MISSING)"
     echo "NSS trust: $(certutil -d "sql:$NSSDB" -L 2>/dev/null | grep -q hcproxy-mitm && echo yes || echo no)"
-    echo "launcher flag: $(grep -q proxy-server "$SHELL_QML" && echo on || echo off)"
+    echo "launcher flag: $(grep -qF -- "--proxy-server=" "$SHELL_QML" && echo on || echo off)"
 }
 
 refresh() {

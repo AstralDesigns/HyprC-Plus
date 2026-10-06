@@ -273,6 +273,7 @@ Item {
             // the FileView reads it; views made before then get no blocker until
             // re-injected on the next tab open or a shield toggle.
             property string webAdBlockScript: ""
+            property string webSabrKillScript: ""
             property bool _webResolved: false
             // The launcher window is now kept loaded (hidden) so the shared
             // WebEngineView survives hide/show. Defer backend warm-up until the
@@ -298,6 +299,20 @@ Item {
                     win.webEnabled = win.readWebStartupState()
                     win.webAdBlockEnabled = win.readAdBlockState()
                     win._webResolved = true
+                    // The async state read can land AFTER views were built (and
+                    // after adBlockScriptFile.onLoaded re-injected with the
+                    // default ON) -- re-apply so the persisted choice always
+                    // wins, otherwise a shield-OFF silently keeps the script.
+                    // The reload is MANDATORY: DocumentCreation scripts are
+                    // snapshotted at page load, so a restored tab keeps the old
+                    // injection until it re-navigates (proven: hcdebug beacons
+                    // fired 30s into a session with adblock persisted OFF). The
+                    // signature guard inside _applyUserScripts keeps this to at
+                    // most ONE reload when the state genuinely differs.
+                    for (var k in win._views) {
+                        var v = win._views[k]
+                        if (v && win._applyUserScripts(v)) v.reload()
+                    }
                     // Only warm once the policy is resolved (2a): a persisted
                     // OFF must never be raced by a docker warm-up.
                     if (win.webEnabled && win.visible && win._webResolved) win.webEnsureUp()
@@ -323,9 +338,29 @@ Item {
                     // Re-inject into any views built before this async load finished
                     // (restored tabs) and reload them -- setting the collection alone
                     // does not re-run DocumentCreation on an already-loaded page.
+                    // (Signature guard: no reload when the view already runs this src.)
                     for (var k in win._views) {
                         var v = win._views[k]
-                        if (v) { win._applyUserScripts(v); v.reload() }
+                        if (v && win._applyUserScripts(v)) v.reload()
+                    }
+                }
+                Component.onCompleted: reload()
+            }
+
+            // SABR kill-switch script (see scripts/webscripts/sabrkill.js):
+            // ALWAYS on, independent of the ad-block shield -- it is the fix
+            // for the ~12min YouTube deaths (SABR's in-band session-cache
+            // deadline never reaches the player in QtWebEngine, so the 720s
+            // renewal never fires).
+            FileView {
+                id: sabrKillScriptFile
+                path: Config.barDir + "/scripts/webscripts/sabrkill.js"
+                watchChanges: false
+                onLoaded: {
+                    win.webSabrKillScript = sabrKillScriptFile.text() || ""
+                    for (var k in win._views) {
+                        var v = win._views[k]
+                        if (v && win._applyUserScripts(v)) v.reload()
                     }
                 }
                 Component.onCompleted: reload()
@@ -335,7 +370,9 @@ Item {
                 id: webWriteProc
                 property string _content: "{\"enabled\":true}\n"
                 command: ["python3", "-c",
-                          "import sys,os; os.makedirs(os.path.dirname(sys.argv[1]),exist_ok=True); open(sys.argv[1],'w').write(sys.argv[2])",
+                          "import sys,os; d=os.path.dirname(sys.argv[1]); os.makedirs(d,exist_ok=True); "
+                          + "open(sys.argv[1]+'.tmp','w').write(sys.argv[2]); "
+                          + "os.replace(sys.argv[1]+'.tmp', sys.argv[1])",
                           win.webStatePath, webWriteProc._content]
             }
 
@@ -478,7 +515,7 @@ Item {
             // ad/tracker blocker when enabled and its source is loaded. Both run at
             // DocumentCreation in the MainWorld so they beat the page's own scripts.
             function _applyUserScripts(v) {
-                if (!v) return
+                if (!v) return false
                 // This patched build's non-standard userScripts.collection only
                 // reliably injects a SINGLE entry: a second (11KB) source was silently
                 // dropped -- the blocker never ran (no HCAB-RUN, doubleclick XHRs
@@ -486,12 +523,27 @@ Item {
                 // and the ad/tracker blocker into ONE DocumentCreation source.
                 // adblock.js is a self-contained IIFE, so concatenation is safe.
                 var src = win.webUserScriptSource
+                // SABR kill is always-on (merge first: adblock.js wraps fetch
+                // after it, so both sanitizers chain on the same responses).
+                if (win.webSabrKillScript && win.webSabrKillScript.length)
+                    src += "\n;" + win.webSabrKillScript
                 if (win.webAdBlockEnabled && win.webAdBlockScript && win.webAdBlockScript.length)
                     src += "\n;" + win.webAdBlockScript
+                // Signature guard: the three startup FileViews (state, adblock,
+                // sabrkill) each re-apply to restored views; without this check
+                // every restored tab took 3-4 reloads in seconds, and YouTube
+                // answered the pile-up with a playability ERROR on the restored
+                // video ("Something went wrong", unlocalized $BEGIN_LINK
+                // template) that survived manual reload but not a video change.
+                // Only a REAL content change (persisted shield OFF, toggle) may
+                // reload: DocumentCreation scripts are snapshotted at page load.
+                if (v._hcAppliedSrc === src) return false
+                v._hcAppliedSrc = src
                 v.userScripts.collection = [{
                     name: "hyprcandy-inject", sourceCode: src,
                     injectionPoint: 2, worldId: 0, runsOnSubFrames: true
                 }]
+                return true
             }
 
             // Shield toggle: flip + persist, then re-inject into every live tab and
@@ -501,7 +553,7 @@ Item {
                 win.writeWebStartupState()
                 for (var k in win._views) {
                     var v = win._views[k]
-                    if (v) { win._applyUserScripts(v); v.reload() }
+                    if (v && win._applyUserScripts(v)) v.reload()
                 }
                 win.webRev++
             }
@@ -584,6 +636,136 @@ Item {
                 request.accept()
                 win.webFullscreenTabId = request.toggleOn ? id : -1
                 win.webRev++
+            }
+
+            // ── Media stall watchdog ─────────────────────────────────────────
+            // When the launcher hides, the window unmaps and the WebEngine media
+            // pipeline can hard-stall: the player still reports "playing" but
+            // currentTime freezes and the renderer stops issuing ANY requests
+            // (proxy logs go silent mid-buffer; relaunch shows a live UI stuck on
+            // the spinner — only a manual reload recovered it). Chromium's
+            // backgrounding flags reduce but do not eliminate this. So while the
+            // websearch tab is on screen we poll the active view's <video>:
+            // frozen-but-not-paused -> nudge play(), persisting freeze (>~20s) ->
+            // one automatic reload. A user pause (paused=true) resets the watch.
+            property real _wdLastT: -1
+            property int  _wdTicks: 0
+            property int  _wdOut: 0
+            property int  _wdNoView: 0
+            property real _wdReloadAt: 0
+            property int  _wdReloads: 0
+            property bool _wdGiveUp: false
+            Process {
+                id: ytStallLogProc
+                property string _line: ""
+                command: ["python3", "-c",
+                          "import sys,os; p=os.path.expanduser("
+                          + "'~/.local/share/hyprcandy/logs/yt-stall.log'); "
+                          + "os.makedirs(os.path.dirname(p),exist_ok=True); "
+                          + "open(p,'a').write(sys.argv[1]+chr(10))",
+                          ytStallLogProc._line]
+            }
+            Timer {
+                id: mediaStallWatchdog
+                interval: 4000
+                repeat: true
+                // PARKED (running:false): this build never resolves the runJavaScript
+                // promise (zero probe payloads in yt-stall.log across every run), so the
+                // unanswered-probe ladder reloads HEALTHY pages seconds into playback --
+                // the opposite of seamless. Recovery redesign must use the MPRIS channel
+                // (playerctl position, browser-process side); prevention is the real fix.
+                running: false
+                // Lifecycle breadcrumbs for the (parked) watchdog; only fire if it
+                // is ever un-parked via the MPRIS-channel redesign.
+                function wdLog(tag) {
+                    ytStallLogProc._line = JSON.stringify(
+                        { at: Qt.formatDateTime(new Date(), "yyyy-MM-dd hh:mm:ss"),
+                          wd: tag, tab: win.tab, vis: win.visible })
+                    ytStallLogProc.running = false
+                    ytStallLogProc.running = true
+                }
+                onTriggered: {
+                    const t0 = win.webTabs[win.activeWebTab]
+                    const v = win.activeView ?? (t0 ? win._views[t0._id] : null)
+                    if (!v) {
+                        win._wdLastT = -1; win._wdTicks = 0; win._wdOut = 0
+                        win._wdNoView++
+                        if (win._wdNoView === 5) mediaStallWatchdog.wdLog("no-activeView")
+                        return
+                    }
+                    win._wdNoView = 0
+                    if (win._wdGiveUp) return
+                    if (v.loading || Date.now() - win._wdReloadAt < 60000) {
+                        win._wdOut = 0; win._wdTicks = 0; win._wdLastT = -1
+                        return
+                    }
+                    // Unanswered probe ladder: a hung renderer never resolves the
+                    // runJavaScript promise (its main thread is stuck), so silence
+                    // itself is the stall signal. 3 silent ticks (~12s) -> reload.
+                    win._wdOut++
+                    if (win._wdOut >= 3) {
+                        win._wdOut = 0; win._wdTicks = 0; win._wdLastT = -1
+                        if (win._wdReloads >= 3) {
+                            win._wdGiveUp = true
+                            mediaStallWatchdog.wdLog("giveup-unresponsive")
+                            return
+                        }
+                        win._wdReloads++; win._wdReloadAt = Date.now()
+                        ytStallLogProc._line = JSON.stringify(
+                            { at: Qt.formatDateTime(new Date(), "yyyy-MM-dd hh:mm:ss"),
+                              hang: "renderer-unresponsive",
+                              url: String(v.url).slice(0, 120) })
+                        ytStallLogProc.running = false
+                        ytStallLogProc.running = true
+                        v.reload()
+                        return
+                    }
+                    v.runJavaScript("(function(){var e=document.querySelector('video');"
+                        + "if(!e)return null;"
+                        + "var pl=document.getElementById('movie_player');"
+                        + "var b=0;try{for(var i=0;i<e.buffered.length;i++)"
+                        + "if(e.buffered.end(i)>e.currentTime)b=e.buffered.end(i)-e.currentTime;"
+                        + "}catch(x){}"
+                        + "return JSON.stringify({p:!!e.paused,t:+e.currentTime||0,"
+                        + "rs:e.readyState,ns:e.networkState,"
+                        + "er:e.error?e.error.code:0,buf:+b.toFixed(1),"
+                        + "ad:!!pl&&pl.classList.contains('ad-showing'),"
+                        + "sp:!!document.querySelector('.ytp-spinner.is-visible')})})()")
+                        .then(function (s) {
+                            win._wdOut = 0; win._wdReloads = 0; win._wdGiveUp = false
+                            if (!s) { win._wdLastT = -1; win._wdTicks = 0; return }
+                            let o; try { o = JSON.parse(s) } catch (e) { return }
+                            // Time moved (healthy play, seek, new video) -> re-baseline.
+                            // User-paused AND buffer still ahead (>=1.5s) -> likewise.
+                            // A quiet stall pauses with the buffer DRY, an ad-hang shows
+                            // the spinner/ad class -- both must escalate, not reset.
+                            if (Math.abs(o.t - win._wdLastT) > 0.2
+                                || (o.p && !o.sp && !o.ad && o.buf >= 1.5)) {
+                                win._wdLastT = o.t; win._wdTicks = 0; return
+                            }
+                            win._wdTicks++
+                            if (win._wdTicks === 2)
+                                v.runJavaScript("(function(){var e=document.querySelector('video');"
+                                    + "if(e&&!e.paused){var pr=e.play();if(pr&&pr.catch)pr.catch(function(){})}})()")
+                                    .catch(function () {})
+                            // One diagnostic line per stall: buffer depth + readyState +
+                            // networkState + error code tell dry-network stalls apart from
+                            // decoder/MSE stalls. Devtools cannot attach; this can.
+                            if (win._wdTicks === 3) {
+                                ytStallLogProc._line = JSON.stringify(
+                                    { at: Qt.formatDateTime(new Date(), "yyyy-MM-dd hh:mm:ss"),
+                                      url: String(v.url).slice(0, 120), v: o })
+                                ytStallLogProc.running = false
+                                ytStallLogProc.running = true
+                            }
+                            if (win._wdTicks >= 6) {   // ~24s frozen (ad-hang or stall)
+                                win._wdTicks = 0; win._wdLastT = -1
+                                win._wdReloads++; win._wdReloadAt = Date.now()
+                                v.reload()
+                            }
+                        })
+                        .catch(function () {})
+                }
             }
 
             function webNavigateActive(url) {
@@ -670,6 +852,25 @@ Item {
             readonly property string webTabsStatePath: Config.home
                 + "/.local/share/hyprcandy/websearch-tabs-state.json"
 
+            // Ephemeral radio queues (list=RD...) die with the session: restoring
+            // watch?v=X&list=RDx&start_radio=1 makes YouTube answer a playability
+            // ERROR ("Something went wrong", raw $BEGIN_LINK tokens) because the
+            // auto-generated queue no longer exists server-side -- while the same
+            // track from history (plain watch URL) loads fine. Strip the dead
+            // queue params at restore; real playlists (PL/OL...) are kept.
+            function _sanitizeRestoreUrl(u) {
+                try {
+                    if (!/(\?|&)list=RD/.test(u) && !/(\?|&)start_radio=/.test(u)) return u
+                    var i = u.indexOf("?")
+                    if (i < 0) return u
+                    var base = u.slice(0, i)
+                    var keep = u.slice(i + 1).split("&").filter(function (p) {
+                        return !/^list=RD/.test(p) && !/^start_radio=/.test(p)
+                    })
+                    return base + (keep.length ? "?" + keep.join("&") : "")
+                } catch (e) { return u }
+            }
+
             FileView {
                 id: webTabsFile
                 path: win.webTabsStatePath
@@ -679,7 +880,7 @@ Item {
                         const o = JSON.parse(webTabsFile.text())
                         if (o && Array.isArray(o.tabs) && o.tabs.length) {
                             win.webTabs = o.tabs.map(function (t) {
-                                return { url: String(t.url || win.searxBase),
+                                return { url: win._sanitizeRestoreUrl(String(t.url || win.searxBase)),
                                          title: String(t.title || ""), _id: win._nextTabId++ }
                             })
                             win.activeWebTab = Math.min(Math.max(0, o.active | 0), win.webTabs.length - 1)
@@ -3378,6 +3579,10 @@ Item {
                                             WebEngineView {
                                                 id: tabView
                                                 property int tabId: -1
+                                                // Signature of the merged user-script
+                                                // source this view last EXECUTED; drives
+                                                // _applyUserScripts' reload decision.
+                                                property string _hcAppliedSrc: ""
                                                 // Spoof a clean Chrome UA (always) and
                                                 // inject the ad/tracker blocker (when
                                                 // enabled) before any page script runs.

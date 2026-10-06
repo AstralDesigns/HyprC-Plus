@@ -16,6 +16,74 @@
     // Third-party ad networks / exchanges / trackers (matched as URL substrings).
     // Deliberately excludes the Facebook / WhatsApp property so WhatsApp Web and
     // FB-embedded logins keep working.
+    // ── page visibility spoof ───────────────────────────────────────────────
+    // When the launcher closes, its window is UNMAPPED and QtWebEngine tells
+    // every page visibilityState=hidden. Chromium and YouTube then defer the
+    // media pipeline (video decode first, then segment loads) and audio dies
+    // ~11 minutes into hidden playback -- the exact stall we kept chasing.
+    // Report "visible" forever and swallow visibilitychange so the player
+    // behaves like a foreground tab (standard kiosk-embed workaround).
+    try {
+        Object.defineProperty(document, "visibilityState",
+            { configurable: true, get: function () { return "visible"; } });
+        Object.defineProperty(document, "hidden",
+            { configurable: true, get: function () { return false; } });
+        Object.defineProperty(document, "webkitVisibilityState",
+            { configurable: true, get: function () { return "visible"; } });
+        var _docAel = Document.prototype.addEventListener;
+        Document.prototype.addEventListener = function (t, f, o) {
+            if (t === "visibilitychange") return;
+            return _docAel.call(this, t, f, o);
+        };
+        var _winAel = window.addEventListener;
+        window.addEventListener = function (t, f, o) {
+            if (t === "visibilitychange") return;
+            return _winAel.call(this, t, f, o);
+        };
+    } catch (e) {}
+
+    // ── rAF lifeline (the "12:09 freeze" root cause) ──────────────────────
+    // While the launcher window is unmapped, Chromium stops producing frames,
+    // so EVERY requestAnimationFrame callback halts -- below the page, invisible
+    // to the visibilityState spoof above. YouTube's HTML5 player drives buffer
+    // top-ups through rAF: hide the launcher a couple of minutes before the 720s
+    // streaming-cache boundary and segment fetching silently dies (proven in the
+    // hcproxy journal: qoe/watchtime/videoplayback ALL stop at the same second,
+    // ~2 min before the playhead crawls to the buffer edge at 12:09). The shim
+    // races each rAF against a 120ms timer: visible windows keep real vsync
+    // cadence (rAF wins the race); hidden ones keep the media loop alive on
+    // timers, which do run (--disable-background-timer-throttling).
+    try {
+        if (/(^|\.)(youtube\.com|youtu\.be)$/.test(location.hostname)) {
+            var _raf = window.requestAnimationFrame.bind(window);
+            var _caf = window.cancelAnimationFrame.bind(window);
+            var _rp = {}, _rs = 0;
+            window.requestAnimationFrame = function (cb) {
+                var key = "hc" + (_rs++), done = false;
+                var rafId = _raf(function (ts) {
+                    if (done) return; done = true;
+                    delete _rp[key]; cb(ts);
+                });
+                var tid = setTimeout(function () {
+                    if (done) return; done = true;
+                    try { _caf(rafId); } catch (e) {}
+                    delete _rp[key];
+                    cb(typeof performance !== "undefined" ? performance.now() : Date.now());
+                }, 120);
+                _rp[key] = function () {
+                    done = true;
+                    try { _caf(rafId); } catch (e) {}
+                    clearTimeout(tid);
+                };
+                return key;
+            };
+            window.cancelAnimationFrame = function (k) {
+                if (_rp[k]) { _rp[k](); delete _rp[k]; return; }
+                try { _caf(k); } catch (e) {}
+            };
+        }
+    } catch (e) {}
+
     var BLOCK = [
         "doubleclick.net", "googlesyndication.com", "googleadservices.com",
         "adservice.google", "google.com/ads", "pagead",
@@ -34,7 +102,7 @@
         // pings driven by the player JS, so the fetch/XHR/src patches above catch
         // them; blocking them makes the player skip straight to content.
         "youtube.com/pagead/", "youtube.com/get_midroll_info",
-        "youtube.com/api/stats/ads", "youtube.com/ptracking",
+        "youtube.com/api/stats/ads",
         "youtube.com/pcs/activeview", "youtube.com/player/ad_break",
         "googlevideo.com/videostats"
     ];
@@ -59,6 +127,48 @@
     // response (adSlots), not a separate ad request -- pruning it here is what
     // makes pre/mid-rolls truly seamless (uBlock's yt-player-adslots trick).
     var YT_PLAYER = "youtubei/v1/player";
+    // Midroll probes MUST be answered, not killed: when get_midroll_info /
+    // player/ad_break fail, the player waits forever at the scheduled break
+    // (~12 min into long videos) -- infinite spinner, content video paused.
+    // A valid empty ad-break response tells it there is no break; continue.
+    // (uBlock's youtube getMidrollInfo stub trick.)
+    var MIDROLL_STUB = '{"emptyBookmarks":[]}';
+    function isMidroll(u) {
+        u = "" + u;
+        return u.indexOf("get_midroll_info") > -1 ||
+               u.indexOf("/player/ad_break") > -1;
+    }
+    // ptracking is the ad beacon the player WAITS on during ad transitions;
+    // uBlock answers it with empty text (nooptext) rather than erroring.
+    // NOTE: modern innertube /player/ad_break is deliberately NOT stubbed --
+    // {"emptyBookmarks":[]} is the LEGACY get_midroll_info schema; serving it
+    // to the modern API throws inside the break module's response handler and
+    // kills its promise chain, which freezes buffer extension at the first
+    // midroll marker (the "12:09 death"). uBlock lets ad_break FAIL like any
+    // blocked network request (player handles that path gracefully), so we
+    // fall through to bad(u) -> reject above.
+    function stubFor(u) {
+        u = "" + u;
+        if (u.indexOf("get_midroll_info") > -1) return MIDROLL_STUB;
+        if (u.indexOf("/ptracking") > -1) return "";
+        return null;
+    }
+    function hcFakeJsonXhr(xhr, body) {
+        try {
+            Object.defineProperty(xhr, "readyState",   { configurable: true, get: function () { return 4; } });
+            Object.defineProperty(xhr, "status",       { configurable: true, get: function () { return 200; } });
+            Object.defineProperty(xhr, "statusText",   { configurable: true, get: function () { return "OK"; } });
+            Object.defineProperty(xhr, "responseText", { configurable: true, get: function () { return body; } });
+            Object.defineProperty(xhr, "response",     { configurable: true, get: function () { return body; } });
+        } catch (e) { return; }
+        setTimeout(function () {
+            try {
+                if (xhr.onreadystatechange) xhr.onreadystatechange();
+                xhr.dispatchEvent(new Event("load"));
+                xhr.dispatchEvent(new Event("loadend"));
+            } catch (e) {}
+        }, 0);
+    }
     function pruneAds(j) {
         var hit = false;
         if (j && typeof j === "object") {
@@ -72,6 +182,13 @@
         var _fetch = window.fetch;
         window.fetch = function (a) {
             var u = (a && a.url) || a;
+            var sb = stubFor(u);
+            if (sb !== null) {
+                blocked();
+                return Promise.resolve(new Response(sb,
+                    { status: 200, statusText: "OK",
+                      headers: { "content-type": "application/json" } }));
+            }
             if (bad(u)) { blocked(); return Promise.reject(new Error("hc-ab")); }
             var p = _fetch.apply(this, arguments);
             if (u && ("" + u).indexOf(YT_PLAYER) > -1) {
@@ -102,9 +219,13 @@
         var _send = XMLHttpRequest.prototype.send;
         XMLHttpRequest.prototype.open = function (m, u) {
             this.__hcU = u; this.__hcB = bad(u); if (this.__hcB) blocked();
+            this.__hcM = stubFor(u);
             return _open.apply(this, arguments);
         };
         XMLHttpRequest.prototype.send = function () {
+            if (this.__hcM !== null && this.__hcM !== undefined) {
+                hcFakeJsonXhr(this, this.__hcM); return;
+            }
             if (this.__hcB) { try { this.abort(); } catch (e) {} return; }
             return _send.apply(this, arguments);
         };
@@ -205,6 +326,12 @@
     function ytGuard() {
         var h = location.hostname;
         if (!/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return;
+        // Ad and content share ONE <video> element. Fast-forwarding the ad to
+        // duration+1 (and clicking Skip) can leave that element paused/ended, and
+        // YouTube does not always auto-play the content back — the tab looks frozen
+        // until reload. So we watch for the ad->content transition and nudge play()
+        // for a short window until the main video is actually running.
+        var wasAd = false, resumeTries = 0;
         setInterval(function () {
             try {
                 // The player container carries .ad-showing ONLY while an ad plays;
@@ -213,6 +340,7 @@
                 var ad = document.querySelector(
                     ".html5-video-player.ad-showing, #movie_player.ad-showing");
                 if (ad) {
+                    wasAd = true; resumeTries = 0;
                     var v = ad.querySelector("video");
                     if (v && v.duration > 0 && isFinite(v.duration))
                         v.currentTime = v.duration + 1;
@@ -220,6 +348,22 @@
                         ".ytp-ad-skip-button, .ytp-ad-skip-button-modern, " +
                         ".ytp-skip-ad-button, [button-title*=\"Skip\"]");
                     if (s) s.click();
+                } else {
+                    if (wasAd) { wasAd = false; resumeTries = 1; }
+                    // ~12 * 300ms window for the content stream to attach and start.
+                    if (resumeTries > 0 && resumeTries <= 12) {
+                        resumeTries++;
+                        var mv = document.querySelector(
+                            "video.html5-main-video, #movie_player video.html5-main-video, " +
+                            "#movie_player video");
+                        if (mv && !mv.paused) {
+                            resumeTries = 0;                 // playing again — done
+                        } else if (mv) {
+                            if (mv.ended) { try { mv.currentTime = 0; } catch (e) {} }
+                            var pr = mv.play && mv.play();
+                            if (pr && pr.catch) pr.catch(function () {});
+                        }
+                    }
                 }
                 var close = document.querySelector(".ytp-ad-overlay-close-button");
                 if (close) close.click();

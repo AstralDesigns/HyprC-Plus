@@ -33,7 +33,7 @@ Item {
             text: WeatherPopupState.icon
             color: Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 1.00)
             font.family: Config.fontFamily
-            font.pixelSize: Config.infoGlyphSize + 2
+            font.pixelSize: Config.weatherIconSize
             font.weight: Config.fontWeight
             anchors.verticalCenter: parent.verticalCenter
         }

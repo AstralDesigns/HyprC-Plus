@@ -356,6 +356,7 @@ PanelWindow {
 
             DockBadge {
                 id: startBadgeH
+                glyphSize: Config.dockStartIconSize
                 kind: "start"
                 glyph: dock._startGlyph
                 onClicked: dock._startClicked()
@@ -375,6 +376,7 @@ PanelWindow {
             }
             DockBadge {
                 id: trashBadgeH
+                glyphSize: Config.dockTrashIconSize
                 kind: "trash"
                 glyph: TrashState.glyph
                 tipText: TrashState.count === 0 ? "Trash (empty)"
@@ -393,6 +395,7 @@ PanelWindow {
 
             DockBadge {
                 id: startBadgeV
+                glyphSize: Config.dockStartIconSize
                 kind: "start"
                 glyph: dock._startGlyph
                 onClicked: dock._startClicked()
@@ -413,6 +416,7 @@ PanelWindow {
             }
             DockBadge {
                 id: trashBadgeV
+                glyphSize: Config.dockTrashIconSize
                 kind: "trash"
                 glyph: TrashState.glyph
                 tipText: TrashState.count === 0 ? "Trash (empty)"
@@ -1577,6 +1581,7 @@ PanelWindow {
         required property string kind
         required property string glyph
         property string tipText: ""
+        property real glyphSize: -1   // <=0 -> auto (iconD*0.62)
         readonly property bool hovered: hover.hovered
         signal clicked
         signal rightClicked
@@ -1610,7 +1615,7 @@ PanelWindow {
             text: badge.glyph
             color: Theme.cOnSecondary
             font.family: Theme.fontFamily
-            font.pixelSize: Math.round(badge.iconD * 0.62)
+            font.pixelSize: badge.glyphSize > 0 ? Math.round(badge.glyphSize) : Math.round(badge.iconD * 0.62)
         }
         HoverHandler { id: hover; onHoveredChanged: dock._setTip(badge, hovered) }
         MouseArea {

@@ -108,6 +108,27 @@ Item {
                 // it immediately, and bail out without touching mediaPlayers; the
                 // sweep (or a real status line arriving below) resolves it.
                 if (status === "Stopped") {
+                    // A Stopped line with cleared metadata means the source is
+                    // gone for good (closed tab/app) — drop the entry right away,
+                    // exactly like the popup/widget watcher does. Keeping it here
+                    // left the module showing stale album art from closed media.
+                    // Only Stopped lines that still carry a track (transient
+                    // browser-bridge gaps/ad breaks) get the debounce below.
+                    if (!title && !artist) {
+                        if (idx >= 0) {
+                            list.splice(idx, 1)
+                            root.mediaPlayers = list
+                            if (root.activePlayerIndex >= root.mediaPlayers.length) {
+                                root.activePlayerIndex = Math.max(0, root.mediaPlayers.length - 1)
+                            }
+                        }
+                        if (root._pendingStops[name] !== undefined) {
+                            let ps0 = Object.assign({}, root._pendingStops)
+                            delete ps0[name]
+                            root._pendingStops = ps0
+                        }
+                        return
+                    }
                     if (idx < 0) return
                     let ps = Object.assign({}, root._pendingStops)
                     if (ps[name] === undefined) ps[name] = Date.now()
@@ -171,18 +192,23 @@ Item {
     //  Stopped branch above. Poll `playerctl -l` to catch that case and
     //  drop anything it no longer lists.
     property var _liveNames: []
+    property var _liveStatus: ({})   // busName -> "Playing"|"Paused"|"Stopped"|""
     Process {
         id: playerListProc
-        command: ["playerctl", "-l"]
+        command: ["bash", "-c",
+            "for p in $(playerctl -l 2>/dev/null); do printf '%s\t%s\n' \"$p\" \"$(playerctl -p \"$p\" status 2>/dev/null)\"; done"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
             onRead: function(l) {
-                const n = l.trim()
-                if (n) root._liveNames.push(n)
+                const p = l.split("\t")
+                const n = p[0].trim()
+                if (!n) return
+                root._liveNames.push(n)
+                root._liveStatus[n] = (p.length > 1 ? p[1].trim() : "")
             }
         }
-        onRunningChanged: if (running) root._liveNames = []
+        onRunningChanged: if (running) { root._liveNames = []; root._liveStatus = ({}) }
         onExited: function(code) { if (code === 0) root._prunePlayers() }
     }
     Timer {
@@ -199,10 +225,27 @@ Item {
         }
         return false
     }
+    // Direct `playerctl -p <busName> status` truth for a tracked entry name
+    // (entries store the short {{playerName}}, bus lists chromium.instanceNNN
+    // style names — match by prefix, same as _isLive). "" = no answer.
+    function _liveStatusFor(name) {
+        const st = root._liveStatus
+        for (const n in st) {
+            if (n === name || n.indexOf(name + ".") === 0) return st[n]
+        }
+        return ""
+    }
     function _prunePlayers() {
         if (root.mediaPlayers.length === 0) return
         const live = root._liveNames
-        const filtered = root.mediaPlayers.filter(p => root._isLive(p.name, live))
+        // Drop players the bus no longer lists AND players whose bus name
+        // lingers (browsers keep MPRIS registered after the media tab closes)
+        // but whose real status is Stopped — the follow-watcher can miss that
+        // final transition entirely, leaving the module showing stale art from
+        // closed media as if it were merely paused. Re-adding is automatic on
+        // the next metadata line if the source resumes.
+        const filtered = root.mediaPlayers.filter(p =>
+            root._isLive(p.name, live) && _liveStatusFor(p.name) !== "Stopped")
         if (filtered.length !== root.mediaPlayers.length) {
             root.mediaPlayers = filtered
             if (root.activePlayerIndex >= root.mediaPlayers.length) {

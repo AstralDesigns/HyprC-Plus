@@ -16,6 +16,14 @@
 #      exception rules, plus cosmetic hiding + injected scriptlets per document.
 #   3. Strips adSlots from YouTube's youtubei/v1/player response at the network
 #      layer (more reliable than the in-page fetch patch).
+#   4. Strips streamingData.serverAbr* from the /player response AND the /watch
+#      HTML's inline player response -- forcing legacy segmented streaming.
+#      MUST live here, not in the page: YouTube's service worker (sw.js) runs
+#      innertube fetches in its own realm where userScripts never reach, so
+#      every JS-level /player cleaner was silently bypassed (verified 2026-10-06:
+#      two loadVideoById conversions ran, live response still had the SABR url).
+#      get_watch is deliberately NEVER touched: its payload is attestation-
+#      sealed -- any edit (bytes or parsed object) kills player boot.
 #
 # The in-page script stays the always-on baseline: if this proxy is not running,
 # the launcher still blocks YouTube + top trackers. This layer only ADDS to it.
@@ -27,11 +35,13 @@
 # Lists are cached under ~/.cache/hcproxy and refreshed lazily (TTL below).
 
 import os
+import json
 import re
 import time
 import urllib.request
 
 import adblock  # extra/python-adblock -- Brave's adblock-rs crate in Python
+from mitmproxy import http
 
 CACHE_DIR = os.path.expanduser("~/.cache/hcproxy")
 LIST_TTL = 60 * 60 * 24 * 7  # re-download weekly
@@ -56,6 +66,15 @@ _EXT_TYPE = {
     "woff": "font", "woff2": "font", "ttf": "font", "otf": "font",
     "mp4": "media", "webm": "media", "mp3": "media",
 }
+
+
+# serverAbr* members of a streamingData object. Observed key order puts them
+# last (expiresInSeconds, formats, adaptiveFormats, serverAbr...), so eating
+# the LEADING comma keeps the JSON valid; a first-position key would need the
+# trailing-comma variant -- add it only if a capture ever shows that shape.
+SABR_RE = re.compile(
+    r',\s*"serverAbr[^"]*"\s*:\s*(?:"(?:[^"\\]|\\.)*"'
+    r'|-?\d+(?:\.\d+)?|true|false|null)')
 
 
 def _log(*a):
@@ -120,6 +139,29 @@ def _empty_key(text, key):
     return "".join(out)
 
 
+# The launcher's shield toggle persists here; when adblock is OFF the proxy
+# must degrade to UA-rewrite ONLY (the pre-adblock baseline that never died):
+# no engine blocks, no midroll stub, no adSlots gutting, no cosmetics.
+STATE_PATH = os.path.expanduser(
+    "~/.local/share/hyprcandy/websearch-startup-state.json")
+
+
+def _adblock_on():
+    try:
+        mt = os.stat(STATE_PATH).st_mtime
+        if mt != _adblock_on._mt:
+            _adblock_on._mt = mt
+            with open(STATE_PATH) as f:
+                _adblock_on._on = json.load(f).get("adblock", True) is True
+    except Exception:
+        return True
+    return _adblock_on._on
+
+
+_adblock_on._mt = 0.0
+_adblock_on._on = True
+
+
 def _load_lists():
     os.makedirs(CACHE_DIR, exist_ok=True)
     texts = []
@@ -159,17 +201,43 @@ class HCProxy:
     # ── request: header rewrite + network blocking ──────────────────────────
     def request(self, flow):
         h = flow.request.headers
+        # 0. Debug-beacon channel: adblock.js mirrors every page-side decision
+        #    on YouTube player endpoints as a GET to hcdebug.invalid, answered
+        #    here locally (no DNS). Journal lines then prove what the player
+        #    attempted at the 12:09 boundary -- incl. requests the page-side
+        #    patches swallowed before they ever hit the network.
+        if flow.request.pretty_host == "hcdebug.invalid":
+            # mitmdump's own request-line log truncates at terminal width in
+            # non-TTY mode, so echo the full beacon path ourselves instead.
+            _log("BEACON", flow.request.path)
+            flow.response = http.Response.make(200, b"")
+            return
         # 1. Clean Chrome identity on the wire (fixes WhatsApp's server gate).
         h["User-Agent"] = CHROME_UA
         h["sec-ch-ua"] = CHROME_BRANDS
         h["sec-ch-ua-mobile"] = "?0"
         h["sec-ch-ua-platform"] = '"Linux"'
 
-        # 2. EasyList network match. source_url is approximated as the request's
+        # 2. Legacy YouTube midroll probes must be ANSWERED with an empty
+        #    ad-break JSON: a failed get_midroll_info makes the old player wait
+        #    forever at the scheduled break. Modern innertube /player/ad_break
+        #    is NOT stubbed here -- its schema differs and a wrong-shaped 200
+        #    kills the break module's promise chain (buffer freezes at the
+        #    midroll marker); it must fail like any blocked request instead.
+        ph = flow.request.pretty_host
+        if _adblock_on():
+            if "youtube.com" in ph and ("get_midroll_info" in ph
+                                        or "get_midroll_info" in (flow.request.path or "")):
+                flow.response = http.Response.make(
+                    200, b'{"emptyBookmarks":[]}',
+                    {"content-type": "application/json"})
+                return
+
+        # 3. EasyList network match. source_url is approximated as the request's
         #    own origin (mitmproxy does not carry the initiator), so pure-domain
         #    rules (||doubleclick.net^) still block; $third-party-only rules are
         #    matched less precisely. The in-page script + cosmetics cover the gap.
-        if self.engine is None:
+        if self.engine is None or not _adblock_on():
             return
         try:
             res = self.engine.check_network_urls(
@@ -177,13 +245,38 @@ class HCProxy:
                 _req_type(flow.request.path or ""),
             )
             if res and res.matched:
-                flow.kill()
+                # NOT flow.kill(): kill tears down the entire client CONNECTION,
+                # and Chromium multiplexes qoe/watchtime/innertube/media over ONE
+                # HTTP/2 connection per host — a kill every 30s (EasyPrivacy
+                # matches api/stats/qoe) randomly destroys in-flight media
+                # requests => "stuck on loading" minutes later. A 204 rejects
+                # the single ad ping and leaves the connection intact.
+                flow.response = http.Response.make(204, b"")
         except Exception as e:
             _log("check_network_urls error:", repr(e))
 
-    # ── response: adSlots emptying + cosmetic injection ─────────────────────
+    # ── response: adSlots emptying + SABR kill + cosmetic injection ────────
     def response(self, flow):
         try:
+            host = flow.request.pretty_host
+            path = flow.request.path or ""
+            url = flow.request.url
+            # 4. SABR kill: unconditional (shield state is about ads, and a
+            #    SABR playback death is not an ad outcome we can trade).
+            #    /player JSON responses ONLY. RETIRED 2026-10-06: the tape
+            #    proved stripped /player responses kill playback seconds in
+            #    ("An error occurred (Playback ID ...)") -- innertube FETCH
+            #    responses are attestation-verified. Legacy is enforced
+            #    page-side instead (inline trap + full-document navigation,
+            #    see webscripts/sabrkill.js). Code kept dark as a map of
+            #    the dead end.
+            if False and "youtube.com" in host and "youtubei/v1/player" in url:
+                self._desabr(flow)
+            # Shield OFF: never touch response bodies. Rewriting player
+            # responses (adSlots gutting) is exactly the tier the pre-adblock
+            # baseline never had and the 720s renewal consumes.
+            if not _adblock_on():
+                return
             host = flow.request.pretty_host
             path = flow.request.path or ""
             url = flow.request.url
@@ -203,6 +296,19 @@ class HCProxy:
                 self._inject_cosmetics(flow)
         except Exception as e:
             _log("response error:", repr(e))
+
+    def _desabr(self, flow):
+        try:
+            body = flow.response.get_text()
+        except Exception:
+            return
+        if not body or '"serverAbr' not in body:
+            return
+        new = SABR_RE.sub("", body)
+        if new != body:
+            flow.response.set_text(new)
+            flow.response.headers.pop("content-length", None)
+            _log("stripped serverAbr")
 
     def _empty_adslots(self, flow):
         try:

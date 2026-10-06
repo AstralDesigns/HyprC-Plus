@@ -255,120 +255,9 @@ Item {
                 }
 
                 // Right Side: Hourly forecast tilted circular orbit
-                Item {
-                    id: orbitContainer
+                HourlyOrbit {
+                    root: wxPanel.root
                     Layout.fillWidth: true
-                    implicitHeight: 160
-                    clip: true
-
-                    WheelHandler {
-                        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                        onWheel: (event) => {
-                            if (event.angleDelta.y > 0)
-                                root.stepHour(-1)
-                            else
-                                root.stepHour(1)
-                        }
-                    }
-
-                    Repeater {
-                        model: WeatherPopupState.hrTimes.length
-                        delegate: Rectangle {
-                            id: hrCard
-                            required property int index
-
-                            readonly property real theta: (2 * Math.PI / root._hourCount) * (index - root.orbitOffset)
-                            readonly property real zRatio: Math.cos(theta)
-                            readonly property bool isCurrentHour: index === 0
-                            readonly property bool isOrbitFront: zRatio > 0.96
-
-                            width: 58
-                            height: 78
-                            radius: 99
-                            clip: true
-
-                            readonly property real cx: orbitContainer.width / 2
-                            readonly property real cy: orbitContainer.height / 2
-
-                            x: cx + 105 * Math.sin(theta) - width / 2
-                            y: cy + 30 * zRatio - height / 2
-
-                            scale: {
-                                const baseScale = 0.68 + 0.32 * (zRatio + 1) / 2
-                                return baseScale * (isOrbitFront && hrHover.hovered ? 1.15 : (isOrbitFront ? 1.08 : 1.0))
-                            }
-                            opacity: 0.20 + 0.80 * (zRatio + 1) / 2
-                            z: Math.round((zRatio + 1) * 10)
-
-                            Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-                            Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-
-                            color: isCurrentHour
-                                ? "transparent"
-                                : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.65)
-
-                            gradient: isCurrentHour ? hrGradient : null
-
-                            Gradient {
-                                id: hrGradient
-                                GradientStop { position: 0.0; color: Theme.cInversePrimary }
-                                GradientStop { position: 1.0; color: Theme.cOnSecondary }
-                            }
-
-                            border.width: 1
-                            border.color: isCurrentHour
-                                ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
-                                : isOrbitFront
-                                    ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.65)
-                                    : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.18)
-
-                            HoverHandler {
-                                id: hrHover
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                z: 1
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: root.focusHour(index)
-                            }
-
-                            Column {
-                                anchors.centerIn: parent
-                                spacing: 1
-                                Text {
-                                    text: WeatherPopupState.hrTimes[index] || "--"
-                                    color: isCurrentHour ? Theme.cSurfaceTint
-                                        : Theme.cOnSecondary
-                                    font.pixelSize: 9; font.family: Config.labelFont
-                                    horizontalAlignment: Text.AlignHCenter
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                }
-                                Text {
-                                    text: WeatherPopupState.hrIcons[index] || "󰖐"
-                                    color: isCurrentHour ? Theme.cSurfaceTint
-                                        : Theme.cOnSecondary
-                                    font.pixelSize: 18; font.family: Config.fontFamily
-                                    horizontalAlignment: Text.AlignHCenter
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                }
-                                Text {
-                                    text: WeatherPopupState.hrTemps[index] || "--"
-                                    color: isCurrentHour ? Theme.cPrimary : Theme.cOnSecondary
-                                    font.pixelSize: 9; font.weight: Font.Medium; font.family: Config.labelFont
-                                    horizontalAlignment: Text.AlignHCenter
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                }
-                                Text {
-                                    text: WeatherPopupState.hrPrec[index] || "0%"
-                                    color: isCurrentHour ? Theme.cPrimary : Theme.cOnSecondary
-                                    font.pixelSize: 8; font.family: Config.labelFont
-                                    horizontalAlignment: Text.AlignHCenter
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                }
-                            }
-                        }
-                    }
                 }
             }
 
@@ -378,72 +267,225 @@ Item {
             }
 
             // ── 7-day forecast ────────────────────────────────────────────
-            RowLayout {
-                Layout.fillWidth: true; spacing: 6
-                Repeater {
-                    model: WeatherPopupState.fcDays.length
-                    delegate: Rectangle {
-                        id: fcCard
-                        required property int index
-                        Layout.fillWidth: true
-                        implicitHeight: fcCol.implicitHeight + 16
-                        radius: 12
-                        clip: true
+            DayForecastRow { Layout.fillWidth: true }
 
-                        // Gradient for current day, Theme.cSurfaceTint for others
-                        color: index === 0
-                            ? "transparent"
-                            : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.65)
+            Item { height: 4 }
+        }
+    }
 
-                        gradient: index === 0 ? fcGradient : null
+    component HourlyOrbit: Item {
+        id: orbitContainer
+        required property var root
+        implicitHeight: 160
+        clip: true
 
-                        Gradient {
-                            id: fcGradient
-                            GradientStop { position: 0.0; color: Theme.cInversePrimary }
-                            GradientStop { position: 1.0; color: Theme.cOnSecondary }
-                        }
+        WheelHandler {
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            onWheel: (event) => {
+                if (event.angleDelta.y > 0)
+                    root.stepHour(-1)
+                else
+                    root.stepHour(1)
+            }
+        }
 
-                        border.width: 1
-                        border.color: index === 0
-                            ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
-                            : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+        Repeater {
+            model: WeatherPopupState.hrTimes.length
+            delegate: Rectangle {
+                id: hrCard
+                required property int index
 
-                        Column {
-                            id: fcCol
-                            anchors.centerIn: parent
-                            spacing: 3
-                            Text {
-                                text: WeatherPopupState.fcDays[index] || "--"
-                                color: index === 0 ? Theme.cSurfaceTint : Theme.cOnSecondary
-                                font.pixelSize: 11; font.weight: index === 0 ? Font.Bold : Font.Normal
-                                font.family: Config.labelFont
-                                horizontalAlignment: Text.AlignHCenter
-                                anchors.horizontalCenter: parent.horizontalCenter
-                            }
-                            Text {
-                                text: WeatherPopupState.fcIcons[index] || "󰖐"
-                                color: index === 0 ? Theme.cSurfaceTint : Theme.cOnSecondary; font.pixelSize: 22; font.family: Config.fontFamily
-                                horizontalAlignment: Text.AlignHCenter
-                                anchors.horizontalCenter: parent.horizontalCenter
-                            }
-                            Text {
-                                text: WeatherPopupState.fcHi[index] || "--"
-                                color: index === 0 ? Theme.cPrimary : Theme.cOnSecondary; font.pixelSize: 10; font.weight: Font.Medium; font.family: Config.labelFont
-                                horizontalAlignment: Text.AlignHCenter
-                                anchors.horizontalCenter: parent.horizontalCenter
-                            }
-                            Text {
-                                text: WeatherPopupState.fcLo[index] || "--"
-                                color: index === 0 ? Theme.cPrimary : Theme.cOnSecondary; font.pixelSize: 10; font.family: Config.labelFont
-                                horizontalAlignment: Text.AlignHCenter
-                                anchors.horizontalCenter: parent.horizontalCenter
-                            }
-                        }
+                readonly property real theta: (2 * Math.PI / root._hourCount) * (index - root.orbitOffset)
+                readonly property real zRatio: Math.cos(theta)
+                readonly property bool isCurrentHour: index === 0
+                readonly property bool isOrbitFront: zRatio > 0.96
+
+                width: 58
+                height: 78
+                radius: 99
+                clip: true
+
+                readonly property real cx: orbitContainer.width / 2
+                readonly property real cy: orbitContainer.height / 2
+
+                x: cx + 105 * Math.sin(theta) - width / 2
+                y: cy + 30 * zRatio - height / 2
+
+                scale: {
+                    const baseScale = 0.68 + 0.32 * (zRatio + 1) / 2
+                    return baseScale * (isOrbitFront && hrHover.hovered ? 1.15 : (isOrbitFront ? 1.08 : 1.0))
+                }
+                opacity: 0.20 + 0.80 * (zRatio + 1) / 2
+                z: Math.round((zRatio + 1) * 10)
+
+                Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+                color: isCurrentHour
+                    ? "transparent"
+                    : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.65)
+
+                gradient: isCurrentHour ? hrGradient : null
+
+                Gradient {
+                    id: hrGradient
+                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                    GradientStop { position: 1.0; color: Theme.cOnSecondary }
+                }
+
+                border.width: 1
+                border.color: isCurrentHour
+                    ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+                    : isOrbitFront
+                        ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.65)
+                        : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.18)
+
+                HoverHandler {
+                    id: hrHover
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    z: 1
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.focusHour(index)
+                }
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: 1
+                    Text {
+                        text: WeatherPopupState.hrTimes[index] || "--"
+                        color: isCurrentHour ? Theme.cSurfaceTint
+                            : Theme.cOnSecondary
+                        font.pixelSize: 9; font.family: Config.labelFont
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    Text {
+                        text: WeatherPopupState.hrIcons[index] || "󰖐"
+                        color: isCurrentHour ? Theme.cSurfaceTint
+                            : Theme.cOnSecondary
+                        font.pixelSize: 18; font.family: Config.fontFamily
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    Text {
+                        text: WeatherPopupState.hrTemps[index] || "--"
+                        color: isCurrentHour ? Theme.cPrimary : Theme.cOnSecondary
+                        font.pixelSize: 9; font.weight: Font.Medium; font.family: Config.labelFont
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    Text {
+                        text: WeatherPopupState.hrPrec[index] || "0%"
+                        color: isCurrentHour ? Theme.cPrimary : Theme.cOnSecondary
+                        font.pixelSize: 8; font.family: Config.labelFont
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
                     }
                 }
             }
+        }
+    }
 
-            Item { height: 4 }
+    component DayForecastRow: RowLayout {
+        spacing: 6
+        Repeater {
+            model: WeatherPopupState.fcDays.length
+            delegate: Rectangle {
+                id: fcCard
+                required property int index
+                Layout.fillWidth: true
+                implicitHeight: fcCol.implicitHeight + 16
+                radius: 12
+                clip: true
+
+                // Gradient for current day, Theme.cSurfaceTint for others
+                color: index === 0
+                    ? "transparent"
+                    : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.65)
+
+                gradient: index === 0 ? fcGradient : null
+
+                Gradient {
+                    id: fcGradient
+                    GradientStop { position: 0.0; color: Theme.cInversePrimary }
+                    GradientStop { position: 1.0; color: Theme.cOnSecondary }
+                }
+
+                border.width: 1
+                border.color: index === 0
+                    ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+                    : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+
+                Column {
+                    id: fcCol
+                    anchors.centerIn: parent
+                    spacing: 3
+                    Text {
+                        text: WeatherPopupState.fcDays[index] || "--"
+                        color: index === 0 ? Theme.cSurfaceTint : Theme.cOnSecondary
+                        font.pixelSize: 11; font.weight: index === 0 ? Font.Bold : Font.Normal
+                        font.family: Config.labelFont
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    Text {
+                        text: WeatherPopupState.fcIcons[index] || "󰖐"
+                        color: index === 0 ? Theme.cSurfaceTint : Theme.cOnSecondary; font.pixelSize: 22; font.family: Config.fontFamily
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    Text {
+                        text: WeatherPopupState.fcHi[index] || "--"
+                        color: index === 0 ? Theme.cPrimary : Theme.cOnSecondary; font.pixelSize: 10; font.weight: Font.Medium; font.family: Config.labelFont
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                    Text {
+                        text: WeatherPopupState.fcLo[index] || "--"
+                        color: index === 0 ? Theme.cPrimary : Theme.cOnSecondary; font.pixelSize: 10; font.family: Config.labelFont
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.horizontalCenter: parent.horizontalCenter
+                    }
+                }
+            }
+        }
+    }
+
+    // ── Detached widget body: hourly orbital UI only ───────────────────────
+    // cOnSecondary@0.35 orbit panel inside a Theme.cPanelBg card ring with
+    // the Config bar border/width; the arc is nudged up for even gaps.
+    component WeatherWidgetCard: Rectangle {
+        id: wxWidget
+        required property var root
+        readonly property real pad: 10
+        // cPanelBg card ring (pad) around the cOnSecondary@0.35 orbit
+        // panel; the arc is nudged up 8px so the top gap shrinks and the
+        // bottom gap grows for an even inset.
+        width: 284 + pad * 2
+        implicitHeight: 160 + pad * 2
+        radius: 20
+        color: Theme.cPanelBg
+        border.width: Config.barBorderWidth
+        border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                              Config.barBorderColor.b, Config.barBorderAlpha)
+
+        Rectangle {
+            id: orbitBg
+            anchors { fill: parent; margins: wxWidget.pad }
+            radius: 14
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                           Theme.cOnSecondary.b, 0.35)
+
+            HourlyOrbit {
+                id: orbit
+                root: wxWidget.root
+                anchors { left: parent.left; right: parent.right
+                          top: parent.top; topMargin: -8 }
+                height: 160
+            }
         }
     }
 
@@ -513,10 +555,8 @@ Item {
             WeatherPopupState.widgetY = Math.round(y)
         }
 
-        WeatherPanel {
+        WeatherWidgetCard {
             root: scope
-            showClose: false
-            popupMode: false
         }
     }
 }

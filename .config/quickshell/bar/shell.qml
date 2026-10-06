@@ -29,16 +29,24 @@
 // zero-copy shares GPU buffers (the very DMA-BUF path that failed under ANGLE-
 // on-Vulkan -- benign on native GL, but the FIRST thing to drop if blank pages
 // return); disable-background-timer-throttling + disable-renderer-backgrounding
-// keep the YouTube ad-skip interval and the agent hot while backgrounded
+// + disable-backgrounding-occluded-windows keep the YouTube ad-skip interval
+// and the agent hot while backgrounded, and stop an UNMAPPED launcher window
+// (hidden while media plays) from being treated as occluded -- that path
+// starves segment requests and the audio cuts out once the buffer drains
 // (costs a little idle CPU); no-pings drops link beacon tracking;
 // renderer-process-limit=2 caps Chromium renderer processes (the main per-tab
 // RAM lever). WebGPU is left ENABLED: the old "Vulkan probe" log spam it caused
 // came from the ANGLE-on-Vulkan path, which we no longer use (native GL), so
-// enabling it is now silent. proxy-server routes websearch through the opt-in
-// hcproxy (its lifecycle is tied to the websearch toggle in LauncherWindow.qml
-// -- see proxyOptIn; run `hcproxy disable` to strip this flag and stop the
+// enabling it is now silent. The proxy flag (added/removed by `hcproxy
+// enable|disable`, never by hand -- those functions grep this file for the
+// exact Chromium flag spelling, so do NOT quote that literal here) routes
+// websearch through the opt-in hcproxy
+// (its lifecycle is tied to the websearch toggle in LauncherWindow.qml
+// -- see proxyOptIn; run `hcproxy disable` to strip the flag and stop the
 // launcher managing it).
-//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--enable-gpu-rasterization --ignore-gpu-blocklist --enable-zero-copy --disable-background-timer-throttling --disable-renderer-backgrounding --no-pings --renderer-process-limit=2 --proxy-server=http://127.0.0.1:8888
+//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--enable-gpu-rasterization --ignore-gpu-blocklist --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --renderer-process-limit=2 --proxy-server=http://127.0.0.1:8888 --proxy-server=http://127.0.0.1:8888 --proxy-server=http://127.0.0.1:8888
+// (If CDP forensics are ever needed again: re-add
+//  //@ pragma Env QTWEBENGINE_REMOTE_DEBUGGING=9223 and use bar/scripts/webtest/.)
 
 // ── Qt logging filter (keep errors, drop benign chatter) ────────────────────
 // qt.svg: Humanity icon theme probing a printer.svg that isn't installed.
@@ -381,7 +389,8 @@ ShellRoot {
         function setDockPosition(pos: string) { DockState.setPosition(pos) }
         function cycleDockPosition()   { DockState.cyclePosition() }
         function toggleLauncher()      { if (LicenseState.activated) HCCLauncherState.toggle() }
-        function openLauncher(tab: string) { if (LicenseState.activated) HCCLauncherState.open(tab) }
+        // No tab arg -> toggle (hyprviz.lua SUPER+A); with a tab -> open it.
+        function openLauncher(tab: string) { if (!LicenseState.activated) return; tab ? HCCLauncherState.open(tab) : HCCLauncherState.toggle() }
         function closeLauncher()       { HCCLauncherState.close() }
     }
 }

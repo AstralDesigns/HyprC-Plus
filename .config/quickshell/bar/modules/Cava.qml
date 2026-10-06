@@ -271,10 +271,15 @@ Item {
                 if (!visible) return
                 const ctx = getContext("2d")
                 ctx.reset()
+                // The right module mirrors its band data (cava reverse=1), so the
+                // horizontal colour ramp must mirror too: end-colour leads and
+                // the start-colour trails, keeping both modules symmetric about
+                // the bar centre.
+                const mirrored = root.side === "right"
                 CP.paint(ctx, Config.cavaPaintMap[Config.cavaStyle], root._bands,
                          width, height,
-                         { c0: root._rgba(root._colorTop),
-                           c1: root._rgba(root._colorBot),
+                         { c0: root._rgba(mirrored ? root._colorBot : root._colorTop),
+                           c1: root._rgba(mirrored ? root._colorTop : root._colorBot),
                            thickness: Config.cavaWaveThickness,
                            smooth: Config.cavaWaveSmooth })
             }

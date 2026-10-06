@@ -882,6 +882,8 @@ PanelWindow {
         readonly property real  _topT:    bar._shellTopT
         readonly property real  _bottomT: bar._shellBottomT
         readonly property int   _ri:     Config.shellInnerRadius
+        readonly property int   _bh:     Config.barHeight
+        readonly property int   _mh:     Config.moduleHeight
         readonly property int   _bw:     Config.barBorderWidth
         readonly property color _fill:   Theme.blurBackground
         readonly property color _border: Qt.rgba(Config.barBorderColor.r,
@@ -902,6 +904,8 @@ PanelWindow {
         on_TopTChanged:    requestPaint()
         on_BottomTChanged: requestPaint()
         on_RiChanged:      requestPaint()
+        on_BhChanged:      requestPaint()
+        on_MhChanged:      requestPaint()
         on_BwChanged:      requestPaint()
         on_FillChanged:    requestPaint()
         on_BorderChanged:  requestPaint()
@@ -949,6 +953,16 @@ PanelWindow {
             const cWidth = centerActive ? (shellCenterRow.implicitWidth + Config.barEdgePaddingLeft + Config.barEdgePaddingRight + Config.islandSpacing * 2) : 0
             const cX1 = (W - cWidth) / 2
             const cX2 = (W + cWidth) / 2
+            // Center-island radius: clamp to half the island's own depth/width so the
+            // concave armpit (quadratic) and convex outer corner (arcTo) meet flush on
+            // the side (straight side retracts to zero at rt = depth/2) and never cross.
+            const _tabD = Math.max(0, centerH - armT)
+            const rt = Math.min(r, _tabD * 0.66, cWidth / 2)
+            // Armpit flare: horizontal spread along the arm (fa, keeps the wide
+            // neck) is decoupled from the vertical bite down the side (fv). A
+            // shallower fv frees the side so rt can round further (more leeway).
+            const fa = rt * 0.78
+            const fv = rt * 0.5
 
             const isTop = bar._isTop
             const isBot = bar._isBottom
@@ -956,14 +970,14 @@ PanelWindow {
             if (cw) {
                 ctx.moveTo(armT + r, armT)
                 if (isTop && centerH > armT && cWidth > 0) {
-                    ctx.lineTo(cX1 - r, armT)
-                    ctx.arcTo(cX1, armT, cX1, armT + r, r)
-                    ctx.lineTo(cX1, centerH - r)
-                    ctx.arcTo(cX1, centerH, cX1 + r, centerH, r)
-                    ctx.lineTo(cX2 - r, centerH)
-                    ctx.arcTo(cX2, centerH, cX2, centerH - r, r)
-                    ctx.lineTo(cX2, armT + r)
-                    ctx.arcTo(cX2, armT, cX2 + r, armT, r)
+                    ctx.lineTo(cX1 - fa, armT)
+                    ctx.quadraticCurveTo(cX1, armT, cX1, armT + fv)
+                    ctx.lineTo(cX1, centerH - rt)
+                    ctx.arcTo(cX1, centerH, cX1 + rt, centerH, rt)
+                    ctx.lineTo(cX2 - rt, centerH)
+                    ctx.arcTo(cX2, centerH, cX2, centerH - rt, rt)
+                    ctx.lineTo(cX2, armT + fv)
+                    ctx.quadraticCurveTo(cX2, armT, cX2 + fa, armT)
                     ctx.lineTo(W - armT - r, armT)
                 } else {
                     ctx.lineTo(W - armT - r, armT)
@@ -975,14 +989,14 @@ PanelWindow {
                 if (isBot && centerH > armT && cWidth > 0) {
                     const botTabY = H - centerH
                     const botArmY = H - armT
-                    ctx.lineTo(cX2 + r, botArmY)
-                    ctx.arcTo(cX2, botArmY, cX2, botArmY - r, r)
-                    ctx.lineTo(cX2, botTabY + r)
-                    ctx.arcTo(cX2, botTabY, cX2 - r, botTabY, r)
-                    ctx.lineTo(cX1 + r, botTabY)
-                    ctx.arcTo(cX1, botTabY, cX1, botTabY + r, r)
-                    ctx.lineTo(cX1, botArmY - r)
-                    ctx.arcTo(cX1, botArmY, cX1 - r, botArmY, r)
+                    ctx.lineTo(cX2 + fa, botArmY)
+                    ctx.quadraticCurveTo(cX2, botArmY, cX2, botArmY - fv)
+                    ctx.lineTo(cX2, botTabY + rt)
+                    ctx.arcTo(cX2, botTabY, cX2 - rt, botTabY, rt)
+                    ctx.lineTo(cX1 + rt, botTabY)
+                    ctx.arcTo(cX1, botTabY, cX1, botTabY + rt, rt)
+                    ctx.lineTo(cX1, botArmY - fv)
+                    ctx.quadraticCurveTo(cX1, botArmY, cX1 - fa, botArmY)
                     ctx.lineTo(armT + r, botArmY)
                 } else {
                     ctx.lineTo(armT + r, H - armT)
@@ -999,14 +1013,14 @@ PanelWindow {
                 if (isBot && centerH > armT && cWidth > 0) {
                     const botTabY = H - centerH
                     const botArmY = H - armT
-                    ctx.lineTo(cX1 - r, botArmY)
-                    ctx.arcTo(cX1, botArmY, cX1, botArmY - r, r)
-                    ctx.lineTo(cX1, botTabY + r)
-                    ctx.arcTo(cX1, botTabY, cX1 + r, botTabY, r)
-                    ctx.lineTo(cX2 - r, botTabY)
-                    ctx.arcTo(cX2, botTabY, cX2, botTabY + r, r)
-                    ctx.lineTo(cX2, botArmY - r)
-                    ctx.arcTo(cX2, botArmY, cX2 + r, botArmY, r)
+                    ctx.lineTo(cX1 - fa, botArmY)
+                    ctx.quadraticCurveTo(cX1, botArmY, cX1, botArmY - fv)
+                    ctx.lineTo(cX1, botTabY + rt)
+                    ctx.arcTo(cX1, botTabY, cX1 + rt, botTabY, rt)
+                    ctx.lineTo(cX2 - rt, botTabY)
+                    ctx.arcTo(cX2, botTabY, cX2, botTabY + rt, rt)
+                    ctx.lineTo(cX2, botArmY - fv)
+                    ctx.quadraticCurveTo(cX2, botArmY, cX2 + fa, botArmY)
                     ctx.lineTo(W - armT - r, botArmY)
                 } else {
                     ctx.lineTo(W - armT - r, H - armT)
@@ -1016,14 +1030,14 @@ PanelWindow {
                 ctx.arcTo(W - armT, armT, W - armT - r, armT, r)
 
                 if (isTop && centerH > armT && cWidth > 0) {
-                    ctx.lineTo(cX2 + r, armT)
-                    ctx.arcTo(cX2, armT, cX2, armT + r, r)
-                    ctx.lineTo(cX2, centerH - r)
-                    ctx.arcTo(cX2, centerH, cX2 - r, centerH, r)
-                    ctx.lineTo(cX1 + r, centerH)
-                    ctx.arcTo(cX1, centerH, cX1, centerH - r, r)
-                    ctx.lineTo(cX1, armT + r)
-                    ctx.arcTo(cX1, armT, cX1 - r, armT, r)
+                    ctx.lineTo(cX2 + fa, armT)
+                    ctx.quadraticCurveTo(cX2, armT, cX2, armT + fv)
+                    ctx.lineTo(cX2, centerH - rt)
+                    ctx.arcTo(cX2, centerH, cX2 - rt, centerH, rt)
+                    ctx.lineTo(cX1 + rt, centerH)
+                    ctx.arcTo(cX1, centerH, cX1, centerH - rt, rt)
+                    ctx.lineTo(cX1, armT + fv)
+                    ctx.quadraticCurveTo(cX1, armT, cX1 - fa, armT)
                     ctx.lineTo(armT + r, armT)
                 } else {
                     ctx.lineTo(armT + r, armT)

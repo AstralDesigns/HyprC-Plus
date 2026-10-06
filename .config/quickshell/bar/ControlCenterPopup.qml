@@ -1759,13 +1759,13 @@ PanelWindow {
                                         CCSlider { visible: Config.barMode === "tri" || Config.barMode === "shell"; label:"R.Bottom-Right"; from:0;to:90; value:Config.barBottomRightRadius;    onMoved:function(v){Config.barBottomRightRadius=v} }
                                         CCSlider { label:"Island"; from:0;to:90; value:Config.islandRadius; onMoved:function(v){Config.islandRadius=v} }
                                         // Shell-specific geometry
-                                         CCSlider { visible: Config.barMode === "shell"; label:"Inner Radii"; from:0;to:90;               value:Config.shellInnerRadius;           onMoved:function(v){Config.shellInnerRadius=v} }
+                                         CCSlider { visible: Config.barMode === "shell"; label:"Inner Radii"; from:0;to:20;               value:Config.shellInnerRadius;           onMoved:function(v){Config.shellInnerRadius=v} }
                                          //CCSlider { visible: Config.barMode === "shell"; label:"C.Junction";  from:0;to:90;               value:Config.shellCenterJunctionRadius;  onMoved:function(v){Config.shellCenterJunctionRadius=v} }
 
                                          CCSection { text: "Dimensions" }
                                          CCSlider { visible: Config.barMode === "shell"; label:"Shell Pad";   from:4;to:120; stepSize:1;  value:Config.shellArmThickness;         onMoved:function(v){Config.shellArmThickness=v} }
-                                         CCSlider { label:"Bar Height";    from:20;to:80;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
-                                         CCSlider { label:"Module Height";  from:12;to:70;  stepSize:2;  value:Config.moduleHeight;  onMoved:function(v){Config.moduleHeight=v} }
+                                         CCSlider { label:"Bar Height";    from:20;to:50;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
+                                         CCSlider { label:"Module Height";  from:12;to:30;  stepSize:2;  value:Config.moduleHeight;  onMoved:function(v){Config.moduleHeight=v} }
 
                                          CCSection { text: "Screen Margins" }
                                          CCSlider { label:"Top Margin";    from:0;to:30; value:Config.outerMarginTop;    onMoved:function(v){Config.outerMarginTop=v} }
@@ -2213,10 +2213,10 @@ PanelWindow {
                                     ColumnLayout {
                                         width: parent.width; spacing: 5
 
-                                        CCSection { text: "Glyph Sizes" }
-                                        CCSlider { label:"Glyph Size";  from:8;to:24; value:Config.glyphSize;     onMoved:function(v){Config.glyphSize=v} }
-                                        CCSlider { label:"Info Glyph";  from:8;to:24; value:Config.infoGlyphSize;  onMoved:function(v){Config.infoGlyphSize=v} }
-                                        CCSlider { label:"Media Glyph"; from:8;to:24; value:Config.mediaGlyphSize; onMoved:function(v){Config.mediaGlyphSize=v} }
+                                        CCSection { text: "Icon Sizes" }
+                                        CCSlider { label:"Glyph Size";   from:8;to:24;stepSize:2; value:Config.glyphSize;      onMoved:function(v){Config.glyphSize=v} }
+                                        CCSlider { label:"Info Glyph";   from:8;to:24;stepSize:2; value:Config.infoGlyphSize;  onMoved:function(v){Config.infoGlyphSize=v} }
+                                        CCSlider { label:"Weather Icon"; from:8;to:24;stepSize:2; value:Config.weatherIconSize; onMoved:function(v){Config.weatherIconSize=v} }
 
                                         CCSection { text: "Text Sizes" }
                                         CCSlider { label:"Module Text"; from:8;to:20; value:Config.infoFontSize;  onMoved:function(v){Config.infoFontSize=v} }
@@ -2368,8 +2368,8 @@ PanelWindow {
                                         CCSection { text: "Thumbnail" }
                                         CCSlider { label:"Thumb Size"; from:10;to:40; value:Config.mediaThumbSize; onMoved:function(v){Config.mediaThumbSize=v} }
 
-                                        //CCSection { text: "Controls" }
-                                        //CCSlider { label:"Ctl Glyph Size"; from:6;to:24; value:Config.mediaCtlSize; onMoved:function(v){Config.mediaCtlSize=v} }
+                                        CCSection { text: "Controls" }
+                                        CCSlider { label:"Media Glyph"; from:8;to:24;stepSize:2; value:Config.mediaGlyphSize; onMoved:function(v){Config.mediaGlyphSize=v} }
 
                                         //CCSection { text: "Padding (0 = true zero)" }
                                         //CCSlider { label:"Pad Left";   from:0;to:16; value:Config.mediaPadLeft;   onMoved:function(v){Config.mediaPadLeft=v} }
@@ -4022,6 +4022,18 @@ PanelWindow {
                                 from: 18; to: 60; stepSize: 1
                                 value: Config.dockIconSize
                                 onMoved: function(v) { Config.dockIconSize = v }
+                            }
+                            CCSlider {
+                                label: "Start Icon"
+                                from: 8; to: 40; stepSize: 2
+                                value: Config.dockStartIconSize
+                                onMoved: function(v) { Config.dockStartIconSize = v }
+                            }
+                            CCSlider {
+                                label: "Trash Icon"
+                                from: 8; to: 40; stepSize: 2
+                                value: Config.dockTrashIconSize
+                                onMoved: function(v) { Config.dockTrashIconSize = v }
                             }
                             CCSlider {
                                 label: "Spacing"

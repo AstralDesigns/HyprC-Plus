@@ -36,6 +36,11 @@ QtObject {
         onTriggered: _saveSettings()
     }
 
+    // ── Media equalizer (EasyEffects) persistence ────────────────────────
+    property var     eqGains:    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]   // 10 band gains, dB
+    property string  eqPreset:   "Flat"
+    property bool    eqExpanded: false
+
     // QSettings INI backend stores booleans as "true"/"false" strings.
     // On read they come back as strings — coerce them to proper bools.
     function _toBool(v) {
@@ -108,11 +113,21 @@ QtObject {
         v = _settings.value("islandBorderVar"); if (v !== undefined && v !== null) islandBorderVar = v
         v = _settings.value("islandBorderMode"); if (v !== undefined && v !== null) islandBorderMode = v
         v = _settings.value("islandBorderWallustVar"); if (v !== undefined && v !== null) islandBorderWallustVar = v
+        v = _settings.value("islandBorderGradient"); if (v !== undefined && v !== null) islandBorderGradient = _toBool(v)
+        v = _settings.value("islandBorderSecondVar"); if (v !== undefined && v !== null) islandBorderSecondVar = v
+        v = _settings.value("islandBorderSecondMode"); if (v !== undefined && v !== null) islandBorderSecondMode = v
+        v = _settings.value("islandBorderSecondWallustVar"); if (v !== undefined && v !== null) islandBorderSecondWallustVar = v
+        v = _settings.value("islandBorderAngle"); if (v !== undefined && v !== null) islandBorderAngle = parseFloat(v)
         v = _settings.value("barBorderWidth"); if (v !== undefined && v !== null) barBorderWidth = v
         v = _settings.value("barBorderAlpha"); if (v !== undefined && v !== null) barBorderAlpha = v
         v = _settings.value("barBorderVar"); if (v !== undefined && v !== null) barBorderVar = v
         v = _settings.value("barBorderMode"); if (v !== undefined && v !== null) barBorderMode = v
         v = _settings.value("barBorderWallustVar"); if (v !== undefined && v !== null) barBorderWallustVar = v
+        v = _settings.value("barBorderGradient"); if (v !== undefined && v !== null) barBorderGradient = _toBool(v)
+        v = _settings.value("barBorderSecondVar"); if (v !== undefined && v !== null) barBorderSecondVar = v
+        v = _settings.value("barBorderSecondMode"); if (v !== undefined && v !== null) barBorderSecondMode = v
+        v = _settings.value("barBorderSecondWallustVar"); if (v !== undefined && v !== null) barBorderSecondWallustVar = v
+        v = _settings.value("barBorderAngle"); if (v !== undefined && v !== null) barBorderAngle = parseFloat(v)
         v = _settings.value("islandBgStyle");  if (v !== undefined && v !== null) islandBgStyle  = v
         v = _settings.value("barRectBgStyle"); if (v !== undefined && v !== null) barRectBgStyle = v
         v = _settings.value("moduleBgOpacity"); if (v !== undefined && v !== null) moduleBgOpacity = v
@@ -124,6 +139,7 @@ QtObject {
         v = _settings.value("glyphSize"); if (v !== undefined && v !== null) glyphSize = v
         v = _settings.value("infoGlyphSize"); if (v !== undefined && v !== null) infoGlyphSize = v
         v = _settings.value("mediaGlyphSize"); if (v !== undefined && v !== null) mediaGlyphSize = v
+        v = _settings.value("weatherIconSize"); if (v !== undefined && v !== null) weatherIconSize = v
         v = _settings.value("infoFontSize");   if (v !== undefined && v !== null) infoFontSize   = v
         v = _settings.value("labelFontSize");  if (v !== undefined && v !== null) labelFontSize  = v
         v = _settings.value("mediaCtlSize"); if (v !== undefined && v !== null) mediaCtlSize = v
@@ -179,6 +195,9 @@ QtObject {
         v = _settings.value("cavaWaveThickness"); if (v !== undefined && v !== null) cavaWaveThickness = v
         v = _settings.value("cavaWaveSmooth"); if (v !== undefined && v !== null) cavaWaveSmooth = _toBool(v)
         v = _settings.value("cavaTransparentWhenInactive"); if (v !== undefined && v !== null) cavaTransparentWhenInactive = _toBool(v)
+        v = _settings.value("eqGains"); if (v !== undefined && v !== null) { try { eqGains = JSON.parse(v) } catch(e) {} }
+        v = _settings.value("eqPreset"); if (v !== undefined && v !== null) eqPreset = v
+        v = _settings.value("eqExpanded"); if (v !== undefined && v !== null) eqExpanded = _toBool(v)
         v = _settings.value("cavaActiveOpacity"); if (v !== undefined && v !== null) cavaActiveOpacity = v
         v = _settings.value("cavaInactiveOpacity"); if (v !== undefined && v !== null) cavaInactiveOpacity = v
         v = _settings.value("cavaAutoHide"); if (v !== undefined && v !== null) cavaAutoHide = _toBool(v)
@@ -256,6 +275,8 @@ QtObject {
         v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v)
         // ── Dock appearance (qs-native dock — source of truth, replaces GJS config.js) ──
         v = _settings.value("dockIconSize");       if (v !== undefined && v !== null) dockIconSize       = parseInt(v)
+        v = _settings.value("dockStartIconSize");  if (v !== undefined && v !== null) dockStartIconSize  = parseInt(v)
+        v = _settings.value("dockTrashIconSize");  if (v !== undefined && v !== null) dockTrashIconSize  = parseInt(v)
         v = _settings.value("dockButtonSpacing");  if (v !== undefined && v !== null) dockButtonSpacing  = parseInt(v)
         v = _settings.value("dockInnerPadding");   if (v !== undefined && v !== null) dockInnerPadding   = parseInt(v)
         v = _settings.value("dockPadding");        if (v !== undefined && v !== null) dockPadding        = parseInt(v)
@@ -330,11 +351,21 @@ QtObject {
         _settings.setValue("islandBorderVar", islandBorderVar)
         _settings.setValue("islandBorderMode", islandBorderMode)
         _settings.setValue("islandBorderWallustVar", islandBorderWallustVar)
+        _settings.setValue("islandBorderGradient", islandBorderGradient)
+        _settings.setValue("islandBorderSecondVar", islandBorderSecondVar)
+        _settings.setValue("islandBorderSecondMode", islandBorderSecondMode)
+        _settings.setValue("islandBorderSecondWallustVar", islandBorderSecondWallustVar)
+        _settings.setValue("islandBorderAngle", islandBorderAngle)
         _settings.setValue("barBorderWidth", barBorderWidth)
         _settings.setValue("barBorderAlpha", barBorderAlpha)
         _settings.setValue("barBorderVar", barBorderVar)
         _settings.setValue("barBorderMode", barBorderMode)
         _settings.setValue("barBorderWallustVar", barBorderWallustVar)
+        _settings.setValue("barBorderGradient", barBorderGradient)
+        _settings.setValue("barBorderSecondVar", barBorderSecondVar)
+        _settings.setValue("barBorderSecondMode", barBorderSecondMode)
+        _settings.setValue("barBorderSecondWallustVar", barBorderSecondWallustVar)
+        _settings.setValue("barBorderAngle", barBorderAngle)
         _settings.setValue("islandBgStyle",  islandBgStyle)
         _settings.setValue("barRectBgStyle", barRectBgStyle)
         _settings.setValue("moduleBgOpacity", moduleBgOpacity)
@@ -346,6 +377,7 @@ QtObject {
         _settings.setValue("glyphSize", glyphSize)
         _settings.setValue("infoGlyphSize", infoGlyphSize)
         _settings.setValue("mediaGlyphSize", mediaGlyphSize)
+        _settings.setValue("weatherIconSize", weatherIconSize)
         _settings.setValue("infoFontSize",   infoFontSize)
         _settings.setValue("labelFontSize",  labelFontSize)
         _settings.setValue("mediaCtlSize", mediaCtlSize)
@@ -393,6 +425,9 @@ QtObject {
         _settings.setValue("cavaWaveThickness", cavaWaveThickness)
         _settings.setValue("cavaWaveSmooth", cavaWaveSmooth)
         _settings.setValue("cavaTransparentWhenInactive", cavaTransparentWhenInactive)
+        _settings.setValue("eqGains", JSON.stringify(eqGains))
+        _settings.setValue("eqPreset", eqPreset)
+        _settings.setValue("eqExpanded", eqExpanded)
         _settings.setValue("cavaActiveOpacity", cavaActiveOpacity)
         _settings.setValue("cavaInactiveOpacity", cavaInactiveOpacity)
         _settings.setValue("cavaAutoHide", cavaAutoHide)
@@ -471,6 +506,8 @@ QtObject {
         _settings.setValue("dockMargin",       dockMargin)
         // ── Dock appearance (qs-native dock) ──
         _settings.setValue("dockIconSize",        dockIconSize)
+        _settings.setValue("dockStartIconSize",   dockStartIconSize)
+        _settings.setValue("dockTrashIconSize",   dockTrashIconSize)
         _settings.setValue("dockButtonSpacing",   dockButtonSpacing)
         _settings.setValue("dockInnerPadding",    dockInnerPadding)
         _settings.setValue("dockPadding",         dockPadding)
@@ -612,6 +649,16 @@ QtObject {
     readonly property color islandBorderColor: islandBorderMode === "wallust"
         ? _wallustThemeColor(islandBorderWallustVar)
         : _cavaThemeColor(islandBorderVar)
+    // island border gradient: a second colour + angle, rendered by the
+    //  GradientBorder Canvas overlay when <prefix>BorderGradient is on.
+    property bool   islandBorderGradient: false
+    property string islandBorderSecondVar:        "$outline_variant"
+    property string islandBorderSecondMode:       "matugen"
+    property string islandBorderSecondWallustVar: "$color15"
+    readonly property color islandBorderColor2: islandBorderSecondMode === "wallust"
+        ? _wallustThemeColor(islandBorderSecondWallustVar)
+        : _cavaThemeColor(islandBorderSecondVar)
+    property real   islandBorderAngle: 45
 
     // ── Per-island border on/off toggles — each gates whether that
     //  island draws the border; all share the global islandBorder width
@@ -636,6 +683,16 @@ QtObject {
     readonly property color barBorderColor: barBorderMode === "wallust"
         ? _wallustThemeColor(barBorderWallustVar)
         : _cavaThemeColor(barBorderVar)
+    // bar border gradient: a second colour + angle, rendered by the
+    //  GradientBorder Canvas overlay when <prefix>BorderGradient is on.
+    property bool   barBorderGradient: false
+    property string barBorderSecondVar:        "$outline_variant"
+    property string barBorderSecondMode:       "matugen"
+    property string barBorderSecondWallustVar: "$color15"
+    readonly property color barBorderColor2: barBorderSecondMode === "wallust"
+        ? _wallustThemeColor(barBorderSecondWallustVar)
+        : _cavaThemeColor(barBorderSecondVar)
+    property real   barBorderAngle: 45
 
     // ── Island background opacity ─────────────────────────────────────────
     //  moduleBgOpacity  — flat tint alpha in bar mode (also used by islandBgOpacityBar)
@@ -679,6 +736,7 @@ QtObject {
     property int glyphSize:      12   // px
     property int infoGlyphSize:  12   // px — clock / date / weather icon
     property int mediaGlyphSize: 12   // px — media player toggle glyph
+    property int weatherIconSize: 14  // px - weather bar module icon (was infoGlyphSize+2)
 
     //  Text (label) sizes:
     //  infoFontSize  — time, date, weather value, battery %
@@ -1224,6 +1282,8 @@ QtObject {
     property int    dockAutoHideDelay: 5       // seconds
     property int    dockMargin:        6       // px — screen-edge gap
     property int    dockIconSize:      24      // px — app icon size
+    property int    dockStartIconSize: 15      // px - start badge glyph
+    property int    dockTrashIconSize: 15      // px - trash badge glyph
     property int    dockButtonSpacing: 4       // px — gap between dock buttons
     property int    dockInnerPadding:  16      // px — padding inside dock rect
     property int    dockPadding:       4       // px — legacy extra padding

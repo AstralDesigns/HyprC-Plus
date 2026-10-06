@@ -256,6 +256,9 @@ Item {
     }
     function playerAction(cmd) {
         let argv
+        // Same transport path the bar module (MediaPlayerState.ctl) uses — it
+        // drives QtWebEngine/Chromium fine: {{playerName}} reports the short
+        // "chromium" and CanPlay/CanPause go true once media is loaded.
         const target = scope.mediaSource ? ("-p '" + scope.mediaSource.replace(/'/g, "'\\''") + "' ") : ""
         if (cmd === "shuffle") {
             argv = "playerctl " + target + "shuffle toggle"
@@ -386,13 +389,187 @@ Item {
         }
     }
 
+    // ── Equalizer (EasyEffects) ─────────────────────────────────────────────
+    // 10-band UI driving the 10-band EasyEffects output preset (full range —
+    // EasyEffects only supports 10/12/15/30 bands). Gains + active preset
+    // persist through Config; edits are debounced, written to
+    // ~/.local/share/easyeffects/output/QS-EQ.json (EE 8 data dir) and
+    // reloaded via `easyeffects -l QS-EQ` (service auto-started if needed).
+    readonly property var  eqFreqs:   [62, 125, 250, 500, 1000, 2000, 4000, 7000, 11000, 15000]
+    readonly property var  eqFreqLbl: ["62", "125", "250", "500", "1k", "2k", "4k", "7k", "11k", "15k"]
+    readonly property real eqMin:     -12
+    readonly property real eqMax:      12
+    readonly property var  eqPresets: ({
+        "Flat":   [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        "Bass":   [7, 6, 4, 1, 0, 0, 0, 0, -1, -2],
+        "Treble": [0, 0, 0, 1, 3, 5, 6, 7, 7, 6],
+        "Cinema": [6, 4, 0, -2, 1, 3, 4, 5, 4, 3],
+        "Vocal":  [-2, 0, 3, 5, 4, 1, -1, -1, -2, -2],
+        "Rock":   [5, 3, -1, -1, 2, 4, 5, 4, 3, 2],
+        "Pop":    [-1, 2, 4, 4, 2, 0, -1, -1, -1, -1]
+    })
+
+    function _eqGains() {
+        let g = Config.eqGains
+        if (!Array.isArray(g) || g.length !== 10) g = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        return g.slice()
+    }
+    function setEqGain(i, v) {
+        let g = _eqGains()
+        g[i] = Math.max(scope.eqMin, Math.min(scope.eqMax, Math.round(v * 2) / 2))
+        Config.eqGains  = g
+        Config.eqPreset = "Custom"
+        eqApplyTimer.restart()
+    }
+    function applyEqPreset(name) {
+        if (!scope.eqPresets[name]) return
+        Config.eqGains  = scope.eqPresets[name].slice()
+        Config.eqPreset = name
+        eqApplyTimer.restart()
+    }
+
+    function _eqPresetJson() {
+        const g     = _eqGains()
+        const freqs = scope.eqFreqs
+        const gains = g
+        const bands = {}
+        for (let i = 0; i < 10; i++) {
+            bands["band" + i] = {
+                frequency: freqs[i], gain: gains[i], mode: "RLC (BT)",
+                mute: false, q: 4.36, slope: "x1", solo: false,
+                type: "Bell", width: 4.0
+            }
+        }
+        const eq = {
+            balance: 0.0, bypass: false, decramp: "x2", "input-gain": 0.0,
+            left: bands, right: bands, mode: "Stereo", "num-bands": 10,
+            "output-gain": 0.0, "pitch-left": 1.0, "pitch-right": 1.0,
+            "split-channels": false
+        }
+        // EE 8 load_blocklist() does json["output"]["blocklist"] with .at() —
+        // the key MUST exist as a string array or loading fails with
+        // "Wrong format in excluded apps list".
+        return JSON.stringify({ output: { "equalizer#0": eq,
+                                          blocklist: [],
+                                          plugins_order: ["equalizer#0"] } }, null, 2)
+    }
+    function applyEq() {
+        const json = _eqPresetJson().replace(/'/g, "'\\''")
+        eqProc._cmd =
+            "mkdir -p \"$HOME/.local/share/easyeffects/output\"; " +
+            "printf \'%s\' '" + json + "' > \"$HOME/.local/share/easyeffects/output/QS-EQ.json\"; " +
+            "pgrep -x easyeffects >/dev/null 2>&1 || { easyeffects --service-mode >/dev/null 2>&1 & sleep 2; }; " +
+            "easyeffects -l QS-EQ >/dev/null 2>&1"
+        if (eqProc.running) eqProc.running = false
+        eqProc.running = true
+    }
+
+    Process {
+        id: eqProc
+        property string _cmd: "true"
+        command: ["bash", "-c", eqProc._cmd]
+    }
+    Timer { id: eqApplyTimer; interval: 450; repeat: false; onTriggered: scope.applyEq() }
+
+    // ── EQ vertical band slider ─────────────────────────────────────────────
+    component EqBandSlider: Item {
+        id: band
+        required property real gain
+        required property string label
+        signal gainEdited(real g)
+        readonly property real lo: -12
+        readonly property real hi:  12
+        readonly property real trackH: 120
+        width: 34
+        height: trackH + 18
+        readonly property real norm:  (gain - lo) / (hi - lo)
+        readonly property real knobY: trackH * (1 - norm)
+
+        Rectangle {
+            x: band.width / 2 - 3; width: 6; height: band.trackH; radius: 3
+            color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.5)
+            border.width: 1
+            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.4)
+        }
+        Rectangle {
+            x: 0; width: band.width; height: 1; y: band.trackH / 2
+            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.30)
+        }
+        Rectangle {
+            x: band.width / 2 - 3; width: 6; radius: 3
+            y: Math.min(band.trackH / 2, band.knobY)
+            height: Math.abs(band.trackH / 2 - band.knobY)
+            color: Theme.cPrimary
+        }
+        Rectangle {
+            width: 18; height: 10; radius: 5
+            x: band.width / 2 - 9; y: band.knobY - 5
+            color: Theme.cOnSecondary
+            border.width: 1; border.color: Theme.cPrimary
+        }
+        Text {
+            anchors { top: parent.top; topMargin: band.trackH + 2
+                      horizontalCenter: parent.horizontalCenter }
+            text: band.label
+            font.pixelSize: 9; font.family: Config.labelFont
+            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.7)
+        }
+        MouseArea {
+            anchors.fill: parent; anchors.margins: -4
+            cursorShape: Qt.PointingHandCursor; preventStealing: true
+            function toGain(my) {
+                const n = 1 - Math.max(0, Math.min(1, my / band.trackH))
+                return band.lo + n * (band.hi - band.lo)
+            }
+            onPressed:         function(m) { band.gainEdited(toGain(m.y)) }
+            onPositionChanged: function(m) { if (pressed) band.gainEdited(toGain(m.y)) }
+            onWheel: function(e) {
+                band.gainEdited(band.gain + (e.angleDelta.y > 0 ? 1 : -1))
+                e.accepted = true
+            }
+        }
+    }
+
+    // ── EQ preset pill button ───────────────────────────────────────────────
+    component EqPill: Rectangle {
+        id: pill
+        required property string label
+        required property bool active
+        signal picked()
+        width: pillText.implicitWidth + 20; height: 26; radius: 99
+        color: active ? Theme.cSurfaceTint
+             : pillMa.containsMouse
+               ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65)
+               : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.5)
+        border.width: 0
+        border.color: "transparent"
+        Behavior on color { ColorAnimation { duration: 140 } }
+        Text {
+            id: pillText
+            anchors.centerIn: parent
+            text: pill.label
+            font.pixelSize: 11; font.bold: pill.active
+            color: pill.active ? Theme.cOnSecondary : Theme.cPrimary
+        }
+        MouseArea {
+            id: pillMa
+            anchors.fill: parent; hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: pill.picked()
+        }
+    }
+
     // ── Media Player Card (shared UI for popup + widget) ─────────────────
     component MediaPlayerCard: Item {
         required property var root
+        property bool popupMode: false
 
         id: mediaCard
         implicitWidth:  450
-        implicitHeight: Math.max(mediaCardRow.implicitHeight + 28, 198)
+        implicitHeight: Math.max(mediaCardRow.implicitHeight
+                                 + (popupMode ? eqColumn.height + 12 : 28), 198)
+        width:  implicitWidth
+        height: implicitHeight
 
         layer.enabled: true
         layer.effect: MultiEffect {
@@ -902,6 +1079,151 @@ Item {
                 }
             }
         }
+
+        // ── Equalizer section (popup only) ──────────────────────────────
+        Column {
+            id: eqColumn
+            anchors {
+                left: parent.left; right: parent.right
+                top: mediaCardRow.bottom
+                topMargin: -15
+                leftMargin: 16; rightMargin: 16
+            }
+            spacing: 8
+            visible: mediaCard.popupMode
+
+            // "Equalizer · <preset>" as a compact segmented-style pill; the whole
+            // pill is the expand/collapse toggle (chevron glyph removed). The x:24
+            // wrapper keeps it aligned with the control buttons even though the
+            // column margin is 16 now (widened for the 10-band slider container).
+            Item {
+                width: parent.width; height: eqToggle.height
+                Rectangle {
+                    id: eqToggle
+                    x: 24
+                    width: eqHeaderRow.implicitWidth + 22
+                    height: 24; radius: 99
+                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.5)
+                    Row {
+                        id: eqHeaderRow
+                        anchors.centerIn: parent
+                        spacing: 6
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "Equalizer"
+                            font.pixelSize: 12; font.weight: Font.DemiBold
+                            color: Theme.cOnSurf
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: "\u00b7 " + Config.eqPreset
+                            font.pixelSize: 11; color: Theme.cPrimary
+                        }
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: Config.eqExpanded = !Config.eqExpanded
+                    }
+                }
+            }
+
+            Column {
+                id: eqBody
+                width: parent.width
+                spacing: 10
+                // Smooth reveal: animate height + opacity (clipped) instead of
+                // toggling visibility, mirroring the history panel expansion.
+                height: Config.eqExpanded ? implicitHeight : 0
+                Behavior on height  { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
+                Behavior on opacity { NumberAnimation { duration: 200 } }
+                opacity: Config.eqExpanded ? 1.0 : 0.0
+                clip: true
+
+                Item {
+                    width: parent.width; height: eqTrack.height + 24
+                    Rectangle {
+                        anchors.centerIn: eqTrack
+                        width:  eqTrack.width + 24
+                        height: eqTrack.height + 24
+                        radius: 14
+                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.25)
+                    }
+                    Item {
+                        id: eqTrack
+                        anchors.centerIn: parent
+                        width:  10 * 34 + 9 * 6
+                        height: 138
+                        Canvas {
+                            id: eqCurve
+                            anchors { left: parent.left; right: parent.right; top: parent.top }
+                            height: 120
+                            onPaint: {
+                                const ctx = getContext("2d")
+                                ctx.reset()
+                                function rgba(c, a) {
+                                    return "rgba(" + Math.round(c.r * 255) + "," +
+                                           Math.round(c.g * 255) + "," +
+                                           Math.round(c.b * 255) + "," + a + ")"
+                                }
+                                const g = root._eqGains(), n = g.length
+                                const step = eqTrack.width / n
+                                const xs = [], ys = []
+                                for (let i = 0; i < n; i++) {
+                                    xs.push(step * (i + 0.5))
+                                    const norm = (g[i] - root.eqMin) / (root.eqMax - root.eqMin)
+                                    ys.push(120 * (1 - norm))
+                                }
+                                const grad = ctx.createLinearGradient(0, 0, eqTrack.width, 0)
+                                grad.addColorStop(0, rgba(Theme.cInversePrimary, 1))
+                                grad.addColorStop(1, rgba(Theme.cOnSecondary, 1))
+                                ctx.strokeStyle = grad
+                                ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.lineCap = "round"
+                                ctx.beginPath(); ctx.moveTo(xs[0], ys[0])
+                                for (let i = 1; i < n - 1; i++) {
+                                    const xc = (xs[i] + xs[i + 1]) / 2
+                                    const yc = (ys[i] + ys[i + 1]) / 2
+                                    ctx.quadraticCurveTo(xs[i], ys[i], xc, yc)
+                                }
+                                ctx.lineTo(xs[n - 1], ys[n - 1])
+                                ctx.stroke()
+                            }
+                            Connections {
+                                target: Config
+                                function onEqGainsChanged() { if (eqCurve.visible) eqCurve.requestPaint() }
+                            }
+                        }
+                        Row {
+                            anchors.fill: parent
+                            spacing: 6
+                            Repeater {
+                                model: 10
+                                EqBandSlider {
+                                    required property int index
+                                    gain:  Config.eqGains[index] || 0
+                                    label: root.eqFreqLbl[index]
+                                    onGainEdited: function(g) { root.setEqGain(index, g) }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: 4
+                    Repeater {
+                        model: ["Flat", "Bass", "Treble", "Cinema", "Vocal", "Rock", "Pop"]
+                        EqPill {
+                            required property var modelData
+                            label:  modelData
+                            active: Config.eqPreset === modelData
+                            onPicked: root.applyEqPreset(modelData)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // ── Top-Layer Popup Surface ─────────────────────────────────────────
@@ -914,7 +1236,7 @@ Item {
         readonly property bool _barAtBottom: Config.barPosition === "bottom"
         readonly property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop) : Config.outerMarginTop) + Config.barHeight + 4
         readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 4
-        readonly property real _leftMargin: Config.barMode === "shell" ? Config.shellModuleSideMargin : Config.outerMarginSide
+        readonly property real _leftMargin: Config.popupSideMargin
 
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true }
         margins {
@@ -924,7 +1246,7 @@ Item {
         }
 
         implicitWidth:  mpPanel.implicitWidth + 8
-        implicitHeight: mpPanel.implicitHeight + 8
+        implicitHeight: 480
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "quickshell"
@@ -946,7 +1268,17 @@ Item {
         MediaPlayerCard {
             id: mpPanel
             root: scope
-            anchors.centerIn: parent
+            popupMode: true
+            anchors {
+                left: parent.left
+                top:    !mpPopup._barAtBottom ? parent.top    : undefined
+                bottom:  mpPopup._barAtBottom ? parent.bottom : undefined
+            }
+            // Cascade open: the Loader recreates this window on every open, so
+            // animate opacity/scale on creation (same pattern as notif toasts).
+            transformOrigin: mpPopup._barAtBottom ? Item.BottomLeft : Item.TopLeft
+            NumberAnimation on opacity { from: 0; to: 1; duration: 220; easing.type: Easing.OutCubic; running: true }
+            NumberAnimation on scale   { from: 0.92; to: 1; duration: 220; easing.type: Easing.OutCubic; running: true }
         }
     }
 
