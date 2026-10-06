@@ -1026,7 +1026,7 @@ Item {
                             const barH  = 2 + amp * (maxBarH - 2)
                             ctx.beginPath()
                             ctx.strokeStyle = Qt.rgba(
-                                Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b,
+                                Theme.cPrimry.r, Theme.cPrimry.g, Theme.cPrimry.b,
                                 0.40 + amp * 1.00).toString()
                             ctx.lineWidth = 1.5
                             ctx.lineCap   = "round"

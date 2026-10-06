@@ -1058,20 +1058,20 @@ ShellRoot {
                                             spacing: 0
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockHour; color: root.cWc2
+                                                text: root.clockHour; color: root.cWc5
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "󰫢  󰫢"; color: root.cWc3
+                                                text: "󰫢  󰫢"; color: root.cPrimary
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
                                                 topPadding: 6; bottomPadding: 6
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockMin; color: root.cPrimary
+                                                text: root.clockMin; color: root.cWc3
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
@@ -1117,7 +1117,7 @@ ShellRoot {
                                                     radius: width / 2
                                                     color: "transparent"
                                                     border.width: 4
-                                                    border.color: root.cWc2
+                                                    border.color: root.cWc5
                                                 }
                                             }
                                             
@@ -1197,14 +1197,14 @@ ShellRoot {
                                             spacing: 14
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDayName; color: root.cWc2
+                                                text: root.clockDayName; color: root.cWc5
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 22
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockDateNum; color: root.cWc3
+                                                text: root.clockDateNum; color: root.cPrimary
                                                 font.family: "C059"; font.pixelSize: 86
                                                 font.italic: true; font.weight: Font.DemiBold
                                                 lineHeight: 0.88
@@ -1212,7 +1212,7 @@ ShellRoot {
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: root.clockMonthName; color: root.cPrimary
+                                                text: root.clockMonthName; color: root.cWc3
                                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 22
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
@@ -1261,7 +1261,7 @@ ShellRoot {
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: root.weatherTemp
-                                                color: root.cPrimary
+                                                color: root.cWc2
                                                 font.pixelSize: 18
                                                 font.weight: Font.Bold
                                                 font.family: "C059"
@@ -1720,7 +1720,7 @@ ShellRoot {
                                                     const angle = (i / _barCount) * Math.PI * 2 - Math.PI / 2
                                                     const barH  = 2 + amp * (maxBarH - 2)   // 2px baseline above disc
                                                     ctx.beginPath()
-                                                    ctx.strokeStyle = Qt.rgba(root.cWc6.r, root.cWc6.g, root.cWc6.b, 0.40 + amp * 1.00)
+                                                    ctx.strokeStyle = Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.40 + amp * 1.00)
                                                     ctx.lineWidth = 1.5
                                                     ctx.lineCap   = "round"
                                                     ctx.moveTo(cx + Math.cos(angle) * innerR,            cy + Math.sin(angle) * innerR)
