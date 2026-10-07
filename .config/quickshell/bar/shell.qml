@@ -44,7 +44,7 @@
 // (its lifecycle is tied to the websearch toggle in LauncherWindow.qml
 // -- see proxyOptIn; run `hcproxy disable` to strip the flag and stop the
 // launcher managing it).
-//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--enable-gpu-rasterization --ignore-gpu-blocklist --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --renderer-process-limit=2 --proxy-server=http://127.0.0.1:8888 --proxy-server=http://127.0.0.1:8888 --proxy-server=http://127.0.0.1:8888
+//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--enable-gpu-rasterization --ignore-gpu-blocklist --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --renderer-process-limit=2 --proxy-server=http://127.0.0.1:8888
 // (If CDP forensics are ever needed again: re-add
 //  //@ pragma Env QTWEBENGINE_REMOTE_DEBUGGING=9223 and use bar/scripts/webtest/.)
 
@@ -325,12 +325,16 @@ ShellRoot {
         }
         function setMode(m: string) { Config.barMode = m }
 
-        // Toggle visibility on focused monitor
+        // Toggle visibility on focused monitor. Flips the _altHidden intent
+        // flag (not .visible directly): auto-hide timers recompute .visible
+        // via updateBarVisibility(), so a bare .visible toggle was silently
+        // undone — and _altHidden additionally parks the hotspots, keeping
+        // "hidden" truly hidden.
         function toggleVisibility() {
             for (let i = 0; i < barVariants.instances.length; i++) {
                 const b = barVariants.instances[i]
                 if (Hyprland.monitorFor(b.screen)?.id === Hyprland.focusedMonitor?.id)
-                    b.visible = !b.visible
+                    b._altHidden = !b._altHidden
             }
         }
 

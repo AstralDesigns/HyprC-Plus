@@ -30,8 +30,8 @@ PanelWindow {
 
     // ── Tracks whether Candy_Update.sh is alive in the OS, even across QS reloads ──
     property bool _hcScriptRunning: false
-    // True while any phase of the HC+ update is active: launcher, script, agent build, state cleanup, recolor, or probe
-    readonly property bool _hcBusy: _hcUpdateProc.running || _hcScriptRunning || _hcAgentBuildProc.running || _hcStateClearProc.running || _hcReColorProc.running || _hcSentinelCheckProc.running
+    // True while any phase of the HC+ update is active: launcher, script, agent build, hcproxy repair, state cleanup, recolor, or probe
+    readonly property bool _hcBusy: _hcUpdateProc.running || _hcScriptRunning || _hcAgentBuildProc.running || _hcProxyRepairProc.running || _hcStateClearProc.running || _hcReColorProc.running || _hcSentinelCheckProc.running
 
     // On every QS load (including reloads mid-update), probe the sentinel files
     // and process table so recovery and state transitions happen seamlessly.
@@ -384,6 +384,28 @@ PanelWindow {
         command: [
             "bash", "--login", "-c",
             "exec bash \"" + Quickshell.env("HOME") + "/.hyprcandy/GJS/hyprcandydock/agent-app/hc-agent-build.sh\""
+        ]
+        running: false
+        onExited: {
+            running = false
+            if (!_hcProxyRepairProc.running)
+                _hcProxyRepairProc.running = true
+        }
+    }
+
+    // ── hcproxy regeneration — runs after the agent build, before cleanup ───
+    // Candy_Update.sh overwrites quickshell (incl. the hcproxy unit target
+    // and shell.qml's proxy flag) but knows nothing about hcproxy. 'repair'
+    // re-checks pacman deps (pkexec auth dialog, like the updater), then
+    // re-generates unit + flag; no-op unless the user opted in before
+    // (~/.mitmproxy present). Sends its own "setup in progress" notify —
+    // completion notice stays with the cleanup proc's notify.sh.
+    // The agent-app 'pm build' already ran just above via hc-agent-build.sh.
+    Process {
+        id: _hcProxyRepairProc
+        command: [
+            "bash", "-c",
+            "exec bash \"" + Quickshell.env("HOME") + "/.config/quickshell/bar/scripts/webproxy/hcproxy\" repair"
         ]
         running: false
         onExited: {

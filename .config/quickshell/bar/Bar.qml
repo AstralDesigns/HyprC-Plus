@@ -79,10 +79,14 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Bottom
     WlrLayershell.exclusionMode: _shellMode ? ExclusionMode.Ignore : ExclusionMode.Auto
 
-    readonly property real _shellActiveResHeight: shellCenter.visible
+    // Reserve the island's full height only while it is actually shown:
+    // shellCenter stays .visible while auto-hidden (opacity-0 fade), so keying
+    // on .visible alone kept a barHeight-tall exclusive zone reserved even
+    // when only the thin hotspot was active. _shown tracks the ah state.
+    readonly property real _shellActiveResHeight: (shellCenter.visible && shellCenter._shown)
         ? (Config.barHeight + Config.outerMarginBottom)
         : Config.shellArmThickness
-    readonly property real _shellActiveResHeightBot: shellCenter.visible
+    readonly property real _shellActiveResHeightBot: (shellCenter.visible && shellCenter._shown)
         ? (Config.barHeight + Config.outerMarginTop)
         : Config.shellArmThickness
 
@@ -168,6 +172,9 @@ PanelWindow {
                         + Config.islandSpacing * 2
 
         HoverHandler {
+            // Opacity-0 island windows still take hover; gate so only the
+            // thin hotspot strip can reveal while auto-hidden.
+            enabled: !bar._triLeftAhHidden
             onHoveredChanged: {
                 if (!bar._triLeftAhEnabled) return
                 if (hovered) {
@@ -270,6 +277,9 @@ PanelWindow {
                         + Config.islandSpacing * 2
 
         HoverHandler {
+            // Opacity-0 island windows still take hover; gate so only the
+            // thin hotspot strip can reveal while auto-hidden.
+            enabled: !bar._triRightAhHidden
             onHoveredChanged: {
                 if (!bar._triRightAhEnabled) return
                 if (hovered) {
@@ -477,7 +487,7 @@ PanelWindow {
         if (bar._ahEnabled) {
             if (bar.anyPanelOpen) {
                 _ahHideTimer.stop()
-                if (bar._ahHidden) { bar._ahHidden = false; bar.visible = true }
+                if (bar._ahHidden) { bar._ahHidden = false; bar.visible = !bar._altHidden }
             } else {
                 _ahHideTimer.restart()
             }
@@ -579,18 +589,29 @@ PanelWindow {
         onTriggered: { if (bar._ahHidden) bar.visible = false }
     }
 
+    // ALT+1 (bar.sh → toggleVisibility) user intent flag: hides the bar AND
+    // its hotspots completely — without it, auto-hide timers re-reveal the
+    // surface (updateBarVisibility) or re-arm the hotspot edge.
+    property bool _altHidden: false
+    on_AltHiddenChanged: updateBarVisibility()
+
     function updateBarVisibility() {
         if (Config.barMode === "tri") {
             const leftVisible   = !Config.triLeftAutoHide   || !_triLeftAhHidden   || _triLeftPinned
             const centerVisible = !Config.triCenterAutoHide || !_triCenterAhHidden || _triCenterPinned
             const rightVisible  = !Config.triRightAutoHide  || !_triRightAhHidden  || _triRightPinned
-            bar.visible = leftVisible || centerVisible || rightVisible
+            // Tri hotspots live in their own Top-layer windows, so the bar
+            // surface may stay hidden while islands are auto-hidden — the
+            // hotspots reveal it again (previously bar.visible=false here
+            // also killed every hotspot, making the bar unreachable without
+            // ALT+1 once all three islands hid).
+            bar.visible = !bar._altHidden && (leftVisible || centerVisible || rightVisible)
         } else if (Config.barMode === "shell") {
-            bar.visible = true
+            bar.visible = !bar._altHidden
         } else {
             if (!bar._ahHidden) {
                 // Showing: make visible immediately so animation can play
-                bar.visible = true
+                bar.visible = !bar._altHidden
             } else {
                 // Hiding: keep visible during exit animation, destroy after
                 _ahAnimExitTimer.restart()
@@ -629,7 +650,7 @@ PanelWindow {
     }
 
     // ── Tri & Shell Center Auto-Hide ── (Shell center AH currently disabled)
-    property bool _triCenterAhEnabled: Config.triCenterAutoHide && Config.barMode === "tri" //-> (Config.barMode === "tri" || Config.barMode === "shell")
+    property bool _triCenterAhEnabled: Config.triCenterAutoHide && (Config.barMode === "tri" || Config.barMode === "shell")
     property int  _triCenterAhDelaySec: Config.triCenterAutoHideDelay
     property bool _triCenterAhHidden: false
 
@@ -775,7 +796,7 @@ PanelWindow {
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
 
-        visible: bar._ahEnabled && bar._ahHidden && !_fullscreen
+        visible: !bar._altHidden && bar._ahEnabled && bar._ahHidden && !_fullscreen
 
         WlrLayershell.layer:     WlrLayer.Top
         WlrLayershell.namespace: "quickshell:bar-autohide-hotspot"
@@ -1425,6 +1446,9 @@ PanelWindow {
 
             HoverHandler {
                 id: triLeftHover
+                // Opacity-0 island still takes hover; gate so only the thin
+                // hotspot strip can reveal while auto-hidden.
+                enabled: !bar._triLeftAhHidden
                 onHoveredChanged: {
                     if (!bar._triLeftAhEnabled) return
                     if (hovered) {
@@ -1512,6 +1536,10 @@ PanelWindow {
                            + Config.islandSpacing * 2
 
             HoverHandler {
+                // While auto-hidden the island is only opacity-0 — without
+                // this gate its own footprint (island-sized!) still takes
+                // hover and reveals it, defeating the thin hotspot strip.
+                enabled: !bar._triCenterAhHidden
                 onHoveredChanged: {
                     if (!bar._triCenterAhEnabled) return
                     if (hovered) {
@@ -1576,6 +1604,9 @@ PanelWindow {
 
             HoverHandler {
                 id: triCenterHover
+                // Same opacity-0 hover leak as shellCenter — the hotspot
+                // strip owns reveal while hidden.
+                enabled: !bar._triCenterAhHidden
                 onHoveredChanged: {
                     if (!bar._triCenterAhEnabled) return
                     if (hovered) {
@@ -1663,6 +1694,9 @@ PanelWindow {
 
             HoverHandler {
                 id: triRightHover
+                // Opacity-0 island still takes hover; gate so only the thin
+                // hotspot strip can reveal while auto-hidden.
+                enabled: !bar._triRightAhHidden
                 onHoveredChanged: {
                     if (!bar._triRightAhEnabled) return
                     if (hovered) {
@@ -1730,7 +1764,8 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: bar.visible && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triLeftAhEnabled && bar._triLeftAhHidden && !_fullscreen
+        visible: !bar._altHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triLeftAhEnabled && bar._triLeftAhHidden && !_fullscreen
+        screen: bar.screen
 
         WlrLayershell.layer:     WlrLayer.Top
         WlrLayershell.namespace: "quickshell:tri-left-autohide-hotspot"
@@ -1746,8 +1781,8 @@ PanelWindow {
         margins {
             left: Config.barMode === "shell" ? Config.shellModuleSideMargin : barLayout.mapToItem(null, triLeft.x, 0).x
         }
-        implicitWidth:  Config.barMode === "shell" ? shellLeftPW.implicitWidth : triLeft.width
-        implicitHeight: Config.barMode === "shell" ? Math.max(4, Config.shellArmThickness) : 4
+        implicitWidth:  Config.barMode === "shell" ? shellLeftPW.implicitWidth : triLeft.implicitWidth
+        implicitHeight: 4
 
         HoverHandler {
             onHoveredChanged: {
@@ -1765,9 +1800,12 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: bar.visible && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triCenterAhEnabled && bar._triCenterAhHidden && !_fullscreen
+        visible: !bar._altHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triCenterAhEnabled && bar._triCenterAhHidden && !_fullscreen
+        screen: bar.screen
 
-        WlrLayershell.layer:     WlrLayer.Top
+        // Overlay (not Top): must sit above the Bottom-layer shell arm
+        // reservation windows so the thin center strip keeps the hover.
+        WlrLayershell.layer:     WlrLayer.Overlay
         WlrLayershell.namespace: "quickshell:tri-center-autohide-hotspot"
         exclusionMode:           ExclusionMode.Ignore
         exclusiveZone:           0
@@ -1778,11 +1816,16 @@ PanelWindow {
             bottom: bar._isBottom
             left:   true
         }
+        // Screen-relative centering: the center island is always horizontally
+        // centered, so derive the strip's margin from the screen width. The
+        // old barLayout.mapToItem(...) dependency went stale while the bar
+        // surface was unmapped (shell/tri autohide) and sized/positioned the
+        // hotspot like the island itself instead of a thin edge strip.
         margins {
-            left: barLayout.mapToItem(null, Config.barMode === "shell" ? shellCenter.x : triCenter.x, 0).x
+            left: Math.max(0, Math.round((screen.width  - implicitWidth) / 2))
         }
-        implicitWidth:  Config.barMode === "shell" ? shellCenter.width : triCenter.width
-        implicitHeight: Config.barMode === "shell" ? Math.max(4, Config.shellArmThickness) : 4
+        implicitWidth:  Config.barMode === "shell" ? shellCenter.implicitWidth : triCenter.implicitWidth
+        implicitHeight: 4
 
         HoverHandler {
             onHoveredChanged: {
@@ -1800,7 +1843,8 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: bar.visible && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triRightAhEnabled && bar._triRightAhHidden && !_fullscreen
+        visible: !bar._altHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triRightAhEnabled && bar._triRightAhHidden && !_fullscreen
+        screen: bar.screen
 
         WlrLayershell.layer:     WlrLayer.Top
         WlrLayershell.namespace: "quickshell:tri-right-autohide-hotspot"
@@ -1816,8 +1860,8 @@ PanelWindow {
         margins {
             left: Config.barMode === "shell" ? (bar.width - Config.shellModuleSideMargin - shellRightPW.implicitWidth) : barLayout.mapToItem(null, triRight.x, 0).x
         }
-        implicitWidth:  Config.barMode === "shell" ? shellRightPW.implicitWidth : triRight.width
-        implicitHeight: Config.barMode === "shell" ? Math.max(4, Config.shellArmThickness) : 4
+        implicitWidth:  Config.barMode === "shell" ? shellRightPW.implicitWidth : triRight.implicitWidth
+        implicitHeight: 4
 
         HoverHandler {
             onHoveredChanged: {

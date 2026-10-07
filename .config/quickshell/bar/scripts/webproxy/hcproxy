@@ -28,7 +28,13 @@ install_deps() {
     python -c "import adblock" 2>/dev/null || pkgs+=("python-adblock")
     if [ ${#pkgs[@]} -gt 0 ]; then
         echo "==> installing (official repos): ${pkgs[*]}"
-        sudo pacman -S --needed "${pkgs[@]}"
+        # Headless callers (QML Process from the update chain) have no tty for
+        # sudo's prompt — fall back to pkexec, same auth model as the updater.
+        if [ -t 0 ] || [ -t 1 ]; then
+            sudo pacman -S --needed "${pkgs[@]}"
+        else
+            pkexec pacman -S --needed "${pkgs[@]}"
+        fi
     fi
 }
 
@@ -76,7 +82,9 @@ EOF
 flag_on() {
     # Anchor on the EXACT flag syntax: a bare "proxy-server" substring
     # can appear in shell.qml comments and fool this check into skipping the insert.
-    grep -qF "--proxy-server=" "$SHELL_QML" && return 0
+    # NOTE the `--`: without it grep parses the leading-dash pattern as an
+    # option, the guard always fails, and the flag got re-appended every run.
+    grep -qF -- "--proxy-server=" "$SHELL_QML" && return 0
     echo "==> adding proxy flag to shell.qml"
     # Append at end of the QTWEBENGINE_CHROMIUM_FLAGS pragma line. (We used to
     # anchor the insert on `--disable-features=WebGPU`, but WebGPU is now left
@@ -92,7 +100,7 @@ link_cli() {
 }
 
 flag_off() {
-    grep -qF "--proxy-server=" "$SHELL_QML" || return 0
+    grep -qF -- "--proxy-server=" "$SHELL_QML" || return 0
     echo "==> removing proxy flag from shell.qml"
     sed -i "s# --proxy-server=http://127\.0\.0\.1:[0-9]*##g" "$SHELL_QML"
 }
@@ -134,10 +142,31 @@ refresh() {
     echo "✅ lists cleared; service restarted (it re-downloads on start)"
 }
 
+repair() {
+    # Re-generate the unit + launcher flag after a HyprCandy update
+    # overwrote quickshell (Candy_Update.sh does not know about hcproxy).
+    # Opt-in only: no CA confdir means the user never enabled it. Also
+    # re-checks pacman deps (pkexec auth if missing) so non-clean installs
+    # that merely lost files to the update fully recover. The start-phase
+    # notify is the only notification here; the update chain's cleanup
+    # proc already sends the completion notice.
+    [ -d "$CONFDIR" ] || { echo "hcproxy: not opted in — nothing to repair"; return 0; }
+    notify-send "Web-search Proxy" "Setup in progress ..." 2>/dev/null || true
+    install_deps
+    import_ca
+    write_unit
+    link_cli
+    systemctl --user daemon-reload
+    systemctl --user enable --now hcproxy
+    flag_on
+    echo "✅ hcproxy repaired (deps + unit + flag regenerated; bar relaunch applies the flag)"
+}
+
 case "${1:-}" in
     enable) enable ;;
     disable) disable ;;
     status) status ;;
     refresh) refresh ;;
-    *) echo "usage: hcproxy {enable|disable|status|refresh}"; exit 1 ;;
+    repair) repair ;;
+    *) echo "usage: hcproxy {enable|disable|status|refresh|repair}"; exit 1 ;;
 esac

@@ -308,6 +308,14 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent
             radius: bg.radius
+            // Mirror the per-corner radii too: in gradient mode bg itself is
+            // transparent, so without these the CC corner-radius sliders only
+            // visibly worked in glass mode (bar islands use this same
+            // parent-binding pattern).
+            topLeftRadius:     bg.topLeftRadius
+            topRightRadius:    bg.topRightRadius
+            bottomLeftRadius:  bg.bottomLeftRadius
+            bottomRightRadius: bg.bottomRightRadius
             visible: Config.dockBackgroundStyle === "gradient"
             gradient: Gradient {
                 orientation: dock.isHorizontal ? Gradient.Vertical : Gradient.Horizontal
