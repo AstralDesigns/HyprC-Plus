@@ -397,7 +397,7 @@ Item {
                 const minText = Qt.formatDateTime(time, "mm")
                 // Outer ring spans r=51 (inner dial edge) to r=78 (widget edge).
                 // Midpoint ≈ 63 — centers the minute text in the blurred ring region.
-                const rMin = 63
+                const rMin = 66
                 const minX = cx + rMin * Math.sin(minAngle)
                 const minY = cy - rMin * Math.cos(minAngle)
 
