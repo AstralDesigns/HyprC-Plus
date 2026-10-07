@@ -2149,14 +2149,14 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maSusp.containsMouse ? root.cOnSecondary : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.75)
                                 border.width: 1
-                                border.color: _maSusp.containsMouse ? Qt.rgba(root.cWc6.r, root.cWc6.g, root.cWc6.b,0.65) : "transparent"
+                                border.color: _maSusp.containsMouse ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰒲"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cWc6; opacity: _maSusp.containsMouse ? 1.0 : 1.0
+                                color: root.cPrimary; opacity: _maSusp.containsMouse ? 1.0 : 1.0
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {
@@ -2222,14 +2222,14 @@ ShellRoot {
                                 anchors.fill: parent; radius: 22
                                 color:        _maShut.containsMouse ? root.cOnSecondary : Qt.rgba(root.cOnSecondary.r, root.cOnSecondary.g, root.cOnSecondary.b, 0.75)
                                 border.width: 1
-                                border.color: _maShut.containsMouse ? Qt.rgba(root.cWc6.r, root.cWc6.g, root.cWc6.b,0.65) : "transparent"
+                                border.color: _maShut.containsMouse ? Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b,0.65) : "transparent"
                                 Behavior on color       { ColorAnimation { duration: 130 } }
                                 Behavior on border.color{ ColorAnimation { duration: 130 } }
                             }
                             Text {
                                 anchors.centerIn: parent; text: "󰐥"
                                 font.family: "Symbols Nerd Font Mono"; font.pixelSize: 17
-                                color: root.cWc6; opacity: _maShut.containsMouse ? 1.0 : 1.0
+                                color: root.cPrimary; opacity: _maShut.containsMouse ? 1.0 : 1.0
                                 Behavior on opacity { NumberAnimation { duration: 130 } }
                             }
                             MouseArea {

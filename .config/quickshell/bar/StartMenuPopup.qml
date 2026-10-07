@@ -455,7 +455,7 @@ PanelWindow {
                         border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Text { anchors.centerIn: parent; text: "󰒓"
-                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cWc5 }
+                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cSurfaceTint }
                         MouseArea { id: netSettingsH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: Quickshell.execDetached(["nm-connection-editor"])
                         }
@@ -468,7 +468,7 @@ PanelWindow {
                         border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Text { anchors.centerIn: parent; text: StartMenuState.networkExpanded ? "󰁆" : "󰁄"
-                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cWc5 }
+                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cSurfaceTint }
                         MouseArea { id: nxh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 StartMenuState.networkExpanded = !StartMenuState.networkExpanded
@@ -491,7 +491,7 @@ PanelWindow {
                         border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                         Behavior on color { ColorAnimation { duration: 100 } }
                         Text { anchors.centerIn: parent; text: StartMenuState.btExpanded ? "󰁆" : "󰁄"
-                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cWc5 }
+                            font.pixelSize: 13; font.family: Config.fontFamily; color: Theme.cSurfaceTint }
                         MouseArea { id: bxh; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 StartMenuState.btExpanded = !StartMenuState.btExpanded
@@ -1107,10 +1107,10 @@ PanelWindow {
                     Repeater {
                         model: [
                             { i: "󰳌", c: Theme.cWc13, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh lock",    show: true,     isLogout: false },
-                            { i: "󰒲", c: Theme.cWc14, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh suspend", show: true,     isLogout: false },
+                            { i: "󰒲", c: Theme.cSurfaceTint, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh suspend", show: true,     isLogout: false },
                             { i: "󰈉", c: Theme.cWc11, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh hibernate", show: StartMenuState.hibernateAvailable, isLogout: false },
                             { i: "󰑙", c: Theme.cWc11, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh reboot",  show: true,     isLogout: false },
-                            { i: "󰐥", c: Theme.cWc14, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh shutdown",show: true,     isLogout: false },
+                            { i: "󰐥", c: Theme.cSurfaceTint, cmd: Quickshell.env("HOME") + "/.config/hypr/scripts/power.sh shutdown",show: true,     isLogout: false },
                             { i: "󰗼", c: Theme.cWc13, cmd: "",                                                                 show: true,     isLogout: true }
                         ].filter(item => item.show)
                         delegate: Item {
