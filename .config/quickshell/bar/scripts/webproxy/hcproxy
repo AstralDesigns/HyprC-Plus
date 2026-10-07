@@ -147,11 +147,10 @@ repair() {
     # overwrote quickshell (Candy_Update.sh does not know about hcproxy).
     # Opt-in only: no CA confdir means the user never enabled it. Also
     # re-checks pacman deps (pkexec auth if missing) so non-clean installs
-    # that merely lost files to the update fully recover. The start-phase
-    # notify is the only notification here; the update chain's cleanup
-    # proc already sends the completion notice.
+    # that merely lost files to the update fully recover. Announcement
+    # lives in setup(); the update chain's cleanup proc sends the
+    # completion notice.
     [ -d "$CONFDIR" ] || { echo "hcproxy: not opted in — nothing to repair"; return 0; }
-    notify-send "Web-search Proxy" "Setup in progress ..." 2>/dev/null || true
     install_deps
     import_ca
     write_unit
@@ -162,11 +161,26 @@ repair() {
     echo "✅ hcproxy repaired (deps + unit + flag regenerated; bar relaunch applies the flag)"
 }
 
+setup() {
+    # Update-chain entry point. Devices that installed HyprCandy+ BEFORE
+    # hcproxy existed have neither the unit nor the opt-in marker — they
+    # get the full first-time install (deps + CA + unit + flag), same as a
+    # clean install does. Once hcproxy is present this degrades to 'repair'
+    # (idempotent refresh). notify here so both branches announce once.
+    notify-send "Web-search Proxy" "Setup in progress ..." 2>/dev/null || true
+    if [ -f "$UNIT" ] && [ -d "$CONFDIR" ]; then
+        repair
+    else
+        enable
+    fi
+}
+
 case "${1:-}" in
     enable) enable ;;
     disable) disable ;;
     status) status ;;
     refresh) refresh ;;
     repair) repair ;;
-    *) echo "usage: hcproxy {enable|disable|status|refresh|repair}"; exit 1 ;;
+    setup) setup ;;
+    *) echo "usage: hcproxy {enable|disable|status|refresh|repair|setup}"; exit 1 ;;
 esac
