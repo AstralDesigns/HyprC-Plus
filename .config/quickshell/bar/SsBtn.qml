@@ -16,7 +16,7 @@ Rectangle {
     radius:         10
 
     color: _emphasized
-        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+        ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.8)
         : Qt.rgba(Theme.cSurfHi.r,  Theme.cSurfHi.g,  Theme.cSurfHi.b,  0.35)
     border.color: accent
         ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, _emphasized ? 0.85 : 0.45)

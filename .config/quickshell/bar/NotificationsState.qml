@@ -254,7 +254,7 @@ Item {
                              ap.includes("grimblast")  || ap.includes("grim")
         const isRecording  = ic.includes("record") || ap.includes("record") ||
                              ap.includes("obs")    || ap.includes("wf-recorder") ||
-                             ap.includes("kooha")
+                             ap.includes("gpu-screen-recorder") || ap.includes("kooha")
         if (isScreenshot) {
             ns._launchNautilus(Quickshell.env("HOME") + "/Pictures/Screenshots")
             return
