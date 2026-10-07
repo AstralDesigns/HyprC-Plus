@@ -71,7 +71,7 @@ Type=simple
 ExecStart=/usr/bin/mitmdump -s "$ADDON" --set confdir="$CONFDIR" \\
     --listen-host 127.0.0.1 --listen-port $PORT \\
     --set connection_strategy=lazy --set stream_large_bodies=1m \\
-    --set ignore_hosts=googlevideo \\
+    --set "ignore_hosts=(googlevideo|accounts\\.google\\.|oauth2\\.googleapis\\.com|iam\\.googleapis\\.com)" \\
     --set termlog_verbosity=warn
 Restart=on-failure
 RestartSec=2
