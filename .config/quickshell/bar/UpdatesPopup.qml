@@ -307,8 +307,10 @@ PanelWindow {
             running = false
             _hcScriptRunning = false
             if (code === 0) {
-                if (!_hcAgentBuildProc.running)
-                    _hcAgentBuildProc.running = true
+                // Recolor first (fast, purely visual) — its onExited then
+                // hands off to the agent build → hcproxy setup → cleanup chain.
+                if (!_hcReColorProc.running)
+                    _hcReColorProc.running = true
             }
         }
     }
@@ -354,8 +356,10 @@ PanelWindow {
                 // Only clear state if script was previously running or sentinel was detected
                 if (_hcScriptRunning) {
                     _hcScriptRunning = false
-                    if (!_hcAgentBuildProc.running)
-                        _hcAgentBuildProc.running = true
+                    // Same post-update chain entry point as _hcUpdateProc:
+                    // recolor → agent build → hcproxy setup → cleanup.
+                    if (!_hcReColorProc.running)
+                        _hcReColorProc.running = true
                 }
             }
         }
@@ -431,8 +435,6 @@ PanelWindow {
         onExited: {
             running = false
             UpdatesPopupState.requestRescan()
-            if (!_hcReColorProc.running)
-                _hcReColorProc.running = true
         }
     }
 
@@ -451,13 +453,19 @@ PanelWindow {
     }
 
     // ── Post-update color regeneration ───────────────────────────────────────
-    // Runs wallpaper_integration.sh as the real user after HC+ update completes.
+    // Runs wallpaper_integration.sh as the real user immediately after the
+    // update script completes (so themes refresh before the long build/setup
+    // phases), then hands off to the agent build chain step.
     // QS is already running in the user session so HOME, WAYLAND_DISPLAY and
     // DBUS_SESSION_BUS_ADDRESS are all correct — no pkexec env juggling needed.
     Process {
         id: _hcReColorProc
         command: [Quickshell.env("HOME") + "/.config/hyprcandy/hooks/wallpaper_integration.sh"]
         running: false
-        onExited: running = false
+        onExited: {
+            running = false
+            if (!_hcAgentBuildProc.running)
+                _hcAgentBuildProc.running = true
+        }
     }
 }

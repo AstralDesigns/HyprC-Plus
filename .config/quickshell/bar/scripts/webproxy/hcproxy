@@ -30,10 +30,12 @@ install_deps() {
         echo "==> installing (official repos): ${pkgs[*]}"
         # Headless callers (QML Process from the update chain) have no tty for
         # sudo's prompt — fall back to pkexec, same auth model as the updater.
+        # --noconfirm is mandatory there: pacman's [Y/n] question would hang
+        # forever on the process's non-interactive stdin.
         if [ -t 0 ] || [ -t 1 ]; then
-            sudo pacman -S --needed "${pkgs[@]}"
+            sudo pacman -S --needed --noconfirm "${pkgs[@]}"
         else
-            pkexec pacman -S --needed "${pkgs[@]}"
+            pkexec pacman -S --needed --noconfirm "${pkgs[@]}"
         fi
     fi
 }
