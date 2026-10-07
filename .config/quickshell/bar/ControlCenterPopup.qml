@@ -2398,9 +2398,8 @@ PanelWindow {
                                                     required property int    index
                                                     // Fixed width so all cells align uniformly
                                                     width: 72; height: 52
-                                                    // the user's chosen cava colour (matugen/pywal/wallust)
-                                                    readonly property color _cavaCol: Config.cavaGradientEnabled
-                                                        ? Config.cavaGradientStartColor : Config.cavaGlyphColor
+                                                    // Preview colour for style thumbnails
+                                                    readonly property color _cavaCol: Theme.cSurfaceTint
 
                                                     Column {
                                                         anchors.fill: parent

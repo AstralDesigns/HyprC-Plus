@@ -58,12 +58,20 @@ PanelWindow {
             let activate = null
             let goBack = null
 
-            if (step === "audio") {
-                count = 3
+            if (step === "mode") {
+                count = 2
+                const modes = ["record", "stream"]
+                activate = function(idx) {
+                    if (idx < 2) RecorderPopupState.pickMode(modes[idx])
+                }
+            } else if (step === "audio") {
+                count = 4
                 const modes = ["mic", "system", "none"]
                 activate = function(idx) {
                     if (idx < 3) RecorderPopupState.pickAudio(modes[idx])
+                    else RecorderPopupState.step = "mode"
                 }
+                goBack = function() { RecorderPopupState.step = "mode" }
             } else if (step === "region") {
                 count = 3
                 const regions = ["output", "region"]
@@ -122,8 +130,11 @@ PanelWindow {
             // ── Header icon ───────────────────────────────────────────
             Text {
                 Layout.alignment: Qt.AlignHCenter
-                text: "󰑋"
-                color: Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.9)
+                text: RecorderPopupState.step === "mode" && RecorderPopupState.mode === "stream"
+                    ? "" : "󰑋"
+                color: RecorderPopupState.step === "mode" && RecorderPopupState.mode === "stream"
+                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.9)
+                    : Qt.rgba(Theme.cErr.r, Theme.cErr.g, Theme.cErr.b, 0.9)
                 font.family:    Config.fontFamily
                 font.pixelSize: Config.glyphSize + 4
                 Layout.bottomMargin: 4
@@ -134,6 +145,7 @@ PanelWindow {
                 Layout.alignment: Qt.AlignHCenter
                 text: {
                     switch (RecorderPopupState.step) {
+                        case "mode":   return "Capture Mode"
                         case "audio":  return "Audio Source"
                         case "region": return "Record Area"
                         default:       return "Screen Record"
@@ -144,6 +156,25 @@ PanelWindow {
                 font.pixelSize: Config.infoFontSize + 1
                 font.weight:    Font.DemiBold
                 Layout.bottomMargin: 12
+            }
+
+            // ── Step: mode ────────────────────────────────────────────
+            ColumnLayout {
+                visible: RecorderPopupState.step === "mode"
+                Layout.fillWidth: true
+                spacing: 6
+                SsBtn {
+                    Layout.fillWidth: true
+                    label: "󰑋  Record"
+                    highlighted: card._focusedIndex === 0
+                    onActivated: RecorderPopupState.pickMode("record")
+                }
+                SsBtn {
+                    Layout.fillWidth: true
+                    label: "  Stream"
+                    highlighted: card._focusedIndex === 1
+                    onActivated: RecorderPopupState.pickMode("stream")
+                }
             }
 
             // ── Step: audio ───────────────────────────────────────────
@@ -168,6 +199,13 @@ PanelWindow {
                     label: "󰍭  No Audio"
                     highlighted: card._focusedIndex === 2
                     onActivated: RecorderPopupState.pickAudio("none")
+                }
+                SsBtn {
+                    Layout.fillWidth: true
+                    label: "  Back"
+                    accent: false
+                    highlighted: card._focusedIndex === 3
+                    onActivated: RecorderPopupState.step = "mode"
                 }
             }
 

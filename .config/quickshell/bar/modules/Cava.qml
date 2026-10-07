@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Io
 import ".."
@@ -244,52 +245,72 @@ Item {
         // per-band signal arrives every cava frame; the underscored
         // _bands/_active change signals are not reliably emitted, so we
         // simply repaint on a fixed tick while the canvas is shown).
-        Canvas {
-            id: waveCanvas
-            anchors.centerIn: parent
-            width:  parent.width
-            height: Config.moduleHeight
-            visible: Config.cavaIsPaint
-            renderStrategy: Canvas.Cooperative
+        //
+        // The canvas fills the module to its edges (like ascii) and is masked
+        // to the island radius so it never paints outside the pill.
+    }
 
-            onVisibleChanged: if (visible) requestPaint()
-            onWidthChanged: requestPaint()
-            onHeightChanged: requestPaint()
+    // Painted canvas — sibling of cavaLabelRoot, fills root, masked to island radius.
+    Rectangle {
+        id: cavaPaintMask
+        anchors.fill: parent
+        radius: Config.islandRadius
+        color: "white"
+        opacity: 0
+        layer.enabled: true
+    }
 
-            Connections {
-                target: Config
-                function onCavaStyleChanged()           { if (waveCanvas.visible) waveCanvas.requestPaint() }
-                function onCavaWaveThicknessChanged()   { if (waveCanvas.visible) waveCanvas.requestPaint() }
-                function onCavaWaveSmoothChanged()      { if (waveCanvas.visible) waveCanvas.requestPaint() }
-                function onModuleHeightChanged()         { if (waveCanvas.visible) waveCanvas.requestPaint() }
-                function onCavaGradientEnabledChanged() { if (waveCanvas.visible) waveCanvas.requestPaint() }
-                function onCavaActiveOpacityChanged()   { if (waveCanvas.visible) waveCanvas.requestPaint() }
-                function onCavaInactiveOpacityChanged() { if (waveCanvas.visible) waveCanvas.requestPaint() }
-            }
-
-            onPaint: {
-                if (!visible) return
-                const ctx = getContext("2d")
-                ctx.reset()
-                // The right module mirrors its band data (cava reverse=1), so the
-                // horizontal colour ramp must mirror too: end-colour leads and
-                // the start-colour trails, keeping both modules symmetric about
-                // the bar centre.
-                const mirrored = root.side === "right"
-                CP.paint(ctx, Config.cavaPaintMap[Config.cavaStyle], root._bands,
-                         width, height,
-                         { c0: root._rgba(mirrored ? root._colorBot : root._colorTop),
-                           c1: root._rgba(mirrored ? root._colorTop : root._colorBot),
-                           thickness: Config.cavaWaveThickness,
-                           smooth: Config.cavaWaveSmooth })
-            }
+    Canvas {
+        id: waveCanvas
+        anchors.fill: parent
+        visible: Config.cavaIsPaint
+        renderStrategy: Canvas.Cooperative
+        layer.enabled: visible
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: cavaPaintMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1.0
         }
 
-        Timer {
-            interval: 16
-            repeat: true
-            running: waveCanvas.visible && root._procShouldRun
-            onTriggered: waveCanvas.requestPaint()
+        onVisibleChanged: if (visible) requestPaint()
+        onWidthChanged: requestPaint()
+        onHeightChanged: requestPaint()
+
+        Connections {
+            target: Config
+            function onCavaStyleChanged()           { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            function onCavaWaveThicknessChanged()   { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            function onCavaWaveSmoothChanged()      { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            function onModuleHeightChanged()         { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            function onIslandRadiusChanged()        { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            function onCavaGradientEnabledChanged() { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            function onCavaActiveOpacityChanged()   { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            function onCavaInactiveOpacityChanged() { if (waveCanvas.visible) waveCanvas.requestPaint() }
         }
+
+        onPaint: {
+            if (!visible) return
+            const ctx = getContext("2d")
+            ctx.reset()
+            // The right module mirrors its band data (cava reverse=1), so the
+            // horizontal colour ramp must mirror too: end-colour leads and
+            // the start-colour trails, keeping both modules symmetric about
+            // the bar centre.
+            const mirrored = root.side === "right"
+            CP.paint(ctx, Config.cavaPaintMap[Config.cavaStyle], root._bands,
+                     width, height,
+                     { c0: root._rgba(mirrored ? root._colorBot : root._colorTop),
+                       c1: root._rgba(mirrored ? root._colorTop : root._colorBot),
+                       thickness: Config.cavaWaveThickness,
+                       smooth: Config.cavaWaveSmooth })
+        }
+    }
+
+    Timer {
+        interval: 16
+        repeat: true
+        running: waveCanvas.visible && root._procShouldRun
+        onTriggered: waveCanvas.requestPaint()
     }
 }

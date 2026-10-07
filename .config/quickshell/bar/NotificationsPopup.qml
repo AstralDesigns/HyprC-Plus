@@ -117,12 +117,30 @@ Item {
                     // Card surface
                     Rectangle {
                         anchors.fill:parent; radius:parent._radius
-                        color: _hov ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
-                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.25)
+                        color: _hov ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.80)
+                            : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.80)
                         border.width:1
                         border.color: notif.urgency>=2 ? Qt.rgba(Theme.cErr.r,Theme.cErr.g,Theme.cErr.b,0.6)
                             : notif.category==="bt" ? Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.5)
                             : Qt.rgba(Theme.cOutVar.r,Theme.cOutVar.g,Theme.cOutVar.b,0.38)
+                        Behavior on color { ColorAnimation { duration:100 } }
+                    }
+
+                    // Inner floating panel — OnSecondary 0.50 / 0.80 on hover.
+                    // 8px clearance all around; left side measures from the
+                    // urgency bar (6px wide) outward, radius fixed at 12.
+                    Rectangle {
+                        anchors {
+                            left: parent.left; right: parent.right
+                            top: parent.top;   bottom: parent.bottom
+                            leftMargin: 8    // 6px urgency bar + 2px gap
+                            rightMargin: 6
+                            topMargin: 6
+                            bottomMargin: 6
+                        }
+                        radius: 12
+                        color: _hov ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.80)
+                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.50)
                         Behavior on color { ColorAnimation { duration:100 } }
                     }
 
