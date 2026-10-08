@@ -25,6 +25,7 @@ ShellRoot {
     property string _m3primary:                 ""
     property string _m3onPrimary:               ""
     property string _m3onSecondary:             ""
+    property string _m3secondary:               ""
     property string _m3secondaryContainer:      ""
     property string _m3onSecondaryContainer:    ""
     property string _m3background:              ""
@@ -46,6 +47,7 @@ ShellRoot {
     readonly property color cOnPrimary: Qt.color(_m3onPrimary)
     readonly property color cSecCont:   Qt.color(_m3secondaryContainer)
     readonly property color cOnSecCont: Qt.color(_m3onSecondaryContainer)
+    readonly property color cSecondary:   Qt.color(_m3secondary)
     readonly property color cOnSecondary: Qt.color(_m3onSecondary)
     readonly property color cOutline:   Qt.color(_m3outline)
     readonly property color cOutlineVar:Qt.color(_m3outlineVariant)
@@ -68,6 +70,7 @@ ShellRoot {
                 case "m3primary":             root._m3primary = val; break
                 case "m3onPrimary":           root._m3onPrimary = val; break
                 case "m3onSecondary":         root._m3onSecondary = val; break
+                case "m3secondary":           root._m3secondary = val; break
                 case "m3secondaryContainer":  root._m3secondaryContainer = val; break
                 case "m3onSecondaryContainer":root._m3onSecondaryContainer = val; break
                 case "m3background":          root._m3background = val; break
@@ -103,6 +106,8 @@ ShellRoot {
     property int    focusedIdx:      0
     property var    allWallpapers:   []
     property var    filtered:        []
+    property string lightboxPath:    ""
+    property var    lightboxWh:      null   // Wallhaven modelData when previewing a remote item; null for local
     property bool   sidebarOpen:     false
 
     // ── Sidebar directory browsing state ─────────────────────────────────────
@@ -520,6 +525,30 @@ ShellRoot {
                 _path = next
                 running = true
             }
+        }
+    }
+
+    // Delete a local wallpaper file, then drop it from the in-memory list,
+    // clear the active badge if it was the live wallpaper, close the lightbox
+    // if it was previewing this file, and re-filter the grid.
+    function deleteWallpaper(path) {
+        if (!path) return
+        deleteProc._path = path
+        if (deleteProc.running) deleteProc.running = false
+        Qt.callLater(function() { deleteProc.running = true })
+    }
+
+    Process {
+        id: deleteProc
+        property string _path: ""
+        command: ["bash", "-c", "rm -f -- \"$1\"", "--", _path]
+        onExited: function() {
+            const i = root.allWallpapers.indexOf(_path)
+            if (i >= 0) root.allWallpapers.splice(i, 1)
+            root.allWallpapers = root.allWallpapers.slice()
+            if (root.currentWallpaper === _path) root.currentWallpaper = ""
+            if (root.lightboxPath === _path) root.lightboxPath = ""
+            root.applyFilter()
         }
     }
 
@@ -1068,6 +1097,20 @@ ShellRoot {
                                         color: root.cOnSurface
                                         font.pixelSize: 14
                                         verticalAlignment: TextInput.AlignVCenter
+                                        // Show the caret even when the field has
+                                        // not been re-focused this frame (the
+                                        // grid MouseAreas briefly steal focus
+                                        // during hover, which otherwise hides
+                                        // the caret and makes in-text editing
+                                        // look impossible).
+                                        cursorVisible: true
+                                        // Native TextInput already handles
+                                        // Left/Right, Home/End, Ctrl+Left/Right
+                                        // (word nav), Ctrl+A (select all) and
+                                        // Shift+<arrow> (extend selection) as
+                                        // long as we do NOT override them from
+                                        // the Keys attached property below.
+                                        activeFocusOnPress: true
                                         selectionColor: Qt.rgba(
                                             root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.35)
                                         selectedTextColor: root.cOnSurface
@@ -1089,15 +1132,29 @@ ShellRoot {
                                         }
                                         Component.onCompleted: forceActiveFocus()
                                         Keys.onEscapePressed: {
-                                            if (root.animPopupOpen) root.animPopupOpen = false
+                                            if (root.lightboxPath !== "") root.lightboxPath = ""
+                                            else if (root.animPopupOpen) root.animPopupOpen = false
                                             else if (root.ratioPopupOpen) root.ratioPopupOpen = false
                                             else if (root.sidebarOpen) root.sidebarOpen = false
                                             else root._quit()
                                         }
-                                        Keys.onUpPressed:    function(e) { root.moveFocus(-gridView.cols); e.accepted = true }
-                                        Keys.onDownPressed:  function(e) { root.moveFocus(+gridView.cols); e.accepted = true }
-                                        Keys.onLeftPressed:  function(e) { root.moveFocus(-1); e.accepted = true }
-                                        Keys.onRightPressed: function(e) { root.moveFocus(+1); e.accepted = true }
+                                        // Up/Down iterate the filtered results
+                                        // one cell at a time (was ±cols, which
+                                        // was spatial row-jumping and confusing
+                                        // for keyboard-only selection).
+                                        Keys.onUpPressed:    function(e) { root.moveFocus(-1); e.accepted = true }
+                                        Keys.onDownPressed:  function(e) { root.moveFocus(+1); e.accepted = true }
+                                        // Tab / Shift+Tab jump a whole row so
+                                        // users can still spatially scan the
+                                        // grid when they want to, without
+                                        // stealing Left/Right from the caret.
+                                        Keys.onTabPressed:     function(e) { root.moveFocus(+gridView.cols); e.accepted = true }
+                                        Keys.onBacktabPressed: function(e) { root.moveFocus(-gridView.cols); e.accepted = true }
+                                        // Home / End move the caret natively; if
+                                        // the user really wants to jump to the
+                                        // first / last wallpaper they can use
+                                        // Ctrl+Home / Ctrl+End (unbound here so
+                                        // we do not intercept either).
                                         Keys.onReturnPressed: {
                                             if (root.activeTab === "wallhaven") {
                                                 root.fetchWallhaven(searchIn.text)
@@ -1630,12 +1687,52 @@ ShellRoot {
                                     }
                                 }
 
+                                // Delete badge — top-left of the tile (opposite the
+                                // applied checkmark), 20×20 / rFull. Secondary bg
+                                // (brightens on hover), OnSecondary trash glyph.
+                                // Shown on hover/focus so idle tiles stay clean;
+                                // z:20 + its own MouseArea keeps it above the
+                                // tile's click-to-apply layer.
+                                Rectangle {
+                                    anchors {
+                                        top:    thumbCard.top
+                                        left:   thumbCard.left
+                                        topMargin:   6
+                                        leftMargin:  6
+                                    }
+                                    width: 20; height: 20; radius: root.rFull
+                                    color: delArea.containsMouse
+                                        ? Qt.lighter(root.cSecondary, 1.18) : root.cSecondary
+                                    visible: thumb.isFocused
+                                    z: 20
+                                    Text {
+                                        anchors.centerIn: parent; text: "\u{F0A7A}"
+                                        color: root.cOnSecondary
+                                        font.pixelSize: 11; font.family: "Symbols Nerd Font Mono"
+                                    }
+                                    MouseArea {
+                                        id: delArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: root.deleteWallpaper(thumb.path)
+                                    }
+                                }
+
                                 MouseArea {
                                     anchors.fill: thumbCard
                                     hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                                     cursorShape: Qt.PointingHandCursor
                                     onEntered: root.focusedIdx = thumb.index
-                                    onClicked: root.applyWallpaper(thumb.path)
+                                    onClicked: function(mouse) {
+                                        if (mouse.button === Qt.RightButton) {
+                                            root.lightboxWh = null
+                                            root.lightboxPath = thumb.path
+                                        } else {
+                                            root.applyWallpaper(thumb.path)
+                                        }
+                                    }
                                 }
                             } // delegate Item
 
@@ -1828,11 +1925,20 @@ ShellRoot {
                                         MouseArea {
                                             anchors.fill: parent
                                             hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
                                             cursorShape: Qt.PointingHandCursor
                                             onEntered: whThumb.imgHovered = true
                                             onExited:  whThumb.imgHovered = false
-                                            onClicked: {
-                                                if (whThumb.isDownloaded) {
+                                            onClicked: function(mouse) {
+                                                if (mouse.button === Qt.RightButton) {
+                                                    // Preview the full-res image in the
+                                                    // shared lightbox; remember the source
+                                                    // item so Apply downloads + applies it.
+                                                    if (whThumb.modelData.path) {
+                                                        root.lightboxWh = whThumb.modelData
+                                                        root.lightboxPath = whThumb.modelData.path
+                                                    }
+                                                } else if (whThumb.isDownloaded) {
                                                     root.applyWallpaper(whThumb.downloadedPath)
                                                 } else {
                                                     root.downloadWallhaven(whThumb.modelData, true)
@@ -2218,6 +2324,137 @@ ShellRoot {
                     } // ratioPopup
 
                 } // Rectangle panelContent
+
+                // ── Lightbox preview (right-click a local tile) ──────────────
+                // Top-most child of `panel` so it renders inside the layershell
+                // mask (mask: Region { item: panel }). Scrim click-away and Escape
+                // (see searchIn) both dismiss; Apply promotes the preview to the
+                // live wallpaper and closes.
+                Rectangle {
+                    id: lightbox
+                    anchors.fill: parent
+                    visible: root.lightboxPath !== ""
+                    color: Qt.rgba(0, 0, 0, 0.74)
+                    z: 400
+
+                    // Scrim: a click anywhere that isn't the card below closes.
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: root.lightboxPath = ""
+                    }
+
+                    Column {
+                        id: lbCol
+                        anchors.centerIn: parent
+                        spacing: 12
+
+                        // Aspect-fit within the panel preserving AR; falls back to
+                        // a modest default box until sourceSize resolves.
+                        property real availW: panel.width  - 120
+                        property real availH: panel.height - 180
+                        property real iw: lbImg.sourceSize.width  > 0 ? lbImg.sourceSize.width  : 16
+                        property real ih: lbImg.sourceSize.height > 0 ? lbImg.sourceSize.height : 9
+                        property real fit: Math.min(availW / iw, availH / ih, 1)
+                        property real boxW: Math.max(240, Math.min(availW, iw * fit))
+                        property real boxH: Math.max(140, Math.min(availH, ih * fit))
+
+                        Rectangle {
+                            id: lbCard
+                            width: lbCol.boxW
+                            height: lbCol.boxH
+                            radius: 20
+                            color: "#111111"
+                            clip: true
+                            // QtQuick clip is rectangular and ignores radius, so the
+                            // 20px rounding comes from a MultiEffect layer mask.
+                            layer.enabled: true
+                            layer.effect: MultiEffect {
+                                maskEnabled: true
+                                maskSource: lbMask
+                                maskThresholdMin: 0.5
+                                maskSpreadAtMin: 1.0
+                            }
+
+                            Image {
+                                id: lbImg
+                                anchors.fill: parent
+                                source: root.lightboxPath === "" ? ""
+                                    : (root.lightboxPath.indexOf("http") === 0
+                                        ? root.lightboxPath : "file://" + root.lightboxPath)
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                cache: true
+                                smooth: true
+                                mipmap: false
+                            }
+
+                            // Swallow clicks on the image so they don't fall
+                            // through to the scrim (which would close the preview).
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {}
+                            }
+
+                            // Rounded-corner mask source (20px) sampled by the
+                            // MultiEffect above; invisible in the scene graph.
+                            Item {
+                                id: lbMask
+                                anchors.fill: parent
+                                opacity: 0
+                                layer.enabled: true
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 20
+                                    color: "white"
+                                }
+                            }
+                        }
+
+                        RowLayout {
+                            width: lbCol.boxW
+                            spacing: 10
+
+                            Text {
+                                Layout.fillWidth: true
+                                text: root.lightboxPath.split("/").pop()
+                                color: root.cOnSecCont
+                                font.pixelSize: 13
+                                elide: Text.ElideRight
+                            }
+
+                            Rectangle {
+                                Layout.preferredWidth: applyText.implicitWidth + 28
+                                Layout.preferredHeight: 32
+                                radius: root.rFull
+                                color: lbApplyArea.containsMouse
+                                    ? Qt.lighter(root.cPrimary, 1.12) : root.cPrimary
+                                Text {
+                                    id: applyText
+                                    anchors.centerIn: parent
+                                    text: "\u{F0420} Apply"
+                                    color: root.cOnPrimary
+                                    font.pixelSize: 12
+                                    font.family: "Symbols Nerd Font Mono"
+                                }
+                                MouseArea {
+                                    id: lbApplyArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        if (root.lightboxWh)
+                                            root.downloadWallhaven(root.lightboxWh, true)
+                                        else
+                                            root.applyWallpaper(root.lightboxPath)
+                                        root.lightboxPath = ""
+                                        root.lightboxWh = null
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } // lightbox
+
             } // Item mainWindow
         } // popupContent
     } // PanelWindow
