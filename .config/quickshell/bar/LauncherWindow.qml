@@ -975,6 +975,66 @@ Item {
                 Qt.callLater(win.webRefreshCredOrigins)
             }
 
+            // Enforcement-page auto-recovery: clears YouTube's HttpOnly session
+            // cookies from the on-disk Chromium profile DB, purges the HTTP cache,
+            // then destroys and recreates the view so Chromium re-reads the cookie
+            // store from disk (the in-memory jar ignores external DB writes).
+            // Called from adblock.js via a console signal when the "Ad blockers
+            // violate ToS" page is detected.
+            property int _fabRecoveryPending: -1
+            property var _fabRecoveryTimer: null
+            function _clearYouTubeCookiesAndReload(tabId) {
+                if (win._fabRecoveryPending >= 0) return // already in progress
+                win._fabRecoveryPending = tabId
+                webCredClearProc._host = ".youtube.com"
+                webCredClearProc.running = false
+                webCredClearProc.running = true
+                if (win.webProfile) {
+                    win.webProfile.clearHttpCache()
+                    // Nuke the in-memory cookie jar by flipping the persistent
+                    // policy off-then-on. Chromium drops its cookie cache when
+                    // the policy switches to NoPersistentCookies, so the next
+                    // view we build starts with a clean cookie context.
+                    win.webProfile.persistentCookiesPolicy =
+                        WebEngineProfile.NoPersistentCookies
+                }
+                // Destroy the affected view IMMEDIATELY so Chromium releases the
+                // renderer + its cached cookie jar for this origin. Then wait a
+                // short beat for the sqlite write to land and the policy toggle
+                // to propagate, then recreate the view (which navigates to
+                // `tab.url` again). Cache-bust with a timestamp param so
+                // Chromium's disk cache can't serve the flagged enforcement HTML.
+                win._destroyView(tabId)
+                if (win._fabRecoveryTimer) win._fabRecoveryTimer.stop()
+                win._fabRecoveryTimer = Qt.createQmlObject('
+                    import QtQuick; import QtQml; Timer {}', win)
+                win._fabRecoveryTimer.interval = 700
+                win._fabRecoveryTimer.singleShot = true
+                win._fabRecoveryTimer.triggered.connect(function () {
+                    if (win.webProfile) {
+                        win.webProfile.persistentCookiesPolicy =
+                            WebEngineProfile.ForcePersistentCookies
+                    }
+                    var t = win._tabById(tabId)
+                    if (t) {
+                        // Strip any previous cache-buster, then append a fresh
+                        // timestamp so the next navigation is guaranteed cold.
+                        var u = String(t.url || "")
+                        u = u.replace(/[?&]_hcR=\d+/g, "")
+                        if (u && u.indexOf("youtube.com") > -1) {
+                            u += (u.indexOf("?") > -1 ? "&" : "?") +
+                                 "_hcR=" + Date.now()
+                            t.url = u
+                        }
+                        var v = win._ensureView(t)
+                        if (v) v.url = t.url
+                        win._syncViewVisibility()
+                    }
+                    win._fabRecoveryPending = -1
+                })
+                win._fabRecoveryTimer.start()
+            }
+
             Process {
                 id: agentServerProc
                 command: ["python3", Config.barDir + "/agent_loopback_server.py"]
@@ -3609,6 +3669,13 @@ Item {
                                                 // context, Permissions-Policy). Drop info/warning wholesale and the
                                                 // recurring harmless errors, but surface any other real JS error.
                                                 onJavaScriptConsoleMessage: function (level, message, lineNumber, sourceID) {
+                                                    // Enforcement-page recovery signal from adblock.js:
+                                                    // clear YouTube cookies from the persistent profile
+                                                    // and reload (HttpOnly cookies are unreachable from JS).
+                                                    if (message === "__HC_FAB_CLEAR__") {
+                                                        win._clearYouTubeCookiesAndReload(tabId)
+                                                        return
+                                                    }
                                                     if (level < 2) return
                                                     if (message.indexOf("allow-scripts") > -1) return
                                                     if (message.indexOf("ResizeObserver loop") > -1) return

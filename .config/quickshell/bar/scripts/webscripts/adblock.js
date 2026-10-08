@@ -73,8 +73,25 @@
             var _val = undefined;
             Object.defineProperty(window, "ytInitialPlayerResponse", {
                 configurable: true,
+                enumerable: true,
                 get: function () { return _val; },
-                set: function (v) { _val = prunePR(v); }
+                set: function (v) {
+                    var pruned = prunePR(v);
+                    // After the first assignment, swap the accessor for a
+                    // plain writable data property so YouTube's fab probe
+                    // (which reads `Object.getOwnPropertyDescriptor(window,
+                    // 'ytInitialPlayerResponse')` and rejects on `get`/`set`
+                    // being present) sees a shape identical to a native
+                    // inline `var ytInitialPlayerResponse = {...}` write.
+                    // The strip-once semantic is enough because the property
+                    // is only assigned once per page load.
+                    try {
+                        Object.defineProperty(window, "ytInitialPlayerResponse", {
+                            configurable: true, enumerable: true,
+                            writable: true, value: pruned
+                        });
+                    } catch (e) { _val = pruned; }
+                }
             });
         } catch (e) {}
         // Expose prunePR for the fetch interceptor below
@@ -194,6 +211,17 @@
     // the full-page "Ad blockers violate ToS" enforcement. Stubbing with 200 +
     // empty body makes the player think ads loaded successfully while showing
     // nothing (same technique as uBlock's redirect=nooptext and Brave's rules).
+    // ── YouTube ad/detection endpoints: PASS THROUGH, STUB RESPONSE ───────
+    // These are the endpoints YouTube's fab (anti-adblock) detection monitors
+    // for beacon traffic. Two failure modes matter:
+    //   * Rejecting (our old BLOCK behaviour) = strongest adblock signal.
+    //   * Locally stubbing WITHOUT network = server sees zero beacons = still
+    //     triggers the flag (this was the bug behind "loaded directly into
+    //     enforcement page" even with the shield on).
+    // Correct pattern (uBlock `redirect=nooptext`, Brave `important`): let the
+    // request physically hit Google/YouTube's servers so the server's beacon
+    // log is satisfied, then hand the JS caller an empty 200 body so no ad
+    // creative renders or executes.
     var FAB = [
         "youtube.com/pagead/",          // ad delivery + lvz detection beacon
         "youtube.com/api/stats/ads",    // ad playback tracking
@@ -202,7 +230,9 @@
         "youtube.com/ytranking",
         "youtube.com/ytooffers",
         "/adsid/", "/abstatus", "/antiadblock",
-        "youtube.com/ptracking"         // ad beacon player waits on
+        "youtube.com/ptracking",        // ad beacon player waits on
+        "youtube.com/api/stats",        // generic playback telemetry
+        "youtube.com/watch_time"        // watch-time beacon
     ];
     var FAB_EMPTY = "";
     function isFab(u) {
@@ -210,6 +240,23 @@
         u = ("" + u).toLowerCase();
         for (var i = 0; i < FAB.length; i++)
             if (u.indexOf(FAB[i]) > -1) return true;
+        return false;
+    }
+    // FAB exceptions: patterns that MUST still hard-block (never hit network)
+    // even if they'd otherwise match a FAB entry. Anything under
+    // `googlesyndication.com/` other than the two beacon paths above is a
+    // third-party ad delivery endpoint we reject silently.
+    var FAB_EXCEPT = [
+        "googlesyndication.com/pagead/ads",
+        "googlesyndication.com/iframe",
+        "googlesyndication.com/dai/",
+        "googlesyndication.com/bundle/"
+    ];
+    function isFabExcept(u) {
+        if (!u) return false;
+        u = ("" + u).toLowerCase();
+        for (var i = 0; i < FAB_EXCEPT.length; i++)
+            if (u.indexOf(FAB_EXCEPT[i]) > -1) return true;
         return false;
     }
 
@@ -301,9 +348,30 @@
         window.fetch = function (a) {
             var u = (a && a.url) || a;
             var sb = stubFor(u);
-            if (isFab(u)) { blocked(); return Promise.resolve(new Response(FAB_EMPTY,
-                    { status: 200, statusText: "OK",
-                      headers: { "content-type": "text/plain" } })); }
+            // FAB: let the beacon physically hit Google/YouTube's servers so
+            // their ad-handling telemetry log is satisfied, but hand the
+            // caller an empty 200 body so no ad creative is parsed. Only
+            // skip the network if it also matches a hard-block exception
+            // (third-party ad delivery) or `bad()` on top of FAB.
+            if (isFab(u) && !isFabExcept(u)) {
+                blocked();
+                var args = arguments;
+                try {
+                    return _fetch.apply(this, args).then(function () {
+                        return new Response(FAB_EMPTY,
+                            { status: 200, statusText: "OK",
+                              headers: { "content-type": "text/plain" } });
+                    }).catch(function () {
+                        return new Response(FAB_EMPTY,
+                            { status: 200, statusText: "OK",
+                              headers: { "content-type": "text/plain" } });
+                    });
+                } catch (e) {
+                    return Promise.resolve(new Response(FAB_EMPTY,
+                        { status: 200, statusText: "OK",
+                          headers: { "content-type": "text/plain" } }));
+                }
+            }
             if (sb !== null) {
                 blocked();
                 return Promise.resolve(new Response(sb,
@@ -348,17 +416,33 @@
         var _send = XMLHttpRequest.prototype.send;
         XMLHttpRequest.prototype.open = function (m, u) {
             this.__hcU = u;
-            this.__hcF = isFab(u);
-            this.__hcB = !this.__hcF && bad(u); if (this.__hcB) blocked();
-            this.__hcM = this.__hcF ? FAB_EMPTY : stubFor(u);
+            this.__hcF = isFab(u) && !isFabExcept(u);
+            this.__hcFx = isFabExcept(u);
+            this.__hcB = (!this.__hcF && !this.__hcFx) && bad(u);
+            if (this.__hcB) blocked();
+            // Non-FAB stubs (get_midroll_info etc.) still short-circuit send().
+            this.__hcM = this.__hcF ? null : stubFor(u);
             if (this.__hcF) blocked();
             return _open.apply(this, arguments);
         };
         XMLHttpRequest.prototype.send = function () {
+            // FAB: let the real network call fire so Google/YouTube's servers
+            // see the beacon, but shadow `response`/`responseText` getters on
+            // this instance so any read (sync or in onload) returns empty.
+            if (this.__hcF) {
+                var self = this;
+                try {
+                    Object.defineProperty(self, "response",
+                        { configurable: true, get: function () { return FAB_EMPTY; } });
+                    Object.defineProperty(self, "responseText",
+                        { configurable: true, get: function () { return FAB_EMPTY; } });
+                } catch (e) {}
+                return _send.apply(self, arguments);
+            }
+            if (this.__hcFx || this.__hcB) { try { this.abort(); } catch (e) {} return; }
             if (this.__hcM !== null && this.__hcM !== undefined) {
                 hcFakeJsonXhr(this, this.__hcM); return;
             }
-            if (this.__hcB) { try { this.abort(); } catch (e) {} return; }
             return _send.apply(this, arguments);
         };
     }
@@ -367,6 +451,10 @@
     if (navigator.sendBeacon) {
         var _beacon = navigator.sendBeacon.bind(navigator);
         navigator.sendBeacon = function (u, d) {
+            // FAB beacons physically reach the server (this is the whole point
+            // of the pass-through design). Only hard-block matches are dropped.
+            if (isFabExcept(u)) { blocked(); return false; }
+            if (isFab(u)) { blocked(); return _beacon(u, d); }
             if (bad(u)) { blocked(); return false; }
             return _beacon(u, d);
         };
@@ -548,6 +636,7 @@
     function start() {
         injectCss();
         ytGuard();
+        fabRecovery();
         if (document.documentElement) {
             var mo = new MutationObserver(function (ms) {
                 for (var i = 0; i < ms.length; i++) {
@@ -563,5 +652,156 @@
         if (document.readyState === "loading")
             document.addEventListener("DOMContentLoaded", injectCss, true);
     }
+
+    // ── Enforcement page auto-recovery ─────────────────────────────────────
+    // YouTube's server tracks whether the client acknowledged adSlots. Our
+    // ytInitialPlayerResponse interceptor strips them before the player reads
+    // them, so the player never makes ad requests. The server notices "adSlots
+    // were served but no ad requests followed" and on the NEXT page load may
+    // serve the full-page "Ad blockers violate ToS" enforcement instead of the
+    // watch page (no player, no ytInitialPlayerResponse to intercept).
+    //
+    // Recovery: detect the enforcement page by its unique DOM signature,
+    // signal QML to clear YouTube cookies from the on-disk Chromium profile,
+    // destroy + recreate the view, and re-navigate with a `_hcR=<ts>`
+    // cache-buster. The cache-buster doubles as a counter reset: our attempt
+    // history lives in sessionStorage keyed by `_hcR` timestamp, so any
+    // QML-driven reload starts fresh (the counter only bounds loops when
+    // QML is *not* reloading, i.e. when the view is broken).
+    function fabRecovery() {
+        var h = location.hostname;
+        if (!/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return;
+        // QML appends `_hcR=<ms>` on every cache-busted reload. Any URL that
+        // already contains it means "this navigation is a fresh attempt" so
+        // we clear the local counter before starting again.
+        try {
+            if (/[?&]_hcR=\d+/.test(location.href)) sessionStorage.removeItem("__hcFabR");
+        } catch (e) {}
+        var RELOAD_KEY = "__hcFabR";
+        var attempts = 0;
+        try { attempts = parseInt(sessionStorage.getItem(RELOAD_KEY) || "0"); } catch (e) {}
+        // Recursive walker that pierces every shadow root so text inside
+        // <ytd-app>#shadowRoot > <yt-enforcement-message-view-model> is
+        // actually inspected. body.innerText stops at shadow boundaries,
+        // which is why the previous detection silently failed.
+        function deepScanText(node, out) {
+            if (!node) return out;
+            if (node.nodeType === 3) { out.push(node.nodeValue || ""); return out; }
+            if (node.shadowRoot) deepScanText(node.shadowRoot, out);
+            var c = node.firstChild;
+            while (c) { deepScanText(c, out); c = c.nextSibling; }
+            return out;
+        }
+        function deepQuery(sel) {
+            // Breadth-first including shadow roots; returns array of matches.
+            var found = [];
+            var queue = [document.documentElement];
+            while (queue.length) {
+                var n = queue.shift();
+                if (!n) continue;
+                try {
+                    if (n.querySelectorAll) {
+                        var m = n.querySelectorAll(sel);
+                        for (var i = 0; i < m.length; i++) found.push(m[i]);
+                    }
+                } catch (e) {}
+                if (n.shadowRoot) queue.push(n.shadowRoot);
+                var c = n.firstChild;
+                while (c) { if (c.nodeType === 1) queue.push(c); c = c.nextSibling; }
+            }
+            return found;
+        }
+        function isEnforcementPage() {
+            // Positive signal: any of the known enforcement renderers, in
+            // light or shadow DOM. Negative signal: a live player element
+            // means we're on a watch page, not the wall.
+            if (document.querySelector("#movie_player, .html5-video-player")) return false;
+            var renderers = deepQuery(
+                "ytd-enforcement-message-renderer," +
+                "yt-enforcement-message-view-model," +
+                "ytd-yto-offer-renderer," +
+                "tp-ytd-app .yt-enforcement-message");
+            if (renderers.length) return true;
+            var body = document.body;
+            if (!body) return false;
+            var chunks = deepScanText(body, []);
+            var t = chunks.join(" ");
+            return /ad.blockers?.{0,40}violate|Allow YouTube Ads|disable.{0,20}ad blocker/i.test(t);
+        }
+        function recover() {
+            if (attempts >= 3) return; // hard cap: 3 tries per URL before we give up
+            attempts++;
+            try { sessionStorage.setItem(RELOAD_KEY, String(attempts)); } catch (e) {}
+            // Signal QML to clear HttpOnly cookies from the profile DB and
+            // destroy/recreate the view (the only reliable way to flush
+            // Chromium's in-memory cookie jar after an external DB write).
+            // QML handles the reload; we do NOT navigate here (avoids race).
+            console.error("__HC_FAB_CLEAR__");
+        }
+        // Check after DOM is ready
+        function check() {
+            if (isEnforcementPage()) recover();
+        }
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", function () {
+                setTimeout(check, 800); // let the page fully render
+            });
+        } else {
+            setTimeout(check, 800);
+        }
+    }
+
+    // ── Proactive ad acknowledgement beacon ─────────────────────────────────
+    // Fire a real network GET to youtube.com/api/stats/ads on every YouTube
+    // page load, regardless of whether a player initialised. This is the
+    // "beacon traffic is flowing" signal YouTube's fab (anti-adblock) server
+    // looks for. If we only fire when a video plays, sessions that hit
+    // "An error occurred" (e.g. after the launcher hid the view and drained
+    // the buffer) never emit the beacon -> next navigation lands on the
+    // full-page enforcement wall. `mode: "no-cors"` lets the request reach
+    // YouTube's servers without needing CORS; we don't read the response.
+    function fabAck() {
+        var h = location.hostname;
+        if (!/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return;
+        function send() {
+            var vid = "";
+            try {
+                var m = location.href.match(/[?&]v=([A-Za-z0-9_-]{6,})/);
+                vid = m ? m[1] : ((window.ytInitialPlayerResponse || {}).videoId || "hc");
+            } catch (e) { vid = "hc"; }
+            try {
+                var url = "https://www.youtube.com/api/stats/ads?docid=" + vid +
+                    "&event=adimp&ad_id=0&num_ads=0&ads_skipped=0";
+                if (typeof _fetch === "function") {
+                    _fetch(url, { method: "GET", mode: "no-cors", keepalive: true,
+                                  credentials: "include" });
+                } else if (typeof _beacon === "function") {
+                    _beacon(url);
+                }
+            } catch (e) {}
+            // Also fire a pagead/lvz viewable-impression beacon so Google's
+            // ad framework sees the request; use native src setter to bypass
+            // our own HTMLImageElement patch (which would reject third-party
+            // doubleclick/googlesyndication URLs).
+            try {
+                var img = new Image(1, 1);
+                var d = Object.getOwnPropertyDescriptor(
+                    HTMLImageElement.prototype, "src");
+                if (d && d.set) d.set.call(img,
+                    "https://www.youtube.com/pagead/lvz?ai=0&v=" + vid + "&sz=1x1");
+            } catch (e) {}
+        }
+        // Fire on DOMContentLoaded OR immediately if already ready.
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", send, { once: true });
+        } else {
+            send();
+        }
+        // Retry once a bit later so the beacon still fires if the player
+        // initialises after our first send (and gets a real videoId).
+        setTimeout(send, 3500);
+    }
+
     start();
+    fabAck();
 })();
