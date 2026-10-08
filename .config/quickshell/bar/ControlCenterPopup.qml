@@ -3249,7 +3249,7 @@ PanelWindow {
                             // ── Opacity slider ───────────────────────────────────
                             CCSlider {
                                 label: "Opacity"
-                                from: 0.0; to: 1.0; stepSize: 0.05; decimals: 2
+                                from: 0.0; to: 0.95; stepSize: 0.05; decimals: 2
                                 value: ccWin.hyprOpacVal
                                 onMoved: function(v) {
                                     ccWin._hyprOpacSlider = v

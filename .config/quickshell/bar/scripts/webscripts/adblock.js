@@ -42,6 +42,55 @@
         };
     } catch (e) {}
 
+    // ── anti-adblock-detection spoof ────────────────────────────────────────
+    // YouTube probes for ad blockers via 3 vectors:
+    //   (a) `window.adsbygoogle` must exist with .loaded/.push/.exec shape
+    //   (b) `<ins class="adsbygoogle">` test element must NOT be display:none
+    //   (c) `pagead/lvz` + `adsystem` beacon fetches must resolve with 200
+    // We satisfy all three without ever actually loading an ad: define the
+    // globals as no-op shims, leave `[class*="adsbygoogle"]` VISIBLE in the
+    // cosmetic CSS (the network layer already prevents any real ad content
+    // from populating it), and stub the beacon endpoints with empty 200s.
+    // This mirrors Brave's approach and cancels the "ad blocker detected"
+    // dialog for the vast majority of probe cycles.
+    (function spoofAdGlobals() {
+        var noop = function () {};
+        var shim = { loaded: true, exec: noop, pausing: false, policy: {},
+                     push: noop, container_id_counter: function () { return 0 } };
+        // adsbygoogle is sometimes read before the shim installs; use a getter
+        // that lazily materialises the object so any read path succeeds.
+        try {
+            var _adbg = shim;
+            Object.defineProperty(window, "adsbygoogle", {
+                configurable: true,
+                get: function () { return _adbg; },
+                set: function (v) { if (v && v !== _adbg) { try { Object.assign(_adbg, v); } catch (e) {} } }
+            });
+        } catch (e) { try { window.adsbygoogle = shim; } catch (_) {} }
+        // Google ad-related globals the probe checks (existence only).
+        var globals = {
+            _gads: { canAdsRun: true, loaded: true },
+            google_jobad: noop,
+            google_cbt: noop, google_cache_bg: noop,
+            google_rum: noop, google_cl: noop, google_iafv: noop,
+            google_pa: noop,
+            google_reactive_ads_config: {},
+            google_esf: function () { return noop }
+        };
+        for (var k in globals) {
+            if (typeof window[k] === "undefined") { try { window[k] = globals[k]; } catch (e) {} }
+        }
+        // google_reactive_ads_global_state: probe checks .product configuration
+        if (typeof window.google_reactive_ads_global_state === "undefined") {
+            try {
+                window.google_reactive_ads_global_state = {
+                    product: 1, adFormats: ["link","banner"], adsEnabled: true,
+                    googleHtmlNocache: noop, googleNs: noop
+                };
+            } catch (e) {}
+        }
+    })();
+
     // ── rAF lifeline (the "12:09 freeze" root cause) ──────────────────────
     // While the launcher window is unmapped, Chromium stops producing frames,
     // so EVERY requestAnimationFrame callback halts -- below the page, invisible
@@ -101,11 +150,34 @@
         // YouTube ad endpoints (stable for years). They are same-origin XHR/img
         // pings driven by the player JS, so the fetch/XHR/src patches above catch
         // them; blocking them makes the player skip straight to content.
+        // NOTE: /pagead/lvz is YouTube's ADBLOCK-DETECTION beacon, NOT a real ad
+        // request. Blocking it is one of the strongest fab signals -> stub it
+        // with an empty 200 instead of rejecting (see FAB_STUBS below).
         "youtube.com/pagead/", "youtube.com/get_midroll_info",
         "youtube.com/api/stats/ads",
         "youtube.com/pcs/activeview", "youtube.com/player/ad_break",
         "googlevideo.com/videostats"
     ];
+
+    // ── fab (anti-adblock-detection) beacon stubs ─────────────────────────
+    // Requests matching FAB must resolve with 200 + a benign body, NOT reject.
+    // Rejecting them is what the probe uses as the "ad blocker present" signal.
+    // This mirrors uBO's `important,redirect=nooptext` cosmetic exceptions.
+    var FAB = [
+        "youtube.com/pagead/lvz",      // ad-block detection beacon
+        "youtube.com/pagead/ping",     // detection ping
+        "youtube.com/ytranking",
+        "youtube.com/ytooffers",
+        "/adsid/", "/abstatus", "/antiadblock"
+    ];
+    var FAB_EMPTY = "";    // nooptext body
+    function isFab(u) {
+        if (!u) return false;
+        u = ("" + u).toLowerCase();
+        for (var i = 0; i < FAB.length; i++)
+            if (u.indexOf(FAB[i]) > -1) return true;
+        return false;
+    }
 
     function bad(u) {
         if (!u) return false;
@@ -183,6 +255,9 @@
         window.fetch = function (a) {
             var u = (a && a.url) || a;
             var sb = stubFor(u);
+            if (isFab(u)) { blocked(); return Promise.resolve(new Response(FAB_EMPTY,
+                    { status: 200, statusText: "OK",
+                      headers: { "content-type": "text/plain" } })); }
             if (sb !== null) {
                 blocked();
                 return Promise.resolve(new Response(sb,
@@ -218,8 +293,11 @@
         var _open = XMLHttpRequest.prototype.open;
         var _send = XMLHttpRequest.prototype.send;
         XMLHttpRequest.prototype.open = function (m, u) {
-            this.__hcU = u; this.__hcB = bad(u); if (this.__hcB) blocked();
-            this.__hcM = stubFor(u);
+            this.__hcU = u;
+            this.__hcF = isFab(u);
+            this.__hcB = !this.__hcF && bad(u); if (this.__hcB) blocked();
+            this.__hcM = this.__hcF ? FAB_EMPTY : stubFor(u);
+            if (this.__hcF) blocked();
             return _open.apply(this, arguments);
         };
         XMLHttpRequest.prototype.send = function () {
@@ -272,9 +350,14 @@
 
     // ── cosmetic: hide same-origin ad slots ─────────────────────────────────
     var COSMETIC = [
-        "iframe[src*=\"doubleclick\"]", "ins.adsbygoogle",
+        // NOTE: `[class*="adsbygoogle"]` is DELIBERATELY OMITTED -- YouTube's
+        // fab probe creates a hidden <ins class="adsbygoogle"> test element
+        // and reads its computed style; a display:none answer triggers the
+        // warning. Real ad iframes inside it are already blocked at the network
+        // layer, so leaving the container visible only renders an empty slot.
+        "iframe[src*=\"doubleclick\"]", "ins.adsbygoogle[data-ad-client]",
         "div[id^=\"google_ads\"]", "div[id^=\"div-gpt-ad\"]",
-        "iframe[id^=\"google_ads\"]", "[class*=\"adsbygoogle\"]",
+        "iframe[id^=\"google_ads\"]",
         "[data-ad-slot]", "[data-ad-client]", "[data-testid=\"ad\"]",
         "[aria-label=\"Advertisement\"]", ".google-auto-placed",
         "iframe[title*=\"advertisement\"]",
@@ -292,7 +375,16 @@
         ".ytp-ad-module", ".ytp-ad-overlay-slot", ".ytp-ad-player-overlay",
         ".ytp-ad-player-overlay-layout", ".ytp-ad-text-image-layout",
         ".ytp-ad-overlay-container", ".ytp-ad-survey",
-        ".ytp-suggestion-set:has(.ad-badge)"
+        ".ytp-suggestion-set:has(.ad-badge)",
+        // ── YouTube "ad blocker detected" enforcement dialog ────────────
+        // If the probe slips past the spoof, hide the dialog itself so the
+        // user is never interrupted. These selectors cover the renderers
+        // used through 2024-2025 (yt-*, ytd-* variants + modal backdrop).
+        "ytd-enforcement-message-renderer",
+        "yt-enforcement-message-view-model",
+        "ytd-yto-offer-renderer",
+        "#dialog[aria-label*=\"blocker\"]",
+        "tp-ytd-app .yt-enforcement-message"
     ].join(",") + "{display:none!important;height:0!important;width:0!important;overflow:hidden!important}";
 
     function injectCss() {
@@ -319,11 +411,39 @@
         } catch (e) {}
     }
 
-    // ── YouTube in-stream guard: auto-skip / fast-forward past ads ───────────
-    // Belt-and-braces for any pre/mid-roll that slips the network block: when an
-    // ad overlay is showing, jump the video to its end and click Skip if present,
-    // so the ad is perceptually instant and the Skip UI never lingers.
+    // ── fab-dialog scrub ──────────────────────────────────────────────────
+    // CSS above hides known renderer tags; if YouTube introduces a new variant
+    // (rotating class names / role=dialog with adblock copy) this catches it
+    // generically by content match and removes the dialog before it paints.
+    var FAB_TEXT_RE = /ad blocker|adblocker|ad-blocker|unblock our ads|disable.{0,20}adblock|whitelist us|ad blocker detected/i;
+    function scrubFabDialogs(root) {
+        try {
+            if (!root || root.nodeType !== 1) return;
+            // Only inspect dialogs / overlays / banners (cheap).
+            var nodes = [];
+            if (root.matches && root.matches('[role="dialog"],tp-ytd-app,tp-material-dialog,.ytd-enforcement-message,yt-enforcement-message-view-model'))
+                nodes.push(root);
+            if (root.querySelectorAll) {
+                var q = root.querySelectorAll('[role="dialog"],tp-material-dialog,.ytd-enforcement-message,yt-enforcement-message-view-model,ytd-enforcement-message-renderer');
+                for (var i = 0; i < q.length; i++) nodes.push(q[i]);
+            }
+            for (var n = 0; n < nodes.length; n++) {
+                var el = nodes[n];
+                if (FAB_TEXT_RE.test(el.textContent || "")) {
+                    try { el.remove(); } catch (e) {}
+                    // Also close any backdrop left behind.
+                    var bd = document.querySelector('tp-ytd-app#ytd-main-content ~ .scrim, ytd-backdrop');
+                    if (bd) { try { bd.remove(); } catch (e) {} }
+                }
+            }
+        } catch (e) {}
+    }
+
     function ytGuard() {
+        // ── YouTube in-stream guard: auto-skip / fast-forward past ads ──────
+        // Belt-and-braces for any pre/mid-roll that slips the network block:
+        // when an ad overlay is showing, jump the video to its end and click
+        // Skip so the ad is perceptually instant and the Skip UI never lingers.
         var h = location.hostname;
         if (!/(^|\.)(youtube\.com|youtu\.be)$/.test(h)) return;
         // Ad and content share ONE <video> element. Fast-forwarding the ad to
@@ -378,7 +498,10 @@
             var mo = new MutationObserver(function (ms) {
                 for (var i = 0; i < ms.length; i++) {
                     var an = ms[i].addedNodes;
-                    for (var j = 0; j < an.length; j++) scrub(an[j]);
+                    for (var j = 0; j < an.length; j++) {
+                        scrub(an[j]);
+                        scrubFabDialogs(an[j]);
+                    }
                 }
             });
             mo.observe(document.documentElement, { childList: true, subtree: true });
