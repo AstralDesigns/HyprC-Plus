@@ -60,6 +60,24 @@ sha256sums=('SKIP')
 
 _distributor="HyprCandy+ (hyprcandy-qs: noctalia fork + QtWebEngine)"
 
+prepare() {
+    cd "$_pkg"
+    # Qt 6.12 + GCC 16 combined-AUTOMOC compat shim (toolchain-only, not a source defect).
+    # HyprlandMonitor and HyprlandWorkspace expose each other as pointer Q_PROPERTYs. CMake's
+    # AUTOMOC compiles every moc into one shared mocs_compilation.cpp TU; there GCC 16 caches
+    # the earlier "incomplete in a SFINAE context" verdict (from the forward-decl uses in the
+    # connection/toplevel/qml mocs) and Qt's static_assert(TypeIsCompleteOrVoid<Self>) then
+    # hard-fails in each class's OWN moc: "error: Meta Types must be fully defined". On the
+    # Qt 6.11 / GCC 15 toolchain this was merely the -Wsfinae-incomplete warning, so the fork
+    # built fine. Self-including the moc in the matching .cpp pulls it out of the combined TU;
+    # monitor.cpp / workspace.cpp already #include the peer header, so there the type is
+    # complete and the assert passes. Verified: quickshell-hyprland-ipc then compiles+links.
+    for f in monitor workspace; do
+        p="src/wayland/hyprland/ipc/${f}.cpp"
+        grep -q "moc_${f}\.cpp" "$p" || printf '\n#include "moc_%s.cpp"\n' "$f" >> "$p"
+    done
+}
+
 build() {
     cd "$_pkg"
     # BUILD.md: a UTF-8 locale keeps real diagnostics from being buried by Qt warnings.
