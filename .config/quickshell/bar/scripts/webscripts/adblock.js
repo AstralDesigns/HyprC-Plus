@@ -42,17 +42,52 @@
         };
     } catch (e) {}
 
+    // ── ytInitialPlayerResponse interceptor ─────────────────────────────────
+    // YouTube's primary ad-block detection: the inline <script> on /watch pages
+    // sets `var ytInitialPlayerResponse = {...}` with adPlacements/adSlots/
+    // playerAds/ssapConfig. The player JS reads these to schedule breaks; if
+    // they exist but ad network requests fail, the detection fires the
+    // "Ad blockers violate ToS" enforcement page.
+    //
+    // Fix: intercept the property DEFINITION via Object.defineProperty on window
+    // and strip ad-related keys BEFORE any page script reads them. This is the
+    // same technique as Zen Desktop's $remove-js-constant and uBlock's
+    // set-constant scriptlet, but done in-page since we have no proxy layer.
+    (function interceptPlayerResponse() {
+        var STRIP = ["adPlacements", "adSlots", "playerAds"];
+        function prunePR(j) {
+            if (!j || typeof j !== "object") return j;
+            for (var i = 0; i < STRIP.length; i++) delete j[STRIP[i]];
+            // ssapConfig (Server-Side Ad Placement) is the detection flag
+            if (j.playerConfig && j.playerConfig.args) delete j.playerConfig.args.ssapConfig;
+            if (j.playerConfig) delete j.playerConfig.ssapConfig;
+            // playabilityStatus with LOGIN_REQUIRED is the enforcement trigger
+            if (j.playabilityStatus && j.playabilityStatus.status
+                && j.playabilityStatus.status !== "OK"
+                && /ad.block|Terms of Service/i.test(j.playabilityStatus.reason || "")) {
+                j.playabilityStatus = { status: "OK", playableInEmbeds: true };
+            }
+            return j;
+        }
+        try {
+            var _val = undefined;
+            Object.defineProperty(window, "ytInitialPlayerResponse", {
+                configurable: true,
+                get: function () { return _val; },
+                set: function (v) { _val = prunePR(v); }
+            });
+        } catch (e) {}
+        // Expose prunePR for the fetch interceptor below
+        window.__hcPrunePR = prunePR;
+    })();
+
     // ── anti-adblock-detection spoof ────────────────────────────────────────
-    // YouTube probes for ad blockers via 3 vectors:
+    // Secondary detection vectors (Brave/uBlock counter these the same way):
     //   (a) `window.adsbygoogle` must exist with .loaded/.push/.exec shape
     //   (b) `<ins class="adsbygoogle">` test element must NOT be display:none
-    //   (c) `pagead/lvz` + `adsystem` beacon fetches must resolve with 200
-    // We satisfy all three without ever actually loading an ad: define the
-    // globals as no-op shims, leave `[class*="adsbygoogle"]` VISIBLE in the
-    // cosmetic CSS (the network layer already prevents any real ad content
-    // from populating it), and stub the beacon endpoints with empty 200s.
-    // This mirrors Brave's approach and cancels the "ad blocker detected"
-    // dialog for the vast majority of probe cycles.
+    //   (c) `pagead/lvz` + `videostats` beacon fetches must resolve with 200
+    // We satisfy all three: define globals as no-op shims, leave the test
+    // element visible (real ads blocked at network), stub beacons with 200.
     (function spoofAdGlobals() {
         var noop = function () {};
         var shim = { loaded: true, exec: noop, pausing: false, policy: {},
@@ -135,7 +170,7 @@
 
     var BLOCK = [
         "doubleclick.net", "googlesyndication.com", "googleadservices.com",
-        "adservice.google", "google.com/ads", "pagead",
+        "adservice.google", "google.com/ads",
         "google-analytics.com", "googletagmanager.com", "analytics.google.com",
         "adnxs.com", "amazon-adsystem.com", "criteo.com", "criteo.net",
         "pubmatic.com", "rubiconproject.com", "openx.net", "smartadserver.com",
@@ -147,30 +182,29 @@
         "bluekai.com", "crwdcntrl.net", "permutive.com", "segment.com",
         "segment.io", "mixpanel.com", "branch.io", "hotjar.com", "fullstory.com",
         "taplytics.com", "adscale.de",
-        // YouTube ad endpoints (stable for years). They are same-origin XHR/img
-        // pings driven by the player JS, so the fetch/XHR/src patches above catch
-        // them; blocking them makes the player skip straight to content.
-        // NOTE: /pagead/lvz is YouTube's ADBLOCK-DETECTION beacon, NOT a real ad
-        // request. Blocking it is one of the strongest fab signals -> stub it
-        // with an empty 200 instead of rejecting (see FAB_STUBS below).
-        "youtube.com/pagead/", "youtube.com/get_midroll_info",
-        "youtube.com/api/stats/ads",
-        "youtube.com/pcs/activeview", "youtube.com/player/ad_break",
-        "googlevideo.com/videostats"
+        // YouTube midroll scheduling: stubbed via stubFor() before reaching bad().
+        // ad_break intentionally rejected (SABR: stubbing it freezes buffer).
+        "youtube.com/get_midroll_info",
+        "youtube.com/player/ad_break"
     ];
 
-    // ── fab (anti-adblock-detection) beacon stubs ─────────────────────────
-    // Requests matching FAB must resolve with 200 + a benign body, NOT reject.
-    // Rejecting them is what the probe uses as the "ad blocker present" signal.
-    // This mirrors uBO's `important,redirect=nooptext` cosmetic exceptions.
+    // ── YouTube ad/detection endpoints: STUB with 200, never reject ───────
+    // These are the endpoints YouTube's fab (anti-adblock) detection monitors.
+    // Rejecting them is the strongest "ad blocker present" signal that triggers
+    // the full-page "Ad blockers violate ToS" enforcement. Stubbing with 200 +
+    // empty body makes the player think ads loaded successfully while showing
+    // nothing (same technique as uBlock's redirect=nooptext and Brave's rules).
     var FAB = [
-        "youtube.com/pagead/lvz",      // ad-block detection beacon
-        "youtube.com/pagead/ping",     // detection ping
+        "youtube.com/pagead/",          // ad delivery + lvz detection beacon
+        "youtube.com/api/stats/ads",    // ad playback tracking
+        "youtube.com/pcs/activeview",   // Google ActiveView measurement
+        "googlevideo.com/videostats",   // playback telemetry (ad + content)
         "youtube.com/ytranking",
         "youtube.com/ytooffers",
-        "/adsid/", "/abstatus", "/antiadblock"
+        "/adsid/", "/abstatus", "/antiadblock",
+        "youtube.com/ptracking"         // ad beacon player waits on
     ];
-    var FAB_EMPTY = "";    // nooptext body
+    var FAB_EMPTY = "";
     function isFab(u) {
         if (!u) return false;
         u = ("" + u).toLowerCase();
@@ -245,8 +279,20 @@
         var hit = false;
         if (j && typeof j === "object") {
             if (j.adSlots) { delete j.adSlots; hit = true; }
+            if (j.adPlacements) { delete j.adPlacements; hit = true; }
+            if (j.playerAds) { delete j.playerAds; hit = true; }
             if (j.ads) { delete j.ads; hit = true; }
-            if (j.playerResponse && j.playerResponse.adSlots) { delete j.playerResponse.adSlots; hit = true; }
+            if (j.playerResponse) {
+                if (j.playerResponse.adSlots) { delete j.playerResponse.adSlots; hit = true; }
+                if (j.playerResponse.adPlacements) { delete j.playerResponse.adPlacements; hit = true; }
+                if (j.playerResponse.playerAds) { delete j.playerResponse.playerAds; hit = true; }
+            }
+            if (j.playerConfig) {
+                if (j.playerConfig.ssapConfig) { delete j.playerConfig.ssapConfig; hit = true; }
+                if (j.playerConfig.args && j.playerConfig.args.ssapConfig) {
+                    delete j.playerConfig.args.ssapConfig; hit = true;
+                }
+            }
         }
         return hit;
     }
@@ -270,7 +316,15 @@
                 return p.then(function (res) {
                     try {
                         return res.clone().json().then(function (j) {
-                            if (!pruneAds(j)) return res;
+                            // Strip ad keys AND fix playabilityStatus enforcement
+                            var changed = pruneAds(j);
+                            if (j.playabilityStatus && j.playabilityStatus.status
+                                && j.playabilityStatus.status !== "OK"
+                                && /ad.block|Terms of Service/i.test(j.playabilityStatus.reason || "")) {
+                                j.playabilityStatus = { status: "OK", playableInEmbeds: true };
+                                changed = true;
+                            }
+                            if (!changed) return res;
                             blocked();
                             var h = new Headers();
                             try { res.headers.forEach(function (v, k) {
