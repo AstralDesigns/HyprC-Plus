@@ -63,18 +63,28 @@ _distributor="HyprCandy+ (hyprcandy-qs: noctalia fork + QtWebEngine)"
 prepare() {
     cd "$_pkg"
     # Qt 6.12 + GCC 16 combined-AUTOMOC compat shim (toolchain-only, not a source defect).
-    # HyprlandMonitor and HyprlandWorkspace expose each other as pointer Q_PROPERTYs. CMake's
-    # AUTOMOC compiles every moc into one shared mocs_compilation.cpp TU; there GCC 16 caches
-    # the earlier "incomplete in a SFINAE context" verdict (from the forward-decl uses in the
-    # connection/toplevel/qml mocs) and Qt's static_assert(TypeIsCompleteOrVoid<Self>) then
+    # Several quickshell modules hold two mutually forward-declared QObjects that expose each
+    # other as a pointer Q_PROPERTY (e.g. HyprlandMonitor<->HyprlandWorkspace, I3Monitor<->
+    # I3Workspace, and the pipewire PwNodeIface/PwLinkIface<->PwNodePeakMonitor/PwAudioSpectrum
+    # pair). CMake's AUTOMOC compiles every header's moc into one shared mocs_compilation.cpp
+    # TU; there GCC 16 caches the earlier "incomplete in a SFINAE context" verdict from the
+    # forward-decl uses, so Qt's unconditional static_assert(TypeIsCompleteOrVoid<Self>) then
     # hard-fails in each class's OWN moc: "error: Meta Types must be fully defined". On the
     # Qt 6.11 / GCC 15 toolchain this was merely the -Wsfinae-incomplete warning, so the fork
-    # built fine. Self-including the moc in the matching .cpp pulls it out of the combined TU;
-    # monitor.cpp / workspace.cpp already #include the peer header, so there the type is
-    # complete and the assert passes. Verified: quickshell-hyprland-ipc then compiles+links.
-    for f in monitor workspace; do
-        p="src/wayland/hyprland/ipc/${f}.cpp"
-        grep -q "moc_${f}\.cpp" "$p" || printf '\n#include "moc_%s.cpp"\n' "$f" >> "$p"
+    # built fine. Self-including the moc in the matching .cpp pulls it out of the combined TU
+    # (each such .cpp already #includes the peer header, so the type is complete there) and the
+    # leftover pointer-to-incomplete uses in the remaining mocs are legal, so the assert passes.
+    # Verified: hyprland-ipc, i3-ipc and service-pipewire then all compile+link.
+    local tu stem
+    for tu in \
+        src/wayland/hyprland/ipc/monitor.cpp \
+        src/wayland/hyprland/ipc/workspace.cpp \
+        src/x11/i3/ipc/monitor.cpp \
+        src/x11/i3/ipc/workspace.cpp \
+        src/services/pipewire/qml.cpp ; do
+        [ -f "$tu" ] || continue
+        stem="${tu##*/}"; stem="${stem%.cpp}"
+        grep -q "moc_${stem}\.cpp" "$tu" || printf '\n#include "moc_%s.cpp"\n' "$stem" >> "$tu"
     done
 }
 
