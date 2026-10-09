@@ -52,7 +52,7 @@ PanelWindow {
                 text: "Empty the Trash?"
                 font.pixelSize: 14
                 font.bold: true
-                color: Theme.cPrimary
+                color: Theme.cOnSurf
                 horizontalAlignment: Text.AlignHCenter
             }
             Text {
@@ -60,8 +60,8 @@ PanelWindow {
                 text: TrashState.count + " item" + (TrashState.count === 1 ? "" : "s")
                       + " will be deleted permanently."
                 font.pixelSize: 11
-                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                               Theme.cPrimary.b, 0.7)
+                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g,
+                               Theme.cOnSurf.b, 0.7)
                 horizontalAlignment: Text.AlignHCenter
             }
         }
@@ -79,7 +79,7 @@ PanelWindow {
                 height: 34
                 radius: 17
                 color: cancelMa.containsMouse
-                       ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                       ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.35)
                        : "transparent"
                 border.width: 1
                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
@@ -90,7 +90,7 @@ PanelWindow {
                     anchors.centerIn: parent
                     text: "Cancel"
                     font.pixelSize: 12
-                    color: Theme.cPrimary
+                    color: Theme.cOnSurf
                 }
                 MouseArea {
                     anchors.fill: parent
