@@ -2335,6 +2335,7 @@ ShellRoot {
                     anchors.fill: parent
                     visible: root.lightboxPath !== ""
                     color: Qt.rgba(0, 0, 0, 0.74)
+                    radius: 20
                     z: 400
 
                     // Scrim: a click anywhere that isn't the card below closes.
