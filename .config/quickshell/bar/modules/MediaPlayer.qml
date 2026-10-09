@@ -70,7 +70,7 @@ Item {
                             target: discContainer
                             from: 0; to: 360
                             duration: 8000; loops: Animation.Infinite
-                            running: MediaPlayerState.playing && discContainer.visible
+                            running: MediaPlayerState.playing && discContainer.visible && artImage.status === Image.Ready
                         }
 
                         onVisibleChanged: {
@@ -96,7 +96,7 @@ Item {
                             radius: width / 2
                             color: "transparent"
                             border.width: 1
-                            border.color: Theme.cWc10
+                            border.color: Config.barBorderColor
                         }
                 	opacity: discMa.containsMouse ? 0.7 : 1.0
                 	Behavior on opacity { NumberAnimation { duration: 80 } }
