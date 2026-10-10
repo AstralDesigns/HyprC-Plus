@@ -206,7 +206,67 @@ Item {
             // because a tab used it, and the lazy profile keeps a never-used
             // session paying zero. Disk cache (re-downloadable, zero UX impact)
             // is the remaining safe lever:
+            //
+            // Returns true via cb when ANY live view has an HTMLMediaElement
+            // that is currently playing (!paused && !ended && readyState>0).
+            // Safe on hidden views -- runJavaScript flows through the renderer
+            // IPC, which keeps running while compositor frames are throttled.
+            // Used by idleCacheTrim to defer clearHttpCache during playback:
+            // clearHttpCache aborts in-flight DASH/SABR segment fetches at the
+            // network service, and YouTube's Html5NetworkHandler translates
+            // those aborted fetches into a "Cannot connect to the Internet"
+            // toast WITHOUT firing HTMLMediaElement.error (so the media-event
+            // probe stays silent and only cacheTrim correlates).
+            //
+            // Scope: any <video>/<audio> that has an assigned source and has
+            // not ended counts as "live". This is intentionally broader than
+            // "currently playing" -- a PAUSED YouTube stream keeps its SABR
+            // long-connection open, and trimming the HTTP cache while that
+            // socket is bound can orphan it so resume fails ~2 min later when
+            // the buffer drains. Chromium's own LRU eviction bounds the disk
+            // cache (cachePath + default 100 MB ceiling) so skipping a trim
+            // here has no unbounded cost.
+            function _anyActiveMedia(cb) {
+                var ids = Object.keys(win._views)
+                if (ids.length === 0) { cb(false); return }
+                var pending = ids.length
+                var found = false
+                var done = function () { if (--pending === 0) cb(found) }
+                var probe = "(function(){try{var vs=document.querySelectorAll('video,audio');"
+                          + "for(var i=0;i<vs.length;i++){var x=vs[i];"
+                          + "if(!x.ended&&(x.currentSrc||x.src))return true}return false"
+                          + "}catch(_){return false}})()"
+                for (var i = 0; i < ids.length; i++) {
+                    var v = win._views[ids[i]]
+                    if (!v) { done(); continue }
+                    try { v.runJavaScript(probe, function (res) { if (res) found = true; done() }) }
+                    catch (_) { done() }
+                }
+            }
+            //
+            // DIAGNOSTIC (temporary): before trimming, emit an [HCMMEDIA] event
+            // through every live tab's JS console so it lands in
+            // ~/.local/share/hyprcandy/media-errors.log via the existing
+            // onJavaScriptConsoleMessage intercept. Cross-referencing that
+            // timestamp with a "loss of network" toast from the page proves
+            // idleCacheTrim's clearHttpCache() is aborting in-flight DASH/SABR
+            // segment fetches (YouTube's Html5NetworkHandler counts those
+            // failures and shows the toast without HTMLMediaElement.error
+            // ever firing -- that's why the media-only probe stayed silent).
             function _webClearCache() {
+                var payload = {ev: "cacheTrim", t: Date.now(),
+                               vis: win.visible, views: 0}
+                for (var k in win._views) { if (win._views[k]) payload.views++ }
+                var msg = "[HCMMEDIA]" + JSON.stringify(payload)
+                for (var k2 in win._views) {
+                    var v = win._views[k2]
+                    if (!v) continue
+                    try { v.runJavaScript("console.error(" + JSON.stringify(msg) + ")") }
+                    catch (_) { /* view may be mid-destroy; ignore */ }
+                }
+                // Also echo to qs stderr so we still see the event if the
+                // launcher had no live views at trim time.
+                if (payload.views === 0) console.error(msg + " (no live views)")
                 if (win.webProfile)
                     win.webProfile.clearHttpCache()
             }
@@ -274,6 +334,16 @@ Item {
             // re-injected on the next tab open or a shield toggle.
             property string webAdBlockScript: ""
             property string webSabrKillScript: ""
+            // ── DIAGNOSTIC: media-error probe (temporary, remove once we pin the
+            // root cause of YouTube "An error occurred" on auto-advance) ─────────
+            // Attaches via MutationObserver to every <video>/<audio>, records a
+            // compact ring of the last 10 events (play/playing/pause/waiting/
+            // stalled/suspend/ended/seeked/loadstart) with {t,rs,ns,p,vs,at}, and
+            // on HTMLMediaElement.error emits ONE console.error('[HCMMEDIA]'+json)
+            // carrying code+name, message, currentSrc, duration, page url and the
+            // ring. Silent for normal playback -> only fires on a real failure,
+            // so it does not add log noise.
+            readonly property string webMediaErrorProbe: "(function(){if(window.__HCMMEDIA_INSTALLED)return;window.__HCMMEDIA_INSTALLED=1;var CODE={1:'ABORTED',2:'NETWORK',3:'DECODE',4:'SRC_NOT_SUPPORTED'};function push(el,ev){var rec={ev:ev,t:Math.round(el.currentTime*10)/10,rs:el.readyState,ns:el.networkState,p:el.paused?1:0,v:document.visibilityState,at:Date.now()};(el.__HCMMEDIA_H=el.__HCMMEDIA_H||[]).push(rec);if(el.__HCMMEDIA_H.length>10)el.__HCMMEDIA_H.shift();}function emitError(el){try{var e=el.error||{};var o={ev:'error',code:e.code||0,cn:CODE[e.code]||'',msg:e.message||'',src:String(el.currentSrc||el.src||'').slice(0,140),dur:isFinite(el.duration)?Math.round(el.duration):0,u:String(location.href).slice(0,160),hist:el.__HCMMEDIA_H||[]};console.error('[HCMMEDIA]'+JSON.stringify(o));}catch(_){}}function attach(el){if(el.__HCMMEDIA_ON)return;el.__HCMMEDIA_ON=1;['play','playing','pause','waiting','stalled','suspend','ended','seeked','loadstart'].forEach(function(t){el.addEventListener(t,function(){push(el,t);},true);});el.addEventListener('error',function(){push(el,'error');emitError(el);},true);}function scan(){document.querySelectorAll('video,audio').forEach(attach);}var mo=new MutationObserver(scan);mo.observe(document,{childList:true,subtree:true});scan();if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',scan,{once:true});})();"
             property bool _webResolved: false
             // The launcher window is now kept loaded (hidden) so the shared
             // WebEngineView survives hide/show. Defer backend warm-up until the
@@ -527,6 +597,9 @@ Item {
                 // after it, so both sanitizers chain on the same responses).
                 if (win.webSabrKillScript && win.webSabrKillScript.length)
                     src += "\n;" + win.webSabrKillScript
+                // Media-error diagnostic probe: always-on (see webMediaErrorProbe).
+                if (win.webMediaErrorProbe && win.webMediaErrorProbe.length)
+                    src += "\n;" + win.webMediaErrorProbe
                 if (win.webAdBlockEnabled && win.webAdBlockScript && win.webAdBlockScript.length)
                     src += "\n;" + win.webAdBlockScript
                 // Signature guard: the three startup FileViews (state, adblock,
@@ -2116,6 +2189,8 @@ Item {
                     win.webSaveActive(); win.webSaveTabsState()
                     // Hidden = idle: start the cooldown after which the bounded HTTP
                     // disk cache is reclaimed (live pages keep in-memory state).
+                    // See idleCacheTrim below for the media guard that skips the
+                    // trim while a stream is open (playing or paused mid-playback).
                     idleCacheTrim.restart()
                 }
             }
@@ -2153,11 +2228,22 @@ Item {
             // Idle HTTP-cache reclamation: fires once per hide, only acting if the
             // window is still hidden when it elapses. clearHttpCache is async
             // (emits clearHttpCacheCompleted) and safe to call repeatedly.
+            // Media guard: if any live view has an HTMLMediaElement with a
+            // source that hasn't ended (playing OR paused mid-stream), skip
+            // this trim. Next hide cycle gets its own shot; if the user keeps
+            // a YouTube tab open indefinitely, Chromium's own disk-cache LRU
+            // bounds the footprint so never-trimming is not a leak.
             Timer {
                 id: idleCacheTrim
                 interval: 10 * 60 * 1000   // 10 min after the launcher is hidden
                 repeat: false
-                onTriggered: { if (!win.visible) win._webClearCache() }
+                onTriggered: {
+                    if (win.visible) return
+                    win._anyActiveMedia(function (active) {
+                        if (active) return
+                        win._webClearCache()
+                    })
+                }
             }
 
             // Boot is deferred to the first show (see onVisibleChanged) — the
@@ -3643,6 +3729,18 @@ Item {
                                                 // source this view last EXECUTED; drives
                                                 // _applyUserScripts' reload decision.
                                                 property string _hcAppliedSrc: ""
+                                                // DIAGNOSTIC sink for [HCMMEDIA] payloads
+                                                // emitted by win.webMediaErrorProbe. Each
+                                                // real media error appends one line to
+                                                // ~/.local/share/hyprcandy/media-errors.log
+                                                // (dir auto-created); also echoed to stderr.
+                                                Process {
+                                                    id: mediaErrProc
+                                                    property string _line: ""
+                                                    command: ["bash", "-c",
+                                                        "mkdir -p \"$HOME/.local/share/hyprcandy\" && printf '%s\\n' \"$1\" >> \"$HOME/.local/share/hyprcandy/media-errors.log\"",
+                                                        "sh", _line]
+                                                }
                                                 // Spoof a clean Chrome UA (always) and
                                                 // inject the ad/tracker blocker (when
                                                 // enabled) before any page script runs.
@@ -3674,6 +3772,18 @@ Item {
                                                     // and reload (HttpOnly cookies are unreachable from JS).
                                                     if (message === "__HC_FAB_CLEAR__") {
                                                         win._clearYouTubeCookiesAndReload(tabId)
+                                                        return
+                                                    }
+                                                    // Media-error diagnostic: route the tagged
+                                                    // payload to the log file + stderr BEFORE the
+                                                    // level<2 filter, so it never gets dropped by
+                                                    // the normal noise gate.
+                                                    if (message.indexOf("[HCMMEDIA]") === 0) {
+                                                        var ts = Qt.formatDateTime(new Date(), "yyyy-MM-dd HH:mm:ss")
+                                                        mediaErrProc._line = ts + " tab=" + tabId + " " + message
+                                                        mediaErrProc.running = false
+                                                        mediaErrProc.running = true
+                                                        console.error(message)
                                                         return
                                                     }
                                                     if (level < 2) return
