@@ -60,7 +60,7 @@ Item {
                             visible: MediaPlayerState.artPath === "" || artImage.status !== Image.Ready
                             anchors.centerIn: parent
                             text: "󰀥" // 󰀥 󰎆 󰎍 󰺕 󱥸 󱨧
-                            color: Theme.cWc6
+                            color: Theme.cInversePrimary
                             font.family: Config.fontFamily
                             font.pixelSize: MediaPlayerState.thumbSize - 2
                         }
