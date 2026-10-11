@@ -909,7 +909,17 @@ Item {
     property bool hibernateAvailable: false
     Process {
         id: _hibCheckProc
-        command: ["bash","-c","grep -qw hibernate /sys/power/state 2>/dev/null && echo yes || echo no"]
+        // Authoritative hibernation check: logind's CanHibernate method reports
+        // "yes" only when suspend-to-disk is genuinely usable (persistent swap
+        // of sufficient size + a configured resume target). The previous probe
+        // (`grep -qw hibernate /sys/power/state`) was ALWAYS false because that
+        // sysfs file reads "freeze mem disk" -- it never contains the literal
+        // word "hibernate" -- so the Hibernate button was permanently hidden.
+        // CachyOS ships without hibernation configured, so this correctly returns
+        // no here; the button auto-appears once swap+resume are set up.
+        command: ["bash","-c",
+            "busctl call org.freedesktop.login1 /org/freedesktop/login1 " +
+            "org.freedesktop.login1.Manager CanHibernate 2>/dev/null | grep -q '\"yes\"' && echo yes || echo no"]
         running: true
         stdout: SplitParser {
             splitMarker: "\n"

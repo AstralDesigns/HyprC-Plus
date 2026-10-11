@@ -29,13 +29,19 @@ fi
 
 if [[ "$1" == "suspend" ]]; then
   echo ":: Suspend"
-  touch /tmp/.qs-candylock-sleep
+  # Marker carries the action so candylock sleeps with the RIGHT method AFTER
+  # the session is locked (see suspendIfFlagged in candylock/shell.qml).
+  echo suspend > /tmp/.qs-candylock-sleep
   "$HOME/.config/hyprcandy/scripts/candylock.sh"
   rm -f /tmp/.qs-candylock-sleep
 fi
 
 if [[ "$1" == "hibernate" ]]; then
   echo ":: Hibernate"
-  sleep 1
-  systemctl hibernate
+  # Mirror suspend: lock first, then suspend-to-disk once secured, so the
+  # session is never exposed on resume. Only reachable when the Hibernate
+  # button is shown, i.e. logind CanHibernate=yes (swap+resume configured).
+  echo hibernate > /tmp/.qs-candylock-sleep
+  "$HOME/.config/hyprcandy/scripts/candylock.sh"
+  rm -f /tmp/.qs-candylock-sleep
 fi

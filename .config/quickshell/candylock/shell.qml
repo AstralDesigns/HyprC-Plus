@@ -880,8 +880,12 @@ ShellRoot {
     property bool _hibernateAvailable: false
     Process {
         id: _hibCheckProc
-        // systemd exposes hibernate as a sleep state only when swap/hibernation is configured
-        command: ["bash","-c","grep -qw hibernate /sys/power/state 2>/dev/null && echo yes || echo no"]
+        // logind CanHibernate = authoritative (needs persistent swap + resume
+        // target). The old `grep -qw hibernate /sys/power/state` probe was
+        // always false: that file reads "freeze mem disk", never "hibernate".
+        command: ["bash","-c",
+            "busctl call org.freedesktop.login1 /org/freedesktop/login1 " +
+            "org.freedesktop.login1.Manager CanHibernate 2>/dev/null | grep -q '\"yes\"' && echo yes || echo no"]
         running: true
         stdout: SplitParser {
             splitMarker: "\n"
@@ -889,12 +893,31 @@ ShellRoot {
         }
         onExited: running = false
     }
+    // Marker-gated sleep: power.sh writes the desired action ("suspend" or
+    // "hibernate") into /tmp/.qs-candylock-sleep BEFORE launching candylock, so
+    // BOTH sleep paths lock first and only sleep once the session is secured.
+    // A plain idle/lock sets no marker -> nothing happens here (just locks).
+    // Triggered from the lock surface's Component.onCompleted, NOT from
+    // WlSessionLock.onLockedChanged -- on this noctalia-qs fork the grant event
+    // never reaches that handler (only the explicit unlock's locked=false does),
+    // which is why the StartMenu 'suspend' button used to lock but never sleep.
     Process {
         id: suspendIfFlagged
         command: ["/bin/bash", "-c",
-            "f=/tmp/.qs-candylock-sleep; [ -f \"$f\" ] && rm -f \"$f\" && systemctl suspend"]
+            "f=/tmp/.qs-candylock-sleep; " +
+            "if [ -f \"$f\" ]; then a=$(cat \"$f\" 2>/dev/null); " +
+            "[ \"$a\" = hibernate ] || a=suspend; rm -f \"$f\"; systemctl \"$a\"; fi"]
         running: false
         onExited: running = false
+    }
+    // Settle delay: let the compositor map the lock surfaces and paint the
+    // first frame (and the pre-lock transition blur finish) before suspending,
+    // so the session is fully secured when we sleep and after resume.
+    Timer {
+        id: lockSettleTimer
+        interval: 450
+        repeat: false
+        onTriggered: suspendIfFlagged.running = true
     }
     function playerAction(cmd) {
         let argv
@@ -928,9 +951,15 @@ ShellRoot {
 
     // ── Session lock ──────────────────────────────────────────────────────────
     WlSessionLock { id:sessionLock
-        locked: true
-        onLockedChanged: if (locked) suspendIfFlagged.running = true
+        // Request the lock imperatively once the component is complete. The
+        // suspend is driven from the surface's Component.onCompleted below
+        // (the grant event never reaches onLockedChanged on this fork).
+        Component.onCompleted: Qt.callLater(function () { sessionLock.locked = true })
         WlSessionLockSurface {
+            // Reliable "lock is actually up" hook: Quickshell instantiates this
+            // surface per screen only once the ext-session-lock is engaged. Arm
+            // the marker-gated suspend from here via a short settle delay.
+            Component.onCompleted: lockSettleTimer.restart()
             Rectangle {
                 id:mainRect; anchors.fill:parent; color:root.cBg; focus:true
                 Keys.onPressed: function(ev){ if(!ev.isAutoRepeat) pinInput.forceActiveFocus() }

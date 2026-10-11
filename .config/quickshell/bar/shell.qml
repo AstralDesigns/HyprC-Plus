@@ -150,8 +150,6 @@ ShellRoot {
     }
 
     // ── Optional popup overlays (loaded on demand) ─────────────────────────
-    Loader { active: LicenseState.activated && PowerMenuState.visible;    source: "PowerMenu.qml"     }
-    Loader { active: LicenseState.activated && PowerLauncherState.visible; source: "PowerLauncher.qml" }
     Loader { active: LicenseState.activated && VolumePopupState.visible;   source: "VolumePopup.qml"   }
     Loader { active: LicenseState.activated && NetworkPopupState.visible;  source: "NetworkPopup.qml"  }
     Loader { active: LicenseState.activated && CalendarPopupState.visible; source: "CalendarPopup.qml" }
@@ -300,7 +298,6 @@ ShellRoot {
         target: "bar"
 
         // Popup toggles — all gated on activation
-        function togglePowerMenu()      { if (LicenseState.activated) PowerMenuState.toggle() }
         function toggleVolume()         { if (LicenseState.activated) VolumePopupState.toggle() }
         function toggleNetwork()        { if (LicenseState.activated) NetworkPopupState.toggle() }
         function toggleCalendar()       { if (LicenseState.activated) CalendarPopupState.toggle() }

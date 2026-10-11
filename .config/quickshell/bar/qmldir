@@ -7,7 +7,6 @@ singleton NotificationsState 1.0 NotificationsState.qml
 singleton MediaPlayerState 1.0 MediaPlayerState.qml
 singleton StartMenuState 1.0 StartMenuState.qml
 singleton LauncherState 1.0 LauncherState.qml
-singleton PowerMenuState 1.0 PowerMenuState.qml
 singleton CpuState 1.0 CpuState.qml
 singleton RamState 1.0 RamState.qml
 singleton GpuState 1.0 GpuState.qml
@@ -32,15 +31,11 @@ ClockPopup 1.0 ClockPopup.qml
 MediaPlayerPopup 1.0 MediaPlayerPopup.qml
 SmallLauncher 1.0 SmallLauncher.qml
 AppLauncher 1.0 AppLauncher.qml
-PowerMenu 1.0 PowerMenu.qml
 NetworkPopup 1.0 NetworkPopup.qml
 VolumePopup 1.0 VolumePopup.qml
-PowerMenuButton 1.0 PowerMenuButton.qml
-PowerLauncher 1.0 PowerLauncher.qml
 TrayMenuPopup 1.0 TrayMenuPopup.qml
 SysTrayPopup 1.0 SysTrayPopup.qml
 UpdatesPopup 1.0 UpdatesPopup.qml
-singleton PowerLauncherState 1.0 PowerLauncherState.qml
 singleton ControlCenterState 1.0 ControlCenterState.qml
 singleton LicenseState 1.0 LicenseState.qml
 ControlCenterPopup 1.0 ControlCenterPopup.qml
