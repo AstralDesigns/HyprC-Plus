@@ -2,6 +2,22 @@
 set -Eeuo pipefail
 cd "$(dirname "$0")"
 
+# ── Size the V8 heap for this machine before the React build ─────────────────
+# `tsc --noEmit` + `vite build` need more old-space than Node's default ceiling;
+# on low-RAM devices the build aborts with "ineffective mark-compacts near heap
+# limit allocation failed - javascript heap out of memory" (seen on a 4-cpu
+# i5-3337U box). Give the build ~half of MemTotal (MB), clamped to [1024,8192] so
+# we never ask for more than the machine has. Honours a caller-set NODE_OPTIONS.
+if [ -z "${NODE_OPTIONS:-}" ]; then
+  _mem_mb="$(awk '/MemTotal/{print int($2/1024); exit}' /proc/meminfo 2>/dev/null)"
+  case "$_mem_mb" in ''|*[!0-9]*) _mem_mb=2048 ;; esac
+  _heap=$((_mem_mb/2))
+  if [ "$_heap" -lt 1024 ]; then _heap=1024; fi
+  if [ "$_heap" -gt 8192 ]; then _heap=8192; fi
+  export NODE_OPTIONS="--max-old-space-size=${_heap}"
+  echo "Build heap: NODE_OPTIONS=$NODE_OPTIONS (MemTotal=${_mem_mb}MB)"
+fi
+
 # One-shot first-time setup for a new install: prepares everything the agent
 # workspace needs to run, without starting or auto-starting any of it.
 # The GJS launcher starts the Python runtime itself on demand (it's lightweight,
