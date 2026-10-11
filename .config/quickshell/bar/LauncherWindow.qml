@@ -4645,7 +4645,7 @@ Item {
                             text: "\u200a\u200a\u200a\u200a\u{F165D}\u200a\u200a\u200a\u200a"
                             color: Theme.cSurfaceTint
                             font.family: Theme.fontFamily
-                            font.pixelSize: Math.round(Config.launcherIconSize * 1.0)
+                            font.pixelSize: Math.round(Config.launcherIconSize * 0.8)
                         }
                     }
                     Text {
