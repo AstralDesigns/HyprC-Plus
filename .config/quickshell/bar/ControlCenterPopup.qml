@@ -1329,7 +1329,7 @@ PanelWindow {
                             { icon: "", label: "Hyprland",  idx: 1 },
                             { icon: "󰇜", label: "Bar",       idx: 0 },
                             { icon: "󰔎", label: "Themes",    idx: 2 },
-                            { icon: "󰇜", label: "Dock",      idx: 3 },
+                            { icon: "󰍹", label: "Display",   idx: 3 },
                             { icon: "󰮫", label: "Menus",     idx: 4 },
                             { icon: "󰍂", label: "SDDM",      idx: 5 },
                             { icon: "󰌌", label: "Keybinds",  idx: 7 },
@@ -1460,7 +1460,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["General","Borders","Icons","Workspaces","Media","Cava","Background","Visibility"]
+                                    model: ["General","Borders","Icons","Workspaces","Cava","Background","Visibility","Dock"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -2221,6 +2221,10 @@ PanelWindow {
                                         CCSection { text: "Text Sizes" }
                                         CCSlider { label:"Module Text"; from:8;to:20; value:Config.infoFontSize;  onMoved:function(v){Config.infoFontSize=v} }
 
+                                        CCSection { text: "Media" }
+                                        CCSlider { label:"Thumb Size"; from:10;to:40; value:Config.mediaThumbSize; onMoved:function(v){Config.mediaThumbSize=v} }
+                                        CCSlider { label:"Media Glyph"; from:8;to:24;stepSize:2; value:Config.mediaGlyphSize; onMoved:function(v){Config.mediaGlyphSize=v} }
+
                                         CCSection { text: "Workspace Icon Glyphs" }
                                         CCIconEntry { label:"Active Dot";     value:Config.wsDotActive;     onApplied:function(v){Config.wsDotActive=v} }
                                         CCSlider { label:"Active Opacity";     from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsActiveOpacity;     onMoved:function(v){Config.wsActiveOpacity=v} }
@@ -2355,27 +2359,6 @@ PanelWindow {
                                         CCSlider { label:"Sep Size";  from:6;to:20; value:Config.wsSeparatorSize;     onMoved:function(v){Config.wsSeparatorSize=v} }
                                         CCSlider { label:"Sep Pad L"; from:0;to:10; value:Config.wsSeparatorPadLeft;  onMoved:function(v){Config.wsSeparatorPadLeft=v} }
                                         CCSlider { label:"Sep Pad R"; from:0;to:10; value:Config.wsSeparatorPadRight; onMoved:function(v){Config.wsSeparatorPadRight=v} }
-
-                                        Item { height: 10 }
-                                    }
-                                }
-
-                                // ── Media ──────────────────────────────────
-                                CCScrollPane {
-                                    ColumnLayout {
-                                        width: parent.width; spacing: 5
-
-                                        CCSection { text: "Thumbnail" }
-                                        CCSlider { label:"Thumb Size"; from:10;to:40; value:Config.mediaThumbSize; onMoved:function(v){Config.mediaThumbSize=v} }
-
-                                        CCSection { text: "Controls" }
-                                        CCSlider { label:"Media Glyph"; from:8;to:24;stepSize:2; value:Config.mediaGlyphSize; onMoved:function(v){Config.mediaGlyphSize=v} }
-
-                                        //CCSection { text: "Padding (0 = true zero)" }
-                                        //CCSlider { label:"Pad Left";   from:0;to:16; value:Config.mediaPadLeft;   onMoved:function(v){Config.mediaPadLeft=v} }
-                                        //CCSlider { label:"Pad Right";  from:0;to:16; value:Config.mediaPadRight;  onMoved:function(v){Config.mediaPadRight=v} }
-                                        //CCSlider { label:"Pad Top";    from:0;to:10; value:Config.mediaPadTop;    onMoved:function(v){Config.mediaPadTop=v} }
-                                        //CCSlider { label:"Pad Bottom"; from:0;to:10; value:Config.mediaPadBottom; onMoved:function(v){Config.mediaPadBottom=v} }
 
                                         Item { height: 10 }
                                     }
@@ -3085,6 +3068,57 @@ PanelWindow {
                                         CCToggle { label:"Wallpaper Btn";  value:Config.showWallpaper;      onToggled:function(v){Config.showWallpaper=v} }
                                         CCToggle { label:"System Tray";    value:Config.showTray;           onToggled:function(v){Config.showTray=v} }
                                         //CCToggle { label:"Distro Icon";    value:Config.showDistro;         onToggled:function(v){Config.showDistro=v} }
+
+                                        Item { height: 10 }
+                                    }
+                                }
+
+                                // ── Dock ──────────────────────────────────
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        width: parent.width; spacing: 5
+
+                                        CCSection { text: "Screen Margin" }
+                                        CCSlider { label:"Edge Gap"; from:0;to:40;stepSize:1; value:Config.dockMargin; onMoved:function(v){Config.dockMargin=v} }
+
+                                        CCSection { text: "Dock Auto-Hide" }
+                                        CCToggle { label:"Auto-Hide Dock"; value:Config.dockAutoHide; onToggled:function(v){Config.dockAutoHide=v} }
+                                        CCSlider {
+                                            label:"Delay (s)"
+                                            from:1;to:60;stepSize:1
+                                            value:Config.dockAutoHideDelay
+                                            opacity: Config.dockAutoHide ? 1.0 : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            onMoved:function(v){Config.dockAutoHideDelay=v}
+                                        }
+
+                                        CCSection { text: "Position" }
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            Repeater {
+                                                model: ["bottom", "left", "top", "right"]
+                                                delegate: CCPillBtn {
+                                                    required property var modelData
+                                                    text: (DockState.position === modelData ? "● " : "○ ") +
+                                                          modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                    onClicked: DockState.setPosition(modelData)
+                                                }
+                                            }
+                                        }
+
+                                        CCSection { text: "Shape" }
+                                        CCSlider { label:"Icon Size"; from:18;to:60;stepSize:1; value:Config.dockIconSize; onMoved:function(v){Config.dockIconSize=v} }
+                                        CCSlider { label:"Start Icon"; from:8;to:40;stepSize:2; value:Config.dockStartIconSize; onMoved:function(v){Config.dockStartIconSize=v} }
+                                        CCSlider { label:"Trash Icon"; from:8;to:40;stepSize:2; value:Config.dockTrashIconSize; onMoved:function(v){Config.dockTrashIconSize=v} }
+                                        CCSlider { label:"Spacing"; from:0;to:30;stepSize:1; value:Config.dockButtonSpacing; onMoved:function(v){Config.dockButtonSpacing=v} }
+                                        CCSlider { label:"Padding"; from:8;to:20;stepSize:1; value:Config.dockInnerPadding; onMoved:function(v){Config.dockInnerPadding=v} }
+
+                                        CCSection { text: "Corner Radius" }
+                                        CCSlider { label:"Top-Left"; from:0;to:60;stepSize:1; value:Config.dockTopLeftRadius; onMoved:function(v){Config.dockTopLeftRadius=v} }
+                                        CCSlider { label:"Top-Right"; from:0;to:60;stepSize:1; value:Config.dockTopRightRadius; onMoved:function(v){Config.dockTopRightRadius=v} }
+                                        CCSlider { label:"Bottom-Left"; from:0;to:60;stepSize:1; value:Config.dockBottomLeftRadius; onMoved:function(v){Config.dockBottomLeftRadius=v} }
+                                        CCSlider { label:"Bottom-Right"; from:0;to:60;stepSize:1; value:Config.dockBottomRightRadius; onMoved:function(v){Config.dockBottomRightRadius=v} }
 
                                         Item { height: 10 }
                                     }
@@ -3967,116 +4001,335 @@ PanelWindow {
                     }
 
                     // ── TAB 3: Dock (hyprcandy-dock) ─────────────────────────
-                    CCScrollPane {
+                    // Display tab: nwg-displays-style monitor management.
+                    // Drag rects on the canvas to arrange; edit fields on the right;
+                    // Apply regenerates ~/.config/hypr/monitors.lua + hyprctl reload.
+                    Item {
+                        id: dispTab
+                        // Working copy of the currently selected monitor (dummy-safe
+                        // before the first hyprctl read lands, so bindings never throw).
+                        readonly property var sel: (DisplayState.draft.length > DisplayState.selected
+                                && DisplayState.selected >= 0)
+                            ? DisplayState.draft[DisplayState.selected]
+                            : ({ name: "—", mode: "preferred", modes: [], x: 0, y: 0,
+                                 w: 0, h: 0, scale: 1, transform: 0, mirror: "",
+                                 bitdepth: 8, cm: "srgb", vrr: 0,
+                                 sdrbrightness: 1, sdrsaturation: 1,
+                                 disabled: false, dpms: true })
+
+                        Component.onCompleted: {
+                            DisplayState.refresh()
+                            DisplayState.refreshProfiles()
+                        }
+
                         ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.margins: 14
-                            spacing: 6
-                            CCSection { text: " 󰇜 Dock" }
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 8
 
-                            CCSection { text: "Screen Margin" }
-                            CCSlider {
-                                label: "Edge Gap"
-                                from: 0; to: 40; stepSize: 1
-                                value: Config.dockMargin
-                                onMoved: function(v) { Config.dockMargin = v }
-                            }
-
-                            CCSection { text: "Dock Auto-Hide" }
-                            CCToggle {
-                                label: "Auto-Hide Dock"
-                                value: Config.dockAutoHide
-                                onToggled: function(v) { Config.dockAutoHide = v }
-                            }
-
-                            CCSlider {
-                                label: "Delay (s)"
-                                from: 1; to: 60; stepSize: 1
-                                value: Config.dockAutoHideDelay
-                                opacity: Config.dockAutoHide ? 1.0 : 0.4
-                                Behavior on opacity { NumberAnimation { duration: 120 } }
-                                onMoved: function(v) { Config.dockAutoHideDelay = v }
-                            }
-
-                            CCSection { text: "Position" }
+                            // ── Header: title + actions ──────────────────────
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 6
-                                Repeater {
-                                    model: ["bottom", "left", "top", "right"]
-                                    delegate: CCPillBtn {
-                                        required property var modelData
-                                        text: (DockState.position === modelData ? "● " : "○ ") +
-                                              modelData.charAt(0).toUpperCase() + modelData.slice(1)
-                                        onClicked: DockState.setPosition(modelData)
+                                spacing: 8
+                                Text {
+                                    text: "󰍹 Displays"
+                                    color: Theme.cOnSurf
+                                    font.family: Config.labelFont; font.pixelSize: 15; font.weight: Font.Bold
+                                }
+                                Item { Layout.fillWidth: true }
+                                CCPillBtn { text: "⟳ Refresh"; onClicked: DisplayState.refresh() }
+                                CCPillBtn { text: "↺ Reset"; active: DisplayState.dirty; onClicked: DisplayState.reset() }
+                                CCPillBtn { text: "✔ Apply"; active: DisplayState.dirty; onClicked: DisplayState.apply() }
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: DisplayState.statusText + (DisplayState.dirty ? "   •   unsaved changes" : "")
+                                color: DisplayState.dirty ? Theme.cTertiary : Theme.cPrimary
+                                opacity: 0.7
+                                font.family: Config.labelFont; font.pixelSize: 11
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                spacing: 12
+
+                                // ── Top: draggable layout canvas ─────────────
+                                Rectangle {
+                                    id: dispCanvas
+                                    Layout.fillWidth: true
+                                    Layout.preferredHeight: 220
+                                    radius: 12
+                                    color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.25)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                    clip: true
+
+                                    property var dm: DisplayState.draft
+                                    property real worldMinX: dm.length ? Math.min.apply(null, dm.map(function (m) { return m.x; })) : 0
+                                    property real worldMinY: dm.length ? Math.min.apply(null, dm.map(function (m) { return m.y; })) : 0
+                                    property real worldMaxX: dm.length ? Math.max.apply(null, dm.map(function (m) { return m.x + m.w; })) : 1
+                                    property real worldMaxY: dm.length ? Math.max.apply(null, dm.map(function (m) { return m.y + m.h; })) : 1
+                                    property real worldW: Math.max(1, worldMaxX - worldMinX)
+                                    property real worldH: Math.max(1, worldMaxY - worldMinY)
+                                    property real fitScale: Math.min((width - 48) / worldW, (height - 70) / worldH)
+                                    property real userScale: -1
+                                    property real viewScale: userScale > 0 ? userScale : fitScale
+                                    property real offX: (width - worldW * viewScale) / 2
+                                    property real offY: (height - worldH * viewScale) / 2
+
+                                    function zoom(factor) { userScale = Math.max(0.02, Math.min(2.0, viewScale * factor)) }
+
+                                    // Background: wheel-to-zoom (delegates add their own).
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        acceptedButtons: Qt.NoButton
+                                        onWheel: function (e) { dispCanvas.zoom(e.angleDelta.y > 0 ? 1.15 : 0.87) }
+                                    }
+
+                                    Repeater {
+                                        model: dispCanvas.dm
+                                        delegate: Rectangle {
+                                            id: monRect
+                                            required property var modelData
+                                            required property int index
+                                            property real dragDx: 0
+                                            property real dragDy: 0
+                                            property bool isSel: index === DisplayState.selected
+
+                                            x: (modelData.x - dispCanvas.worldMinX) * dispCanvas.viewScale + dispCanvas.offX + dragDx
+                                            y: (modelData.y - dispCanvas.worldMinY) * dispCanvas.viewScale + dispCanvas.offY + dragDy
+                                            width: Math.max(30, modelData.w * dispCanvas.viewScale)
+                                            height: Math.max(20, modelData.h * dispCanvas.viewScale)
+                                            radius: 4
+                                            color: isSel
+                                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                                                : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                                            border.width: isSel ? 2 : 1
+                                            border.color: isSel ? Theme.cPrimary : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
+                                            Behavior on color { ColorAnimation { duration: 120 } }
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: modelData.name
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 11; font.weight: Font.DemiBold
+                                            }
+                                            Text {
+                                                anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 2 }
+                                                text: modelData.w + "x" + modelData.h
+                                                color: Theme.cPrimary; opacity: 0.75
+                                                font.family: Config.labelFont; font.pixelSize: 9
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.SizeAllCursor
+                                                property real _sx: 0
+                                                property real _sy: 0
+                                                property real _ox: 0
+                                                property real _oy: 0
+                                                onPressed: function (m) { _sx = m.x; _sy = m.y; _ox = monRect.dragDx; _oy = monRect.dragDy }
+                                                onPositionChanged: function (m) {
+                                                    monRect.dragDx = _ox + (m.x - _sx)
+                                                    monRect.dragDy = _oy + (m.y - _sy)
+                                                }
+                                                onReleased: {
+                                                    DisplayState.selected = monRect.index
+                                                    var lx = dispCanvas.worldMinX + (monRect.x - dispCanvas.offX) / dispCanvas.viewScale
+                                                    var ly = dispCanvas.worldMinY + (monRect.y - dispCanvas.offY) / dispCanvas.viewScale
+                                                    DisplayState.setPosition(monRect.index, lx, ly)
+                                                    DisplayState.snapAndCommit(monRect.index)
+                                                    monRect.dragDx = 0; monRect.dragDy = 0
+                                                }
+                                                onWheel: function (e) { dispCanvas.zoom(e.angleDelta.y > 0 ? 1.15 : 0.87) }
+                                            }
+                                        }
+                                    }
+
+                                    // Zoom controls
+                                    RowLayout {
+                                        anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 6 }
+                                        spacing: 6
+                                        CCPillBtn { text: "−"; onClicked: dispCanvas.zoom(0.87) }
+                                        CCPillBtn { text: "Fit"; onClicked: dispCanvas.userScale = -1 }
+                                        CCPillBtn { text: "+"; onClicked: dispCanvas.zoom(1.15) }
+                                        Text {
+                                            text: Math.round(dispCanvas.viewScale * 100) + "%"
+                                            color: Theme.cPrimary; opacity: 0.7
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                        }
                                     }
                                 }
-                            }
-                            // No cycle pill — the position pills above are the
-                            // direct per-position controls (dock menu mirrors).
 
-                            CCSection { text: "Shape" }
-                            CCSlider {
-                                label: "Icon Size"
-                                from: 18; to: 60; stepSize: 1
-                                value: Config.dockIconSize
-                                onMoved: function(v) { Config.dockIconSize = v }
-                            }
-                            CCSlider {
-                                label: "Start Icon"
-                                from: 8; to: 40; stepSize: 2
-                                value: Config.dockStartIconSize
-                                onMoved: function(v) { Config.dockStartIconSize = v }
-                            }
-                            CCSlider {
-                                label: "Trash Icon"
-                                from: 8; to: 40; stepSize: 2
-                                value: Config.dockTrashIconSize
-                                onMoved: function(v) { Config.dockTrashIconSize = v }
-                            }
-                            CCSlider {
-                                label: "Spacing"
-                                from: 0; to: 30; stepSize: 1
-                                value: Config.dockButtonSpacing
-                                onMoved: function(v) { Config.dockButtonSpacing = v }
-                            }
-                            CCSlider {
-                                label: "Padding"
-                                from: 8; to: 20; stepSize: 1   // <8 clips indicator dots
-                                value: Config.dockInnerPadding
-                                onMoved: function(v) { Config.dockInnerPadding = v }
-                            }
-                            CCSection { text: "Corner Radius" }
-                            CCSlider {
-                                label: "Top-Left"
-                                from: 0; to: 60; stepSize: 1
-                                value: Config.dockTopLeftRadius
-                                onMoved: function(v) { Config.dockTopLeftRadius = v }
-                            }
-                            CCSlider {
-                                label: "Top-Right"
-                                from: 0; to: 60; stepSize: 1
-                                value: Config.dockTopRightRadius
-                                onMoved: function(v) { Config.dockTopRightRadius = v }
-                            }
-                            CCSlider {
-                                label: "Bottom-Left"
-                                from: 0; to: 60; stepSize: 1
-                                value: Config.dockBottomLeftRadius
-                                onMoved: function(v) { Config.dockBottomLeftRadius = v }
-                            }
-                            CCSlider {
-                                label: "Bottom-Right"
-                                from: 0; to: 60; stepSize: 1
-                                value: Config.dockBottomRightRadius
-                                onMoved: function(v) { Config.dockBottomRightRadius = v }
-                            }
+                                // Canvas usage hint
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "Drag a display to arrange it — edges snap together. Zoom with − / Fit / +."
+                                    color: Theme.cOnSurf; opacity: 0.65
+                                    font.family: Config.labelFont; font.pixelSize: 10
+                                    wrapMode: Text.Wrap
+                                }
 
-                            // Behaviour section removed: Reserve Space is
-                            // applied internally (dock always overlays, GJS
-                            // parity) and hide-dock is now a one-shot row in
-                            // the start-button popup; auto-hide stays above.
-                            Item { height: 10 }
+                                // ── Bottom: per-monitor form ─────────────────
+                                CCScrollPane {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
+
+                                    // ── Profiles (nwg-displays style) ──────────────
+                                    CCSection { text: "Profiles" }
+                                    Flow {
+                                        Layout.fillWidth: true; spacing: 5
+                                        Repeater {
+                                            model: DisplayState.profileNames
+                                            delegate: CCPillBtn {
+                                                required property string modelData
+                                                text: modelData
+                                                active: modelData === DisplayState.activeProfile
+                                                onClicked: DisplayState.loadProfile(modelData)
+                                            }
+                                        }
+                                    }
+                                    Text {
+                                        visible: DisplayState.profileNames.length === 0
+                                        Layout.fillWidth: true
+                                        text: "No saved profiles yet — type a name below and press Enter to capture this layout."
+                                        color: Theme.cOnSurf; opacity: 0.65
+                                        font.family: Config.labelFont; font.pixelSize: 10
+                                        wrapMode: Text.Wrap
+                                    }
+                                    CCEntryRow {
+                                        label: "New profile"
+                                        value: ""
+                                        onApplied: function (v) { DisplayState.saveProfile(v) }
+                                    }
+                                    RowLayout {
+                                        Layout.fillWidth: true; spacing: 6
+                                        Item { Layout.fillWidth: true }
+                                        CCPillBtn {
+                                            text: "Save active"
+                                            active: DisplayState.activeProfile !== ""
+                                            opacity: DisplayState.activeProfile !== "" ? 1.0 : 0.4
+                                            onClicked: DisplayState.saveCurrent()
+                                        }
+                                        CCPillBtn {
+                                            text: "Delete"
+                                            active: DisplayState.activeProfile !== ""
+                                            opacity: DisplayState.activeProfile !== "" ? 1.0 : 0.4
+                                            onClicked: DisplayState.deleteProfile(DisplayState.activeProfile)
+                                        }
+                                    }
+                                    CCToggle {
+                                        label: "Bind wallpapers"
+                                        value: DisplayState.bindWallpapers
+                                        onToggled: function (v) { DisplayState.bindWallpapers = v }
+                                    }
+
+                                    // ── Monitor selector ─────────────────────
+                                    Flow {
+                                        Layout.fillWidth: true
+                                        spacing: 5
+                                        Repeater {
+                                            model: DisplayState.draft
+                                            delegate: CCPillBtn {
+                                                required property var modelData
+                                                required property int index
+                                                text: modelData.name
+                                                active: index === DisplayState.selected
+                                                onClicked: DisplayState.selected = index
+                                            }
+                                        }
+                                    }
+
+                                    CCSection { text: "Mode" }
+                                    Flow {
+                                        Layout.fillWidth: true; spacing: 5
+                                        Repeater {
+                                            model: ["preferred"].concat(dispTab.sel.modes || [])
+                                            delegate: CCPillBtn {
+                                                required property string modelData
+                                                text: modelData
+                                                active: dispTab.sel.mode === modelData
+                                                onClicked: DisplayState.setField(DisplayState.selected, "mode", modelData)
+                                            }
+                                        }
+                                    }
+
+                                    CCSection { text: "Scale & Transform" }
+                                    CCSlider { label: "Scale"; from: 0.5; to: 3; stepSize: 0.25; decimals: 2; value: dispTab.sel.scale; onMoved: function (v) { DisplayState.setField(DisplayState.selected, "scale", v) } }
+                                    Flow {
+                                        Layout.fillWidth: true; spacing: 5
+                                        Repeater {
+                                            model: ["0°", "90°", "180°", "270°", "↔", "↕", "⤡", "⤢"]
+                                            delegate: CCPillBtn {
+                                                required property string modelData
+                                                required property int index
+                                                text: modelData
+                                                active: dispTab.sel.transform === index
+                                                onClicked: DisplayState.setField(DisplayState.selected, "transform", index)
+                                            }
+                                        }
+                                    }
+
+                                    CCSection { text: "Position" }
+                                    RowLayout {
+                                        Layout.fillWidth: true; spacing: 8
+                                        CCEntryRow {
+                                            Layout.fillWidth: true
+                                            label: "X"
+                                            value: String(dispTab.sel.x)
+                                            onApplied: function (v) { DisplayState.setPosition(DisplayState.selected, parseInt(v) || 0, dispTab.sel.y); DisplayState.snapAndCommit(DisplayState.selected) }
+                                        }
+                                        CCEntryRow {
+                                            Layout.fillWidth: true
+                                            label: "Y"
+                                            value: String(dispTab.sel.y)
+                                            onApplied: function (v) { DisplayState.setPosition(DisplayState.selected, dispTab.sel.x, parseInt(v) || 0); DisplayState.snapAndCommit(DisplayState.selected) }
+                                        }
+                                    }
+
+                                    CCSection { text: "Mirror" }
+                                    Flow {
+                                        Layout.fillWidth: true; spacing: 5
+                                        Repeater {
+                                            model: ["None"].concat(DisplayState.draft.filter(function (m, i) { return i !== DisplayState.selected; }).map(function (m) { return m.name; }))
+                                            delegate: CCPillBtn {
+                                                required property string modelData
+                                                text: modelData
+                                                active: modelData === "None" ? (dispTab.sel.mirror === "") : (dispTab.sel.mirror === modelData)
+                                                onClicked: DisplayState.setField(DisplayState.selected, "mirror", modelData === "None" ? "" : modelData)
+                                            }
+                                        }
+                                    }
+
+                                    CCSection { text: "Signal" }
+                                    CCToggle { label: "Active"; value: !dispTab.sel.disabled; onToggled: function (v) { DisplayState.setField(DisplayState.selected, "disabled", !v) } }
+                                    CCToggle { label: "DPMS (power)"; value: dispTab.sel.dpms; onToggled: function (v) { DisplayState.setDpms(DisplayState.selected, v) } }
+                                    CCToggle { label: "Adaptive Sync"; value: dispTab.sel.vrr === 1; onToggled: function (v) { DisplayState.setField(DisplayState.selected, "vrr", v ? 1 : 0) } }
+                                    CCSegmented { label: "Bit depth"; options: ["8", "10"]; current: String(dispTab.sel.bitdepth); onPicked: function (v) { DisplayState.setField(DisplayState.selected, "bitdepth", parseInt(v)) } }
+                                    CCSegmented { label: "Color (cm)"; options: ["srgb", "auto", "none", "wcg"]; current: dispTab.sel.cm; onPicked: function (v) { DisplayState.setField(DisplayState.selected, "cm", v) } }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: "Available formats depend on the panel — Hyprland ignores unsupported values."
+                                        color: Theme.cOnSurf; opacity: 0.65
+                                        font.family: Config.labelFont; font.pixelSize: 10
+                                        wrapMode: Text.Wrap
+                                    }
+
+                                    CCSection { text: "SDR (in HDR)" }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: "Tone-maps SDR content — visible only on HDR-capable outputs."
+                                        color: Theme.cOnSurf; opacity: 0.65
+                                        font.family: Config.labelFont; font.pixelSize: 10
+                                        wrapMode: Text.Wrap
+                                    }
+                                    CCSlider { label: "Brightness"; from: 0.1; to: 3; stepSize: 0.05; decimals: 2; value: dispTab.sel.sdrbrightness; onMoved: function (v) { DisplayState.setField(DisplayState.selected, "sdrbrightness", v) } }
+                                    CCSlider { label: "Saturation"; from: 0; to: 3; stepSize: 0.05; decimals: 2; value: dispTab.sel.sdrsaturation; onMoved: function (v) { DisplayState.setField(DisplayState.selected, "sdrsaturation", v) } }
+
+                                    Item { height: 12 }
+                                }
+                            }
                         }
                     }
 

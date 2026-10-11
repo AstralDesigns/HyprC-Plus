@@ -404,7 +404,7 @@ Item {
                 ctx.font = "bold 11px monospace"
                 ctx.textAlign = "center"
                 ctx.textBaseline = "middle"
-                ctx.fillStyle = Theme.cSecondary.toString()
+                ctx.fillStyle = Theme.cOnSecondary.toString()
                 ctx.fillText(minText, minX, minY)
             }
         }

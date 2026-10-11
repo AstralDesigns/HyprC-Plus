@@ -24,6 +24,7 @@ singleton UpdatesPopupState 1.0 UpdatesPopupState.qml
 singleton WeatherState 1.0 WeatherState.qml
 singleton WeatherPopupState 1.0 WeatherPopupState.qml
 singleton SystemMonitorPopupState 1.0 SystemMonitorPopupState.qml
+singleton DisplayState 1.0 DisplayState.qml
 singleton DistroState 1.0 DistroState.qml
 Bar 1.0 Bar.qml
 CalendarPopup 1.0 CalendarPopup.qml
