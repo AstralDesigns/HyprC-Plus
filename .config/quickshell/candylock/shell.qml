@@ -915,7 +915,7 @@ ShellRoot {
     // so the session is fully secured when we sleep and after resume.
     Timer {
         id: lockSettleTimer
-        interval: 450
+        interval: 1800
         repeat: false
         onTriggered: suspendIfFlagged.running = true
     }
