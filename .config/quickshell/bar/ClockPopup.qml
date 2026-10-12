@@ -58,6 +58,18 @@ Item {
             }
         }
 
+        // Inner OnSecondary card (UpdatesPopup parity): translucent 50% fill
+        // inset 6px from the blurred panel so the panel tone shows through.
+        // Declared before the content RowLayout so the content paints on top.
+        Rectangle {
+            anchors { fill: parent; margins: 10 }
+            radius: 14
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                           Theme.cOnSecondary.b, 0.35)
+            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                  Theme.cPrimary.b, 0.2)
+        }
+
         RowLayout {
             anchors.fill: parent
             anchors.margins: 18

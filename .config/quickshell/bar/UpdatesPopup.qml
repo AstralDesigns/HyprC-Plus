@@ -53,7 +53,7 @@ PanelWindow {
 
         // Uniform gap, applied twice: once between the UI and the OnSecondary
         // card edge, once between the card edge and the blurred panel window.
-        property real pad: 12
+        property real pad: 10
 
         width:  Math.max(240, col.implicitWidth + pad * 4)
         height: col.implicitHeight + pad * 4
@@ -79,7 +79,7 @@ PanelWindow {
             anchors { fill: parent; margins: popRect.pad }
             radius: 14
             color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                           Theme.cOnSecondary.b, 0.50)
+                           Theme.cOnSecondary.b, 0.35)
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                   Theme.cPrimary.b, 0.2)
             clip: true

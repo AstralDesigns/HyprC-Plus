@@ -1443,21 +1443,48 @@ PanelWindow {
                 color: "transparent"
                 clip: true
 
+                // Inner OnSecondary card (UpdatesPopup parity), 10% alpha. Sits
+                // behind the content stack and starts just right of the sidebar
+                // (this pane is anchored left: sidebar.right), inset from the
+                // pane edges to echo the sidebar card's 14px margins.
+                Rectangle {
+                    anchors { fill: parent; margins: 14 }
+                    radius: 14
+                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                   Theme.cOnSecondary.b, 0.35)
+                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                          Theme.cPrimary.b, 0.2)
+                }
+
                 StackLayout {
                     id: mainStack
-                    anchors.fill: parent
+                    // Inset the viewport to card+4 (the OnSecondary card is 14 from
+                    // the pane → 18 here) on ALL sides. This gives every tab a clean
+                    // 4px margin inside the card and — because the Flickable scroll
+                    // panes clip to their bounds — stops tall tabs (e.g. Hyprland)
+                    // from running past the card vertically.
+                    anchors { fill: parent; margins: 18 }
                     currentIndex: ccTabSettings.activeTab
 
                     // ── TAB 0: Bar ──────────────────────────────────────────
                     Item {
+                        // Clip to the card-inset viewport so the Bar body can't
+                        // scroll past the inset card (mirrors the Flickable clip
+                        // the other tabs already get from CCScrollPane).
+                        clip: true
                         ColumnLayout {
                             anchors.fill: parent
                             anchors.margins: 14
                             spacing: 6
 
-                            // Bar sub-tab header row
+                            // Bar sub-tab header row. Reclaim the column's 14px
+                            // inset via negative layout margins so all 8 sub-tab
+                            // buttons fit within the card — they overflowed once
+                            // the viewport gained its 18px inset.
                             Row {
                                 Layout.fillWidth: true
+                                Layout.leftMargin:  -13
+                                Layout.rightMargin: -14
                                 spacing: 4
                                 Repeater {
                                     model: ["General","Borders","Icons","Workspaces","Cava","Background","Visibility","Dock"]
@@ -7334,8 +7361,11 @@ PanelWindow {
         default property alias scrollContent: _scrollContent.data
         ColumnLayout {
             id: _scrollContent
-            width: parent.width - 10
-            anchors { left: parent.left; leftMargin: 4; top: parent.top; topMargin: 10 }
+            // Fill the (already card-inset) viewport edge-to-edge; the tab's own
+            // Layout.margins supply the breathing room, so no extra asymmetric
+            // inset here (the old left:4 / width-10 / top:10 caused uneven edges).
+            width: parent.width
+            anchors { left: parent.left; top: parent.top }
             spacing: 0
         }
     }

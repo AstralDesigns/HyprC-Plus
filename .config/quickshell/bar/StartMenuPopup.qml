@@ -80,6 +80,19 @@ PanelWindow {
         Keys.onEscapePressed: StartMenuState.menuVisible = false
         Connections { target: StartMenuState; function onMenuVisibleChanged() { if (StartMenuState.menuVisible) panelRect.forceActiveFocus() } }
 
+        // Inner OnSecondary card (UpdatesPopup parity), 10% alpha. Sits
+        // behind the content stack and starts just right of the sidebar
+        // (this pane is anchored left: sidebar.right), inset from the
+        // pane edges to echo the sidebar card's 14px margins.
+        Rectangle {
+            anchors { fill: parent; margins: 10 }
+            radius: 14
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                           Theme.cOnSecondary.b, 0.35)
+            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                  Theme.cPrimary.b, 0.2)
+        }
+
         ColumnLayout {
             id: mainCol
             anchors { top: parent.top; left: parent.left; right: parent.right; margins: 16 }
