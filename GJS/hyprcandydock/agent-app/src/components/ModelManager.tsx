@@ -1329,8 +1329,12 @@ export const ModelManager: FC = () => {
           </div>
         </div>
 
-        {/* Content */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', scrollbarWidth: 'thin' }}>
+        {/* Content — no inline scrollbarWidth: setting the standard
+            scrollbar-width makes WebKit ignore the themed ::-webkit-scrollbar
+            rules in theme.css and repaint a default (white) bar. Leaving it
+            unset lets the global 5px themed scrollbar apply, whose transparent
+            track shows this popup's --matugen-on-secondary background. */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
           <CloudTab />
         </div>
       </div>
