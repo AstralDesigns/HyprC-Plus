@@ -347,11 +347,39 @@ ShellRoot {
     property string wallhavenRatio: "all"     // "all" | "16x9" | "16x10" | "21x9" | "32x9" | "9x16" | "4x3" | "1x1"
     property bool   ratioPopupOpen: false
 
+    // Pagination: the Wallhaven API returns 24 items per page and meta.last_page
+    // can run into the thousands, so we track which page is loaded and append
+    // further pages as the grid is scrolled to the bottom.
+    property int    whPage:         1
+    property int    whLastPage:     1
+    property int    whTotal:        0
+    property bool   _whLoadingMore: false
+
+    // Display mirror of wallhavenResults. Appending rows into a ListModel lets
+    // the GridView keep its existing delegates and contentY; reassigning the
+    // plain array model instead rebuilds the whole view and snaps the scroll
+    // position back to the top.
+    ListModel { id: whModel }
+
+    // (Re)loads page 1 for a fresh query / filter change and replaces the grid.
     function fetchWallhaven(query) {
-        wallhavenLoading = true
+        _whFetch(1, false, query !== undefined ? query : wallhavenQuery)
+    }
+
+    // Appends the next page (called from the grid's atYEnd hook).
+    function fetchWallhavenMore() {
+        if (wallhavenLoading || _whLoadingMore) return
+        if (wallhavenResults.length === 0) return
+        if (whPage >= whLastPage) return
+        _whFetch(whPage + 1, true, wallhavenQuery)
+    }
+
+    function _whFetch(page, append, query) {
+        if (append) _whLoadingMore = true
+        else wallhavenLoading = true
         wallhavenError = ""
-        const q = (query !== undefined ? query : wallhavenQuery).trim()
-        let url = "https://wallhaven.cc/api/v1/search?categories=111&purity=100&page=1"
+        const q = (query || "").trim()
+        let url = "https://wallhaven.cc/api/v1/search?categories=111&purity=100&page=" + page
         if (root.wallhavenRatio && root.wallhavenRatio !== "all") {
             url += "&ratios=" + encodeURIComponent(root.wallhavenRatio)
         }
@@ -368,12 +396,41 @@ ShellRoot {
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 wallhavenLoading = false
+                _whLoadingMore = false
                 if (xhr.status === 200) {
                     try {
                         const json = JSON.parse(xhr.responseText)
-                        wallhavenResults = json.data || []
+                        const data = json.data || []
+                        const meta = json.meta || {}
+                        if (append) {
+                            // Result pages can shift server-side between fetches
+                            // (toplist churn); dedupe by wallhaven id.
+                            const seen = {}
+                            root.wallhavenResults.forEach(function(it) { seen[it.id] = true })
+                            const fresh = data.filter(function(it) { return !seen[it.id] })
+                            root.wallhavenResults = root.wallhavenResults.concat(fresh)
+                            // Append-only into the ListModel: the grid grows at
+                            // the bottom without touching the current viewport.
+                            for (let k = 0; k < fresh.length; k++)
+                                whModel.append({ whItem: fresh[k] })
+                        } else {
+                            root.wallhavenResults = data
+                            whModel.clear()
+                            for (let k = 0; k < data.length; k++)
+                                whModel.append({ whItem: data[k] })
+                        }
+                        whPage     = meta.current_page || page
+                        whLastPage = meta.last_page   || 1
+                        whTotal    = meta.total       || root.wallhavenResults.length
+                        // After a fresh page 1, immediately pull page 2 in the
+                        // background so the second screen of results is already
+                        // present; from page 3 on the scroll lookahead takes over.
+                        // Reuse this same `query` so page 2 matches page 1 exactly.
+                        if (!append && whPage < whLastPage) {
+                            Qt.callLater(function() { _whFetch(page + 1, true, query) })
+                        }
                     } catch (e) {
-                        wallhavenError = "Failed to parse Wallhaven results"
+                        if (!append) wallhavenError = "Failed to parse Wallhaven results"
                     }
                 } else {
                     wallhavenError = "Wallhaven API error: " + xhr.status
@@ -1460,7 +1517,11 @@ ShellRoot {
                                 color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.7)
                                 Text {
                                     id: cntTxt; anchors.centerIn: parent
-                                    text: root.activeTab === "wallhaven" ? root.wallhavenResults.length : root.filtered.length
+                                    text: root.activeTab === "wallhaven"
+                                        ? (root.whTotal > root.wallhavenResults.length
+                                            ? root.wallhavenResults.length + " / " + root.whTotal
+                                            : root.wallhavenResults.length)
+                                        : root.filtered.length
                                     color: root.cOnSecCont; font.pixelSize: 12
                                 }
                             }
@@ -1832,12 +1893,39 @@ ShellRoot {
                             cellHeight: itemH + gap
                             leftMargin: Math.floor((width - (cols * cellWidth)) / 2)
                             rightMargin: leftMargin
-                            model: root.wallhavenResults
+                            model: whModel
+
+                            // Pre-fetch about one row before the bottom so the next
+                            // page is already in place as the user starts revealing
+                            // the last line — continuous scrolling, no dead stop.
+                            // atYEnd stays as a safety net for very slow drags.
+                            onContentYChanged: {
+                                if (contentY + height >= contentHeight - (cellHeight + 60))
+                                    root.fetchWallhavenMore()
+                            }
+                            onAtYEndChanged: root.fetchWallhavenMore()
+
+                            footer: Item {
+                                width: whGridView.width
+                                height: 40
+                                visible: root.wallhavenResults.length > 0
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: root._whLoadingMore ? "Loading more\u2026"
+                                        : (root.whPage >= root.whLastPage
+                                            ? "No more results" : "")
+                                    color: root.cOutline; font.pixelSize: 12
+                                }
+                            }
 
                             delegate: Item {
                                 id: whThumb
-                                required property var modelData
+                                required property var whItem
                                 required property int index
+                                // Keep the familiar modelData name for the body of
+                                // the delegate (ListModel rows expose roles, not
+                                // modelData; whItem carries the raw API object).
+                                readonly property var modelData: whItem
 
                                 readonly property string whId: modelData.id || ""
                                 readonly property string whThumbUrl: (modelData.thumbs && modelData.thumbs.large) ? modelData.thumbs.large : (modelData.thumbs && modelData.thumbs.small ? modelData.thumbs.small : "")
