@@ -1509,9 +1509,10 @@ ShellRoot {
                                 }
                             }
 
-                            // Count badge
+                            // Count badge (local tab only; the wallhaven tab
+                            // omits it so its top-right stays clean).
                             Rectangle {
-                                visible: root.activeTab === "wallhaven" ? root.wallhavenResults.length > 0 : root.filtered.length > 0
+                                visible: root.activeTab !== "wallhaven" && root.filtered.length > 0
                                 width: Math.max(32, cntTxt.implicitWidth + 16); height: 34
                                 radius: root.rFull
                                 color: Qt.rgba(root.cSecCont.r, root.cSecCont.g, root.cSecCont.b, 0.7)
