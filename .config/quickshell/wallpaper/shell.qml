@@ -485,6 +485,12 @@ ShellRoot {
     function applyWallpaper(path) {
         if (!path) return
         root.currentWallpaper = path
+        // Applying from the (now click-live) grid while a preview is open
+        // dismisses the preview.
+        if (root.lightboxPath !== "") {
+            root.lightboxPath = ""
+            root.lightboxWh  = null
+        }
         // Never kill a running process — just let the script run to completion.
         // awww img is fast (sends IPC message then exits), so queuing isn't needed.
         if (!awwwProc.running) {
@@ -556,8 +562,40 @@ ShellRoot {
     function moveFocus(delta) {
         const n = filtered.length
         if (!n) return
-        focusedIdx = Math.max(0, Math.min(n - 1, focusedIdx + delta))
+        // Circular: stepping past the ends wraps first <-> last.
+        focusedIdx = ((focusedIdx + delta) % n + n) % n
         gridView.positionViewAtIndex(focusedIdx, GridView.Contain)
+    }
+
+    // ── Lightbox cycling (← / →) ─────────────────────────────────────────────
+    // Advances the previewed item without closing the lightbox. On the local tab
+    // it walks `filtered` (and keeps the grid focus in sync so the peek thumbs +
+    // positionViewAtIndex track along); on the wallhaven tab it walks
+    // `wallhavenResults` so only the single focused full-res image ever loads.
+    function cycleLightbox(delta) {
+        if (root.lightboxPath === "") return
+        if (root.activeTab === "wallhaven") {
+            const n = root.wallhavenResults.length
+            if (!n) return
+            let i = root.wallhavenResults.indexOf(root.lightboxWh)
+            if (i < 0) i = 0
+            i = (((i + delta) % n) + n) % n   // circular wrap last <-> first
+            const item = root.wallhavenResults[i]
+            root.lightboxWh = item
+            if (item.path) root.lightboxPath = item.path
+        } else {
+            const n = root.filtered.length
+            if (!n) return
+            // Anchor on the previewed path, not focusedIdx: hovering the grid
+            // under the click-through scrim moves focusedIdx.
+            let i = root.filtered.indexOf(root.lightboxPath)
+            if (i < 0) i = root.focusedIdx
+            i = (((i + delta) % n) + n) % n   // circular wrap last <-> first
+            root.focusedIdx  = i
+            root.lightboxWh  = null
+            root.lightboxPath = root.filtered[i]
+            gridView.positionViewAtIndex(root.focusedIdx, GridView.Contain)
+        }
     }
 
     // ── Quit helper ──────────────────────────────────────────────────────────
@@ -1144,6 +1182,12 @@ ShellRoot {
                                         // for keyboard-only selection).
                                         Keys.onUpPressed:    function(e) { root.moveFocus(-1); e.accepted = true }
                                         Keys.onDownPressed:  function(e) { root.moveFocus(+1); e.accepted = true }
+                                        // Left/Right cycle the lightbox preview when it is
+                                        // open; when it is closed the event is left
+                                        // un-accepted so the caret still moves natively
+                                        // inside the search field.
+                                        Keys.onLeftPressed:  function(e) { if (root.lightboxPath !== "") { root.cycleLightbox(-1); e.accepted = true } }
+                                        Keys.onRightPressed: function(e) { if (root.lightboxPath !== "") { root.cycleLightbox(+1); e.accepted = true } }
                                         // Tab / Shift+Tab jump a whole row so
                                         // users can still spatially scan the
                                         // grid when they want to, without
@@ -2325,11 +2369,12 @@ ShellRoot {
 
                 } // Rectangle panelContent
 
-                // ── Lightbox preview (right-click a local tile) ──────────────
+                // ── Lightbox preview (right-click a tile) ────────────────────
                 // Top-most child of `panel` so it renders inside the layershell
-                // mask (mask: Region { item: panel }). Scrim click-away and Escape
-                // (see searchIn) both dismiss; Apply promotes the preview to the
-                // live wallpaper and closes.
+                // mask (mask: Region { item: panel }). A scrim click dismisses the
+                // preview; hoverEnabled stays false on the MouseArea, so hover
+                // events walk past it and the grid tiles below still light up.
+                // Escape and a click on the focus card also dismiss.
                 Rectangle {
                     id: lightbox
                     anchors.fill: parent
@@ -2338,9 +2383,12 @@ ShellRoot {
                     radius: 20
                     z: 400
 
-                    // Scrim: a click anywhere that isn't the card below closes.
+                    // Scrim: click-away closes. A plain MouseArea with
+                    // hoverEnabled: false does not consume hover events, so the
+                    // delegates underneath keep receiving onEntered/onExited.
                     MouseArea {
                         anchors.fill: parent
+                        hoverEnabled: false
                         onClicked: root.lightboxPath = ""
                     }
 
@@ -2350,69 +2398,234 @@ ShellRoot {
                         spacing: 12
 
                         // Aspect-fit within the panel preserving AR; falls back to
-                        // a modest default box until sourceSize resolves.
+                        // a modest default box until sourceSize resolves. The local
+                        // tab widens the coverflow stage to all but a 20px margin at
+                        // the panel edge so the prev/next thumbs stick out well
+                        // beyond the focus card; wallhaven keeps the plain
+                        // single-card layout and still loads only the focused image.
                         property real availW: panel.width  - 120
                         property real availH: panel.height - 180
-                        property real iw: lbImg.sourceSize.width  > 0 ? lbImg.sourceSize.width  : 16
-                        property real ih: lbImg.sourceSize.height > 0 ? lbImg.sourceSize.height : 9
+                        // Size driver: the local tab reads the focused carousel
+                        // cell's own (already decoded) sourceSize, so the incoming
+                        // focus box is right from the first animation frame — no
+                        // grow-into-place. Wallhaven keeps the lbImg driver.
+                        property real iw: root.activeTab === "local"
+                            ? (lbStage.focusCell && lbStage.focusCell.srcW > 0
+                                ? lbStage.focusCell.srcW : 16)
+                            : (lbImg.sourceSize.width  > 0 ? lbImg.sourceSize.width  : 16)
+                        property real ih: root.activeTab === "local"
+                            ? (lbStage.focusCell && lbStage.focusCell.srcH > 0
+                                ? lbStage.focusCell.srcH : 9)
+                            : (lbImg.sourceSize.height > 0 ? lbImg.sourceSize.height : 9)
                         property real fit: Math.min(availW / iw, availH / ih, 1)
                         property real boxW: Math.max(240, Math.min(availW, iw * fit))
                         property real boxH: Math.max(140, Math.min(availH, ih * fit))
+                        property real stageW: root.activeTab === "local"
+                            ? panel.width - 40 : lbCol.boxW
 
-                        Rectangle {
-                            id: lbCard
-                            width: lbCol.boxW
+                        // ── Coverflow stage: the nearby wallpapers are persistent
+                        //    delegates that slide + scale between the prev / focus
+                        //    / next roles instead of swapping slot contents, so a
+                        //    cycle never blanks or reloads. ────────────────────
+                        Item {
+                            id: lbStage
+                            width:  lbCol.stageW
                             height: lbCol.boxH
-                            radius: 20
-                            color: "#111111"
                             clip: true
-                            // QtQuick clip is rectangular and ignores radius, so the
-                            // 20px rounding comes from a MultiEffect layer mask.
-                            layer.enabled: true
-                            layer.effect: MultiEffect {
-                                maskEnabled: true
-                                maskSource: lbMask
-                                maskThresholdMin: 0.5
-                                maskSpreadAtMin: 1.0
+                            Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+                            // Shared neighbour width: from the stage edge up to
+                            // 60px underneath the focus card (hidden behind it).
+                            readonly property real nbW: Math.max(0,
+                                (lbStage.width - lbCol.boxW) / 2 + 60)
+
+                            // Absolute index of the previewed image; falls back to
+                            // the list head if a live search dropped it from view.
+                            readonly property int focusIdx: {
+                                const i = root.filtered.indexOf(root.lightboxPath)
+                                return i >= 0 ? i : 0
                             }
 
-                            Image {
-                                id: lbImg
-                                anchors.fill: parent
-                                source: root.lightboxPath === "" ? ""
-                                    : (root.lightboxPath.indexOf("http") === 0
-                                        ? root.lightboxPath : "file://" + root.lightboxPath)
-                                fillMode: Image.PreserveAspectFit
-                                asynchronous: true
-                                cache: true
-                                smooth: true
-                                mipmap: false
+                            // The role-0 cell; its decoded image sizes the focus box.
+                            property Item focusCell: null
+
+                            Repeater {
+                                // Model-gated (never visible-gated) and only while
+                                // the lightbox is open; wallhaven keeps its own
+                                // single-card preview.
+                                model: root.activeTab === "local" && root.lightboxPath !== ""
+                                    ? root.filtered : []
+                                delegate: Item {
+                                    id: carCell
+                                    required property int    index
+                                    required property string modelData
+
+                                    // Role relative to the focused image, wrapped
+                                    // so the preview cycles circularly with the grid:
+                                    // the list's last image sits to the left of the
+                                    // first one (and vice-versa at the other end).
+                                    readonly property int role: {
+                                        const n = root.filtered.length
+                                        let r = index - lbStage.focusIdx
+                                        if (n > 2) {
+                                            if (r >  n / 2) r -= n
+                                            if (r < -n / 2) r += n
+                                        }
+                                        return r
+                                    }
+                                    readonly property bool near: Math.abs(role) <= 2
+                                    readonly property real srcW: carImg.sourceSize.width
+                                    readonly property real srcH: carImg.sourceSize.height
+                                    onRoleChanged: if (role === 0) lbStage.focusCell = carCell
+                                    Component.onCompleted: if (role === 0) lbStage.focusCell = carCell
+
+                                    x: role === 0 ? (lbStage.width - lbCol.boxW) / 2
+                                       : role === -1 ? 0
+                                       : role === 1 ? lbStage.width - lbStage.nbW
+                                       : role < -1 ? -lbStage.nbW
+                                       : lbStage.width
+                                    width: role === 0 ? lbCol.boxW : lbStage.nbW
+                                    // y tracks the (animated) height on both sides,
+                                    // so no Behavior on y is needed.
+                                    y: (lbStage.height - height) / 2
+                                    height: role === 0 ? lbCol.boxH : lbCol.boxH * 0.8
+                                    z: role === 0 ? 10 : 1
+                                    visible: near
+
+                                    Behavior on x      { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                                    Behavior on width  { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                                    Behavior on height { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+
+                                    Image {
+                                        id: carImg
+                                        anchors.fill: parent
+                                        source: carCell.near ? "file://" + carCell.modelData : ""
+                                        // Crop everywhere: at rest the focus box
+                                        // matches the image AR exactly (crop ==
+                                        // fit), so gaining/losing focus never
+                                        // triggers a fit/crop re-flow pop mid-slide —
+                                        // just a smooth expand in / collapse out.
+                                        fillMode: Image.PreserveAspectCrop
+                                        asynchronous: true
+                                        cache: true
+                                        smooth: true
+                                        layer.enabled: carCell.near
+                                        layer.effect: MultiEffect {
+                                            maskEnabled: true
+                                            maskSource: carMask
+                                            maskThresholdMin: 0.5
+                                            maskSpreadAtMin: 1.0
+                                        }
+                                    }
+
+                                    // 20px rounded-corner mask, follows the cell.
+                                    Item {
+                                        id: carMask
+                                        anchors.fill: parent
+                                        opacity: 0
+                                        layer.enabled: true
+                                        Rectangle {
+                                            anchors.fill: parent
+                                            radius: 20
+                                            color: "white"
+                                        }
+                                    }
+                                }
                             }
 
-                            // Swallow clicks on the image so they don't fall
-                            // through to the scrim (which would close the preview).
+                            // Local mode: lbCard (and its click-catcher) is hidden,
+                            // so a centered MouseArea keeps click-on-focus-to-close.
                             MouseArea {
-                                anchors.fill: parent
-                                onClicked: {}
+                                visible: root.activeTab === "local"
+                                anchors.centerIn: parent
+                                width: lbCol.boxW
+                                height: lbCol.boxH
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.lightboxPath = ""
                             }
 
-                            // Rounded-corner mask source (20px) sampled by the
-                            // MultiEffect above; invisible in the scene graph.
-                            Item {
-                                id: lbMask
-                                anchors.fill: parent
-                                opacity: 0
+                            // Wallhaven keeps the classic single-card preview; on
+                            // the local tab lbCard hides itself (lbImg stays alive
+                            // as the aspect-ratio size driver) and the role-0
+                            // carousel delegate paints the focused image instead.
+                            Rectangle {
+                                id: lbCard
+                                visible: root.activeTab !== "local"
+                                anchors.centerIn: parent
+                                z: 10
+                                width: lbCol.boxW
+                                height: lbCol.boxH
+                                Behavior on width  { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                                Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+                                radius: 20
+                                color: "#111111"
+                                clip: true
+                                // QtQuick clip is rectangular and ignores radius, so the
+                                // 20px rounding comes from a MultiEffect layer mask.
                                 layer.enabled: true
-                                Rectangle {
+                                layer.effect: MultiEffect {
+                                    maskEnabled: true
+                                    maskSource: lbMask
+                                    maskThresholdMin: 0.5
+                                    maskSpreadAtMin: 1.0
+                                }
+
+                                Image {
+                                    id: lbImg
                                     anchors.fill: parent
-                                    radius: 20
-                                    color: "white"
+                                    source: root.lightboxPath === "" ? ""
+                                        : (root.lightboxPath.indexOf("http") === 0
+                                            ? root.lightboxPath : "file://" + root.lightboxPath)
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    cache: true
+                                    smooth: true
+                                    mipmap: false
+                                    // Cross-fade + subtle pop whenever the focused
+                                    // image changes so ← / → cycling glides instead
+                                    // of snapping to the next wallpaper.
+                                    onSourceChanged: { lbFade.restart(); lbPop.restart() }
+                                    NumberAnimation on opacity {
+                                        id: lbFade
+                                        from: 0.25; to: 1.0
+                                        duration: 180
+                                        easing.type: Easing.OutCubic
+                                    }
+                                }
+
+                                NumberAnimation on scale {
+                                    id: lbPop
+                                    from: 0.965; to: 1.0
+                                    duration: 220
+                                    easing.type: Easing.OutCubic
+                                }
+
+                                // Click on the focus card dismisses the preview
+                                // too (the scrim's own click-away also closes).
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.lightboxPath = ""
+                                }
+
+                                // Rounded-corner mask source (20px) sampled by the
+                                // MultiEffect above; invisible in the scene graph.
+                                Item {
+                                    id: lbMask
+                                    anchors.fill: parent
+                                    opacity: 0
+                                    layer.enabled: true
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        radius: 20
+                                        color: "white"
+                                    }
                                 }
                             }
                         }
 
                         RowLayout {
-                            width: lbCol.boxW
+                            width: lbStage.width
                             spacing: 10
 
                             Text {

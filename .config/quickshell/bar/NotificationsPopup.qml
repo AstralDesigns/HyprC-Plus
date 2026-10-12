@@ -133,10 +133,10 @@ Item {
                         anchors {
                             left: parent.left; right: parent.right
                             top: parent.top;   bottom: parent.bottom
-                            leftMargin: 8    // 6px urgency bar + 2px gap
-                            rightMargin: 6
-                            topMargin: 6
-                            bottomMargin: 6
+                            leftMargin: 10    // 6px urgency bar + 2px gap
+                            rightMargin: 8
+                            topMargin: 8
+                            bottomMargin: 8
                         }
                         radius: 12
                         color: _hov ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.80)

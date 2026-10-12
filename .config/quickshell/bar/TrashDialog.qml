@@ -41,6 +41,19 @@ PanelWindow {
         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                               Theme.cPrimary.b, 0.25)
 
+        // Inner OnSecondary card (UpdatesPopup parity): translucent fill inset
+        // from the blurred backdrop, dialog content inset from the card edge.
+        property real pad: 12
+        Rectangle {
+            id: card
+            anchors { fill: parent; margins: parent.pad }
+            radius: 14
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                           Theme.cOnSecondary.b, 0.50)
+            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                  Theme.cPrimary.b, 0.2)
+            clip: true
+
         Column {
             anchors.centerIn: parent
             anchors.verticalCenterOffset: -14
@@ -79,8 +92,8 @@ PanelWindow {
                 height: 34
                 radius: 17
                 color: cancelMa.containsMouse
-                       ? Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.35)
-                       : "transparent"
+                       ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                       : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
                 border.width: 1
                 border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                       Theme.cPrimary.b, 0.3)
@@ -128,6 +141,7 @@ PanelWindow {
                 }
             }
         }
+        } // Rectangle card
     }
 
     // Nautilus DBus first (matches GJS: passes parent-window + skip-confirm

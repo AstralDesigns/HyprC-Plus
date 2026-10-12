@@ -51,8 +51,12 @@ PanelWindow {
             right: parent.right
         }
 
-        width:  Math.max(240, col.implicitWidth + 32)
-        height: col.implicitHeight + 24
+        // Uniform gap, applied twice: once between the UI and the OnSecondary
+        // card edge, once between the card edge and the blurred panel window.
+        property real pad: 12
+
+        width:  Math.max(240, col.implicitWidth + pad * 4)
+        height: col.implicitHeight + pad * 4
 
         color: Theme.blurBackground
         radius:       20
@@ -66,14 +70,28 @@ PanelWindow {
         transformOrigin: win._barAtBottom ? Item.BottomRight : Item.TopRight
         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Behavior on scale   { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
-        Column {
-            id: col
-            anchors {
-                top: parent.top; left: parent.left; right: parent.right
-                topMargin: 12; bottomMargin: 12
-                leftMargin: 16; rightMargin: 16
-            }
-            spacing: 8
+
+        // Inner OnSecondary card: fills the blurred backdrop minus `pad`, and the
+        // UI Column is laid out inside it with the same `pad` inset. The fill is
+        // translucent (50 % alpha) so the blurred panel tone shows through.
+        Rectangle {
+            id: card
+            anchors { fill: parent; margins: popRect.pad }
+            radius: 14
+            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                           Theme.cOnSecondary.b, 0.50)
+            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                  Theme.cPrimary.b, 0.2)
+            clip: true
+
+            Column {
+                id: col
+                anchors {
+                    top: parent.top; left: parent.left; right: parent.right
+                    topMargin: popRect.pad; bottomMargin: popRect.pad
+                    leftMargin: popRect.pad; rightMargin: popRect.pad
+                }
+                spacing: 8
 
             // ════════════════════════════════════════════════════════════════
             // Section separator
@@ -128,7 +146,7 @@ PanelWindow {
                 height: 36
                 radius: 10
                 color: sysUpdateHover.containsMouse
-                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.35)
                     : Qt.rgba(Theme.cWc5.r, Theme.cWc5.g, Theme.cWc5.b, 0.35)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
@@ -229,7 +247,7 @@ PanelWindow {
                 height: 36
                 radius: 10
                 color: hcUpdateHover.containsMouse
-                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.35)
                     : Qt.rgba(Theme.cWc6.r, Theme.cWc6.g, Theme.cWc6.b, 0.35)
                 border.width: 1
         	border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
@@ -255,8 +273,9 @@ PanelWindow {
                     }
                 }
             }
-        }
-    }
+            } // Column col
+        } // Rectangle card
+    } // Rectangle popRect
 
     // ── System update process ─────────────────────────────────────────────────
     // Still launches kitty (system-update.sh is interactive / pacman-driven).
