@@ -1537,6 +1537,44 @@ body,
   color: var(--accent-red);
 }
 
+/* Tab right-click menu: matugen on-secondary surface, wider, with
+   right-aligned accelerators. */
+.tab-context-menu {
+  min-width: 200px;
+  background: var(--matugen-on-secondary, #1d343c);
+  border-color: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 45%, transparent);
+}
+
+.tab-context-menu button {
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.tab-context-menu button:hover {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 22%, transparent);
+  color: var(--text-primary);
+}
+
+.tab-context-menu button .menu-accel {
+  margin-left: auto;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  opacity: .65;
+  font-size: 10px;
+}
+
+.tab-context-menu button:disabled {
+  opacity: .38;
+  cursor: default;
+  pointer-events: none;
+}
+
+.menu-separator {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--border-subtle);
+}
+
 .context-chip {
   display: inline-flex;
   align-items: center;

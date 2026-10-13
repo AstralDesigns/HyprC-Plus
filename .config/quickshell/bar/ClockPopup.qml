@@ -261,7 +261,7 @@ Item {
             anchors.centerIn: parent
             width: 110
             height: 110
-            radius: 55
+            radius: 99
             color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
 			   Theme.cSurfaceTint.b, 0.45)
             border.width: 1
@@ -408,16 +408,39 @@ Item {
                 // Minute text only in the outer blur region (beyond the inner dial)
                 const minText = Qt.formatDateTime(time, "mm")
                 // Outer ring spans r=51 (inner dial edge) to r=78 (widget edge).
-                // Midpoint ≈ 63 — centers the minute text in the blurred ring region.
+                // Midpoint ≈ 65 — centers the minute text in the blurred ring region.
                 const rMin = 65
                 const minX = cx + rMin * Math.sin(minAngle)
                 const minY = cy - rMin * Math.cos(minAngle)
 
+                // Small circular container behind the minute text.
+                // The circle stays centered on (minX, minY); the text is then
+                // nudged so its actual ink (not just the em advance) sits on
+                // that same center, giving even padding on all four sides.
                 ctx.font = "bold 11px monospace"
                 ctx.textAlign = "center"
                 ctx.textBaseline = "middle"
+
+                let tx = minX
+                let ty = minY
+                const metrics = ctx.measureText(minText)
+                if (metrics && typeof metrics.actualBoundingBoxLeft === "number") {
+                    tx = minX - (metrics.actualBoundingBoxRight - metrics.actualBoundingBoxLeft) / 2
+                    ty = minY + (metrics.actualBoundingBoxAscent - metrics.actualBoundingBoxDescent) / 2
+                } else {
+                    // Qt Canvas without ink metrics: small visual-center nudge
+                    // (digits render slightly high/right under "middle").
+                    tx = minX - 0.5
+                    ty = minY + 1
+                }
+
+                ctx.fillStyle = Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.5).toString()
+                ctx.beginPath()
+                ctx.arc(minX, minY, 8, 0, 2 * Math.PI)
+                ctx.fill()
+
                 ctx.fillStyle = Theme.cWc2.toString()
-                ctx.fillText(minText, minX, minY)
+                ctx.fillText(minText, tx, ty)
             }
         }
     }

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Menu,
   ChevronDown,
@@ -18,6 +19,10 @@ import {
   Files,
   User,
   BookOpen,
+  Copy,
+  Check,
+  Pin,
+  ArrowRight,
 } from 'lucide-react';
 import { useStore, setStore, storeActions, PRESET_MODELS, FilePane } from '../store';
 import { bridge } from '../bridge';
@@ -40,6 +45,51 @@ export const Header: React.FC = () => {
   const tabRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const pointerStartRef = useRef<{ x: number; y: number; id: string } | null>(null);
   const suppressClickRef = useRef(false);
+
+  // Tab right-click menu (replaces the Qt WebEngine native context menu).
+  const [tabMenu, setTabMenu] = useState<{ x: number; y: number; paneId: string } | null>(null);
+
+  // Dismiss the tab menu on any outside press, Escape, or tab-row scroll.
+  useEffect(() => {
+    if (!tabMenu) return;
+    const close = () => setTabMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('blur', close);
+    window.addEventListener('keydown', onKey);
+    const onScroll = () => close();
+    tabsContainerRef.current?.addEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('blur', close);
+      window.removeEventListener('keydown', onKey);
+      tabsContainerRef.current?.removeEventListener('scroll', onScroll);
+    };
+  }, [tabMenu]);
+
+  const relativeToProject = (path: string) => {
+    const root = store.projectPath;
+    if (root && path.startsWith(root)) {
+      return path.slice(root.length).replace(/^\/+/, '') || path.split('/').pop() || path;
+    }
+    return path;
+  };
+
+  const runTabAction = (action: string) => {
+    const id = tabMenu?.paneId;
+    setTabMenu(null);
+    if (!id) return;
+    const pane = store.panes.find(p => p.id === id);
+    switch (action) {
+      case 'close': storeActions.closePane(id); break;
+      case 'close-others': storeActions.closeOtherPanes(id); break;
+      case 'close-right': storeActions.closePanesToRight(id); break;
+      case 'close-saved': storeActions.closeSavedPanes(); break;
+      case 'close-all': storeActions.closeAllPanes(); break;
+      case 'copy-path': if (pane?.path) void navigator.clipboard?.writeText(pane.path); break;
+      case 'copy-relative': if (pane?.path) void navigator.clipboard?.writeText(relativeToProject(pane.path)); break;
+    }
+  };
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -274,6 +324,13 @@ export const Header: React.FC = () => {
               className={`header-tab ${isActive ? 'active' : ''} ${dragOverId === pane.id ? 'tab-drag-over' : ''} ${draggedId === pane.id ? 'tab-dragging' : ''}`}
               onClick={() => { if (!suppressClickRef.current) storeActions.setActivePane(pane.id); }}
               title={pane.path || pane.name}
+              onContextMenu={(e) => {
+                // Suppress the Qt WebEngine native menu and show our own.
+                e.preventDefault();
+                e.stopPropagation();
+                storeActions.setActivePane(pane.id);
+                setTabMenu({ x: e.clientX, y: e.clientY, paneId: pane.id });
+              }}
               onPointerDown={(e) => {
                 // Manual pointer-based reordering instead of native HTML5
                 // drag-and-drop: the native DnD API depends on platform
@@ -438,6 +495,38 @@ export const Header: React.FC = () => {
           <MessageSquare size={15} />
         </button>
       </div>
+
+      {tabMenu && createPortal(
+        (() => {
+          const idx = store.panes.findIndex(p => p.id === tabMenu.paneId);
+          const pane = idx >= 0 ? store.panes[idx] : null;
+          if (!pane) return null;
+          const hasRight = idx < store.panes.length - 1;
+          const hasOthers = store.panes.length > 1;
+          const anySaved = store.panes.some(p => !p.isUnsaved);
+          // Keep the menu inside the viewport.
+          const left = Math.min(tabMenu.x, window.innerWidth - 210);
+          const top = Math.min(tabMenu.y, window.innerHeight - 280);
+          return (
+            <div
+              className="agent-context-menu tab-context-menu"
+              style={{ left, top }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onContextMenu={(e) => e.preventDefault()}
+            >
+              <button onClick={() => runTabAction('close')}><X size={13} /> Close<span className="menu-accel">Ctrl+W</span></button>
+              <button disabled={!hasOthers} onClick={() => runTabAction('close-others')}><Files size={13} /> Close Others</button>
+              <button disabled={!hasRight} onClick={() => runTabAction('close-right')}><ArrowRight size={13} /> Close to the Right</button>
+              <button disabled={!anySaved} onClick={() => runTabAction('close-saved')}><Check size={13} /> Close Saved</button>
+              <button onClick={() => runTabAction('close-all')}><X size={13} /> Close All</button>
+              <div className="menu-separator" />
+              <button disabled={!pane.path} onClick={() => runTabAction('copy-path')}><Copy size={13} /> Copy Path<span className="menu-accel">Ctrl+Alt+C</span></button>
+              <button disabled={!pane.path} onClick={() => runTabAction('copy-relative')}><Copy size={13} /> Copy Relative Path</button>
+            </div>
+          );
+        })(),
+        document.body,
+      )}
     </header>
   );
 };

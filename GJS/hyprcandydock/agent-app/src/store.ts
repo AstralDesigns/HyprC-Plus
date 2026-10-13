@@ -1034,6 +1034,48 @@ export const storeActions = {
     });
   },
 
+  /** Close a set of panes at once (tab context-menu bulk actions), choosing a
+   * sensible surviving active pane. Mirrors closePane's bookkeeping. */
+  closePanes: (ids: string[]) => {
+    if (!ids.length) return;
+    const idSet = new Set(ids);
+    setStore(prev => {
+      const remaining = prev.panes.filter(p => !idSet.has(p.id));
+      let newActiveId = prev.activePaneId;
+      if (newActiveId && idSet.has(newActiveId)) {
+        newActiveId = remaining.length ? remaining[remaining.length - 1].id : null;
+      }
+      return {
+        panes: remaining,
+        activePaneId: newActiveId,
+        activeOpenFile: newActiveId,
+        openFiles: prev.openFiles.filter(f => !idSet.has(f)),
+      };
+    });
+  },
+
+  closeOtherPanes: (id: string) => {
+    const ids = getStore().panes.filter(p => p.id !== id).map(p => p.id);
+    storeActions.closePanes(ids);
+    storeActions.setActivePane(id);
+  },
+
+  closePanesToRight: (id: string) => {
+    const panes = getStore().panes;
+    const idx = panes.findIndex(p => p.id === id);
+    if (idx === -1) return;
+    storeActions.closePanes(panes.slice(idx + 1).map(p => p.id));
+  },
+
+  closeAllPanes: () => {
+    storeActions.closePanes(getStore().panes.map(p => p.id));
+  },
+
+  /** Close every pane with no unsaved edits (keeps the dirty ones). */
+  closeSavedPanes: () => {
+    storeActions.closePanes(getStore().panes.filter(p => !p.isUnsaved).map(p => p.id));
+  },
+
   /** Drag-to-rearrange for the Canvas tab row. */
   reorderPanes: (draggedId: string, targetId: string) => {
     if (draggedId === targetId) return;
