@@ -365,7 +365,7 @@ Item {
 
         radius: 16
         color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                       Theme.cSurfaceTint.b, 0.65)
+                       Theme.cSurfaceTint.b, 0.35)
         border.width: 1
         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
