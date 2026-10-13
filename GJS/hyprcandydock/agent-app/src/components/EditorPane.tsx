@@ -4,12 +4,7 @@ import { Image as ImageIcon, Video, X } from 'lucide-react';
 import { useStore, setStore, storeActions } from '../store';
 import { getMediaUrl } from '../utils/media';
 import { registerMonacoThemes } from '../utils/monacoThemes';
-
-function languageFor(path: string) {
-  const ext = path.split('.').pop()?.toLowerCase();
-  const map: Record<string, string> = { ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', json: 'json', css: 'css', html: 'html', md: 'markdown', py: 'python', sh: 'shell' };
-  return map[ext || ''] || 'plaintext';
-}
+import { languageForPath, registerCustomLanguages, attachDiagnostics } from '../utils/monacoLanguages';
 
 export const EditorPane: React.FC = () => {
   const [store] = useStore();
@@ -34,12 +29,13 @@ export const EditorPane: React.FC = () => {
       {!isImage && !isVideo && <Editor
         height="100%"
         theme={store.monacoTheme === 'matugen' || !store.monacoTheme ? 'matugen' : store.monacoTheme}
-        beforeMount={(monaco) => registerMonacoThemes(monaco)}
-        onMount={(_editor, monaco) => {
+        beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); }}
+        onMount={(editor, monaco) => {
           const targetTheme = store.monacoTheme === 'matugen' || !store.monacoTheme ? 'matugen' : store.monacoTheme;
           try { monaco.editor.setTheme(targetTheme); } catch (_) {}
+          try { attachDiagnostics(monaco, editor); } catch (_) {}
         }}
-        language={languageFor(path)}
+        language={languageForPath(path)}
         value={store.openFileContents[path] || ''}
         options={{ minimap: { enabled: false }, fontSize: 12, wordWrap: 'on', automaticLayout: true, padding: { top: 12 }, accessibilitySupport: 'off', experimentalGpuAcceleration: 'off' }}
       />}

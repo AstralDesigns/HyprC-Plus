@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { bridge } from './bridge';
+import { EXTENSION_LANGUAGE_MAP } from './utils/monacoLanguages';
 
 export interface DiffData {
   filePath: string;
@@ -297,35 +298,7 @@ function createDefaultSession(): Session {
 }
 
 function getLanguageForExt(ext: string): string {
-  const map: Record<string, string> = {
-    ts: 'typescript',
-    tsx: 'typescript',
-    js: 'javascript',
-    jsx: 'javascript',
-    json: 'json',
-    css: 'css',
-    scss: 'scss',
-    html: 'html',
-    md: 'markdown',
-    py: 'python',
-    sh: 'shell',
-    bash: 'shell',
-    zsh: 'shell',
-    c: 'c',
-    cpp: 'cpp',
-    h: 'c',
-    hpp: 'cpp',
-    rs: 'rust',
-    go: 'go',
-    yaml: 'yaml',
-    yml: 'yaml',
-    toml: 'toml',
-    ini: 'ini',
-    conf: 'shell',
-    sql: 'sql',
-    txt: 'plaintext',
-  };
-  return map[ext.toLowerCase()] || 'plaintext';
+  return EXTENSION_LANGUAGE_MAP[ext.toLowerCase()] || 'plaintext';
 }
 
 function loadInitialState(): AppState {

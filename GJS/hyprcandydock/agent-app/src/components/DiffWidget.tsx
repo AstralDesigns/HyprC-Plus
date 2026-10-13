@@ -3,6 +3,7 @@ import { DiffEditor } from '@monaco-editor/react';
 import { Check, X, ChevronDown, ChevronRight, FileCode, FilePlus2, CheckCircle2, XCircle, ExternalLink, Eye } from 'lucide-react';
 import { DiffData, storeActions, useStore } from '../store';
 import { registerMonacoThemes } from '../utils/monacoThemes';
+import { languageForPath, registerCustomLanguages } from '../utils/monacoLanguages';
 
 interface DiffWidgetProps {
   sessionId: string;
@@ -93,7 +94,7 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
             key={`${diff.filePath}:${diff.status}`}
             height="260px"
             theme={targetTheme}
-            beforeMount={(monaco) => registerMonacoThemes(monaco)}
+            beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); }}
             language={getLanguageFromPath(diff.filePath)}
             original={diff.originalCode}
             modified={diff.modifiedCode}
@@ -124,12 +125,5 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
 };
 
 export function getLanguageFromPath(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase() || '';
-  const map: Record<string, string> = {
-    js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript',
-    py: 'python', sh: 'shell', bash: 'shell', json: 'json', css: 'css',
-    html: 'html', md: 'markdown', yml: 'yaml', yaml: 'yaml', rs: 'rust',
-    go: 'go', c: 'c', cpp: 'cpp',
-  };
-  return map[ext] || 'plaintext';
+  return languageForPath(filePath);
 }

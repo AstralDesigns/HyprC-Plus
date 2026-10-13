@@ -363,12 +363,23 @@ body,
   box-shadow: var(--shadow-sm);
 }
 
+/* Active-pane marker: a thin matugen-primary underline tucked under the
+   focused tab's file name. The left-side dot already flags unsaved changes,
+   so this cue tracks *focus* and follows the injected theme. Drawn with a
+   box-shadow (not a clipped ::after) because .tab-title uses overflow:hidden
+   for its ellipsis, and a box-shadow neither clips nor shifts the layout. */
+.header-tab.active .tab-title {
+  color: var(--text-primary);
+  box-shadow: 0 1px 0 var(--matugen-primary, #a0c9dc);
+}
+
 .tab-unsaved-dot {
   width: 5px;
   height: 5px;
   border-radius: 50%;
   background: var(--accent-cyan);
   box-shadow: 0 0 6px var(--accent-cyan);
+  flex-shrink: 0;
 }
 
 .tab-title {

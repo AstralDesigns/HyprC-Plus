@@ -14,6 +14,7 @@ import { useStoreSelector, storeActions, getStore } from '../store';
 import { MediaGallery } from './MediaGallery';
 import { bridge } from '../bridge';
 import { registerMonacoThemes, applyMatugenThemeNow } from '../utils/monacoThemes';
+import { registerCustomLanguages, attachDiagnostics } from '../utils/monacoLanguages';
 import { getMediaUrl } from '../utils/media';
 
 /**
@@ -259,7 +260,7 @@ export const Canvas: React.FC = () => {
                     key={`${pane.path}:${pendingEdit!.timestamp}`}
                     height="100%"
                     theme={targetTheme}
-                    beforeMount={(monaco) => { registerMonacoThemes(monaco); monacoRef.current = monaco; }}
+                    beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); monacoRef.current = monaco; }}
                     language={pane.language || 'plaintext'}
                     original={pendingEdit!.oldContent}
                     modified={pane.content}
@@ -279,11 +280,15 @@ export const Canvas: React.FC = () => {
                   <Editor
                     height="100%"
                     theme={targetTheme}
-                    beforeMount={(monaco) => { registerMonacoThemes(monaco); monacoRef.current = monaco; }}
+                    beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); monacoRef.current = monaco; }}
                     onMount={(editor, monaco) => {
                       // Explicitly force the correct theme after all themes are registered.
                       // The `theme` prop alone can race with defineTheme; this guarantees winner.
                       try { monaco.editor.setTheme(targetTheme); } catch (_) {}
+                      // Live syntax markers for languages without a Monaco worker
+                      // (Lua via luaparse, QML structural check); JSON/CSS/HTML/TS
+                      // are validated by their own workers.
+                      try { attachDiagnostics(monaco, editor); } catch (_) {}
 
                       // Restore where you left off — Canvas unmounts/remounts
                       // a fresh editor on every tab switch (only the active
