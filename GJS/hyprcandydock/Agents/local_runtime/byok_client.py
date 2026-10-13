@@ -2,8 +2,9 @@
 byok_client.py — Bring Your Own Key (BYOK) cloud provider client
 
 Supports: OpenRouter, Groq, Google Gemini, Anthropic, OpenAI, xAI (Grok)
-All providers yield the same event dict format as local_backend in agent_loop.py:
+All providers yield the same event dict format as stream_cloud in cloud_client.py:
   {"type": "token",      "content": str}
+  {"type": "reasoning",  "content": str}   # chain-of-thought where the model provides it
   {"type": "tool_calls", "calls": [{"id": str, "name": str, "arguments": str}]}
   {"type": "done"}
   {"type": "error",      "message": str}
@@ -488,7 +489,11 @@ async def _stream_google(
                             content_block = candidate.get("content", {})
                             for part in content_block.get("parts", []):
                                 if "text" in part:
-                                    yield {"type": "token", "content": part["text"]}
+                                    # Gemini flags reasoning parts with `thought: true`.
+                                    if part.get("thought"):
+                                        yield {"type": "reasoning", "content": part["text"]}
+                                    else:
+                                        yield {"type": "token", "content": part["text"]}
                                 elif "functionCall" in part:
                                     fc = part["functionCall"]
                                     call_id = f"google_{fc.get('name', 'fn')}_{len(tool_call_buffer)}"
@@ -580,6 +585,14 @@ async def _stream_openai_compat(
                         delta = choice.get("delta", {})
                         if delta.get("content"):
                             yield {"type": "token", "content": delta["content"]}
+                        # Reasoning / chain-of-thought deltas. Provider key varies:
+                        # OpenRouter uses `reasoning`, DeepSeek-R1 & Groq gpt-oss use
+                        # `reasoning_content`, OpenAI o-series `reasoning_summary_text`.
+                        reasoning = (delta.get("reasoning")
+                                     or delta.get("reasoning_content")
+                                     or delta.get("reasoning_summary_text"))
+                        if reasoning:
+                            yield {"type": "reasoning", "content": reasoning}
                         for tc_delta in delta.get("tool_calls") or []:
                             idx = str(tc_delta.get("index", 0))
                             if idx not in tool_call_buffer:
@@ -637,6 +650,10 @@ async def _stream_anthropic(
         "messages": filtered,
         "max_tokens": 8192,
         "stream": True,
+        # Extended thinking → emits thinking_delta events we surface as real
+        # reasoning. budget_tokens must be >=1024 and < max_tokens, and
+        # temperature must stay at its default (1) when thinking is on.
+        "thinking": {"type": "enabled", "budget_tokens": 2048},
     }
     if system_text:
         payload["system"] = system_text
@@ -697,6 +714,8 @@ async def _stream_anthropic(
                             delta = event.get("delta", {})
                             if delta.get("type") == "text_delta":
                                 yield {"type": "token", "content": delta.get("text", "")}
+                            elif delta.get("type") == "thinking_delta":
+                                yield {"type": "reasoning", "content": delta.get("thinking", "")}
                             elif delta.get("type") == "input_json_delta" and current_tool_id:
                                 tool_call_buffer[current_tool_id]["arguments"] += delta.get("partial_json", "")
                         elif etype == "message_stop":

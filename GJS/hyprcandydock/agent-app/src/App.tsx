@@ -7,6 +7,7 @@ import { Canvas } from './components/Canvas';
 import { ChatPanel } from './components/ChatPanel';
 import { ModelManager } from './components/ModelManager';
 import { ProfileModal } from './components/ProfileModal';
+import { MemoryPanel } from './components/MemoryPanel';
 import { agentEngine } from './engine/agent-engine';
 
 interface ErrorBoundaryProps { children: ReactNode; }
@@ -142,8 +143,17 @@ export const App: React.FC = () => {
     window.addEventListener('error', onUncaughtError);
     window.addEventListener('beforeunload', onBeforeUnload);
 
+    // §3.1 (rev. Option A) — Ctrl/Cmd+N starts a new Quest from the keyboard,
+    // mirroring the ChatPanel Quests dropdown and the agent_new_chat host event.
+    const onKeyDown = (ev: KeyboardEvent) => {
+      if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'n' || ev.key === 'N')) {
+        ev.preventDefault();
+        storeActions.createSession();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
     // Auto-activate last active Cloud tab model/provider if saved from previous session.
-    // The Local tab model is intentionally NOT auto-activated on next workspace session (llama-server stays OFF).
     {
       const autoActivateCloudModel = async () => {
         const current = getStore();
@@ -203,6 +213,7 @@ export const App: React.FC = () => {
       window.removeEventListener('unhandledrejection', onUnhandledRejection);
       window.removeEventListener('error', onUncaughtError);
       window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('keydown', onKeyDown);
       try { persistStoreNow(); } catch (_) { /* noop */ }
     };
   }, []);
@@ -246,6 +257,7 @@ export const App: React.FC = () => {
 
         <ModelManager />
         <ProfileModal />
+        <MemoryPanel />
       </div>
     </AppErrorBoundary>
   );

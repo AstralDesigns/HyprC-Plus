@@ -7,7 +7,7 @@ import {
   Brain, Zap, Eye, ListChecks,
   X,
 } from 'lucide-react';
-import { useStore, getStore, Message, ToolCallData, storeActions, setStore } from '../store';
+import { useStore, getStore, Message, ToolCallData, storeActions, setStore, type PlanTask, type SuggestionsData, type SuggestionOption } from '../store';
 import { DiffWidget } from './DiffWidget';
 import { CommandWidget } from './CommandWidget';
 import { agentEngine } from '../engine/agent-engine';
@@ -132,6 +132,91 @@ const InterstitialLine: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
+/* ── Live task checklist (§3.5) ─────────────────────────────────────────
+   The Python agent loop's todo_add/start/done/skip/list tools all carry the
+   authoritative plan snapshot in their tool_result `list` string (rendered by
+   _TodoList.format()), e.g.:
+       Todo (1/3 done):
+         ✓ [1] Read the config
+         ▶ [2] Edit the composer
+         ☐ [3] Verify build
+   We replay the latest such snapshot across the session's assistant turns and
+   promote it to a live PlanTask[] checklist card instead of the old
+   "Updating plan…" activity line alone. Reuses the existing PlanTask type. */
+const TODO_TOOL_NAMES = ['todo_add', 'todo_start', 'todo_done', 'todo_skip', 'todo_list'];
+
+function parseTodoList(text: string): PlanTask[] {
+  const tasks: PlanTask[] = [];
+  for (const rawLine of (text || '').split('\n')) {
+    const line = rawLine.trim();
+    // "✓ [2] Edit the composer (skipped: …)" — mark, [id], title
+    const m = line.match(/^([✓▶○☐])\s*\[(\d+)\]\s*(.*)$/);
+    if (!m) continue;
+    const [, mark, id, rest] = m;
+    const status: PlanTask['status'] =
+      mark === '✓' ? 'completed' :
+      mark === '▶' ? 'in_progress' :
+      mark === '○' ? 'blocked' : 'pending';
+    // Strip a trailing "(skipped: reason)" note into detail.
+    let detail: string | undefined;
+    let title = rest.trim();
+    const skipNote = title.match(/\s*\(skipped:\s*(.*)\)$/i);
+    if (skipNote) { detail = skipNote[1]; title = title.replace(skipNote[0], '').trim(); }
+    tasks.push({ id, title, status, detail });
+  }
+  return tasks;
+}
+
+/** Most recent plan snapshot present in a session's messages, if any. */
+function deriveLivePlan(messages: Message[]): PlanTask[] {
+  let latest: PlanTask[] = [];
+  for (const msg of messages) {
+    if (msg.role !== 'assistant') continue;
+    for (const tool of msg.tools || []) {
+      if (!TODO_TOOL_NAMES.includes(tool.name) || tool.status !== 'completed') continue;
+      const list = (tool.result as any)?.list;
+      if (typeof list === 'string' && list.includes('[')) {
+        const parsed = parseTodoList(list);
+        if (parsed.length > 0) latest = parsed;
+      }
+    }
+  }
+  return latest;
+}
+
+const PlanChecklistCard: React.FC<{ tasks: PlanTask[]; running: boolean }> = ({ tasks, running }) => {
+  const [collapsed, setCollapsed] = useState(false);
+  const done = tasks.filter(t => t.status === 'completed').length;
+  const allDone = done === tasks.length && tasks.length > 0;
+  const boxColor = (s: PlanTask['status']) =>
+    s === 'completed' ? '#22c55e' : s === 'in_progress' ? 'var(--matugen-primary, #a0c9dc)' : s === 'blocked' ? 'var(--matugen-error, #ffb4ab)' : 'var(--text-muted)';
+  return (
+    <div className="plan-checklist-card animate-fade-in">
+      <div className="plan-checklist-header" onClick={() => setCollapsed(c => !c)}>
+        {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+        <ListChecks size={13} color={allDone ? '#22c55e' : 'var(--matugen-primary, #a0c9dc)'} />
+        <span className="plan-checklist-title">Quest plan</span>
+        <span className="plan-checklist-count">{done}/{tasks.length}</span>
+        {running && !allDone && <Clock size={11} className="agent-activity-spin" />}
+      </div>
+      {!collapsed && (
+        <div className="plan-checklist-body">
+          {tasks.map(t => (
+            <label key={t.id} className={`plan-checklist-row status-${t.status}`} title={t.detail}>
+              <span className="plan-checklist-box" style={{ borderColor: boxColor(t.status), color: boxColor(t.status) }}>
+                {t.status === 'completed' ? <Check size={11} />
+                  : t.status === 'in_progress' ? <Zap size={10} />
+                  : t.status === 'blocked' ? <X size={10} /> : null}
+              </span>
+              <span className="plan-checklist-text">{t.title}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ── Agent activity: single morphing line ↔ cascading timeline ────────── */
 const AgentActivity: React.FC<{ tools: ToolCallData[]; running: boolean }> = ({ tools, running }) => {
   const [expanded, setExpanded] = useState(false);
@@ -195,6 +280,137 @@ const TaskCompleteWidget: React.FC<{ summary: string; remaining?: string }> = ({
 );
 
 /* ── Main stream ────────────────────────────────────────────────────── */
+/* ── Visible reasoning: collapsible, dimmed chain-of-thought ─────── */
+const ReasoningSection: React.FC<{ content: string; live: boolean }> = ({ content, live }) => {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className={`reasoning-section ${expanded ? 'reasoning-expanded' : ''}`}>
+      <div className="reasoning-header" onClick={() => setExpanded(e => !e)}>
+        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <Brain size={12} />
+        <span className="reasoning-title">Thinking</span>
+        {live && <Clock size={11} className="agent-activity-spin" />}
+      </div>
+      {expanded && <div className="reasoning-body">{content}</div>}
+    </div>
+  );
+};
+
+/* ── Steering marker: an instruction the user injected mid-run ─────── */
+const SteerMarker: React.FC<{ content: string }> = ({ content }) => (
+  <div className="steer-marker animate-fade-in">
+    <Zap size={11} />
+    <span className="steer-marker-label">Steered</span>
+    <span className="steer-marker-text">{content}</span>
+  </div>
+);
+
+/* Tapping a chip dispatches its promptText: steer the running turn when one is
+   active (or when the option opts into it), otherwise start a fresh turn via the
+   composer's agent_user_prompt path. Consumed chips clear the composer row. */
+const dispatchSuggestion = (opt: SuggestionOption) => {
+  const text = (opt.promptText || opt.label || '').trim();
+  if (!text) return;
+  setStore({ activeSuggestions: null });
+  const running = getStore().agentRunning;
+  if (opt.sendAs === 'steer' || running) {
+    void agentEngine.steer(text).then((ok) => {
+      if (!ok) window.dispatchEvent(new CustomEvent('agent_user_prompt', { detail: text }));
+    });
+  } else {
+    window.dispatchEvent(new CustomEvent('agent_user_prompt', { detail: text }));
+  }
+};
+
+/* ── Suggestion chips (clarify / next-step) ──────────────────── */
+const SuggestionChips: React.FC<{ data: SuggestionsData }> = ({ data }) => (
+  <div className="suggestion-block animate-fade-in">
+    {data.question ? <div className="suggestion-question">{data.question}</div> : null}
+    <div className="suggestion-chips">
+      {data.options.map((opt, idx) => (
+        <button
+          key={`${opt.label}-${idx}`}
+          type="button"
+          className="suggestion-chip"
+          onClick={() => dispatchSuggestion(opt)}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
+/* ── Spec-driven plan card (§3.4): markdown + Approve/Revise/Cancel gate ── */
+const SpecCard: React.FC<{ markdown: string; status: 'drafting' | 'ready'; actionable: boolean }> = ({ markdown, status, actionable }) => {
+  const [revising, setRevising] = useState(false);
+  const [reviseText, setReviseText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const act = (fn: () => Promise<boolean>) => { setBusy(true); void fn().finally(() => setBusy(false)); };
+  return (
+    <div className="spec-card animate-fade-in">
+      <div className="spec-card-header">
+        <ListChecks size={14} />
+        <span className="spec-card-title">Implementation plan</span>
+        {status === 'drafting' && <span className="spec-card-badge">drafting…</span>}
+      </div>
+      <div className="spec-card-body">
+        {status === 'drafting'
+          ? <div className="spec-card-drafting">Drafting a plan for your review…</div>
+          : <div className="markdown-body"><ReactMarkdown>{markdown}</ReactMarkdown></div>}
+      </div>
+      {actionable && status === 'ready' && (
+        <div className="spec-card-actions">
+          {revising ? (
+            <div className="spec-revise">
+              <textarea
+                className="spec-revise-input"
+                value={reviseText}
+                onChange={e => setReviseText(e.target.value)}
+                placeholder="What should change about this plan?"
+                rows={2}
+              />
+              <div className="spec-revise-btns">
+                <button className="spec-btn spec-btn-ghost" onClick={() => setRevising(false)} disabled={busy}>Back</button>
+                <button className="spec-btn" onClick={() => act(() => agentEngine.approve('revise', reviseText).then(() => { setReviseText(''); setRevising(false); return true; }))} disabled={busy || !reviseText.trim()}>Send revision</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button className="spec-btn spec-btn-primary" onClick={() => act(() => agentEngine.approve('approve'))} disabled={busy}><CheckCircle size={13} /> Approve &amp; execute</button>
+              <button className="spec-btn" onClick={() => setRevising(true)} disabled={busy}><Edit2 size={12} /> Revise</button>
+              <button className="spec-btn spec-btn-ghost" onClick={() => act(() => agentEngine.approve('cancel'))} disabled={busy}><X size={12} /> Cancel</button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ── Verification gate card (§3.8): build/test result with log ─────── */
+const VerificationCard: React.FC<{ command: string; status: 'running' | 'complete'; exitCode?: number; output?: string; passed?: boolean }> = ({ command, exitCode, output, passed }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={`verification-card animate-fade-in ${passed === true ? 'status-passed' : passed === false ? 'status-failed' : 'status-running'}`}>
+      <div className="verification-header" onClick={() => output && setOpen(o => !o)}>
+        {passed === true
+          ? <CheckCircle size={13} color="#22c55e" />
+          : passed === false
+          ? <X size={13} color="var(--matugen-error, #ef4444)" />
+          : <Clock size={13} className="agent-activity-spin" />}
+        <Terminal size={12} />
+        <code className="verification-cmd">{command}</code>
+        <span className="verification-status">
+          {passed === true ? 'passed' : passed === false ? `failed · exit ${exitCode}` : 'running…'}
+        </span>
+        {output ? <span className="verification-toggle">{open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}</span> : null}
+      </div>
+      {open && output && <pre className="verification-output">{output}</pre>}
+    </div>
+  );
+};
+
 export const ChatStream: React.FC = () => {
   const [store] = useStore();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -251,6 +467,7 @@ export const ChatStream: React.FC = () => {
   // Live phase from the last assistant message
   const lastMsg = messages[messages.length - 1];
   const currentPhase = store.agentRunning ? deriveAgentPhase(lastMsg?.tools) : null;
+  const livePlan = deriveLivePlan(messages);
 
   return (
     <>
@@ -263,6 +480,9 @@ export const ChatStream: React.FC = () => {
         flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 14px',
         display: 'flex', flexDirection: 'column', gap: '4px',
       }}>
+        {livePlan.length > 0 && (
+          <PlanChecklistCard tasks={livePlan} running={store.agentRunning} />
+        )}
         {messages.map((msg, idx) => (
         <MessageBlock
           key={msg.id || idx}
@@ -348,6 +568,11 @@ const UserBubble: React.FC<{
     setIsEditing(false);
     if (agentRunning) agentEngine.cancel();
     const historyBefore = previousMessages.map(m => ({ role: m.role, content: m.content }));
+    // Roll the workspace back to before this prompt's turn(s) *before* we
+    // truncate them away, so edit-&-resend starts from the same state the
+    // original prompt saw. Must read the doomed turn ids from the store
+    // while they still exist.
+    await storeActions.revertTurnsAfter(sessionId, previousMessages.length);
     storeActions.editMessage(sessionId, message.id, text);
     try {
       const currentStore = getStore();
@@ -454,6 +679,24 @@ const AgentTurn: React.FC<{
   const taskResult = taskComplete?.result as { summary?: string; remaining?: string } | undefined;
   const running = isLast && agentRunning;
 
+  // Per-turn revert (P3 §3.7): only offered when this turn actually wrote
+  // files (has diffs) and carries a turnId the runtime ledger can roll back.
+  // Hidden while the turn is still running, and dims to a "reverted" state
+  // once store.revertTurn has marked its diffs rejected.
+  const touchedFiles = (message.diffs?.length || 0) > 0 || (message.blocks?.some(b => b.type === 'diff') ?? false);
+  const diffsAllRejected = (() => {
+    const ds = message.diffs || [];
+    const bs = (message.blocks || []).filter(b => b.type === 'diff').map(b => (b as any).diff);
+    const all = [...ds, ...bs];
+    return all.length > 0 && all.every(d => d.status === 'rejected');
+  })();
+  const canRevert = !!message.turnId && touchedFiles && !running && !diffsAllRejected;
+  const [reverting, setReverting] = useState(false);
+  const handleRevert = () => {
+    setReverting(true);
+    void storeActions.revertTurn(sessionId, message.id).finally(() => setReverting(false));
+  };
+
   // Fallback for messages persisted before the block model existed (or any
   // message that never got a blocks array attached) — reconstruct the old
   // fixed-order layout so old sessions don't render blank.
@@ -495,6 +738,17 @@ const AgentTurn: React.FC<{
                 {copied ? <Check size={10} color="#22c55e" /> : <Copy size={10} />}
               </button>
             )}
+            {canRevert && (
+              <button
+                className="bubble-action-btn agent-turn-revert"
+                onClick={handleRevert}
+                disabled={reverting}
+                title="Revert this turn's file changes"
+              >
+                <RotateCcw size={10} />
+                <span>{reverting ? 'Reverting…' : 'Revert turn'}</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -533,6 +787,37 @@ const AgentTurn: React.FC<{
                 <div key={block.id} style={{ marginTop: '4px' }}>
                   <DiffWidget sessionId={sessionId} messageId={message.id} diff={block.diff} />
                 </div>
+              );
+            }
+            if (block.type === 'reasoning') {
+              return <ReasoningSection key={block.id} content={block.content} live={running && isFinalPosition} />;
+            }
+            if (block.type === 'steer') {
+              return <SteerMarker key={block.id} content={block.content} />;
+            }
+            if (block.type === 'suggestions') {
+              return <SuggestionChips key={block.id} data={block.suggestions} />;
+            }
+            if (block.type === 'spec') {
+              return (
+                <SpecCard
+                  key={block.id}
+                  markdown={block.markdown}
+                  status={block.status}
+                  actionable={running && isFinalPosition && getStore().specApprovalPending}
+                />
+              );
+            }
+            if (block.type === 'verification') {
+              return (
+                <VerificationCard
+                  key={block.id}
+                  command={block.command}
+                  status={block.status}
+                  exitCode={block.exitCode}
+                  output={block.output}
+                  passed={block.passed}
+                />
               );
             }
             return null;

@@ -104,10 +104,10 @@ export const ChatPanel: React.FC = () => {
               type="button"
               className={`chat-header-btn ${showSessionsDropdown ? 'active' : ''}`}
               onClick={() => setShowSessionsDropdown(!showSessionsDropdown)}
-              title="Switch or create chat session"
+              title="Switch or create quest"
             >
               <span className="chat-session-btn-title">
-                {activeSession?.title || 'Chats'}
+                {activeSession?.title || 'Quests'}
               </span>
               <ChevronDown size={12} className={showSessionsDropdown ? 'rotate-180' : ''} />
             </button>
@@ -123,11 +123,12 @@ export const ChatPanel: React.FC = () => {
                   }}
                 >
                   <Plus size={13} color="var(--accent-cyan)" />
-                  <span>+ New Chat</span>
+                  <span>New Quest</span>
                 </button>
 
+                <div className="dropdown-quests-label">Quests</div>
                 <div className="dropdown-sessions-list">
-                  {store.sessions.map(s => (
+                  {[...store.sessions].sort((a, b) => b.updatedAt - a.updatedAt).map(s => (
                     <div
                       key={s.id}
                       className={`dropdown-session-item ${s.id === store.activeSessionId ? 'active' : ''}`}
@@ -136,6 +137,7 @@ export const ChatPanel: React.FC = () => {
                         storeActions.switchSession(s.id);
                         setShowSessionsDropdown(false);
                       }}
+                      onDoubleClick={(e) => { if (renamingId !== s.id) startRename(e, s.id, s.title); }}
                     >
                       <MessageSquare size={12} className="session-icon" />
                       {renamingId === s.id ? (
@@ -171,7 +173,7 @@ export const ChatPanel: React.FC = () => {
                           type="button"
                           className="session-delete-btn"
                           onClick={(e) => startRename(e, s.id, s.title)}
-                          title="Rename chat"
+                          title="Rename quest"
                         >
                           <Pencil size={12} />
                         </button>
@@ -183,7 +185,7 @@ export const ChatPanel: React.FC = () => {
                           e.stopPropagation();
                           storeActions.deleteSession(s.id);
                         }}
-                        title="Delete chat"
+                        title="Delete quest"
                       >
                         <X size={12} />
                       </button>

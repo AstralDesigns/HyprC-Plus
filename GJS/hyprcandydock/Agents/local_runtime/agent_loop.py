@@ -1,14 +1,22 @@
 """
 agent_loop.py — Unified multi-step agentic loop for HyprCandy Agent
 
-Handles both local (llama-server) and cloud (Vercel AI Gateway) backends
-through a single `backend_fn` interface.
+Handles the BYOK provider and managed-cloud (Vercel AI Gateway) backends
+through a single `backend_fn` interface. There is no local backend: llama.cpp
+and WebLLM were fully removed from the product (2026-10).
 
 Emits poll-ready dicts:
   {"type": "token",        "data": "..."}
+  {"type": "reasoning",    "data": {"text": "..."}}                 # real chain-of-thought
   {"type": "tool_start",   "data": {"id": "...", "name": "...", "arguments": {...}}}
   {"type": "tool_result",  "data": {"id": "...", "name": "...", "result": any}}
   {"type": "tool_error",   "data": {"id": "...", "name": "...", "error": "..."}}
+  {"type": "steer_ack",    "data": {"text": "..."}}                 # injected user instruction accepted
+  {"type": "suggestions",  "data": {"mode": "...", "question": str, "options": [...]}}
+  {"type": "spec",         "data": {"status": "drafting"|"ready", "markdown": str}}  # spec-driven plan
+  {"type": "awaiting_approval", "data": {"question": str}}          # loop blocks until /approve
+  {"type": "verification", "data": {"command": str, "status": "running"|"complete", "exitCode": int, "output": str, "passed": bool}}
+  {"type": "heartbeat",    "data": {}}                              # keepalive while blocked
   {"type": "done",         "data": {"content": "final text"}}
   {"type": "error",        "data": {"message": "..."}}
 """
@@ -18,11 +26,12 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Optional
 
 import httpx
 
-from tools import TOOLS_SCHEMA, dispatch
+from tools import TOOLS_SCHEMA, dispatch, list_memories
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """You are the HyprCandy Agent — an intelligent, autonomous AI coding assistant embedded in the HyprCandy desktop environment on Hyprland Linux.
@@ -50,6 +59,11 @@ You have access to these tools (call them as JSON tool_calls):
 | todo_done         | Mark a todo task as complete |
 | todo_skip         | Skip a todo task with a reason |
 | todo_list         | Show the current todo list |
+| suggest_options   | Offer the user tappable clarifying / next-step options |
+| list_memories     | List durable topic memories saved across past sessions |
+| read_memory       | Read one memory's full markdown by topic |
+| save_memory       | Create/overwrite a durable markdown memory for a topic |
+| delete_memory     | Remove an obsolete memory by topic |
 | task_complete     | Signal the ENTIRE task is fully done (required to end agentic loops) |
 
 ## Agentic Task Workflow (for multi-step tasks)
@@ -88,6 +102,8 @@ When calling `task_complete` and presenting your response, ALWAYS include a numb
 
 ## Critical Rules
 - **task_complete is the final signal** — call it ONLY when the entire task is fully done and verified, not as a progress update.
+- **Memory** — you have durable, topic-scoped markdown memories that persist across sessions. At the start of a substantive task, glance at `list_memories` and `read_memory` any relevant topic before re-discovering facts. When you learn something worth keeping (a stable project convention, architecture fact, or user preference), `save_memory` it; when a memory goes stale, update or `delete_memory` it. Never store secrets (API keys, passwords, tokens) in memory.
+- **suggest_options** — when you need the user to make a choice before you can proceed, call it with `mode: "clarify"` and 2-4 concrete options; the turn will pause for their pick. Use `mode: "next-step"` to offer optional follow-ups after an answer. Never fabricate choices you can't act on.
 - **Normal answers don't need task_complete** — for conversational responses, just reply in Markdown and stop.
 - **Don't repeat failing tools** — if a tool fails 3 times with the same args, report the limitation and stop.
 - **exec_command safety** — avoid destructive commands (rm -rf, sudo dd, etc.) without clear user intent.
@@ -97,6 +113,87 @@ When calling `task_complete` and presenting your response, ALWAYS include a numb
 You are running on a Hyprland Wayland compositor. The user's project files are provided in context. Use list_directory and read_file to explore when needed."""
 
 MAX_ITERATIONS = 20
+MAX_FIX_ROUNDS = 3
+
+# ── Spec-driven mode: instruction that constrains the first phase to planning ─
+SPEC_DRAFT_INSTRUCTION = """SPEC-DRIVEN MODE IS ON. Do NOT call any tools, edit any file,\
+ or run any command in this phase. Produce ONLY a concrete implementation plan in Markdown:
+
+- A 1-2 sentence **Overview** of the approach.
+- A numbered **Steps** checklist of the specific changes you will make.
+- A **Files** list of what you expect to touch (use the provided project tree only).
+- A **Verification** note describing how you'll prove it works (build/test commands,\
+ screenshot, etc.).
+
+Keep it tight and actionable. The user will Approve or ask for revisions before you execute."""
+
+
+def _detect_verify_command(project_path: Optional[str]) -> Optional[str]:
+    """Best-effort discovery of a project's build/test command for the
+    verification gate. An explicit `verify_command` in `.hyprcandy-agent.json`
+    at the project root always wins; otherwise infer from common manifests.
+    Returns None when there's nothing sensible to run (→ the gate is skipped,
+    which is correct for non-code/conversational turns)."""
+    if not project_path:
+        return None
+    root = Path(project_path).expanduser()
+    try:
+        if not root.is_dir():
+            return None
+    except OSError:
+        return None
+    cfg = root / ".hyprcandy-agent.json"
+    if cfg.is_file():
+        try:
+            data = json.loads(cfg.read_text())
+            cmd = data.get("verify_command")
+            if isinstance(cmd, str) and cmd.strip():
+                return cmd.strip()
+        except Exception:
+            pass
+    if (root / "package.json").is_file():
+        try:
+            pkg = json.loads((root / "package.json").read_text())
+            scripts = pkg.get("scripts", {}) or {}
+            for key in ("build", "typecheck", "test"):
+                if key in scripts:
+                    return f"npm run {key}"
+        except Exception:
+            pass
+    if (root / "pyproject.toml").is_file() or (root / "pytest.ini").is_file() or (root / "setup.py").is_file():
+        if (root / "tests").is_dir() or (root / "test").is_dir():
+            return "pytest -q"
+    if (root / "Cargo.toml").is_file():
+        return "cargo build"
+    if (root / "go.mod").is_file():
+        return "go build ./..."
+    if (root / "Makefile").is_file():
+        return "make"
+    return None
+
+
+async def _run_verify(command: str, cwd: Optional[str], timeout: int = 300) -> dict:
+    """Run the verification command WITHOUT blocking the event loop, so client
+    polls keep flowing during a long build. stdout+stderr are merged."""
+    try:
+        proc = await asyncio.create_subprocess_shell(
+            command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            cwd=str(Path(cwd).expanduser()) if cwd else None,
+        )
+    except Exception as exc:
+        return {"exitCode": -1, "output": f"failed to start command: {exc}"}
+    try:
+        out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        return {"exitCode": -1, "output": f"verification timed out after {timeout}s"}
+    text = (out or b"").decode("utf-8", "replace")
+    return {"exitCode": proc.returncode, "output": text[-4000:]}
 
 # ── In-memory per-request todo list ──────────────────────────────────────────
 class _TodoList:
@@ -161,80 +258,6 @@ class _TodoList:
 #   {"type": "error", "message": str}
 
 
-# ── Local backend (llama-server) ──────────────────────────────────────────────
-async def local_backend(messages: list[dict]) -> AsyncIterator[dict]:
-    """Stream from llama-server /v1/chat/completions (OpenAI-compatible)."""
-    from llama_manager import LLAMA_PORT
-
-    payload = {
-        "model": "local",
-        "messages": messages,
-        "tools": TOOLS_SCHEMA,
-        "tool_choice": "auto",
-        "parallel_tool_calls": False,
-        "stream": True,
-        "temperature": 0.2,
-        "max_tokens": 4096,
-    }
-
-    tool_call_buffer: dict[str, dict] = {}
-
-    async with httpx.AsyncClient(timeout=180.0) as client:
-        async with client.stream(
-            "POST",
-            f"http://127.0.0.1:{LLAMA_PORT}/v1/chat/completions",
-            json=payload,
-            headers={"Content-Type": "application/json"},
-        ) as resp:
-            if not resp.is_success:
-                body = await resp.aread()
-                yield {"type": "error", "message": f"llama-server HTTP {resp.status_code}: {body[:300].decode()}"}
-                return
-
-            buffer = ""
-            async for raw_chunk in resp.aiter_bytes(1024):
-                buffer += raw_chunk.decode(errors="replace")
-                while "\n" in buffer:
-                    line, buffer = buffer.split("\n", 1)
-                    line = line.strip()
-                    if not line or not line.startswith("data:"):
-                        continue
-                    data = line[5:].strip()
-                    if data == "[DONE]":
-                        break
-                    try:
-                        chunk = json.loads(data)
-                    except json.JSONDecodeError:
-                        continue
-
-                    choice = (chunk.get("choices") or [{}])[0]
-                    delta = choice.get("delta", {})
-
-                    if delta.get("content"):
-                        yield {"type": "token", "content": delta["content"]}
-
-                    for tc_delta in delta.get("tool_calls") or []:
-                        idx = str(tc_delta.get("index", 0))
-                        if idx not in tool_call_buffer:
-                            tool_call_buffer[idx] = {"id": "", "name": "", "arguments": ""}
-                        buf = tool_call_buffer[idx]
-                        buf["id"] = buf["id"] or tc_delta.get("id", f"call_{idx}")
-                        fn = tc_delta.get("function", {})
-                        buf["name"] += fn.get("name", "")
-                        buf["arguments"] += fn.get("arguments", "")
-
-                    if choice.get("finish_reason"):
-                        break
-
-    # Flush buffered tool calls
-    if tool_call_buffer:
-        yield {
-            "type": "tool_calls",
-            "calls": list(tool_call_buffer.values()),
-        }
-
-    yield {"type": "done"}
-
 
 # ── Inline tool-call parser (fallback for models that output <tool_call> XML) ─
 _TOOL_CALL_RE = re.compile(
@@ -272,10 +295,25 @@ async def run_agentic_turn(
     history: list[dict],
     backend_fn: Callable[[list[dict]], AsyncIterator[dict]],
     project_context: Optional[str] = None,
+    steer_source: Optional[Callable[[], list[str]]] = None,
+    spec_enabled: bool = False,
+    project_path: Optional[str] = None,
+    approve_source: Optional[Callable[[], Optional[str]]] = None,
 ) -> AsyncIterator[dict]:
     """
     Run the multi-step agentic loop.
     Yields poll-ready dicts (see module docstring for types).
+
+    `steer_source`, if provided, is called at every iteration boundary and must
+    return (and clear) any instructions the user injected mid-run via the
+    /api/chat/steer route; each is appended to the conversation as a user turn
+    and acknowledged with a `steer_ack` event.
+
+    When `spec_enabled` (and `approve_source` is provided), a first phase drafts
+    a Markdown plan, emits `spec` + `awaiting_approval`, and BLOCKS until the user
+    approves (execute the plan), revises (re-draft with the feedback folded in via
+    `steer_source`), or cancels. `project_path` enables the post-completion
+    verification gate; `approve_source` returns 'approve'|'revise'|'cancel' or None.
     """
     # Per-request todo list instance
     todo = _TodoList()
@@ -287,15 +325,117 @@ async def run_agentic_turn(
     first_user_content = user_message
     if project_context:
         first_user_content = f"{user_message}\n\n{project_context}"
+
+    # Best-effort durable-memory index so the agent knows what long-term context
+    # already exists; full bodies are loaded on demand via read_memory.
+    try:
+        _mem = await list_memories()
+        _topics = ", ".join(
+            m.get("topic") for m in (_mem.get("memories") or []) if m.get("topic")
+        )
+    except Exception:
+        _topics = ""
+    if _topics:
+        first_user_content += (
+            f"\n\n[Your durable memories cover: {_topics}. Use read_memory(topic) to "
+            "load one, save_memory(topic, content) to record durable facts, and "
+            "delete_memory(topic) to drop obsolete ones.]"
+        )
     working.append({"role": "user", "content": first_user_content})
 
     full_response = ""
     task_done = False
     repeated_calls: dict[str, int] = {}
 
-    for iteration in range(MAX_ITERATIONS):
+    # ── Spec-driven pre-phase: draft a plan, then block for approval ──
+    spec_enabled = spec_enabled and approve_source is not None
+    if spec_enabled:
+        yield {"type": "spec", "data": {"status": "drafting", "markdown": ""}}
+        while True:
+            spec_text = ""
+            spec_err = None
+            spec_messages = working + [{"role": "user", "content": SPEC_DRAFT_INSTRUCTION}]
+            async for event in backend_fn(spec_messages):
+                if event["type"] == "token":
+                    spec_text += event["content"]
+                elif event["type"] == "reasoning":
+                    yield {"type": "reasoning", "data": {"text": event["content"]}}
+                elif event["type"] == "error":
+                    spec_err = event["message"]
+            if spec_err:
+                yield {"type": "error", "data": {"message": spec_err}}
+                return
+            spec_text = _strip_tool_call_text(spec_text) or "_(the model returned no plan)_"
+            yield {"type": "spec", "data": {"status": "ready", "markdown": spec_text}}
+            yield {"type": "awaiting_approval", "data": {"question": "Approve this plan, or ask for revisions?"}}
+
+            # Block until the user decides. Emit a heartbeat every few seconds so
+            # the client's idle timeout doesn't fire while we're paused.
+            decision = None
+            waited = 0.0
+            while decision is None:
+                await asyncio.sleep(0.5)
+                waited += 0.5
+                if waited >= 5.0:
+                    yield {"type": "heartbeat", "data": {}}
+                    waited = 0.0
+                try:
+                    decision = approve_source() if approve_source else None
+                except Exception:
+                    decision = None
+
+            if decision == "approve":
+                # Seed the approved plan into the conversation, then execute it.
+                working.append({"role": "assistant", "content": spec_text})
+                working.append({
+                    "role": "user",
+                    "content": (
+                        "Plan approved. Now execute it step by step using your tools. "
+                        "Follow the checklist, do the verification, and call task_complete "
+                        "only when fully done. Do not re-ask for approval."
+                    ),
+                })
+                break
+            if decision == "cancel":
+                yield {"type": "done", "data": {"content": "Plan cancelled — nothing was executed."}}
+                return
+            # decision == 'revise': fold the revision notes (via the steering queue)
+            # into the conversation and re-draft above.
+            notes: list[str] = []
+            if steer_source is not None:
+                try:
+                    notes = steer_source() or []
+                except Exception:
+                    notes = []
+            if notes:
+                for n in notes:
+                    working.append({"role": "user", "content": f"[Plan revision request] {n}"})
+                    yield {"type": "steer_ack", "data": {"text": n}}
+            else:
+                working.append({"role": "user", "content": "[Plan revision request] Please refine the plan."})
+            yield {"type": "spec", "data": {"status": "drafting", "markdown": ""}}
+
+    # ── Verification gate state (runs after the model claims completion) ──
+    verify_cmd = _detect_verify_command(project_path)
+    verified_ok = False
+    fix_round = 0
+
+    iteration = 0
+    budget = MAX_ITERATIONS
+    while iteration < budget:
         if task_done:
             break
+
+        # Drain any steering instructions the user injected since the last boundary
+        if steer_source is not None:
+            try:
+                steers = steer_source() or []
+            except Exception:
+                steers = []
+            for s in steers:
+                working.append({"role": "user", "content": f"[User steering] {s}"})
+                yield {"type": "steer_ack", "data": {"text": s}}
+                budget += 1
 
         # ── LLM call ─────────────────────────────────────────────────────────
         assistant_text = ""
@@ -314,6 +454,9 @@ async def run_agentic_turn(
 
             elif event["type"] == "tool_calls":
                 pending_calls = event["calls"]
+
+            elif event["type"] == "reasoning":
+                yield {"type": "reasoning", "data": {"text": event["content"]}}
 
             elif event["type"] == "error":
                 yield {"type": "error", "data": {"message": event["message"]}}
@@ -443,6 +586,25 @@ async def run_agentic_turn(
                 })
                 continue
 
+            elif name == "suggest_options":
+                mode = args.get("mode", "next-step")
+                options = args.get("options") or []
+                question = args.get("question", "")
+                result = {"ok": True, "mode": mode, "options": options}
+                yield {"type": "tool_start", "data": {"id": call["id"], "name": name, "arguments": args}}
+                yield {"type": "suggestions", "data": {"mode": mode, "question": question, "options": options}}
+                yield {"type": "tool_result", "data": {"id": call["id"], "name": name, "result": result}}
+                tool_messages.append({
+                    "role": "tool",
+                    "tool_call_id": call["id"],
+                    "content": json.dumps(result),
+                })
+                if mode == "clarify":
+                    # Hand control back — end this turn so the user can pick an option.
+                    task_done = True
+                    full_response = question or "Choose an option to continue."
+                continue
+
             # All other tools dispatched to tools.py
             yield {"type": "tool_start", "data": {"id": call["id"], "name": name, "arguments": args}}
 
@@ -469,7 +631,39 @@ async def run_agentic_turn(
 
         working.extend(tool_messages)
 
-        if not task_done and iteration < MAX_ITERATIONS - 1:
+        # ── Verification gate: once the model claims completion, actually run the
+        #    project's build/test and feed failures back for an iterative fix. ──
+        if task_done and verify_cmd and not verified_ok:
+            yield {"type": "verification", "data": {"command": verify_cmd, "status": "running", "exitCode": None, "output": "", "passed": None}}
+            vres = await _run_verify(verify_cmd, project_path)
+            exit_code = vres.get("exitCode", -1)
+            output = vres.get("output", "")
+            passed = (exit_code == 0)
+            yield {"type": "verification", "data": {"command": verify_cmd, "status": "complete", "exitCode": exit_code, "output": output, "passed": passed}}
+            if passed:
+                verified_ok = True
+            elif fix_round < MAX_FIX_ROUNDS:
+                fix_round += 1
+                task_done = False
+                budget += 1
+                working.append({
+                    "role": "user",
+                    "content": (
+                        f"Verification FAILED — `{verify_cmd}` exited {exit_code}.\n"
+                        f"--- output (tail) ---\n{output}\n"
+                        f"Fix the remaining issues, re-verify locally if you can, then call "
+                        f"task_complete again. (fix attempt {fix_round}/{MAX_FIX_ROUNDS})"
+                    ),
+                })
+                iteration += 1
+                continue
+            else:
+                full_response = (full_response or "") + (
+                    f"\n\n⚠️ Verification still failing after {MAX_FIX_ROUNDS} fix attempts — "
+                    f"stopping for your review (`{verify_cmd}` exited {exit_code})."
+                )
+
+        if not task_done and iteration < budget - 1:
             # Provide todo status in continuation prompt so the model stays on track
             todo_status = todo.format() if todo.tasks else ""
             continue_msg = "Continue the task. Call task_complete only when it is fully done."
@@ -479,5 +673,7 @@ async def run_agentic_turn(
                 "role": "user",
                 "content": continue_msg,
             })
+
+        iteration += 1
 
     yield {"type": "done", "data": {"content": full_response}}

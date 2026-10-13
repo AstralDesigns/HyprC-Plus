@@ -8,7 +8,7 @@ Exposes:
   - validate_license(key) -> dict          License key validation
   - get_credits(key) -> int                Remaining token balance
   - stream_cloud(messages, model, key) -> AsyncIterator[dict]
-      Yields same event types as local_backend in agent_loop.py
+      Yields the same event types as stream_byok in byok_client.py
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ async def stream_cloud(
 ) -> AsyncIterator[dict]:
     """
     Stream completions from the Vercel AI Gateway.
-    Yields same event dicts as local_backend in agent_loop.py:
+    Yields the same event dicts as stream_byok in byok_client.py:
       {"type": "token", "content": str}
       {"type": "tool_calls", "calls": [...]}
       {"type": "done"}
@@ -166,6 +166,12 @@ async def stream_cloud(
 
                         if delta.get("content"):
                             yield {"type": "token", "content": delta["content"]}
+
+                        reasoning = (delta.get("reasoning")
+                                     or delta.get("reasoning_content")
+                                     or delta.get("reasoning_summary_text"))
+                        if reasoning:
+                            yield {"type": "reasoning", "content": reasoning}
 
                         for tc_delta in delta.get("tool_calls") or []:
                             idx = str(tc_delta.get("index", 0))

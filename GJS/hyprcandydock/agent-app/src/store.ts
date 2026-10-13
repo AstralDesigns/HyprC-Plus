@@ -4,18 +4,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { bridge } from './bridge';
 
-// Kept only for the ModelInfo/customModels shape below — the WebLLM engine
-// that originally consumed this (agent-engine.ts's syncCustomModels) is gone
-// now that all inference runs through the Python runtime server.
-export interface CustomWebLLMModel {
-  id: string;
-  name: string;
-  model: string;
-  model_lib: string;
-  desc?: string;
-  required_features?: string[];
-}
-
 export interface DiffData {
   filePath: string;
   originalCode: string;
@@ -72,17 +60,38 @@ export interface PlanData {
  * text before and after it, instead of all text being concatenated into one
  * block rendered after every widget.
  */
+export interface SuggestionOption {
+  label: string;
+  promptText: string;
+  /** How the chip is dispatched when tapped: send as a fresh turn, or steer the running one. */
+  sendAs?: 'send' | 'steer';
+}
+
+export interface SuggestionsData {
+  mode: 'clarify' | 'next-step';
+  question: string;
+  options: SuggestionOption[];
+}
+
 export type MessageBlock =
   | { type: 'text'; id: string; content: string }
   | { type: 'activity'; id: string; tools: ToolCallData[] }   // grouped ambient tool calls (read/list/search/plan)
   | { type: 'command'; id: string; tool: ToolCallData }        // elevated: exec_command / run_command
-  | { type: 'diff'; id: string; diff: DiffData };              // elevated: write_file result
+  | { type: 'diff'; id: string; diff: DiffData }              // elevated: write_file result
+  | { type: 'reasoning'; id: string; content: string }         // real chain-of-thought (display-only)
+  | { type: 'steer'; id: string; content: string }             // user instruction injected mid-run
+  | { type: 'suggestions'; id: string; suggestions: SuggestionsData } // tappable clarify/next-step chips
+  | { type: 'spec'; id: string; status: 'drafting' | 'ready'; markdown: string }   // spec-driven plan (§3.4)
+  | { type: 'verification'; id: string; command: string; status: 'running' | 'complete'; exitCode?: number; output?: string; passed?: boolean }; // verification gate (§3.8)
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: number;
+  /** Client-generated id tagging an assistant turn's file edits so the whole
+   *  turn can be rolled back at once ("Revert this turn", plan §3.7). */
+  turnId?: string;
   blocks?: MessageBlock[];
   tools?: ToolCallData[];
   plan?: PlanData;
@@ -117,11 +126,7 @@ export interface ModelInfo {
   model?: string;
   model_lib?: string;
   required_features?: string[];
-  llamaRepo?: string;
-  llamaFile?: string;
   toolSupport?: boolean;
-  wllamaRepo?: string;
-  wllamaFile?: string;
 }
 
 export type FilePaneType = 'code' | 'markdown' | 'image' | 'video' | 'audio' | 'image-gallery' | 'video-gallery' | 'preview';
@@ -157,9 +162,7 @@ export const PRESET_MODELS: ModelInfo[] = [
     name: 'Qwen2.5 Coder 1.5B Instruct',
     size: '~940 MB',
     vram: '~1.2 GB',
-    description: 'Compact coding model with tool-use-friendly chat formatting for llama-server.',
-    llamaRepo: 'bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF',
-    llamaFile: 'Qwen2.5-Coder-1.5B-Instruct-Q4_K_M.gguf',
+    description: 'Compact coding model with tool-use-friendly chat formatting.',
     toolSupport: true,
     isDefault: true,
   },
@@ -168,9 +171,7 @@ export const PRESET_MODELS: ModelInfo[] = [
     name: 'Qwen2.5 Coder 0.5B Instruct',
     size: '~379 MB',
     vram: '~600 MB',
-    description: 'Fast lightweight coding model with tool-use-friendly chat formatting for llama-server.',
-    llamaRepo: 'bartowski/Qwen2.5-Coder-0.5B-Instruct-GGUF',
-    llamaFile: 'Qwen2.5-Coder-0.5B-Instruct-Q4_K_M.gguf',
+    description: 'Fast lightweight coding model with tool-use-friendly chat formatting.',
     toolSupport: true,
   },
 ];
@@ -187,6 +188,15 @@ export interface AppState {
   selectedFile: string | null;
   selectedFileContent: string | null;
   agentRunning: boolean;
+  /** Clarifying / next-step options the agent last offered for the running turn.
+   *  Rendered as tappable chips above the composer; cleared when a new turn starts. */
+  activeSuggestions: SuggestionsData | null;
+  /** True while the agentic loop is blocked on the spec-driven Approve/Revise gate. */
+  specApprovalPending: boolean;
+  /** Composer "Spec-driven" toggle — drafts a plan and waits for approval before executing. */
+  specMode: boolean;
+  /** Open the durable-memories panel (agent markdown notes under the HyprCandy cache). */
+  memoryPanelOpen: boolean;
   workspaceStartupEnabled: boolean;
 
   // Floating panel layout
@@ -240,8 +250,10 @@ export interface AppState {
   monacoTheme: string;
 
   // ── Hybrid inference ─────────────────────────────────────────────────────
-  /** 'local' = llama-server, 'byok' = user's own API key, 'cloud' = Vercel AI Gateway (Pro) */
-  inferenceMode: 'local' | 'byok' | 'cloud';
+  /** 'byok' = user's own API key (OpenRouter/Groq), 'cloud' = Vercel AI Gateway (Pro).
+   *  The old 'local' (WebLLM/llama.cpp) mode is fully removed — persisted states
+   *  with 'local' migrate to 'byok' in loadPersistedState(). */
+  inferenceMode: 'byok' | 'cloud';
   /** Validated Lemon Squeezy license key — stored via GJS libsecret on save */
   licenseKey: string;
   /** Selected cloud model id (e.g. 'google/gemini-2.5-flash') */
@@ -250,8 +262,6 @@ export interface AppState {
   cloudCredits: number;
   /** True once the local Python runtime server at :17900 responds to /health */
   runtimeServerReady: boolean;
-  /** Active tab inside ModelManager: 'local' | 'cloud' */
-  modelManagerTab: 'local' | 'cloud';
 
   // ── BYOK (Bring Your Own Key) ─────────────────────────────────────────────
   /** Active BYOK provider: 'google' | 'openai' | 'anthropic' | 'xai' | null */
@@ -335,6 +345,10 @@ function loadInitialState(): AppState {
     selectedFile: null,
     selectedFileContent: null,
     agentRunning: false,
+    activeSuggestions: null,
+    specApprovalPending: false,
+    specMode: false,
+    memoryPanelOpen: false,
     workspaceStartupEnabled: true,
     
     // Floating panels default: both visible, matching CandyCode
@@ -376,7 +390,6 @@ function loadInitialState(): AppState {
     cloudModel: 'google/gemini-2.5-flash',
     cloudCredits: 0,
     runtimeServerReady: true,
-    modelManagerTab: 'cloud' as const,
 
     // BYOK defaults
     byokProvider: 'openrouter',
@@ -417,13 +430,14 @@ function persistedSnapshot() {
     activePaneId: next.activePaneId,
     workspaceStartupEnabled: next.workspaceStartupEnabled,
     // Which backend was active — restored on next launch so the header
-    // chip and Model Manager tab reflect it instead of resetting to
-    // 'local'. Secrets themselves (byokKeys, licenseKey) stay out of the
+    // chip and Model Manager view reflect it instead of resetting to the
+    // default. Secrets themselves (byokKeys, licenseKey) stay out of the
     // blob; they're synced through secret-tool/libsecret instead.
     inferenceMode: next.inferenceMode,
     byokProvider: next.byokProvider,
     byokModel: next.byokModel,
     cloudModel: next.cloudModel,
+    specMode: next.specMode,
     githubToken: next.githubToken,
     githubUser: next.githubUser,
     selectedRepo: next.selectedRepo,
@@ -489,7 +503,6 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     byokProvider: typeof parsed.byokProvider === 'string' && parsed.byokProvider ? parsed.byokProvider : 'openrouter',
     byokModel: typeof parsed.byokModel === 'string' && parsed.byokModel ? parsed.byokModel : 'openrouter/free',
     cloudModel: typeof parsed.cloudModel === 'string' ? parsed.cloudModel : defaultState.cloudModel,
-    modelManagerTab: 'cloud',
   };
 }
 
@@ -915,6 +928,70 @@ export const storeActions = {
     }
   },
 
+  /**
+   * Roll a completed turn's file changes back to their pre-turn state (§3.7).
+   * The Python runtime keeps a per-turn snapshot of every file the turn wrote
+   * (see tools.CURRENT_TURN_ID / TURN_EDITS); this asks it to restore them, then
+   * reflects the rollback in the UI — the turn's diff cards flip to "reverted",
+   * the files leave the pending bar, and any open editor reloads from disk.
+   */
+  revertTurn: async (sessionId: string, messageId: string) => {
+    const msg = getStore().sessions.find(s => s.id === sessionId)?.messages.find(m => m.id === messageId);
+    if (!msg?.turnId) return;
+    const paths = new Set<string>();
+    msg.blocks?.forEach(b => { if (b.type === 'diff') paths.add(b.diff.filePath); });
+    msg.diffs?.forEach(d => paths.add(d.filePath));
+    let res: any;
+    try { res = await bridge.runtimeRequest('/api/turns/revert', { turn_id: msg.turnId }); } catch { return; }
+    if (!res?.ok) return;
+    setStore(prev => ({
+      pendingFiles: Object.fromEntries(Object.entries(prev.pendingFiles).filter(([p]) => !paths.has(p))),
+      sessions: prev.sessions.map(s => s.id !== sessionId ? s : { ...s, messages: s.messages.map(m => m.id !== messageId ? m : {
+        ...m,
+        diff: m.diff ? { ...m.diff, status: 'rejected' as const } : m.diff,
+        diffs: m.diffs?.map(d => ({ ...d, status: 'rejected' as const })),
+        blocks: m.blocks?.map(b => b.type === 'diff' ? { ...b, diff: { ...b.diff, status: 'rejected' as const } } : b),
+      }) }),
+    }));
+    for (const path of paths) {
+      const pane = getStore().panes.find(p => p.path === path);
+      if (!pane) continue;
+      try {
+        const content = await bridge.readFile(path);
+        setStore(prev => ({ panes: prev.panes.map(p => p.id === pane.id ? { ...p, content, isUnsaved: false } : p) }));
+      } catch { /* best-effort */ }
+    }
+  },
+
+  /**
+   * Revert every assistant turn at/after `fromIndex` — run just before an
+   * edit&resend truncates those messages, so the workspace rolls back to the
+   * state prior to the edited prompt. Newest-first so each
+   * turn's snapshot restores cleanly; best-effort per turn.
+   */
+  revertTurnsAfter: async (sessionId: string, fromIndex: number) => {
+    const msgs = getStore().sessions.find(s => s.id === sessionId)?.messages || [];
+    const doomed = msgs.slice(fromIndex);
+    const paths = new Set<string>();
+    for (const m of doomed) {
+      m.blocks?.forEach(b => { if (b.type === 'diff') paths.add(b.diff.filePath); });
+      m.diffs?.forEach(d => paths.add(d.filePath));
+    }
+    const turnIds = doomed.filter(m => m.role === 'assistant' && m.turnId).map(m => m.turnId as string).reverse();
+    for (const turnId of turnIds) {
+      try { await bridge.runtimeRequest('/api/turns/revert', { turn_id: turnId }); } catch { /* best-effort */ }
+    }
+    await storeActions.refreshPendingFiles();
+    for (const path of paths) {
+      const pane = getStore().panes.find(p => p.path === path);
+      if (!pane) continue;
+      try {
+        const content = await bridge.readFile(path);
+        setStore(prev => ({ panes: prev.panes.map(p => p.id === pane.id ? { ...p, content, isUnsaved: false } : p) }));
+      } catch { /* best-effort */ }
+    }
+  },
+
   /** Opens a live file:// preview of a web page/asset in a new Canvas pane. */
   openPreview: (path: string, name?: string) => {
     setStore(prev => {
@@ -1269,16 +1346,5 @@ export const storeActions = {
       customModels: prev.customModels.filter(m => m.id !== id),
       activeModel: prev.activeModel === id ? PRESET_MODELS[0].id : prev.activeModel,
     }));
-  },
-
-  getCustomWebLLMModels: (): CustomWebLLMModel[] => {
-    return currentState.customModels.filter(
-      (model): model is ModelInfo & CustomWebLLMModel => Boolean(
-        model.id?.trim() && (
-          (model.model?.trim() && model.model_lib?.trim()) ||
-          (model.wllamaRepo?.trim() && model.wllamaFile?.trim())
-        )
-      )
-    );
   },
 };

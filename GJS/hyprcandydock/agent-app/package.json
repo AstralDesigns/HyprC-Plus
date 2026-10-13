@@ -6,10 +6,6 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "llama:build": "bash ./build-llama-server.sh",
-    "llama:pull:1.5b": "node ./scripts/llama-pull.cjs Qwen2.5-Coder-1.5B-Instruct",
-    "llama:pull:0.5b": "node ./scripts/llama-pull.cjs Qwen2.5-Coder-0.5B-Instruct",
-    "llama:test": "node ./scripts/llama-chat-test.cjs",
     "preview": "vite preview"
   },
   "dependencies": {

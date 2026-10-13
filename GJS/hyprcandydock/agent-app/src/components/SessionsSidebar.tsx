@@ -1,6 +1,6 @@
-import React from 'react';
-import { MessageSquare, Plus, Trash2, X } from 'lucide-react';
-import { useStore, setStore, storeActions } from '../store';
+import React, { useState } from 'react';
+import { ScrollText, Plus, Trash2, Check } from 'lucide-react';
+import { useStore, storeActions } from '../store';
 
 function relativeTime(ts: number) {
   const diff = Date.now() - ts;
@@ -10,95 +10,124 @@ function relativeTime(ts: number) {
   return Math.floor(diff / 86400_000) + 'd ago';
 }
 
+/** Strip inline markdown to a single readable preview line for a quest row. */
+function oneLine(content: string): string {
+  return (content || '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#*_>`~]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 48);
+}
+
+/**
+ * Persistent left "Quests" rail (§3.1). Supersedes the old ChatPanel header
+ * dropdown as the primary way to see/jump between sessions. Each row is a
+ * quest; double-click the title to rename inline (§3.2 — a manual rename sets
+ * titleSource 'user' so the auto-title from deriveSessionTitle() never
+ * overwrites it again, see store.autoNameSession/renameSession).
+ */
 export const SessionsSidebar: React.FC = () => {
   const [store] = useStore();
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
-  if (!store.chatVisible) return null;
+  const startRename = (id: string, currentTitle: string) => {
+    setRenamingId(id);
+    setRenameValue(currentTitle);
+  };
+  const commitRename = (id: string) => {
+    storeActions.renameSession(id, renameValue);
+    setRenamingId(null);
+  };
 
   return (
-    <div className="chat-sessions-popup animate-slide-in" style={{
-      width: '190px', minWidth: '190px', height: '100%',
-      background: 'var(--bg-sidebar)',
-      border: '1px solid var(--border-subtle)',
-      display: 'flex', flexDirection: 'column',
-      flexShrink: 0, zIndex: 10, overflow: 'hidden',
-    }}>
+    <aside className="quests-rail">
       {/* Header */}
-      <div className="panel-header">
-        <span className="panel-title">Chats</span>
-        <div style={{ display: 'flex', gap: '2px' }}>
-          <button
-            className="icon-btn"
-            style={{ padding: '3px 6px', display: 'flex', alignItems: 'center', gap: '3px', fontSize: '10.5px', color: 'var(--accent-cyan)' }}
-            onClick={() => storeActions.createSession()}
-            title="New chat"
-          >
-            <Plus size={12} />
-            <span>New</span>
-          </button>
-          <button
-            className="icon-btn" style={{ padding: '3px' }}
-            onClick={() => setStore({ chatVisible: false })}
-            title="Close sidebar"
-          >
-            <X size={12} />
-          </button>
-        </div>
+      <div className="quests-rail-header">
+        <span className="quests-rail-title">
+          <ScrollText size={13} /> Quests
+        </span>
+        <button
+          className="quests-new-btn"
+          onClick={() => storeActions.createSession()}
+          title="New Quest (Ctrl/Cmd+N)"
+        >
+          <Plus size={12} />
+          <span>New</span>
+        </button>
       </div>
 
-      {/* Session list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '6px' }}>
+      {/* Quest list */}
+      <div className="quests-rail-list">
         {store.sessions.length === 0 && (
-          <div style={{ padding: '20px 10px', color: 'var(--text-muted)', fontSize: '11px', textAlign: 'center' }}>
-            No chats yet
-          </div>
+          <div className="quests-empty">No quests yet</div>
         )}
 
         {[...store.sessions].reverse().map(session => {
           const isActive = session.id === store.activeSessionId;
           const lastMsg = session.messages[session.messages.length - 1];
+          const preview = oneLine(lastMsg?.content || '');
           return (
             <div
               key={session.id}
-              className={`session-item${isActive ? ' active' : ''}`}
-              onClick={() => setStore({ activeSessionId: session.id })}
-              style={{ position: 'relative' }}
+              className={`quest-item${isActive ? ' active' : ''}`}
+              onClick={() => storeActions.switchSession(session.id)}
+              onDoubleClick={(e) => { e.stopPropagation(); startRename(session.id, session.title); }}
+              title="Double-click to rename"
             >
-              <MessageSquare size={13} color={isActive ? 'var(--accent-cyan)' : 'var(--text-muted)'} style={{ flexShrink: 0 }} />
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div className="session-title" style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                  {session.title}
+              {renamingId === session.id ? (
+                <input
+                  autoFocus
+                  className="quest-rename-input"
+                  value={renameValue}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); commitRename(session.id); }
+                    if (e.key === 'Escape') { e.preventDefault(); setRenamingId(null); }
+                  }}
+                  onBlur={() => commitRename(session.id)}
+                />
+              ) : (
+                <div className="quest-item-text">
+                  <div className="quest-title">{session.title}</div>
+                  {preview && <div className="quest-preview">{preview}</div>}
                 </div>
-                {lastMsg && (
-                  <div style={{
-                    fontSize: '10.5px', color: 'var(--text-muted)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    maxWidth: '130px', marginTop: '1px',
-                  }}>
-                    {lastMsg.content?.substring(0, 40) || '…'}
-                  </div>
-                )}
-              </div>
-              <span className="session-meta">{relativeTime(session.updatedAt)}</span>
+              )}
 
-              {/* Delete button (hover visible via CSS) */}
-              <button
-                className="icon-btn"
-                style={{ padding: '2px', position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', opacity: 0 }}
-                title="Delete session"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  storeActions.deleteSession(session.id);
-                }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
-              >
-                <Trash2 size={11} color="var(--accent-red)" />
-              </button>
+              <span className="quest-meta">{relativeTime(session.updatedAt)}</span>
+
+              <div className="quest-actions">
+                {renamingId === session.id ? (
+                  <button
+                    className="quest-action-btn"
+                    onClick={(e) => { e.stopPropagation(); commitRename(session.id); }}
+                    title="Save name"
+                  >
+                    <Check size={11} />
+                  </button>
+                ) : (
+                  <button
+                    className="quest-action-btn"
+                    onClick={(e) => { e.stopPropagation(); startRename(session.id, session.title); }}
+                    title="Rename quest"
+                  >
+                    <ScrollText size={11} />
+                  </button>
+                )}
+                <button
+                  className="quest-action-btn quest-delete-btn"
+                  onClick={(e) => { e.stopPropagation(); storeActions.deleteSession(session.id); }}
+                  title="Delete quest"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </div>
             </div>
           );
         })}
       </div>
-    </div>
+    </aside>
   );
 };

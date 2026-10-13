@@ -1,8 +1,8 @@
 """
 tools.py — Shared tool matrix for HyprCandy Agent
 
-All tools are called identically regardless of whether the backend is
-llama-server (local) or the Vercel AI Gateway (cloud).
+All tools are called identically regardless of which cloud backend is
+active (a BYOK provider or the Vercel AI Gateway).
 
 Each tool is an async function returning a JSON-serialisable value.
 Errors raise exceptions; the caller converts them to tool error results.
@@ -11,6 +11,7 @@ Errors raise exceptions; the caller converts them to tool error results.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import difflib
 import json
 import os
@@ -33,6 +34,73 @@ import httpx
 # snapshot — the file is already correct on disk) without re-running the
 # model. Keyed by absolute path; last write for a path wins.
 PENDING_EDITS: dict[str, dict] = {}
+
+
+# ── Per-turn snapshot ledger ("Revert this turn", plan §3.7) ─────────────────
+# Every agentic turn is tagged with a client-supplied turn id, exposed to the
+# tools through the CURRENT_TURN_ID context var (set by runtime_server before
+# the loop runs, so it stays isolated per concurrent asyncio task). The FIRST
+# time a turn touches a path we record its pre-turn content; a later revert
+# restores every file the turn changed and deletes the ones it created, in one
+# action — independent of the accept/reject review above. Plain dicts preserve
+# insertion order (3.7+); the ledger is capped to the most recent turns.
+CURRENT_TURN_ID: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "hyprcandy_current_turn_id", default=None
+)
+TURN_EDITS: dict[str, dict[str, dict]] = {}
+_MAX_TURNS_KEPT = 60
+
+
+def _register_turn_edit(path: str, old_content: str, is_new: bool, new_content: str) -> None:
+    turn_id = CURRENT_TURN_ID.get()
+    if not turn_id:
+        return
+    ledger = TURN_EDITS.get(turn_id)
+    if ledger is None:
+        ledger = TURN_EDITS[turn_id] = {}
+        # Bound memory: drop the oldest turns once past the cap.
+        while len(TURN_EDITS) > _MAX_TURNS_KEPT:
+            TURN_EDITS.pop(next(iter(TURN_EDITS)), None)
+    entry = ledger.get(path)
+    if entry is None:
+        # First touch this turn → this is the true pre-turn state to restore.
+        ledger[path] = {"old_content": old_content, "is_new": is_new, "new_content": new_content}
+    else:
+        # A later write in the same turn keeps the original pre-turn snapshot
+        # and only advances the latest content (for reporting).
+        entry["new_content"] = new_content
+
+
+def revert_turn(turn_id: str) -> dict:
+    """Restore every file this turn touched to its pre-turn state (deleting the
+    files the turn created). Returns {ok, reverted:[paths], count}."""
+    ledger = TURN_EDITS.pop(turn_id, None)
+    if not ledger:
+        return {"ok": False, "reverted": [], "count": 0}
+    reverted: list[str] = []
+    for path, rec in ledger.items():
+        p = Path(path)
+        try:
+            if rec["is_new"]:
+                p.unlink(missing_ok=True)
+            else:
+                p.write_text(rec["old_content"])
+            reverted.append(path)
+        except OSError:
+            pass
+        # The on-disk file no longer matches any staged diff — drop its review
+        # snapshot so a later accept/reject can't re-apply stale content.
+        PENDING_EDITS.pop(path, None)
+    return {"ok": True, "reverted": reverted, "count": len(reverted)}
+
+
+def get_turn_edits(turn_id: str) -> list[dict]:
+    ledger = TURN_EDITS.get(turn_id) or {}
+    out = []
+    for path, rec in ledger.items():
+        additions, deletions = _diff_counts(rec["old_content"], rec["new_content"])
+        out.append({"path": path, "is_new": rec["is_new"], "additions": additions, "deletions": deletions})
+    return out
 
 
 def _diff_counts(old: str, new: str) -> tuple[int, int]:
@@ -305,6 +373,100 @@ TOOLS_SCHEMA = [
             },
         },
     },
+    # ── Interactive clarification / next-step chips (handled in agent_loop) ───
+    {
+        "type": "function",
+        "function": {
+            "name": "suggest_options",
+            "description": (
+                "Offer the user tappable follow-up or clarifying options instead of a wall "
+                "of prose. Use when you need a decision to proceed (mode 'clarify') or to "
+                "suggest convenient next steps after an answer (mode 'next-step'). Each "
+                "option carries a short label and the exact prompt text it will send."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "mode": {
+                        "type": "string",
+                        "enum": ["clarify", "next-step"],
+                        "description": "clarify = pause and hand control back so the user picks; next-step = advisory chips shown alongside your answer.",
+                    },
+                    "question": {"type": "string", "description": "Short prompt shown above the chips (optional)."},
+                    "options": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "label": {"type": "string", "description": "Concise chip text (1-5 words)."},
+                                "promptText": {"type": "string", "description": "The message sent to the agent when the chip is tapped."},
+                                "sendAs": {
+                                    "type": "string",
+                                    "enum": ["send", "steer"],
+                                    "description": "steer = inject into the running turn; send = start a new turn. Defaults to send.",
+                                },
+                            },
+                            "required": ["label", "promptText"],
+                        },
+                    },
+                },
+                "required": ["options"],
+            },
+        },
+    },
+    # ── Durable topic memory (markdown files under the HyprCandy cache) ──────
+    {
+        "type": "function",
+        "function": {
+            "name": "list_memories",
+            "description": "List the durable topic memories you (and past sessions) have saved. Call this to see what long-term context exists before deciding to read or update one.",
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "read_memory",
+            "description": "Read the full markdown content of a saved memory by its topic.",
+            "parameters": {
+                "type": "object",
+                "properties": {"topic": {"type": "string", "description": "The memory topic/name (as listed by list_memories)."}},
+                "required": ["topic"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "save_memory",
+            "description": (
+                "Create or overwrite a durable markdown memory for a topic — facts, "
+                "user preferences, or project conventions worth remembering across "
+                "sessions. One note per topic; calling it again with the same topic "
+                "replaces the previous content, so keep each memory current."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "topic": {"type": "string", "description": "Short subject line, e.g. 'HyprCandy launcher architecture'."},
+                    "content": {"type": "string", "description": "Markdown body of the memory."},
+                },
+                "required": ["topic", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_memory",
+            "description": "Delete an obsolete memory by topic.",
+            "parameters": {
+                "type": "object",
+                "properties": {"topic": {"type": "string", "description": "The memory topic to remove."}},
+                "required": ["topic"],
+            },
+        },
+    },
 ]
 
 
@@ -388,6 +550,7 @@ async def write_file(path: str, content: str) -> dict:
         "timestamp": time.time(),
     }
     PENDING_EDITS[str(p)] = record
+    _register_turn_edit(str(p), old_content, is_new, content)
 
     return {
         "success": True,
@@ -492,6 +655,87 @@ async def task_complete(summary: str, remaining: str = "") -> dict:
     return {"summary": summary, "remaining": remaining, "completed": True}
 
 
+# ── Agent memory (durable topic notes) ───────────────────────────────────────
+# Lightweight long-term memory: the agent persists topic-scoped notes as
+# markdown files under ~/.config/hyprcandy/cache/agent-memories so facts and
+# preferences survive across sessions. One file per topic (slug-named) with a
+# small front-matter header; the Memories panel lists/edits the same files.
+MEMORY_DIR = Path(os.environ.get(
+    "HYPRCANDY_MEMORY_DIR",
+    str(Path.home() / ".config" / "hyprcandy" / "cache" / "agent-memories"),
+))
+
+
+def _memory_slug(topic: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "-", (topic or "").lower()).strip("-")
+    return slug[:80] or "untitled"
+
+
+def _memory_path(topic: str) -> Path:
+    return MEMORY_DIR / f"{_memory_slug(topic)}.md"
+
+
+def _parse_memory(text: str) -> dict:
+    topic = ""
+    updated = ""
+    body = text
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            header, body = parts[1], parts[2].lstrip("\n")
+            for line in header.splitlines():
+                if line.startswith("topic:"):
+                    topic = line[len("topic:"):].strip()
+                elif line.startswith("updated:"):
+                    updated = line[len("updated:"):].strip()
+    return {"topic": topic, "updated": updated, "body": body}
+
+
+async def list_memories() -> dict:
+    if not MEMORY_DIR.is_dir():
+        return {"memories": [], "dir": str(MEMORY_DIR)}
+    items = []
+    for f in sorted(MEMORY_DIR.glob("*.md")):
+        try:
+            text = f.read_text(errors="replace")
+        except OSError:
+            continue
+        meta = _parse_memory(text)
+        items.append({
+            "topic": meta["topic"] or f.stem,
+            "path": str(f),
+            "updated": meta["updated"],
+            "bytes": f.stat().st_size,
+            "preview": " ".join(meta["body"].split())[:160],
+        })
+    return {"memories": items, "dir": str(MEMORY_DIR)}
+
+
+async def read_memory(topic: str) -> dict:
+    p = _memory_path(topic)
+    if not p.is_file():
+        raise FileNotFoundError(f"No memory named '{topic}'")
+    meta = _parse_memory(p.read_text(errors="replace"))
+    return {"topic": meta["topic"] or topic, "path": str(p), "content": meta["body"], "updated": meta["updated"]}
+
+
+async def save_memory(topic: str, content: str) -> dict:
+    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    p = _memory_path(topic)
+    existed = p.is_file()
+    ts = datetime.now().isoformat(timespec="seconds")
+    p.write_text(f"---\ntopic: {topic}\nupdated: {ts}\n---\n\n{(content or '').strip()}\n")
+    return {"ok": True, "path": str(p), "topic": topic, "created": not existed, "updated": ts}
+
+
+async def delete_memory(topic: str) -> dict:
+    p = _memory_path(topic)
+    if not p.is_file():
+        return {"ok": False, "path": str(p), "message": "no such memory"}
+    p.unlink(missing_ok=True)
+    return {"ok": True, "path": str(p), "topic": topic}
+
+
 # ── Dispatcher ─────────────────────────────────────────────────────────────────
 TOOL_FUNCTIONS = {
     "list_directory": list_directory,
@@ -502,6 +746,12 @@ TOOL_FUNCTIONS = {
     "fetch_url": fetch_url,
     "capture_preview": capture_preview,
     "task_complete": task_complete,
+    "list_memories": list_memories,
+    "read_memory": read_memory,
+    "save_memory": save_memory,
+    "write_memory": save_memory,
+    "update_memory": save_memory,
+    "delete_memory": delete_memory,
 }
 
 TOOL_ALIASES = {
@@ -550,5 +800,16 @@ async def dispatch(name: str, arguments: dict) -> any:
     elif canonical_name == "fetch_url":
         if "url" not in args:
             args["url"] = args.get("uri") or args.get("link") or ""
+    elif canonical_name in ("read_memory", "save_memory", "delete_memory"):
+        if "topic" not in args:
+            args["topic"] = args.get("name") or args.get("title") or args.get("subject") or ""
+        if canonical_name == "save_memory" and "content" not in args:
+            args["content"] = args.get("text") or args.get("body") or args.get("notes") or ""
+
+    # Memory tools take no/limited args; guard against a missing topic.
+    if canonical_name in ("read_memory", "delete_memory") and not args.get("topic"):
+        raise ValueError("memory tools require a 'topic'")
+    if canonical_name == "save_memory" and not args.get("topic"):
+        raise ValueError("save_memory requires a 'topic'")
 
     return await fn(**args)

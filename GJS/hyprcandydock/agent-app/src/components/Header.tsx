@@ -17,6 +17,7 @@ import {
   Music,
   Files,
   User,
+  BookOpen,
 } from 'lucide-react';
 import { useStore, setStore, storeActions, PRESET_MODELS, FilePane } from '../store';
 import { bridge } from '../bridge';
@@ -392,11 +393,6 @@ export const Header: React.FC = () => {
               if (store.inferenceMode === 'cloud') {
                 return KNOWN_LABELS[store.cloudModel || ''] || store.cloudModel || 'Candy Agent';
               }
-              if (store.inferenceMode === 'local') {
-                return store.activeModel
-                  ? store.activeModel.replace(/\.gguf$/i, '').replace(/_/g, ' ').slice(0, 24)
-                  : 'Local Model';
-              }
               return 'Candy Agent';
             })()}&nbsp;
             <span style={{
@@ -422,6 +418,15 @@ export const Header: React.FC = () => {
               {store.modelStatus === 'ready' ? 'Active' : store.modelStatus === 'loading' || store.modelStatus === 'downloading' ? 'Loading' : 'Idle'}
             </span>
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setStore({ memoryPanelOpen: true })}
+          className="header-icon-btn"
+          title="Agent memories"
+        >
+          <BookOpen size={15} />
         </button>
 
         <button

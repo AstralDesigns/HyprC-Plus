@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState, type FC } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FC } from 'react';
 import {
   AlertTriangle, Check, Cpu,
   Eye, EyeOff, ExternalLink, Key, Loader,
-  RefreshCw, Trash2, X, Zap, Sparkles, TestTube, Search,
+  RefreshCw, X, Zap, Sparkles, TestTube, Search,
 } from 'lucide-react';
 import { useStore, setStore } from '../store';
 import { bridge } from '../bridge';
@@ -18,7 +18,10 @@ const BYPASS_BYOK_LICENSE_GATE = true;
 
 // ── HIDE_PROVIDERS: Add provider IDs here to hide them from the UI ────────────
 // e.g. ["openrouter", "groq"]
-export const HIDE_PROVIDERS: string[] = [];
+// §8.1 streamlining: keep only OpenRouter (new default) + Groq in the cloud
+// picker. The rest stay wired in the backend (BYOK_PROVIDERS / byok_client) but
+// their pills are filtered out by getVisibleProviders(); reversible in one line.
+export const HIDE_PROVIDERS: string[] = ['aimlapi', 'google', 'anthropic', 'openai', 'xai'];
 
 // ── System Color Tokens (Matugen + Wallust) ───────────────────────────────────
 // The user explicitly requested:
@@ -348,8 +351,9 @@ const CloudTab: FC = () => {
   const visibleProviders = getVisibleProviders();
 
   // Selected provider in the scrollable tab bar — resumes whichever provider
-  // was actually last active (if keys are stored); otherwise defaults to AI/ML API
-  // ('aimlapi') when no provider's keys are stored yet, without activating any provider or model.
+  // was actually last active (if keys are stored); otherwise defaults to
+  // OpenRouter ('openrouter') when no provider's keys are stored yet, without
+  // activating any provider or model. (§8.1: OpenRouter is the new no-key default.)
   const [selectedProviderId, setSelectedProviderId] = useState<string>(() => {
     const hasAnyStoredKey = Object.values(store.byokKeys || {}).some(
       k => !!k && typeof k === 'string' && k.trim().length > 0
@@ -357,8 +361,8 @@ const CloudTab: FC = () => {
     if (hasAnyStoredKey && store.byokProvider && visibleProviders.some(p => p.id === store.byokProvider)) {
       return store.byokProvider;
     }
-    const aiml = visibleProviders.find(p => p.id === 'aimlapi');
-    return aiml?.id || visibleProviders[0]?.id || 'aimlapi';
+    const openrouter = visibleProviders.find(p => p.id === 'openrouter');
+    return openrouter?.id || visibleProviders[0]?.id || 'openrouter';
   });
 
   // Per-provider key input and control state
@@ -535,9 +539,8 @@ const CloudTab: FC = () => {
         || providerModels[0]?.id
         || '';
 
-      // If auto-activating, stop llama-server and deactivate local
+      // If auto-activating, clear any model-ready status marker first
       if (autoActivate) {
-        try { await bridge.runtimeRequest('/api/server/stop'); } catch { }
         bridge.notifyModelStatus(false);
       }
 
@@ -576,7 +579,7 @@ const CloudTab: FC = () => {
         byokProvider: isCurrentActive ? null : store.byokProvider,
         byokKeys: newKeys,
         byokModel: isCurrentActive ? '' : store.byokModel,
-        inferenceMode: isCurrentActive ? 'local' : store.inferenceMode,
+        inferenceMode: isCurrentActive ? 'byok' : store.inferenceMode,
         modelStatus: isCurrentActive ? 'idle' : store.modelStatus,
       });
       setKeyInputs(p => {
@@ -619,8 +622,7 @@ const CloudTab: FC = () => {
         return;
       }
       try {
-        // Stop llama-server so local releases VRAM & deactivates
-        try { await bridge.runtimeRequest('/api/server/stop'); } catch { }
+        // Clear any model-ready status marker before switching to this provider
         bridge.notifyModelStatus(false);
 
         // Activate provider in backend
@@ -830,7 +832,7 @@ const CloudTab: FC = () => {
             <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{store.byokLicenseKey?.slice(0, 8)}…</span>
           </div>
           <button
-            onClick={() => setStore({ byokLicenseKey: '', byokLicenseInstanceId: '', byokProvider: null, byokKeys: {}, byokModel: '', inferenceMode: 'local' })}
+            onClick={() => setStore({ byokLicenseKey: '', byokLicenseInstanceId: '', byokProvider: null, byokKeys: {}, byokModel: '', inferenceMode: 'byok' })}
             style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}
           >
             <X size={11} /> Revoke License

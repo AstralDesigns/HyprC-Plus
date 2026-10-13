@@ -35,11 +35,18 @@
 // starves segment requests and the audio cuts out once the buffer drains
 // (costs a little idle CPU); no-pings drops link beacon tracking;
 // renderer-process-limit=2 caps Chromium renderer processes (the main per-tab
-// RAM lever). WebGPU is left ENABLED: the old "Vulkan probe" log spam it caused
-// came from the ANGLE-on-Vulkan path, which we no longer use (native GL), so
-// enabling it is now silent. The proxy flag (added/removed by `hcproxy
-// enable|disable`, never by hand -- those functions grep this file for the
-// exact Chromium flag spelling, so do NOT quote that literal here) routes
+// RAM lever). WebGPU: NOT enabled and no longer needed. We investigated it for
+// the agent-app's WebLLM "Local" tab (2026-10) and proved Qt WebEngine cannot
+// expose a Dawn-backed WebGPU adapter regardless of flags -- it hardcodes
+// --in-process-gpu while WebGPU demands an out-of-process GPU service (the
+// flag --enable-unsafe-webgpu is necessary but never sufficient; upstream Qt
+// has no WebGPU integration through 6.12). The Local/WebLLM tab has since been
+// REMOVED from the agent-app; do not re-add the flag until that changes.
+// The old "Vulkan probe" log spam came from the
+// ANGLE-on-Vulkan path, which we no longer use (native GL). The proxy flag
+// (added/removed by `hcproxy enable|disable`, never by hand -- those functions
+// grep this file for the exact Chromium flag spelling, so do NOT quote that
+// literal here) routes
 // websearch through the opt-in hcproxy
 // (its lifecycle is tied to the websearch toggle in LauncherWindow.qml
 // -- see proxyOptIn; run `hcproxy disable` to strip the flag and stop the

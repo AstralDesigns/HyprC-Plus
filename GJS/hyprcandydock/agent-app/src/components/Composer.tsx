@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Square, Paperclip } from 'lucide-react';
+import { Send, Square, Paperclip, ListChecks } from 'lucide-react';
 import { useStore, setStore, storeActions, type AttachmentData } from '../store';
 import { agentEngine } from '../engine/agent-engine';
 import { bridge } from '../bridge';
@@ -11,11 +11,18 @@ export const Composer: React.FC = () => {
   const [attachments, setAttachments] = useState<AttachmentData[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Listen for prompts injected from the GJS host (search bar)
+  // Listen for prompts injected from the GJS host (search bar) and from
+  // suggestion chips. When a turn is already running, treat the text as a
+  // steering instruction; otherwise start a fresh turn.
   useEffect(() => {
-    const onUserPrompt = (e: any) => {
+    const onUserPrompt = async (e: any) => {
       const text = typeof e.detail === 'string' ? e.detail.trim() : '';
       if (!text) return;
+      if (store.agentRunning) {
+        const ok = await agentEngine.steer(text);
+        if (ok) { setInput(''); return; }
+        // steer refused (task already finished) → fall through to a normal send
+      }
       setInput(text);
       setTimeout(async () => {
         const curr = store.sessions.find(s => s.id === store.activeSessionId);
@@ -46,7 +53,21 @@ export const Composer: React.FC = () => {
 
   const handleSend = async () => {
     const text = input.trim();
-    if ((!text && attachments.length === 0) || store.agentRunning) return;
+    if (!text && attachments.length === 0) return;
+
+    // While a turn is running, a non-empty message steers it instead of
+    // starting a new turn. Attachments can't be steered, so ignore those here.
+    if (store.agentRunning) {
+      if (!text) return;
+      const ok = await agentEngine.steer(text);
+      if (ok) {
+        setInput('');
+        if (textareaRef.current) textareaRef.current.style.height = '38px';
+        return;
+      }
+      // steer refused (task already finished) → fall through to a fresh send
+    }
+
     setInput('');
     if (textareaRef.current) textareaRef.current.style.height = '38px';
 
@@ -164,11 +185,38 @@ export const Composer: React.FC = () => {
     } catch (e) { console.warn('File attach cancelled:', e); }
   };
 
-  const canSend = (!!input.trim() || attachments.length > 0) && !store.agentRunning;
+  const tapComposerChip = (opt: { label: string; promptText: string; sendAs?: 'send' | 'steer' }) => {
+    const text = (opt.promptText || opt.label || '').trim();
+    if (!text) return;
+    setStore({ activeSuggestions: null });
+    // The agent_user_prompt listener routes this to steer (running) or a fresh send.
+    window.dispatchEvent(new CustomEvent('agent_user_prompt', { detail: text }));
+  };
+
+  const canSend = !!input.trim() || attachments.length > 0;
 
   return (
     <div style={{ padding: '10px 12px 14px', background: 'transparent', flexShrink: 0 }}>
       <PendingFilesBar />
+      {store.activeSuggestions && store.activeSuggestions.options.length > 0 && (
+        <div className="suggestion-block composer-suggestions">
+          {store.activeSuggestions.question ? (
+            <div className="suggestion-question">{store.activeSuggestions.question}</div>
+          ) : null}
+          <div className="suggestion-chips">
+            {store.activeSuggestions.options.map((opt, idx) => (
+              <button
+                key={`${opt.label}-${idx}`}
+                type="button"
+                className="suggestion-chip"
+                onClick={() => tapComposerChip(opt)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="composer-wrap">
         <div className="composer-input-row" style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', padding: '6px 8px 0' }}>
           <textarea
@@ -178,10 +226,9 @@ export const Composer: React.FC = () => {
             onChange={handleInput}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder={store.agentRunning ? "Agent is running… click Stop to interrupt." : "Ask the agent...(Enter to send) "}
+            placeholder={store.specApprovalPending ? "Review the plan above — Approve or Revise…" : store.agentRunning ? "Steer the agent… (Enter)" : "Ask the agent...(Enter to send) "}
             rows={1}
             style={{ height: '38px', minHeight: '38px', flex: 1 }}
-            disabled={store.agentRunning}
           />
         </div>
         <div className="composer-toolbar">
@@ -195,12 +242,27 @@ export const Composer: React.FC = () => {
               <Paperclip size={12} />
               <span>Attach</span>
             </button>
+            <button
+              type="button"
+              className={`chat-attach-btn composer-spec-toggle ${store.specMode ? 'active' : ''}`}
+              onClick={() => setStore({ specMode: !store.specMode })}
+              disabled={store.agentRunning}
+              title="Spec-driven: draft a plan for your approval before executing"
+            >
+              <ListChecks size={12} />
+              <span>Spec</span>
+            </button>
           </div>
 
           {store.agentRunning ? (
-            <button className="composer-action-btn composer-stop-btn" onClick={handleStop} title="Stop agent (Esc)" aria-label="Stop agent">
-              <Square size={13} fill="var(--matugen-on-secondary, #1d343c)" color="var(--matugen-on-secondary, #1d343c)" />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <button className="composer-action-btn composer-stop-btn" onClick={handleStop} title="Stop agent (Esc)" aria-label="Stop agent">
+                <Square size={13} fill="var(--matugen-on-secondary, #1d343c)" color="var(--matugen-on-secondary, #1d343c)" />
+              </button>
+              <button className="composer-action-btn" onClick={handleSend} disabled={!canSend} title="Steer the agent (Enter)" aria-label="Steer agent">
+                <Send size={14} color="var(--matugen-on-secondary, #1d343c)" />
+              </button>
+            </div>
           ) : (
             <button className="composer-action-btn" onClick={handleSend} disabled={!canSend} title="Send (Enter)" aria-label="Send message">
               <Send size={14} color="var(--matugen-on-secondary, #1d343c)" />

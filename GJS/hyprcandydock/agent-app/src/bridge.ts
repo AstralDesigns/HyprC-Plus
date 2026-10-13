@@ -1,11 +1,10 @@
 /**
- * GJS <-> React WebKitGTK Bridge
- * Handles asynchronous IPC with HyprCandyDock GJS host.
+ * Host <-> React Bridge (Quickshell/Qt6-WebEngine host, formerly GJS)
+ * Handles asynchronous IPC with the HyprCandy launcher host.
  *
- * WebKitGTK is the only UI and inference-client surface. There is no
- * Electron/Chromium renderer anymore — local llama.cpp, BYOK, and managed
- * cloud inference all go through the local Python runtime server via
- * runtimeRequest(), which GJS proxies to http://127.0.0.1:17900.
+ * BYOK and managed-cloud inference go through the local Python runtime server
+ * via runtimeRequest(), which the host proxies to http://127.0.0.1:17900.
+ * Local inference (llama.cpp, WebLLM) is fully retired — BYOK and cloud only.
  */
 
 export interface HostMessage {

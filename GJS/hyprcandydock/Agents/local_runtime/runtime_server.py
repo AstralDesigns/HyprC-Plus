@@ -12,8 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 
-import llama_manager
-from agent_loop import local_backend, run_agentic_turn
+from agent_loop import run_agentic_turn
 from cloud_client import CLOUD_MODELS, stream_cloud, validate_license
 from byok_client import stream_byok, PROVIDERS, get_provider_models, fetch_remote_models
 from tools import TOOLS_SCHEMA
@@ -93,6 +92,12 @@ class ChatRequest(BaseModel):
     byok_provider: Optional[str] = None
     byok_key: Optional[str] = None
     byok_model: Optional[str] = None
+    # Spec-driven (plan-before-execute) mode + project root for the verification gate:
+    spec_enabled: Optional[bool] = None
+    project_path: Optional[str] = None
+    # Client-generated id grouping this turn's file edits for "Revert this turn"
+    # (plan §3.7). Falls back to the server task_id when omitted.
+    turn_id: Optional[str] = None
 
 
 class LicenseRequest(BaseModel):
@@ -109,6 +114,21 @@ class BYOKSetRequest(BaseModel):
     set_active: bool = True
 
 
+class SteerRequest(BaseModel):
+    text: str
+
+
+class ApprovalRequest(BaseModel):
+    # 'approve' → execute the drafted spec; 'revise' → re-draft with feedback
+    # text (delivered through the steering queue); 'cancel' → abort the turn.
+    action: str
+    text: Optional[str] = None
+
+
+class MemoryDeleteRequest(BaseModel):
+    topic: str
+
+
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/health")
@@ -116,7 +136,8 @@ async def health():
     return {"status": "ok", "server": "hyprcandy-runtime"}
 
 
-# ── Model catalog (Local GGUF deprecated in favor of BYOK/Cloud) ────────────
+# ── Legacy local-model stubs (local inference fully removed; kept as no-ops
+#    so old frontends can't error on them) ───────────────────────────────────
 
 @app.get("/api/models")
 async def get_models():
@@ -153,7 +174,7 @@ async def clear_models():
     return {"status": "ok"}
 
 
-# ── llama-server lifecycle (no-op) ───────────────────────────────────────────
+# ── Legacy llama-server lifecycle (no-ops) ─────────────────────────────────
 
 @app.post("/api/server/start")
 async def start_server(req: ServerStartRequest):
@@ -181,12 +202,17 @@ async def chat_start(req: ChatRequest):
     Routing priority:
       1. byok_provider + byok_key → BYOK provider (Google/OpenAI/Anthropic/xAI)
       2. license_key → Vercel AI Gateway (managed cloud)
-      3. fallback → local llama-server
+      3. otherwise → BYOK with OpenRouter (free-tier route) as last resort
+
+    NOTE: there is deliberately no local (llama-server/GGUF/WebLLM) branch —
+    local inference was fully removed from the product (2026-10; see agent-app
+    plan §8.2 findings). Inference is BYOK or managed cloud only.
     """
     # GC stale tasks first
     _gc_chat_tasks()
 
     task_id = str(uuid.uuid4())
+    turn_id = (req.turn_id or task_id).strip() or task_id
     _chat_tasks[task_id] = {
         "events": [],
         "done": False,
@@ -194,6 +220,9 @@ async def chat_start(req: ChatRequest):
         "created_at": time.time(),
         "task": None,       # asyncio.Task, set below once created
         "cancelled": False,
+        "turn_id": turn_id,            # groups this turn's write_file edits for revert
+        "pending_instructions": [],  # steering text queued mid-run, drained per-iteration
+        "approval": None,            # spec-driven gate: 'approve' | 'revise' | 'cancel'
     }
 
     # Determine route based on explicit inference_mode preference and available credentials
@@ -208,6 +237,9 @@ async def chat_start(req: ChatRequest):
         endpoint = "byok"
 
     async def _run():
+        # Tag every write_file in this turn (isolated per asyncio task via the
+        # context var) so a later /api/turns/revert can roll the whole turn back.
+        tools_module.CURRENT_TURN_ID.set(turn_id)
         try:
             if endpoint == "byok":
                 provider = byok_provider or "openrouter"
@@ -238,6 +270,10 @@ async def chat_start(req: ChatRequest):
                 history=_history_without_last(req.messages),
                 backend_fn=backend_fn,
                 project_context=req.project_context,
+                steer_source=lambda: _drain_steers(task_id),
+                spec_enabled=bool(req.spec_enabled),
+                project_path=req.project_path,
+                approve_source=lambda: _read_approval(task_id),
             ):
                 _chat_tasks[task_id]["events"].append(event)
                 if event.get("type") in ("done", "error"):
@@ -269,10 +305,10 @@ async def chat_start(req: ChatRequest):
 async def chat_cancel(task_id: str):
     """
     Cancel an in-flight chat turn. Cancels the backing asyncio.Task, which
-    unwinds run_agentic_turn and closes the underlying HTTP stream to
-    llama-server / the cloud provider (dropping the connection makes
-    llama-server itself stop generating for that request instead of
-    burning tokens/CPU for a client that has already given up).
+    unwinds run_agentic_turn and closes the underlying HTTP stream to the
+    model provider (dropping the connection makes the provider stop
+    generating for that request instead of burning tokens/CPU for a client
+    that has already given up).
     """
     task_entry = _chat_tasks.get(task_id)
     if not task_entry:
@@ -301,6 +337,52 @@ async def chat_poll(task_id: str, since: int = 0):
         "done": task["done"],
         "total": len(task["events"]),
     }
+
+
+@app.post("/api/chat/steer/{task_id}")
+async def chat_steer(task_id: str, req: SteerRequest):
+    """
+    Inject a steering instruction into an in-flight chat turn.
+
+    The text is queued and drained by run_agentic_turn at the next iteration
+    boundary (see agent_loop.steer_source). Returns {ok: false, done: true} if
+    the task already finished/cancelled so the client can fall back to a normal
+    new-message send.
+    """
+    task_entry = _chat_tasks.get(task_id)
+    if not task_entry:
+        raise HTTPException(status_code=404, detail="Unknown chat task_id")
+    if task_entry.get("done") or task_entry.get("cancelled"):
+        return {"ok": False, "done": True}
+    text = (req.text or "").strip()
+    if not text:
+        return {"ok": False, "done": False}
+    task_entry.setdefault("pending_instructions", []).append(text)
+    return {"ok": True, "done": False}
+
+
+@app.post("/api/chat/approve/{task_id}")
+async def chat_approve(task_id: str, req: ApprovalRequest):
+    """
+    Resolve an `awaiting_approval` gate from the spec-driven mode.
+
+    'approve' resumes execution of the drafted plan; 'revise' re-drafts the plan
+    using `text` (queued through the same steering path so the loop folds it in
+    as revision notes); 'cancel' aborts the turn. Returns {ok:false, done:true}
+    if the task already finished.
+    """
+    task_entry = _chat_tasks.get(task_id)
+    if not task_entry:
+        raise HTTPException(status_code=404, detail="Unknown chat task_id")
+    if task_entry.get("done") or task_entry.get("cancelled"):
+        return {"ok": False, "done": True}
+    action = (req.action or "").strip().lower()
+    if action not in ("approve", "revise", "cancel"):
+        return {"ok": False, "done": False}
+    if action == "revise" and req.text and req.text.strip():
+        task_entry.setdefault("pending_instructions", []).append(req.text.strip())
+    task_entry["approval"] = action
+    return {"ok": True, "done": False}
 
 
 # Legacy SSE endpoints kept for compatibility — use /chat/start + /chat/poll instead
@@ -430,6 +512,40 @@ async def files_reject_all():
     return {"ok": True, "count": count}
 
 
+# ── Turn revert (plan §3.7) ──────────────────────────────────────────────────
+# Every write_file in a turn is tagged with the turn id (see CURRENT_TURN_ID),
+# so the whole turn's file changes can be rolled back in one action.
+
+class TurnBody(BaseModel):
+    turn_id: str
+
+
+@app.get("/api/turns/{turn_id}/edits")
+async def turn_edits(turn_id: str):
+    """List the files a turn touched (for a revert confirmation dialog)."""
+    return {"files": tools_module.get_turn_edits(turn_id)}
+
+
+@app.post("/api/turns/revert")
+async def turn_revert(body: TurnBody):
+    """Restore every file the turn touched to its pre-turn state."""
+    return tools_module.revert_turn(body.turn_id)
+
+
+# ── Agent memory (durable topic notes) ───────────────────────────────────────
+# Backs the Memories panel; the same files the agent reads/writes via its
+# list/read/save/delete_memory tools (see tools.MEMORY_DIR).
+
+@app.get("/api/memories")
+async def memories_list():
+    return await tools_module.list_memories()
+
+
+@app.post("/api/memories/delete")
+async def memories_delete(body: MemoryDeleteRequest):
+    return await tools_module.delete_memory(body.topic)
+
+
 # ── License (Vercel managed cloud) ───────────────────────────────────────────
 
 @app.post("/api/license/validate")
@@ -487,3 +603,23 @@ def _history_without_last(messages: list[dict]) -> list[dict]:
         if messages[i].get("role") == "user":
             return messages[:i]
     return messages
+
+
+def _drain_steers(task_id: str) -> list[str]:
+    """Return and clear any steering instructions queued for a running task."""
+    task_entry = _chat_tasks.get(task_id)
+    if not task_entry:
+        return []
+    pending = task_entry.get("pending_instructions") or []
+    task_entry["pending_instructions"] = []
+    return pending
+
+
+def _read_approval(task_id: str) -> Optional[str]:
+    """Return and clear a pending spec-approval decision ('approve'|'revise'|'cancel')."""
+    task_entry = _chat_tasks.get(task_id)
+    if not task_entry:
+        return None
+    value = task_entry.get("approval")
+    task_entry["approval"] = None
+    return value

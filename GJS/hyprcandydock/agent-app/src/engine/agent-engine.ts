@@ -1,10 +1,10 @@
 /**
  * Agent Engine: orchestrates chat sessions and inline tool-call detection for
- * the visible React UI. All model inference (local llama.cpp, BYOK, and
- * managed cloud) runs through the local Python runtime server — see
- * Agents/local_runtime/ — over bridge.runtimeRequest(). There is no
- * Electron/Chromium renderer or in-browser WebLLM/Wllama engine anymore;
- * WebKitGTK is the only UI and inference-client surface.
+ * the visible React UI. BYOK and managed-cloud inference run through the local
+ * Python runtime server — see Agents/local_runtime/ — over
+ * bridge.runtimeRequest(). There is no local inference backend: llama.cpp was
+ * retired and WebLLM was removed after verifying Qt WebEngine cannot expose a
+ * WebGPU adapter (see the §8.2 findings in the quest-flow plan).
  */
 import { bridge } from '../bridge';
 import {
@@ -15,6 +15,7 @@ import {
   ToolCallData,
   DiffData,
   MessageBlock,
+  SuggestionsData,
 } from '../store';
 
 function createStreamUpdateScheduler(update: (content: string, tools: ToolCallData[] | undefined, blocks: MessageBlock[]) => void, intervalMs = 80) {
@@ -40,6 +41,13 @@ function createStreamUpdateScheduler(update: (content: string, tools: ToolCallDa
 let blockIdCounter = 0;
 const nextBlockId = () => `block_${Date.now()}_${blockIdCounter++}`;
 
+/** Client-generated id for a single agentic turn. Sent to the runtime as
+ * `turn_id` so the per-turn edit ledger can group every write_file the turn
+ * performs, and stored on the assistant Message so "Revert this turn" (and
+ * edit-&-resend rollback) can restore the workspace to its pre-turn state. */
+let turnIdCounter = 0;
+const nextTurnId = () => `turn_${Date.now()}_${turnIdCounter++}`;
+
 /** Turns a completed turn's own text into a short session title — used
  * once, the first time a session's first turn completes, so naming reflects
  * what the conversation is actually about rather than truncating whatever
@@ -58,6 +66,7 @@ function deriveSessionTitle(tools: ToolCallData[], fullText: string): string {
 const AMBIENT_TOOL_NAMES = new Set([
   'read_file', 'list_directory', 'web_search', 'fetch_url', 'capture_preview',
   'todo_add', 'todo_start', 'todo_done', 'todo_skip', 'todo_list',
+  'list_memories', 'read_memory', 'save_memory', 'delete_memory',
 ]);
 
 export class AgentEngine {
@@ -67,6 +76,10 @@ export class AgentEngine {
   private conversationGeneration = 0;
   private activeConversationSettled: Promise<void> | null = null;
   private activeResolveConversation: (() => void) | null = null;
+  /** Steering text the user queued for the in-flight turn. The poll loop drains
+   *  this into the running block list for immediate visual feedback; the backend
+   *  confirms receipt separately via a steer_ack event. */
+  private pendingSteers: string[] = [];
 
   public async loadModel(modelId: string, skipActiveConversationWait = false): Promise<void> {
     const requestedModelId = modelId || PRESET_MODELS[0].id;
@@ -104,12 +117,57 @@ export class AgentEngine {
     this.abortController?.abort();
     this.abortController = null;
     this.cancelActiveTask();
-    setStore({ agentRunning: false });
+    this.pendingSteers = [];
+    setStore({ agentRunning: false, specApprovalPending: false });
     if (this.activeResolveConversation) {
       this.activeResolveConversation();
       this.activeResolveConversation = null;
     }
     this.activeConversationSettled = null;
+  }
+
+  /** Inject a steering instruction into the currently running turn.
+   *  Returns true when the backend accepted it (so the caller can skip starting
+   *  a fresh message); false when there's no active task or the turn already
+   *  finished, in which case the composer falls back to a normal send. */
+  public async steer(text: string): Promise<boolean> {
+    const clean = (text || '').trim();
+    const taskId = this.activeTaskId;
+    if (!clean || !taskId) return false;
+    try {
+      const res: any = await bridge.runtimeRequest(`/api/chat/steer/${taskId}`, { text: clean });
+      if (res?.ok) {
+        this.pendingSteers.push(clean);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Resolve a spec-driven Approve/Revise gate on the active turn.
+   *  'approve' executes the plan; 'revise' re-drafts with `text` as feedback;
+   *  'cancel' aborts. Returns true when the backend accepted it. */
+  public async approve(action: 'approve' | 'revise' | 'cancel', text?: string): Promise<boolean> {
+    const taskId = this.activeTaskId;
+    if (!taskId) return false;
+    try {
+      const res: any = await bridge.runtimeRequest(
+        `/api/chat/approve/${taskId}`,
+        { action, text: text && text.trim() ? text.trim() : undefined },
+      );
+      if (res?.ok) {
+        // Approving resumes execution; cancelling clears the gate. Revising keeps
+        // it open — the loop re-emits drafting + awaiting_approval for the new plan.
+        if (action === 'approve' || action === 'cancel') setStore({ specApprovalPending: false });
+        return true;
+      }
+      if (res?.done) setStore({ specApprovalPending: false });
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   public async runConversation(
@@ -139,15 +197,18 @@ export class AgentEngine {
     const isCurrentConversation = () => conversationGeneration === this.conversationGeneration;
     this.activeConversationSettled = conversationSettled;
     this.abortController = new AbortController();
-    setStore({ agentRunning: true });
+    this.pendingSteers = [];
+    setStore({ agentRunning: true, activeSuggestions: null, specApprovalPending: false });
 
     const assistantMsgId = 'msg_' + Date.now() + '_runtime';
+    const turnId = nextTurnId();
     storeActions.addMessage(sessionId, {
       id: assistantMsgId,
       role: 'assistant',
       content: '',
       timestamp: Date.now(),
       tools: [],
+      turnId,
     });
 
     const streamUi = createStreamUpdateScheduler((content, tools, blocks) =>
@@ -165,6 +226,18 @@ export class AgentEngine {
         blocks = [...blocks.slice(0, -1), last];
       } else {
         blocks = [...blocks, { type: 'text', id: nextBlockId(), content: token }];
+      }
+    };
+
+    // Consecutive reasoning deltas group into one collapsible block, mirroring
+    // how tokens coalesce into a text block. Display-only — never fed back to
+    // the model context (see plan §3.3).
+    const appendReasoning = (text: string) => {
+      const last = blocks[blocks.length - 1];
+      if (last && last.type === 'reasoning') {
+        blocks = [...blocks.slice(0, -1), { ...last, content: last.content + text }];
+      } else {
+        blocks = [...blocks, { type: 'reasoning', id: nextBlockId(), content: text }];
       }
     };
 
@@ -286,6 +359,9 @@ export class AgentEngine {
         payload.model_choice = liveStore.cloudModel || 'google/gemini-2.5-flash';
         payload.license_key = liveStore.licenseKey || undefined;
       }
+      if (liveStore.specMode) payload.spec_enabled = true;
+      if (liveStore.projectPath) payload.project_path = liveStore.projectPath;
+      payload.turn_id = turnId;
 
       // Fire-and-forget: get task_id immediately, then poll for events.
       const startResult = await bridge.runtimeRequest('/api/chat/start', payload);
@@ -295,9 +371,12 @@ export class AgentEngine {
       this.activeTaskId = taskId;
       let since = 0;
       const POLL_MS = 150;
-      // 5-minute max poll timeout to prevent a spike on a crashed/stuck server.
-      const POLL_TIMEOUT_MS = 5 * 60 * 1000;
-      const pollStartTime = Date.now();
+      // Idle-based timeout: a turn is treated as hung only when NO events have
+      // arrived for this long. The loop emits heartbeats while blocked on the
+      // spec-approval gate and verification runs are non-blocking, so long
+      // legitimate waits stay alive; a genuinely stuck runtime still trips here.
+      const IDLE_TIMEOUT_MS = 6 * 60 * 1000;
+      let lastActivity = Date.now();
 
       await new Promise<void>((resolve, reject) => {
         const poll = async () => {
@@ -306,7 +385,7 @@ export class AgentEngine {
             settleConversation();
             return resolve();
           }
-          if (Date.now() - pollStartTime > POLL_TIMEOUT_MS) {
+          if (Date.now() - lastActivity > IDLE_TIMEOUT_MS) {
             streamUi.cancel();
             this.cancelActiveTask();
             const prev = getStore().sessions.find(s => s.id === sessionId)
@@ -326,6 +405,17 @@ export class AgentEngine {
             );
             const events: any[] = resp.events || [];
             since = resp.total ?? since;
+            if (events.length) lastActivity = Date.now();
+
+            // Render any steering the user queued since the last poll immediately,
+            // so it shows in the stream ahead of the model's next output.
+            if (this.pendingSteers.length) {
+              const drained = this.pendingSteers.splice(0, this.pendingSteers.length);
+              for (const s of drained) {
+                blocks = [...blocks, { type: 'steer', id: nextBlockId(), content: s }];
+              }
+              streamUi.schedule(fullText, currentTools.length ? currentTools : undefined, blocks);
+            }
 
             for (const event of events) {
               if (!isCurrentConversation()) break;
@@ -396,6 +486,61 @@ export class AgentEngine {
                 updateToolInBlocks(data.id, t => ({ ...t, status: 'error', result: data.error }));
                 streamUi.schedule(fullText, currentTools, blocks);
 
+              } else if (type === 'reasoning') {
+                const rt: string = typeof data === 'string' ? data : (data?.text ?? '');
+                if (rt) {
+                  appendReasoning(rt);
+                  streamUi.schedule(fullText, currentTools.length ? currentTools : undefined, blocks);
+                }
+
+              } else if (type === 'suggestions') {
+                const sd = (typeof data === 'string' ? null : data) as SuggestionsData | null;
+                if (sd && Array.isArray(sd.options) && sd.options.length) {
+                  blocks = [...blocks, { type: 'suggestions', id: nextBlockId(), suggestions: sd }];
+                  // Mirror to the composer chip row; clarify chips stay live after
+                  // the turn ends, next-step ones are refreshed by the next run.
+                  setStore({ activeSuggestions: sd });
+                  streamUi.schedule(fullText, currentTools.length ? currentTools : undefined, blocks);
+                }
+
+              } else if (type === 'steer_ack') {
+                // The composer already rendered this steer optimistically via
+                // pendingSteers; the backend ack is receipt-confirmation only.
+
+              } else if (type === 'spec') {
+                const status: 'drafting' | 'ready' = data?.status === 'ready' ? 'ready' : 'drafting';
+                const markdown: string = data?.markdown ?? '';
+                const lastIdx = blocks.reduce((acc, b, i) => (b.type === 'spec' ? i : acc), -1);
+                const lastSpec = lastIdx >= 0 ? blocks[lastIdx] : undefined;
+                if (status === 'ready' && lastSpec && lastSpec.type === 'spec' && lastSpec.status === 'drafting') {
+                  // Fill the trailing drafting placeholder with the finished plan.
+                  blocks = blocks.map((b, i) => i === lastIdx ? { type: 'spec', id: b.id, status: 'ready', markdown } : b);
+                } else {
+                  blocks = [...blocks, { type: 'spec', id: nextBlockId(), status, markdown }];
+                }
+                streamUi.schedule(fullText, currentTools.length ? currentTools : undefined, blocks);
+
+              } else if (type === 'awaiting_approval') {
+                setStore({ specApprovalPending: true });
+
+              } else if (type === 'verification') {
+                const command: string = data?.command ?? '';
+                const status: 'running' | 'complete' = data?.status === 'complete' ? 'complete' : 'running';
+                const lastIdx = blocks.reduce((acc, b, i) => (b.type === 'verification' ? i : acc), -1);
+                const lastVer = lastIdx >= 0 ? blocks[lastIdx] : undefined;
+                const id = lastVer ? lastVer.id : nextBlockId();
+                const vblk: MessageBlock = { type: 'verification', id, command, status, exitCode: data?.exitCode, output: data?.output, passed: data?.passed };
+                if (status === 'complete' && lastVer && lastVer.type === 'verification' && lastVer.status === 'running') {
+                  // Update the running card in place with the result.
+                  blocks = blocks.map((b, i) => i === lastIdx ? vblk : b);
+                } else {
+                  blocks = [...blocks, vblk];
+                }
+                streamUi.schedule(fullText, currentTools.length ? currentTools : undefined, blocks);
+
+              } else if (type === 'heartbeat') {
+                // Keepalive while the loop is blocked (spec gate); already
+                // refreshed lastActivity above since it counts as an event.
               } else if (type === 'done') {
                 if (data?.content && !fullText) {
                   fullText = data.content;
