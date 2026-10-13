@@ -2249,7 +2249,7 @@ PanelWindow {
                                         CCSlider { label:"Module Text"; from:8;to:20; value:Config.infoFontSize;  onMoved:function(v){Config.infoFontSize=v} }
 
                                         CCSection { text: "Media" }
-                                        CCSlider { label:"Thumb Size"; from:10;to:40; value:Config.mediaThumbSize; onMoved:function(v){Config.mediaThumbSize=v} }
+                                        CCSlider { label:"Thumb Size"; from:10;to:40;stepSize:2; value:Config.mediaThumbSize; onMoved:function(v){Config.mediaThumbSize=v} }
                                         CCSlider { label:"Media Glyph"; from:8;to:24;stepSize:2; value:Config.mediaGlyphSize; onMoved:function(v){Config.mediaGlyphSize=v} }
 
                                         CCSection { text: "Workspace Icon Glyphs" }
