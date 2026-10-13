@@ -157,7 +157,7 @@ Item {
                     radius: 20
                     clip: true
                     color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                               Theme.cSurfaceTint.b, 0.35)
+                                               Theme.cSurfaceTint.b, 0.65)
                     border.width: 1
                     border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
@@ -404,7 +404,7 @@ Item {
                 // Gradient for current day, Theme.cSurfaceTint for others
                 color: index === 0
                     ? "transparent"
-                    : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.35)
+                    : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.65)
 
                 gradient: index === 0 ? fcGradient : null
 
