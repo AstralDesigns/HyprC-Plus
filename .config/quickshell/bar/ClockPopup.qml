@@ -14,7 +14,7 @@ Item {
 
     property var _now: new Date()
     property string _secStr: Qt.formatDateTime(_now, "ss")
-    property string _dateStr: Qt.formatDateTime(_now, "dddd, MMMM d")
+    //property string _dateStr: Qt.formatDateTime(_now, "dddd, MMMM d")
     property bool _colonVisible: _now.getMilliseconds() < 500
 
     property string _greeting: {
@@ -96,7 +96,7 @@ Item {
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
-                        font.pixelSize: 38
+                        font.pixelSize: 58
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Text {
@@ -115,7 +115,7 @@ Item {
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
-                        font.pixelSize: 38
+                        font.pixelSize: 58
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Item { width: 8; height: 1 }
@@ -138,12 +138,12 @@ Item {
                     }
                 }
 
-                Text {
-                    text: root._dateStr
-                    color: Theme.cOnSurf
-                    font.family: Config.labelFont
-                    font.pixelSize: 12
-                }
+                //Text {
+                    //text: root._dateStr
+                    //color: Theme.cOnSurf
+                    //font.family: Config.labelFont
+                    //font.pixelSize: 12
+                //}
             }
 
             Item {
@@ -409,14 +409,14 @@ Item {
                 const minText = Qt.formatDateTime(time, "mm")
                 // Outer ring spans r=51 (inner dial edge) to r=78 (widget edge).
                 // Midpoint ≈ 63 — centers the minute text in the blurred ring region.
-                const rMin = 66
+                const rMin = 65
                 const minX = cx + rMin * Math.sin(minAngle)
                 const minY = cy - rMin * Math.cos(minAngle)
 
                 ctx.font = "bold 11px monospace"
                 ctx.textAlign = "center"
                 ctx.textBaseline = "middle"
-                ctx.fillStyle = Theme.cOnSecondary.toString()
+                ctx.fillStyle = Theme.cWc2.toString()
                 ctx.fillText(minText, minX, minY)
             }
         }
