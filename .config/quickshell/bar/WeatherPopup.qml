@@ -404,7 +404,7 @@ Item {
                 // Gradient for current day, Theme.cSurfaceTint for others
                 color: index === 0
                     ? "transparent"
-                    : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.65)
+                    : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.35)
 
                 gradient: index === 0 ? fcGradient : null
 
