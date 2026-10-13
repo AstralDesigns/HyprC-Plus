@@ -1239,12 +1239,13 @@ ShellRoot {
                                         // for keyboard-only selection).
                                         Keys.onUpPressed:    function(e) { root.moveFocus(-1); e.accepted = true }
                                         Keys.onDownPressed:  function(e) { root.moveFocus(+1); e.accepted = true }
-                                        // Left/Right cycle the lightbox preview when it is
-                                        // open; when it is closed the event is left
-                                        // un-accepted so the caret still moves natively
-                                        // inside the search field.
-                                        Keys.onLeftPressed:  function(e) { if (root.lightboxPath !== "") { root.cycleLightbox(-1); e.accepted = true } }
-                                        Keys.onRightPressed: function(e) { if (root.lightboxPath !== "") { root.cycleLightbox(+1); e.accepted = true } }
+                                        // Left/Right (plus Home/End, Ctrl+arrows and
+                                        // Shift+arrows) are intentionally NOT handled
+                                        // here: attaching a Keys handler for them to a
+                                        // TextInput suppresses its native caret motion
+                                        // and selection, so the field keeps full text
+                                        // editing. The lightbox overlay owns the arrow
+                                        // keys while a preview is open (see lightbox).
                                         // Tab / Shift+Tab jump a whole row so
                                         // users can still spatially scan the
                                         // grid when they want to, without
@@ -1268,27 +1269,6 @@ ShellRoot {
                                 }
                             }
 
-                            // Clear search
-                            Rectangle {
-                                visible: root.activeTab === "wallhaven" ? searchIn.text !== "" : root.searchText !== ""
-                                width: 34; height: 34
-                                radius: root.rFull
-                                color: clrHov.containsMouse ? root.cSurfHiHi : "transparent"
-                                border.color: root.cOutlineVar; border.width: 1
-                                Behavior on color { ColorAnimation { duration: 130 } }
-                                Text {
-                                    anchors.centerIn: parent; text: "󰅖"
-                                    color: root.cOnSurfVar
-                                    font.pixelSize: 14
-                                    font.family: "Symbols Nerd Font Mono"
-                                }
-                                MouseArea {
-                                    id: clrHov
-                                    anchors.fill: parent; hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: searchIn.text = ""
-                                }
-                            }
 
                             // Name ↓ / Random sort toggle
                             Rectangle {
@@ -2471,6 +2451,27 @@ ShellRoot {
                     color: Qt.rgba(0, 0, 0, 0.74)
                     radius: 20
                     z: 400
+
+                    // While a preview is open the overlay owns the arrow keys so
+                    // left/right (and up/down) cycle the coverflow, Escape
+                    // dismisses and Enter applies. Focus hands back to the search
+                    // field on close, so native caret/selection editing is only
+                    // ever borrowed while the lightbox is up.
+                    focus: visible
+                    onVisibleChanged: if (visible) lightbox.forceActiveFocus()
+                                      else searchIn.forceActiveFocus()
+                    Keys.onLeftPressed:   function(e) { root.cycleLightbox(-1); e.accepted = true }
+                    Keys.onRightPressed:  function(e) { root.cycleLightbox(+1); e.accepted = true }
+                    Keys.onUpPressed:     function(e) { root.cycleLightbox(-1); e.accepted = true }
+                    Keys.onDownPressed:   function(e) { root.cycleLightbox(+1); e.accepted = true }
+                    Keys.onEscapePressed: function(e) { root.lightboxPath = ""; root.lightboxWh = null; e.accepted = true }
+                    Keys.onReturnPressed: function(e) {
+                        if (root.lightboxWh) root.downloadWallhaven(root.lightboxWh, true)
+                        else root.applyWallpaper(root.lightboxPath)
+                        root.lightboxPath = ""
+                        root.lightboxWh = null
+                        e.accepted = true
+                    }
 
                     // Scrim: click-away closes. A plain MouseArea with
                     // hoverEnabled: false does not consume hover events, so the
