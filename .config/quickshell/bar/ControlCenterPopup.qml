@@ -1232,11 +1232,11 @@ PanelWindow {
                 Rectangle {
                     anchors.fill: parent
                     radius: 14
-                    color: Qt.rgba(Theme.cBackground.r, Theme.cBackground.g,
-                                                       Theme.cBackground.b, 0.65)
+                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                   Theme.cOnSecondary.b, 0.35)
                                                        
-		    border.width: 2
-        	    border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+		    border.width: 1
+        	    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
                 }
 
                 ColumnLayout {
