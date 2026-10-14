@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { bridge } from './bridge';
 import { EXTENSION_LANGUAGE_MAP } from './utils/monacoLanguages';
+import { fetchGitStatus, GitFileStatus } from './utils/gitStatus';
 
 export interface DiffData {
   filePath: string;
@@ -247,6 +248,11 @@ export interface AppState {
   // Mirrors the Python runtime's PENDING_EDITS registry (see /api/files/pending).
   pendingFiles: Record<string, PendingFileEdit>;
 
+  // Git working-tree status per absolute path (from `git status --porcelain`).
+  gitStatus: Record<string, GitFileStatus>;
+  // Absolute paths whose open editor currently reports >=1 error marker.
+  errorFiles: Record<string, true>;
+
   // Monaco editor theme
   monacoTheme: string;
 
@@ -354,6 +360,8 @@ function loadInitialState(): AppState {
     contextFiles: [],
     contextImages: [],
     pendingFiles: {},
+    gitStatus: {},
+    errorFiles: {},
 
     monacoTheme: 'matugen',
 
@@ -1112,6 +1120,40 @@ export const storeActions = {
     }));
   },
 
+  // Coalescing refresh of the git status map. Runs at most one `git status`
+  // at a time; a request arriving mid-flight sets a flag so the next loop
+  // iteration picks up the newer on-disk state instead of racing.
+  refreshGitStatus: (() => {
+    let inFlight = false;
+    let queued = false;
+    return async () => {
+      if (inFlight) { queued = true; return; }
+      inFlight = true;
+      try {
+        do {
+          queued = false;
+          const root = getStore().projectPath;
+          if (!root) {
+            if (Object.keys(getStore().gitStatus).length) setStore({ gitStatus: {} });
+            continue;
+          }
+          const { map, isRepo } = await fetchGitStatus(root);
+          setStore({ gitStatus: isRepo ? map : {} });
+        } while (queued);
+      } finally {
+        inFlight = false;
+      }
+    };
+  })(),
+
+  setFileError: (path: string | undefined, hasError: boolean) => {
+    if (!path) return;
+    if (!!getStore().errorFiles[path] === hasError) return;
+    const next = { ...getStore().errorFiles };
+    if (hasError) next[path] = true; else delete next[path];
+    setStore({ errorFiles: next });
+  },
+
   saveFile: async (paneId: string) => {
     const pane = currentState.panes.find(p => p.id === paneId);
     if (!pane || !pane.path) return;
@@ -1121,6 +1163,7 @@ export const storeActions = {
         setStore(prev => ({
           panes: prev.panes.map(p => p.id === paneId ? { ...p, isUnsaved: false } : p),
         }));
+        storeActions.refreshGitStatus();
       }
     } catch (e) {
       console.error('Failed to save file:', e);

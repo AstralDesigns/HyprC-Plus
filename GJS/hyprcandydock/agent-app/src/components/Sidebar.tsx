@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Folder,
@@ -30,29 +30,31 @@ import {
 } from 'lucide-react';
 import { useStore, setStore, storeActions, FileSystemItem } from '../store';
 import { bridge } from '../bridge';
+import { fileStatusClass, fileStatusLetter, buildFolderStatus } from '../utils/gitStatus';
 
 function getFileIcon(name: string, isDir: boolean) {
-  if (isDir) return <Folder size={13} color="var(--accent-yellow)" />;
+  // Same live-palette mapping as the tab glyphs (see Header.getTabIcon).
+  if (isDir) return <Folder size={13} color="var(--wallust-color1, #c16f4c)" />;
   const ext = name.split('.').pop()?.toLowerCase() || '';
   if (['ts', 'tsx', 'js', 'jsx', 'py', 'sh', 'bash', 'c', 'cpp', 'rs', 'go', 'html', 'css'].includes(ext)) {
-    return <FileCode size={13} color="var(--accent-cyan)" />;
+    return <FileCode size={13} color="var(--matugen-primary, #a0c9dc)" />;
   }
   if (['json', 'yaml', 'yml', 'toml', 'ini'].includes(ext)) {
-    return <FileJson size={13} color="var(--accent-yellow)" />;
+    return <FileJson size={13} color="var(--wallust-color4, #a85b27)" />;
   }
   if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'].includes(ext)) {
-    return <ImageIcon size={13} color="var(--accent-teal)" />;
+    return <ImageIcon size={13} color="var(--wallust-color2, #b3a40a)" />;
   }
   if (['mp4', 'webm', 'mov', 'mkv'].includes(ext)) {
-    return <Video size={13} color="var(--accent-gold)" />;
+    return <Video size={13} color="var(--wallust-color3, #3589d0)" />;
   }
   if (['mp3', 'wav', 'ogg', 'flac'].includes(ext)) {
-    return <Music size={13} color="var(--accent-purple)" />;
+    return <Music size={13} color="var(--wallust-color5, #69852d)" />;
   }
   if (['md', 'txt', 'log'].includes(ext)) {
-    return <FileText size={13} color="var(--text-secondary)" />;
+    return <FileText size={13} color="var(--matugen-secondary, #b6c489)" />;
   }
-  return <File size={13} color="var(--text-muted)" />;
+  return <File size={13} color="var(--matugen-outline, #838673)" />;
 }
 
 function formatSize(bytes?: number): string {
@@ -66,6 +68,12 @@ type ProjectEntry = { name: string; isDir: boolean; size: number; path: string }
 
 export const Sidebar: React.FC = () => {
   const [store] = useStore();
+  // One representative status per folder (highest-ranked descendant), used for
+  // the aggregate dot on the right of each directory row.
+  const folderStatus = useMemo(
+    () => buildFolderStatus(store.projectPath, store.gitStatus, store.errorFiles),
+    [store.projectPath, store.gitStatus, store.errorFiles],
+  );
   const [filterSearch, setFilterSearch] = useState('');
   const [projectSearch, setProjectSearch] = useState('');
   const [projectFiles, setProjectFiles] = useState<ProjectEntry[]>([]);
@@ -118,6 +126,7 @@ export const Sidebar: React.FC = () => {
         .sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
       setProjectFiles(sorted);
         setStore({ projectFiles: sorted, projectPath: dirPath });
+      storeActions.refreshGitStatus();
       setFolderChildren({});
       setExpandedFolders(new Set());
     } catch (e) {
@@ -266,6 +275,22 @@ export const Sidebar: React.FC = () => {
           )}
 
           <span className="tree-item-label">{entry.name}</span>
+
+          {!entry.isDir && fileStatusClass(entry.path, store.gitStatus, store.errorFiles) && (
+            <span
+              className={`tree-status-badge ${fileStatusClass(entry.path, store.gitStatus, store.errorFiles)}`}
+              title={fileStatusLetter(entry.path, store.gitStatus, store.errorFiles) === '!' ? 'Syntax error' : `Git: ${store.gitStatus[entry.path]}`}
+            >
+              {fileStatusLetter(entry.path, store.gitStatus, store.errorFiles)}
+            </span>
+          )}
+
+          {entry.isDir && folderStatus[entry.path] && (
+            <span
+              className={`tree-status-dot status-${folderStatus[entry.path]}`}
+              title={`${folderStatus[entry.path]} within`}
+            />
+          )}
 
           {isLoading && <RefreshCw size={10} className="spin" />}
           {!entry.isDir && <span className="tree-item-size">{formatSize(entry.size)}</span>}

@@ -230,6 +230,21 @@ export const App: React.FC = () => {
     return () => el.removeEventListener('scroll', enforceZeroScrollLeft);
   }, []);
 
+  // Keep git badges fresh: refresh on window focus and periodically while
+  // focused, so agent writes / external edits land without threading a
+  // refresh through every code path. refreshGitStatus coalesces, so an
+  // overlapping tick is a no-op beyond the queued follow-up run.
+  useEffect(() => {
+    const tick = () => {
+      if (document.hasFocus() && getStore().projectPath) storeActions.refreshGitStatus();
+    };
+    tick();
+    const id = setInterval(tick, 6000);
+    const onFocus = () => storeActions.refreshGitStatus();
+    window.addEventListener('focus', onFocus);
+    return () => { clearInterval(id); window.removeEventListener('focus', onFocus); };
+  }, []);
+
   return (
     <AppErrorBoundary>
       <div className="app-container">

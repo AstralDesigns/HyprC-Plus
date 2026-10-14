@@ -382,6 +382,41 @@ body,
   flex-shrink: 0;
 }
 
+/* Git / syntax status badges on tabs and project-tree rows. Colors come from
+   the live wallust / matugen palettes (see bridge.applyTheme), never hardcoded. */
+.tab-status-badge,
+.tree-status-badge {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+.tab-status-badge { margin-left: 4px; }
+.tree-status-badge { margin-left: 6px; }
+
+.status-modified { color: var(--wallust-color2, #327081); }
+.status-untracked,
+.status-added    { color: var(--wallust-color3, #856336); }
+.status-renamed  { color: var(--wallust-color4, #4899A8); }
+.status-deleted  { color: var(--text-muted); }
+.status-conflict,
+.status-error    { color: var(--matugen-error, #ffb4ab); }
+
+/* Aggregate folder dot: background follows the same status-* color rules
+   above via currentColor, so a directory reflects its highest-ranked change. */
+.tree-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 4px currentColor;
+  flex-shrink: 0;
+}
+
 .tab-title {
   max-width: 140px;
   overflow: hidden;

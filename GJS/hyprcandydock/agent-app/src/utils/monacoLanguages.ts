@@ -66,6 +66,17 @@ let customRegistered = false;
 export function registerCustomLanguages(monaco: any): void {
   if (customRegistered || !monaco?.languages) return;
   customRegistered = true;
+  // The TS/JS language worker otherwise floods every file with *semantic*
+  // diagnostics ("Cannot find module './x'", missing @types, etc.) because it
+  // has no tsconfig / on-disk module graph — even when `tsc` is clean. Keep
+  // real syntax errors (unbalanced braces, bad tokens) but drop the semantic
+  // pass so the editor and the git/error badges only react to genuine breakage.
+  try {
+    const ts = monaco.languages.typescript;
+    const diag = { noSemanticValidation: true, noSyntaxValidation: false, noSuggestionDiagnostics: true };
+    if (ts?.typescriptDefaults) ts.typescriptDefaults.setDiagnosticsOptions(diag);
+    if (ts?.javascriptDefaults) ts.javascriptDefaults.setDiagnosticsOptions(diag);
+  } catch { /* worker API drift — leave defaults in place */ }
   registerQml(monaco);
   registerToml(monaco);
 }

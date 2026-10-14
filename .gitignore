@@ -4,3 +4,7 @@
 # the state singletons but keep ignoring them so they never get committed.
 **/file:/
 **/file:
+# Dependency + build trees: never meaningful to commit, and collapsing them
+# keeps `git status` (and the editor's untracked badges) fast and relevant.
+**/node_modules/
+**/dist/

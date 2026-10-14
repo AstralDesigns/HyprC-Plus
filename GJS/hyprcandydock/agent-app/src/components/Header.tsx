@@ -25,14 +25,18 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useStore, setStore, storeActions, PRESET_MODELS, FilePane } from '../store';
+import { fileStatusClass, fileStatusLetter } from '../utils/gitStatus';
 import { bridge } from '../bridge';
 
 function getTabIcon(pane: FilePane) {
-  if (pane.type === 'image-gallery' || pane.type === 'image') return <ImageIcon size={12} color="var(--accent-cyan)" />;
-  if (pane.type === 'video-gallery' || pane.type === 'video') return <Video size={12} color="var(--accent-yellow)" />;
-  if (pane.type === 'audio') return <Music size={12} color="var(--accent-purple)" />;
-  if (pane.type === 'markdown') return <FileText size={12} color="var(--text-secondary)" />;
-  return <Code size={12} color="var(--accent-green)" />;
+  // File-type glyphs follow the live Material-You / wallust palette (set by
+  // bridge.applyTheme) instead of the fixed accent colors, so they re-tint
+  // with the wallpaper. Fallbacks only apply before the first theme_update.
+  if (pane.type === 'image-gallery' || pane.type === 'image') return <ImageIcon size={12} color="var(--wallust-color2, #b3a40a)" />;
+  if (pane.type === 'video-gallery' || pane.type === 'video') return <Video size={12} color="var(--wallust-color3, #3589d0)" />;
+  if (pane.type === 'audio') return <Music size={12} color="var(--wallust-color4, #a85b27)" />;
+  if (pane.type === 'markdown') return <FileText size={12} color="var(--matugen-secondary, #b6c489)" />;
+  return <Code size={12} color="var(--matugen-primary, #a0c9dc)" />;
 }
 
 export const Header: React.FC = () => {
@@ -344,6 +348,14 @@ export const Header: React.FC = () => {
               {getTabIcon(pane)}
               {pane.isUnsaved && <span className="tab-unsaved-dot" title="Unsaved changes" />}
               <span className="tab-title">{pane.name}</span>
+              {fileStatusClass(pane.path, store.gitStatus, store.errorFiles) && (
+                <span
+                  className={`tab-status-badge ${fileStatusClass(pane.path, store.gitStatus, store.errorFiles)}`}
+                  title={fileStatusLetter(pane.path, store.gitStatus, store.errorFiles) === '!' ? 'Syntax error' : `Git: ${store.gitStatus[pane.path!]}`}
+                >
+                  {fileStatusLetter(pane.path, store.gitStatus, store.errorFiles)}
+                </span>
+              )}
               <button
                 type="button"
                 className="tab-close-btn"

@@ -136,6 +136,7 @@ export const Canvas: React.FC = () => {
   }));
   const activePane = store.panes.find(p => p.id === store.activePaneId);
   const monacoRef = useRef<any>(null);
+  const markerDispRef = useRef<any>(null);
   const [diffView, setDiffView] = useState(false);
 
   const pendingEdit = activePane?.path ? store.pendingFiles[activePane.path] : undefined;
@@ -171,6 +172,13 @@ export const Canvas: React.FC = () => {
     };
     window.addEventListener('matugen_theme_changed', onThemeRefresh);
     return () => window.removeEventListener('matugen_theme_changed', onThemeRefresh);
+  }, []);
+
+  // Dispose the active editor's marker listener when Canvas itself unmounts.
+  // Per-tab remounts dispose the previous listener inside onMount below.
+  useEffect(() => () => {
+    try { markerDispRef.current?.dispose(); } catch { /* noop */ }
+    markerDispRef.current = null;
   }, []);
 
   if (!activePane) {
@@ -289,6 +297,28 @@ export const Canvas: React.FC = () => {
                       // (Lua via luaparse, QML structural check); JSON/CSS/HTML/TS
                       // are validated by their own workers.
                       try { attachDiagnostics(monaco, editor); } catch (_) {}
+
+                      // Mirror this file's error-marker state into the store so the
+                      // tab + project tree can show a syntax-error badge. Only the
+                      // active pane's editor is mounted, so one listener at a time.
+                      try {
+                        const model = editor.getModel();
+                        if (model && pane.path) {
+                          const p = pane.path;
+                          const compute = () => {
+                            try {
+                              const ms = monaco.editor.getModelMarkers({ resource: model.uri });
+                              const errSev = monaco.MarkerSeverity?.Error ?? 8;
+                              storeActions.setFileError(p, ms.some((m: any) => m.severity === errSev));
+                            } catch { /* noop */ }
+                          };
+                          try { markerDispRef.current?.dispose(); } catch { /* noop */ }
+                          markerDispRef.current = monaco.editor.onDidChangeMarkers((uris: any[]) => {
+                            if (uris.some(u => u && u.toString() === model.uri.toString())) compute();
+                          });
+                          compute();
+                        }
+                      } catch (_) {}
 
                       // Restore where you left off — Canvas unmounts/remounts
                       // a fresh editor on every tab switch (only the active
