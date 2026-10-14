@@ -91,20 +91,10 @@ function blendWithBackground(fgHex: string, alphaPct: number, bgHex: string): st
 }
 
 // ── Foreground legibility guard ──────────────────────────────────────────────
-// Some Material-You roles are "text on a *container*" tokens (on_primary_
-// container, on_secondary_container, …). On the mid-tone containers those
-// tokens sit on, matugen is free to pick a near-BLACK foreground — which is
-// perfect for a filled button chip but catastrophic for editor text, since
-// our editor is always a dark surface (base 'vs-dark' + on-secondary fill).
-// That is exactly what made Lua string literals render black: matugen set
-// on_primary_container to #000000 for this wallpaper, and the very same
-// value drove the `string` rule. It also explains the "theme colour flashes
-// then gets overridden" symptom — before theme_update the rule used the
-// light fallback, after it read the real #000000.
-//
-// ensureReadable keeps the hue but lifts any too-dark foreground back above a
-// minimum relative-luminance so token text stays legible on the dark editor
-// regardless of which palette the wallpaper produced.
+// Some palette roles (matugen on_primary_container, wallust mid-tones) can
+// land near-black on a given wallpaper — fine on a filled container, wrong for
+// text on our dark editor. ensureReadable lifts any too-dark foreground above
+// a minimum relative-luminance while keeping its hue.
 function relLuminance(hex: string): number {
   const { r, g, b } = hexToRgb(hex);
   const chan = (c: number) => {
@@ -137,93 +127,78 @@ function ensureReadable(hex: string, lightBase: string): string {
 export function registerMatugenTheme(monaco: any): void {
   if (!monaco?.editor) return;
 
-  // Read all colors directly from the injected matugen/wallust palette.
-  // Keys match exactly what bridge.ts stores into window.__hyprcandyThemeVars
-  // and also into document.documentElement.style CSS vars.
+  // Matugen palette (roles kept for text/keywords/containers).
   const primary        = readThemeVar('matugen_primary',             '--matugen-primary',             '#a0c9dc');
+  // surface-tint is used for keyword/function text in the code body instead of
+  // primary; primary still drives the surrounding chrome (cursor, gutter, etc).
+  const surfaceTint    = readThemeVar('matugen_surface_tint',        '--matugen-surface-tint',        primary);
   const onSecondary    = readThemeVar('matugen_on_secondary',        '--matugen-on-secondary',        '#1d343c');
   const onSurface      = readThemeVar('matugen_on_surface',          '--matugen-on-surface',          '#dfe3e6');
   const surface        = readThemeVar('matugen_surface',             '--matugen-surface',             '#0c1014');
   const surfaceVariant = readThemeVar('matugen_surface_variant',     '--matugen-surface-variant',     '#40484c');
   const primaryCont    = readThemeVar('matugen_primary_container',   '--matugen-primary-container',   '#1b4d5d');
-  const onPrimaryCont  = readThemeVar('matugen_on_primary_container','--matugen-on-primary-container','#bde9fa');
   const secondary      = readThemeVar('matugen_secondary',           '--matugen-secondary',           '#b2cbd6');
-  const tertiary       = readThemeVar('matugen_tertiary',            '--matugen-tertiary',            '#d0bcff');
   const outline        = readThemeVar('matugen_outline',             '--matugen-outline',             '#8a9296');
+  const textPrimary   = readThemeVar('matugen_on_surface',           '--text-primary',    onSurface);
+  const textSecondary = readThemeVar('matugen_secondary',            '--text-secondary',  secondary);
 
-  // Semantic derived: text colors may have been overridden by bridge's accent logic
-  const textPrimary   = readThemeVar('matugen_on_surface',          '--text-primary',    onSurface);
-  const textSecondary = readThemeVar('matugen_secondary',           '--text-secondary',  secondary);
+  // Wallust palette (color1..color6) drives the structural/special tokens:
+  // digits, strings, braces, commas, operators, and indentation guides.
+  const wc1 = readThemeVar('wallust_color1', '--wallust-color1', '#C16F4C');
+  const wc2 = readThemeVar('wallust_color2', '--wallust-color2', '#B3A40A');
+  const wc3 = readThemeVar('wallust_color3', '--wallust-color3', '#3589D0');
+  const wc4 = readThemeVar('wallust_color4', '--wallust-color4', '#A85B27');
+  const wc5 = readThemeVar('wallust_color5', '--wallust-color5', '#69852D');
+  const wc6 = readThemeVar('wallust_color6', '--wallust-color6', '#386689');
 
-  // Guaranteed-light tone used by ensureReadable() to lift too-dark
-  // foregrounds. Prefer on-surface (already light on this dark editor) but
-  // fall back to neutral light if a wallpaper somehow made it dark.
   const lightBase = relLuminance(onSurface) >= FG_MIN_LUMINANCE ? onSurface : '#e8e8e8';
 
-  // Editor background: on-secondary at ~20% opacity
-  const editorBg   = withAlpha(onSecondary,    20);
-  const subtleLine  = withAlpha(outline,        35);
-
-  // Inactive line numbers and comments use a proper text-safe role
-  // (textSecondary/primary) at reduced alpha, rather than a background-
-  // adjacent tone like surfaceVariant — surfaceVariant is only guaranteed to
-  // contrast against `surface`, not to be readable as foreground text, which
-  // is exactly what made these low-contrast on matugen's lighter (system
-  // light-mode) palettes.
+  const editorBg      = withAlpha(onSecondary, 20);
   const lineNumberDim = withAlpha(primary, 75);
+  // Comments keep the on-surface-derived tone (blend of textSecondary/surface).
   const commentColor  = blendWithBackground(textSecondary, 70, surface);
 
-  // Cursor and line-highlight use the primary accent directly
   const cursorColor       = '#' + strip(primary);
-  const lineHighlight     = withAlpha(primary, 12); // 12% opacity
-  const selectionBg       = withAlpha(primaryCont, 40); // ~40% opacity
-  const selHighlight      = withAlpha(primary, 15);     // subtle word highlight
+  const lineHighlight     = withAlpha(primary, 12);
+  const selectionBg       = withAlpha(primaryCont, 40);
+  const selHighlight      = withAlpha(primary, 15);
   const wordHighlight     = withAlpha(primaryCont, 20);
   const wordHighlightStrg = withAlpha(primary, 20);
-  const scrollbarIdle     = withAlpha(primary, 10); // 10% opacity (0.1 alpha)
-  const scrollbarHover    = withAlpha(primary, 15); // 15% opacity (0.15 alpha)
+  const scrollbarIdle     = withAlpha(primary, 10);
+  const scrollbarHover    = withAlpha(primary, 15);
 
-  // Sticky-scroll (pinned section headers) overlay live scrolling text, so the
-  // fill must be opaque — a literal alpha would show doubled text through it.
-  // Blend primary over the on-secondary surface to land the same primary tint
-  // the focused line uses, but solid.
+  // Sticky-scroll headers overlay live scrolling text, so the fill is opaque:
+  // primary blended over the on-secondary surface rather than a literal alpha.
   const stickyScrollBg    = '#' + blendWithBackground(primary, 10, onSecondary);
   const stickyScrollHover = '#' + blendWithBackground(primary, 16, onSecondary);
+
+  // Readable foreground for a tokenizer rule (guard + strip leading '#').
+  const rfg = (c: string) => strip(ensureReadable(c, lightBase));
 
   monaco.editor.defineTheme('matugen', {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      // Every palette-derived foreground is pushed through ensureReadable():
-      // a role like on_primary_container / primary can legitimately land near
-      // black on some wallpapers (matugen optimises them for filled
-      // containers, not for text on our dark editor), which is what made Lua
-      // strings render black after theme_update. The guard lifts any too-dark
-      // tone back to a legible level while preserving its hue.
-      // Catch-all default: any token scope not matched below (e.g. Lua's
-      // `identifier`/`key`, which most languages never emit) falls back to the
-      // readable on-surface text colour instead of the theme's black default.
-      { token: '',          foreground: strip(ensureReadable(textPrimary, lightBase)) },
-      { token: 'identifier',                        foreground: strip(ensureReadable(textPrimary, lightBase)) },
-      { token: 'key',        foreground: strip(ensureReadable(secondary, lightBase)) },
-      { token: 'comment',     fontStyle: 'italic', foreground: strip(ensureReadable(commentColor, lightBase)) },
-      { token: 'keyword',     fontStyle: 'bold',   foreground: strip(ensureReadable(primary, lightBase)) },
-      { token: 'string',                           foreground: strip(ensureReadable(tertiary, lightBase)) },
-      { token: 'number',                           foreground: 'fab387' },
-      { token: 'type',                             foreground: strip(ensureReadable(secondary, lightBase)) },
-      { token: 'function',                         foreground: strip(ensureReadable(primary, lightBase)) },
-      { token: 'variable',                         foreground: strip(ensureReadable(textPrimary, lightBase)) },
-      { token: 'operator',                         foreground: strip(ensureReadable(textSecondary, lightBase)) },
-      { token: 'punctuation',                      foreground: strip(ensureReadable(textSecondary, lightBase)) },
-      { token: 'delimiter.bracket',                foreground: strip(ensureReadable(textSecondary, lightBase)) },
-      // Shell-specific: Monaco's shell tokenizer emits these for flags
-      // (-e, --needed, --noconfirm) and for redirect/operator characters
-      // (>, &, ;, = in `2>&1`, `cmd1 && cmd2`, etc). Neither had a rule
-      // before, so they fell through to vs-dark's generic defaults instead
-      // of a matugen tone — visibly inconsistent next to everything else.
-      { token: 'delimiter',                        foreground: strip(ensureReadable(textSecondary, lightBase)) },
-      { token: 'attribute.name',                   foreground: strip(ensureReadable(secondary, lightBase)) },
-      { token: 'metatag',    fontStyle: 'bold',     foreground: strip(ensureReadable(primary, lightBase)) },
+      // Text/keyword roles stay on matugen; structural/special tokens use
+      // wallust color1..color6. All go through ensureReadable (rfg).
+      { token: '',            foreground: rfg(textPrimary) },
+      { token: 'identifier',  foreground: rfg(textPrimary) },
+      { token: 'key',         foreground: rfg(secondary) },
+      { token: 'comment',     fontStyle: 'italic', foreground: rfg(commentColor) },
+      { token: 'keyword',     fontStyle: 'bold',   foreground: rfg(surfaceTint) },
+      { token: 'string',      foreground: rfg(wc2) },
+      { token: 'number',      foreground: rfg(wc1) },
+      { token: 'type',        foreground: rfg(secondary) },
+      { token: 'function',    foreground: rfg(surfaceTint) },
+      { token: 'variable',    foreground: rfg(textPrimary) },
+      { token: 'operator',    foreground: rfg(wc5) },
+      { token: 'punctuation', foreground: rfg(wc4) },
+      { token: 'delimiter.bracket', foreground: rfg(wc3) },
+      { token: 'delimiter.array',   foreground: rfg(wc3) },
+      { token: 'delimiter.parenthesis', foreground: rfg(wc3) },
+      { token: 'delimiter',   foreground: rfg(wc4) },
+      { token: 'attribute.name', foreground: rfg(secondary) },
+      { token: 'metatag',     fontStyle: 'bold', foreground: rfg(surfaceTint) },
     ],
     colors: {
       // Editor core
@@ -253,21 +228,21 @@ export function registerMatugenTheme(monaco: any): void {
       'editor.wordHighlightStrongBackground': wordHighlightStrg,
       'editor.findMatchBackground':           '#' + strip(primary) + '44',
       'editor.findMatchHighlightBackground':  '#' + strip(primary) + '22',
-      // Bracket pairs / matching — matugen tones so brace nesting stays
-      // legible regardless of the underlying wallpaper-derived palette
+      // Bracket pairs / matching — wallust tones so brace nesting stays
+      // legible and distinct regardless of the wallpaper-derived palette.
       'editorBracketMatch.background':        withAlpha(primary, 20),
       'editorBracketMatch.border':            '#' + strip(primary),
-      'editorBracketHighlight.foreground1':   '#' + strip(ensureReadable(primary, lightBase)),
-      'editorBracketHighlight.foreground2':   '#' + strip(ensureReadable(secondary, lightBase)),
-      'editorBracketHighlight.foreground3':   '#' + strip(ensureReadable(tertiary, lightBase)),
-      'editorBracketHighlight.foreground4':   '#' + strip(ensureReadable(primary, lightBase)),
-      'editorBracketHighlight.foreground5':   '#' + strip(ensureReadable(secondary, lightBase)),
-      'editorBracketHighlight.foreground6':   '#' + strip(ensureReadable(tertiary, lightBase)),
+      'editorBracketHighlight.foreground1':   '#' + rfg(wc3),
+      'editorBracketHighlight.foreground2':   '#' + rfg(wc4),
+      'editorBracketHighlight.foreground3':   '#' + rfg(wc1),
+      'editorBracketHighlight.foreground4':   '#' + rfg(wc5),
+      'editorBracketHighlight.foreground5':   '#' + rfg(wc2),
+      'editorBracketHighlight.foreground6':   '#' + rfg(wc6),
       'editorBracketHighlight.unexpectedBracket.foreground': '#' + strip(outline),
-      // Indent / whitespace
+      // Indent guides use wallust color6; whitespace stays a dim surface tone.
       'editorWhitespace.foreground':          '#' + strip(surfaceVariant) + '44',
-      'editorIndentGuide.background1':        subtleLine,
-      'editorIndentGuide.activeBackground1':  '#' + strip(primary) + '55',
+      'editorIndentGuide.background1':        withAlpha(ensureReadable(wc6, lightBase), 38),
+      'editorIndentGuide.activeBackground1':  withAlpha(ensureReadable(wc6, lightBase), 75),
       // Widgets & popups — all use matugen on-secondary as bg
       'quickInput.background':                '#' + strip(onSecondary),
       'quickInput.foreground':                '#' + strip(primary),

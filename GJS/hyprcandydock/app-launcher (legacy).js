@@ -7725,19 +7725,23 @@ const AppLauncherWindow = GObject.registerClass({
     _agentInjectTheme() {
         // Pushes theme + runtime config into the WebKitGTK agent view.
         try {
-            const colorsPath = GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']);
             const map = {};
-            if (GLib.file_test(colorsPath, GLib.FileTest.EXISTS)) {
-                const [ok, bytes] = GLib.file_get_contents(colorsPath);
-                if (ok) {
-                    const text = new TextDecoder().decode(bytes);
-                    const re = /@define-color\s+([a-zA-Z0-9_-]+)\s+([^;]+);/g;
-                    let match;
-                    while ((match = re.exec(text)) !== null) {
-                        map[match[1]] = match[2].trim();
-                    }
+            const defineRe = /@define-color\s+([a-zA-Z0-9_-]+)\s+([^;]+);/g;
+            const readColors = (path, prefix) => {
+                if (!GLib.file_test(path, GLib.FileTest.EXISTS)) return;
+                const [ok, bytes] = GLib.file_get_contents(path);
+                if (!ok) return;
+                const text = new TextDecoder().decode(bytes);
+                let match;
+                defineRe.lastIndex = 0;
+                while ((match = defineRe.exec(text)) !== null) {
+                    map[prefix + match[1]] = match[2].trim();
                 }
-            }
+            };
+            // Matugen tokens are sent unprefixed (bridge maps them to --matugen-*).
+            readColors(GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors.css']), '');
+            // Wallust palette is namespaced so bridge maps them to --wallust-colorN.
+            readColors(GLib.build_filenamev([HOME, '.config', 'gtk-4.0', 'colors-wallust.css']), 'wallust_');
             this._cachedThemeVars = map;
             // No subpath assumption here — HOME is a neutral "nothing
             // opened yet" fallback. Which actual project is active is up
