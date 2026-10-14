@@ -1799,6 +1799,12 @@ Item {
                     else if (_attempts >= 40) stop()
                 }
             }
+            // Live app list: DesktopEntries watches the XDG app dirs internally
+            // (QFileSystemWatcher + 100ms debounce) and re-emits on install/remove.
+            Connections {
+                target: DesktopEntries
+                function onApplicationsChanged() { win.rebuildApps() }
+            }
 
             // ── Hyprland dispatch helpers (exact GJS daemon.js strings) ───
             function _hlDispatch(cmd) {
