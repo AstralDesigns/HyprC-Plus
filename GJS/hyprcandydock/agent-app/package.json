@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "luaparse": "^0.3.1",
     "lucide-react": "^0.447.0",
     "monaco-editor": "^0.55.1",
     "react": "^18.3.1",
@@ -18,6 +19,7 @@
     "zustand": "^4.5.5"
   },
   "devDependencies": {
+    "@types/luaparse": "^0.2.13",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^5.0.4",

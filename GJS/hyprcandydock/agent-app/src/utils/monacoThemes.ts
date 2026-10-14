@@ -90,6 +90,48 @@ function blendWithBackground(fgHex: string, alphaPct: number, bgHex: string): st
     .map(n => n.toString(16).padStart(2, '0')).join('');
 }
 
+// ── Foreground legibility guard ──────────────────────────────────────────────
+// Some Material-You roles are "text on a *container*" tokens (on_primary_
+// container, on_secondary_container, …). On the mid-tone containers those
+// tokens sit on, matugen is free to pick a near-BLACK foreground — which is
+// perfect for a filled button chip but catastrophic for editor text, since
+// our editor is always a dark surface (base 'vs-dark' + on-secondary fill).
+// That is exactly what made Lua string literals render black: matugen set
+// on_primary_container to #000000 for this wallpaper, and the very same
+// value drove the `string` rule. It also explains the "theme colour flashes
+// then gets overridden" symptom — before theme_update the rule used the
+// light fallback, after it read the real #000000.
+//
+// ensureReadable keeps the hue but lifts any too-dark foreground back above a
+// minimum relative-luminance so token text stays legible on the dark editor
+// regardless of which palette the wallpaper produced.
+function relLuminance(hex: string): number {
+  const { r, g, b } = hexToRgb(hex);
+  const chan = (c: number) => {
+    c /= 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * chan(r) + 0.7152 * chan(g) + 0.0722 * chan(b);
+}
+
+// Minimum luminance an editor foreground must clear to stay readable over a
+// dark (~near-black) surface.
+const FG_MIN_LUMINANCE = 0.22;
+
+/** Lift a foreground hex to a legible tone for the dark editor. Returns the
+ *  input unchanged when it already clears FG_MIN_LUMINANCE; otherwise blends
+ *  it toward `lightBase` (a guaranteed-light text token) until it does. */
+function ensureReadable(hex: string, lightBase: string): string {
+  const c = normalizeHex(hex, lightBase);
+  if (relLuminance(c) >= FG_MIN_LUMINANCE) return c;
+  const light = normalizeHex(lightBase, '#e6e6e6');
+  for (let t = 15; t <= 100; t += 15) {
+    const mixed = '#' + blendWithBackground(c, 100 - t, light);
+    if (relLuminance(mixed) >= FG_MIN_LUMINANCE) return mixed;
+  }
+  return light;
+}
+
 // ── Theme registration ────────────────────────────────────────────────────────
 
 export function registerMatugenTheme(monaco: any): void {
@@ -106,11 +148,17 @@ export function registerMatugenTheme(monaco: any): void {
   const primaryCont    = readThemeVar('matugen_primary_container',   '--matugen-primary-container',   '#1b4d5d');
   const onPrimaryCont  = readThemeVar('matugen_on_primary_container','--matugen-on-primary-container','#bde9fa');
   const secondary      = readThemeVar('matugen_secondary',           '--matugen-secondary',           '#b2cbd6');
+  const tertiary       = readThemeVar('matugen_tertiary',            '--matugen-tertiary',            '#d0bcff');
   const outline        = readThemeVar('matugen_outline',             '--matugen-outline',             '#8a9296');
 
   // Semantic derived: text colors may have been overridden by bridge's accent logic
   const textPrimary   = readThemeVar('matugen_on_surface',          '--text-primary',    onSurface);
   const textSecondary = readThemeVar('matugen_secondary',           '--text-secondary',  secondary);
+
+  // Guaranteed-light tone used by ensureReadable() to lift too-dark
+  // foregrounds. Prefer on-surface (already light on this dark editor) but
+  // fall back to neutral light if a wallpaper somehow made it dark.
+  const lightBase = relLuminance(onSurface) >= FG_MIN_LUMINANCE ? onSurface : '#e8e8e8';
 
   // Editor background: on-secondary at ~20% opacity
   const editorBg   = withAlpha(onSecondary,    20);
@@ -135,39 +183,67 @@ export function registerMatugenTheme(monaco: any): void {
   const scrollbarIdle     = withAlpha(primary, 10); // 10% opacity (0.1 alpha)
   const scrollbarHover    = withAlpha(primary, 15); // 15% opacity (0.15 alpha)
 
+  // Sticky-scroll (pinned section headers) overlay live scrolling text, so the
+  // fill must be opaque — a literal alpha would show doubled text through it.
+  // Blend primary over the on-secondary surface to land the same primary tint
+  // the focused line uses, but solid.
+  const stickyScrollBg    = '#' + blendWithBackground(primary, 10, onSecondary);
+  const stickyScrollHover = '#' + blendWithBackground(primary, 16, onSecondary);
+
   monaco.editor.defineTheme('matugen', {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      { token: 'comment',     fontStyle: 'italic', foreground: strip(commentColor) },
-      { token: 'keyword',     fontStyle: 'bold',   foreground: strip(primary) },
-      { token: 'string',                           foreground: strip(onPrimaryCont) },
+      // Every palette-derived foreground is pushed through ensureReadable():
+      // a role like on_primary_container / primary can legitimately land near
+      // black on some wallpapers (matugen optimises them for filled
+      // containers, not for text on our dark editor), which is what made Lua
+      // strings render black after theme_update. The guard lifts any too-dark
+      // tone back to a legible level while preserving its hue.
+      // Catch-all default: any token scope not matched below (e.g. Lua's
+      // `identifier`/`key`, which most languages never emit) falls back to the
+      // readable on-surface text colour instead of the theme's black default.
+      { token: '',          foreground: strip(ensureReadable(textPrimary, lightBase)) },
+      { token: 'identifier',                        foreground: strip(ensureReadable(textPrimary, lightBase)) },
+      { token: 'key',        foreground: strip(ensureReadable(secondary, lightBase)) },
+      { token: 'comment',     fontStyle: 'italic', foreground: strip(ensureReadable(commentColor, lightBase)) },
+      { token: 'keyword',     fontStyle: 'bold',   foreground: strip(ensureReadable(primary, lightBase)) },
+      { token: 'string',                           foreground: strip(ensureReadable(tertiary, lightBase)) },
       { token: 'number',                           foreground: 'fab387' },
-      { token: 'type',                             foreground: strip(secondary) },
-      { token: 'function',                         foreground: strip(primary) },
-      { token: 'variable',                         foreground: strip(textPrimary) },
-      { token: 'operator',                         foreground: strip(textSecondary) },
-      { token: 'punctuation',                      foreground: strip(textSecondary) },
-      { token: 'delimiter.bracket',                foreground: strip(textSecondary) },
+      { token: 'type',                             foreground: strip(ensureReadable(secondary, lightBase)) },
+      { token: 'function',                         foreground: strip(ensureReadable(primary, lightBase)) },
+      { token: 'variable',                         foreground: strip(ensureReadable(textPrimary, lightBase)) },
+      { token: 'operator',                         foreground: strip(ensureReadable(textSecondary, lightBase)) },
+      { token: 'punctuation',                      foreground: strip(ensureReadable(textSecondary, lightBase)) },
+      { token: 'delimiter.bracket',                foreground: strip(ensureReadable(textSecondary, lightBase)) },
       // Shell-specific: Monaco's shell tokenizer emits these for flags
       // (-e, --needed, --noconfirm) and for redirect/operator characters
       // (>, &, ;, = in `2>&1`, `cmd1 && cmd2`, etc). Neither had a rule
       // before, so they fell through to vs-dark's generic defaults instead
       // of a matugen tone — visibly inconsistent next to everything else.
-      { token: 'delimiter',                        foreground: strip(textSecondary) },
-      { token: 'attribute.name',                   foreground: strip(secondary) },
-      { token: 'metatag',    fontStyle: 'bold',     foreground: strip(primary) },
+      { token: 'delimiter',                        foreground: strip(ensureReadable(textSecondary, lightBase)) },
+      { token: 'attribute.name',                   foreground: strip(ensureReadable(secondary, lightBase)) },
+      { token: 'metatag',    fontStyle: 'bold',     foreground: strip(ensureReadable(primary, lightBase)) },
     ],
     colors: {
       // Editor core
       'editor.background':                    editorBg,
-      'editor.foreground':                    textPrimary,
+      'editor.foreground':                    ensureReadable(textPrimary, lightBase),
       'editorGutter.background':              editorBg,
       'editorLineNumber.foreground':          lineNumberDim,
       'editorLineNumber.activeForeground':    '#' + strip(primary),
       'editorLineNumber.dimmedForeground':    lineNumberDim,
       'editor.lineHighlightBackground':       lineHighlight,
       'editor.lineHighlightBorder':           '#00000000',
+      // Sticky scroll headers — themed to match the focused-line primary tint
+      // instead of Monaco's default grey (kept opaque, see derivation above).
+      // NOTE: hover and gutter are *separate* color ids in Monaco, not nested
+      // under editorStickyScroll — using the wrong name is silently ignored.
+      'editorStickyScroll.background':         stickyScrollBg,
+      'editorStickyScrollHover.background':    stickyScrollHover,
+      'editorStickyScrollGutter.background':   stickyScrollBg,
+      'editorStickyScroll.border':             withAlpha(primary, 20),
+      'editorStickyScroll.shadow':             '#00000000',
       'editorCursor.foreground':              cursorColor,
       'editorCursor.background':              '#' + strip(onSecondary),
       // Selections
@@ -181,12 +257,12 @@ export function registerMatugenTheme(monaco: any): void {
       // legible regardless of the underlying wallpaper-derived palette
       'editorBracketMatch.background':        withAlpha(primary, 20),
       'editorBracketMatch.border':            '#' + strip(primary),
-      'editorBracketHighlight.foreground1':   '#' + strip(primary),
-      'editorBracketHighlight.foreground2':   '#' + strip(secondary),
-      'editorBracketHighlight.foreground3':   '#' + strip(onPrimaryCont),
-      'editorBracketHighlight.foreground4':   '#' + strip(primary),
-      'editorBracketHighlight.foreground5':   '#' + strip(secondary),
-      'editorBracketHighlight.foreground6':   '#' + strip(onPrimaryCont),
+      'editorBracketHighlight.foreground1':   '#' + strip(ensureReadable(primary, lightBase)),
+      'editorBracketHighlight.foreground2':   '#' + strip(ensureReadable(secondary, lightBase)),
+      'editorBracketHighlight.foreground3':   '#' + strip(ensureReadable(tertiary, lightBase)),
+      'editorBracketHighlight.foreground4':   '#' + strip(ensureReadable(primary, lightBase)),
+      'editorBracketHighlight.foreground5':   '#' + strip(ensureReadable(secondary, lightBase)),
+      'editorBracketHighlight.foreground6':   '#' + strip(ensureReadable(tertiary, lightBase)),
       'editorBracketHighlight.unexpectedBracket.foreground': '#' + strip(outline),
       // Indent / whitespace
       'editorWhitespace.foreground':          '#' + strip(surfaceVariant) + '44',
@@ -200,12 +276,12 @@ export function registerMatugenTheme(monaco: any): void {
       'quickInputList.focusForeground':       '#' + strip(primary),
       'editorSuggestWidget.background':       '#' + strip(onSecondary),
       'editorSuggestWidget.border':           '#' + strip(surfaceVariant),
-      'editorSuggestWidget.foreground':       textPrimary,
+      'editorSuggestWidget.foreground':       ensureReadable(textPrimary, lightBase),
       'editorSuggestWidget.selectedForeground': '#' + strip(primary),
       'editorSuggestWidget.selectedBackground': scrollbarIdle,
       'editorHoverWidget.background':         '#' + strip(onSecondary),
       'editorHoverWidget.border':             '#' + strip(surfaceVariant),
-      'editorHoverWidget.foreground':         textPrimary,
+      'editorHoverWidget.foreground':         ensureReadable(textPrimary, lightBase),
       // Input boxes inside widgets
       'input.background':                     '#' + strip(onSecondary),
       'input.foreground':                     '#' + strip(primary),
