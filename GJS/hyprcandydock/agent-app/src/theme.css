@@ -408,6 +408,19 @@ body,
 
 /* Aggregate folder dot: background follows the same status-* color rules
    above via currentColor, so a directory reflects its highest-ranked change. */
+.tree-status-folder {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.tree-status-count {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1;
+  color: currentColor;
+}
 .tree-status-dot {
   width: 6px;
   height: 6px;

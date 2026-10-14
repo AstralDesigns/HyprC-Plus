@@ -103,25 +103,34 @@ function parentDir(p: string): string {
 }
 
 // Roll every file's status up through its ancestor folders so a folder row can
-// show one dot summarising "what changed inside". The project root itself is
-// left unbadged. Keys are absolute folder paths under `root`.
+// show one dot summarising "what changed inside", plus how many files changed.
+// The project root itself is left unbadged. Keys are absolute folder paths.
+export interface FolderStatus { kind: FileStatusKind; count: number; }
+
 export function buildFolderStatus(
   root: string,
   gitStatus: Record<string, GitFileStatus>,
   errorFiles: Record<string, true>,
-): Record<string, FileStatusKind> {
+): Record<string, FolderStatus> {
   const base = (root || '').replace(/\/+$/, '');
-  const out: Record<string, FileStatusKind> = {};
+  const out: Record<string, FolderStatus> = {};
   if (!base) return out;
-  const consider = (fileAbs: string, kind: FileStatusKind) => {
+  // Merge to one kind per file (a syntax error overrides that file's git
+  // state) so a file that is both changed and broken still counts once.
+  const kinds = new Map<string, FileStatusKind>();
+  for (const [p, s] of Object.entries(gitStatus)) kinds.set(p, s);
+  for (const p of Object.keys(errorFiles)) if (errorFiles[p]) kinds.set(p, 'error');
+  for (const [fileAbs, kind] of kinds) {
     let dir = parentDir(fileAbs);
     while (dir.length > base.length && dir.startsWith(base + '/')) {
       const cur = out[dir];
-      if (!cur || STATUS_RANK[kind] > STATUS_RANK[cur]) out[dir] = kind;
+      if (!cur) out[dir] = { kind, count: 1 };
+      else {
+        if (STATUS_RANK[kind] > STATUS_RANK[cur.kind]) cur.kind = kind;
+        cur.count += 1;
+      }
       dir = parentDir(dir);
     }
-  };
-  for (const [p, s] of Object.entries(gitStatus)) consider(p, s);
-  for (const p of Object.keys(errorFiles)) if (errorFiles[p]) consider(p, 'error');
+  }
   return out;
 }

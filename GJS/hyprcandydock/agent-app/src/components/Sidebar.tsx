@@ -287,9 +287,14 @@ export const Sidebar: React.FC = () => {
 
           {entry.isDir && folderStatus[entry.path] && (
             <span
-              className={`tree-status-dot status-${folderStatus[entry.path]}`}
-              title={`${folderStatus[entry.path]} within`}
-            />
+              className={`tree-status-folder status-${folderStatus[entry.path].kind}`}
+              title={`${folderStatus[entry.path].count} changed within (${folderStatus[entry.path].kind})`}
+            >
+              {folderStatus[entry.path].count > 1 && (
+                <span className="tree-status-count">{folderStatus[entry.path].count}</span>
+              )}
+              <span className="tree-status-dot" />
+            </span>
           )}
 
           {isLoading && <RefreshCw size={10} className="spin" />}
