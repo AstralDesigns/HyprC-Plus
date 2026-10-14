@@ -287,6 +287,7 @@ export const Canvas: React.FC = () => {
                 ) : (
                   <Editor
                     height="100%"
+                    path={pane.path}
                     theme={targetTheme}
                     beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); monacoRef.current = monaco; }}
                     onMount={(editor, monaco) => {

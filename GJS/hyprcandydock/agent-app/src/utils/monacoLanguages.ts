@@ -74,8 +74,26 @@ export function registerCustomLanguages(monaco: any): void {
   try {
     const ts = monaco.languages.typescript;
     const diag = { noSemanticValidation: true, noSyntaxValidation: false, noSuggestionDiagnostics: true };
-    if (ts?.typescriptDefaults) ts.typescriptDefaults.setDiagnosticsOptions(diag);
-    if (ts?.javascriptDefaults) ts.javascriptDefaults.setDiagnosticsOptions(diag);
+    // jsx / moduleResolution matter only once the model URI carries the real
+    // file extension (Canvas passes path={pane.path}); together they let the
+    // worker parse .tsx JSX instead of flagging every tag as a syntax error.
+    const compilerOpts = {
+      target: ts.ScriptTarget?.ESNext ?? 99,
+      module: ts.ModuleKind?.ESNext ?? 99,
+      moduleResolution: ts.ModuleResolutionKind?.NodeJs ?? 2,
+      jsx: ts.JsxEmit?.ReactJSX ?? 4,
+      allowJs: true,
+      strict: false,
+      noEmit: true,
+    };
+    if (ts?.typescriptDefaults) {
+      ts.typescriptDefaults.setDiagnosticsOptions(diag);
+      ts.typescriptDefaults.setCompilerOptions(compilerOpts);
+    }
+    if (ts?.javascriptDefaults) {
+      ts.javascriptDefaults.setDiagnosticsOptions(diag);
+      ts.javascriptDefaults.setCompilerOptions(compilerOpts);
+    }
   } catch { /* worker API drift — leave defaults in place */ }
   registerQml(monaco);
   registerToml(monaco);
