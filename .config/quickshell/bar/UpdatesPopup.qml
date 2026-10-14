@@ -123,6 +123,26 @@ PanelWindow {
                     font.weight:    Font.Medium
                     anchors.verticalCenter: parent.verticalCenter
                 }
+                // Re-run arrow: shown when the OS is up to date, forces the system-update installer
+                Text {
+                    id: sysRerunBtn
+                    visible: !UpdatesPopupState.hasUpdates && !_sysUpdateProc.running
+                    text: ""
+                    color: sysRerunHover.containsMouse
+                        ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.75)
+                        : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.35)
+                    font.family:    Config.fontFamily
+                    font.pixelSize: Config.fontSize + 2
+                    anchors.verticalCenter: parent.verticalCenter
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                    MouseArea {
+                        id: sysRerunHover
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape:  Qt.PointingHandCursor
+                        onClicked: if (!_sysUpdateProc.running) _sysUpdateProc.running = true
+                    }
+                }
             }
 
             Rectangle {

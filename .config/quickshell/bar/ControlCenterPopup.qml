@@ -50,6 +50,25 @@ PanelWindow {
     // ── Scripts directory
     readonly property string scriptDir: Quickshell.env("HOME") + "/.config/quickshell/bar/scripts"
 
+    // ── Login-shell switcher: floating-installer kitty (mirrors UpdatesPopup) ──
+    // CC lives in a Loader gated on ControlCenterState.visible, so hiding it
+    // DESTROYS this component and Quickshell's Process destructor would kill
+    // the kitty child (unlike UpdatesPopup, which is instantiated persistently
+    // and never torn down). setsid --fork orphans kitty into its own session so
+    // the terminal survives the CC being hidden.
+    Process {
+        id: shellSwitchProc
+        running: false
+        command: [
+            "setsid", "--fork", "kitty",
+            "--class", "floating-installer",
+            "--title", "   Change Shell",
+            "-e", "bash", "-ic",
+            ccWin.scriptDir + "/shell-switch.sh"
+        ]
+        onExited: running = false
+    }
+
     // ── Dock current values (read from config.js on open) ─────────────────
     property string _dockSpacingVal:    "0"
     property string _dockPaddingVal:    "0"
@@ -6303,7 +6322,10 @@ PanelWindow {
                                 Layout.topMargin: 4
                                 spacing: 8
 
-                                SysChip { glyph: "";  label: "Shell";    value: sysInfoRoot.info.SHELL || "—" }
+                                SysChip { glyph: "";  label: "Shell"; value: sysInfoRoot.info.SHELL || "—"
+                                    interactive: true
+                                    onClicked: if (!shellSwitchProc.running) shellSwitchProc.running = true
+                                }
 
                                 // Display chips — one per monitor (name + resolution@hz)
                                 Repeater {
@@ -7448,6 +7470,8 @@ PanelWindow {
         property string glyph: ""
         property string label: ""
         property string value: ""
+        signal clicked()
+        property bool interactive: false
 
         implicitWidth: _chipRow.implicitWidth + 24
         implicitHeight: 34
@@ -7479,6 +7503,14 @@ PanelWindow {
                 font.pixelSize: 11
                 color: Theme.cOnSurf
             }
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            enabled: _chip.interactive
+            hoverEnabled: _chip.interactive
+            cursorShape: Qt.PointingHandCursor
+            onClicked: _chip.clicked()
         }
     }
 
