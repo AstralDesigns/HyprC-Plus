@@ -226,8 +226,13 @@ export function registerMatugenTheme(monaco: any): void {
       'editor.selectionHighlightBackground':  selHighlight,
       'editor.wordHighlightBackground':       wordHighlight,
       'editor.wordHighlightStrongBackground': wordHighlightStrg,
-      'editor.findMatchBackground':           '#' + strip(primary) + '44',
-      'editor.findMatchHighlightBackground':  '#' + strip(primary) + '22',
+      // Find/replace widget (Ctrl+F / Ctrl+H): every find-related key set to a
+      // primary tint so none fall through to Monaco's default blue highlight.
+      'editor.findMatchBackground':           '#' + strip(primary) + '33', // current match, ~0.2
+      'editor.findMatchBorder':               '#00000000',
+      'editor.findMatchHighlightBackground':  '#' + strip(primary) + '33', // all matches, ~0.2
+      'editor.findMatchHighlightBorder':      '#00000000',
+      'editor.findRangeHighlightBackground':  '#' + strip(primary) + '1a',
       // Bracket pairs / matching — wallust tones so brace nesting stays
       // legible and distinct regardless of the wallpaper-derived palette.
       'editorBracketMatch.background':        withAlpha(primary, 20),

@@ -631,6 +631,47 @@ Item {
                 win.webRev++
             }
 
+            // ── Resume-from-sleep web recovery ───────────────────────────────
+            // After suspend/hibernate the hcproxy MITM sockets and the view's
+            // in-flight connections are stale, so restored media tabs report
+            // "connection lost" until a manual shield toggle forces a fresh load.
+            // On the logind resume signal, restart the proxy and reload every live
+            // view once (delayed so the network stack has come back first).
+            Process {
+                id: hcproxyRestartProc
+                command: ["systemctl", "--user", "restart", "hcproxy"]
+            }
+            Timer {
+                id: sleepRecoveryTimer
+                interval: 1500
+                onTriggered: {
+                    if (!win.webEnabled) return
+                    if (win.proxyOptIn) hcproxyRestartProc.running = true
+                    for (var k in win._views) {
+                        var v = win._views[k]
+                        if (v) v.reload()
+                    }
+                    win.webRev++
+                }
+            }
+            // gdbus monitor streams login1's PrepareForSleep; the argument is
+            // false on WAKE (true = about to suspend). Watcher runs only while
+            // websearch is enabled so it costs nothing when the tab is off.
+            Process {
+                id: sleepResumeWatch
+                running: win.webEnabled
+                command: ["bash", "-c",
+                    "gdbus monitor --system --dest org.freedesktop.login1 " +
+                    "--object-path /org/freedesktop/login1 2>/dev/null"]
+                stdout: SplitParser {
+                    splitMarker: "\n"
+                    onRead: function(line) {
+                        if (line.indexOf("PrepareForSleep[false]") > -1)
+                            sleepRecoveryTimer.restart()
+                    }
+                }
+            }
+
             // Create the tab's view once (loading its stored URL); never here.
             function _ensureView(tab) {
                 if (!tab) return null
