@@ -170,7 +170,6 @@ EOF
             echo
             echo 'export HYPRLAND_LOG_WS=1'
             echo 'export EDITOR=micro'
-            echo 'export BROWSER=firefox'
             echo 'export TERMINAL=kitty'
             cat <<'EOF'
 
@@ -201,6 +200,8 @@ fi
 EOF
             posix_aliases
             cat <<'EOF'
+# Start HyprCandy fastfetch
+fastfetch
 
 # Initialize Starship prompt
 if command -v starship > /dev/null 2>&1; then
@@ -261,6 +262,8 @@ source $ZSH/oh-my-zsh.sh
 EOF
             posix_aliases
             cat <<'EOF'
+# Start HyprCandy fastfetch
+fastfetch
 
 # fzf integration
 if command -v fzf > /dev/null 2>&1; then
@@ -354,6 +357,9 @@ end
 
 alias sysinfo="fastfetch"
 alias weather="curl wttr.in"
+
+# Start HyprCandy fastfetch
+fastfetch
 
 # Initialize Starship prompt
 if type -q starship
