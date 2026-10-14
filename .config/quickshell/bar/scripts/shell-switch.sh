@@ -431,6 +431,14 @@ else
     exit 1
 fi
 
+# For zsh, start it interactively once so Oh My Zsh runs its first-run /
+# self-update during the switch; exiting that shell returns here.
+if [ "$choice" = "zsh" ]; then
+    echo
+    echo -e "${CYAN}Launching ${BOLD}zsh${NC}${CYAN} to trigger the Oh My Zsh update — type ${GREEN}exit${NC}${CYAN} when it finishes to continue.${NC}"
+    "$target_bin" -i || true
+fi
+
 echo
 echo -e "${BOLD}Done.${NC} The change takes effect ${YELLOW}on next login${NC} (log out and back in, or restart Hyprland)."
 echo -e "To switch this terminal right now, run:  ${GREEN}exec ${choice} -l${NC}"
