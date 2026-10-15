@@ -438,9 +438,9 @@ export const Canvas: React.FC = () => {
                       // the next frames because a new file also inserts a header tab
                       // whose re-render + Monaco re-layout can drop the caret. Focus
                       // only when the caret is nowhere (body) or already inside this
-                      // editor. NOTE: files opened from the floating sidebar are left
-                      // as-is — Qt WebEngine keeps active focus on the overlaid
-                      // sidebar row, so an auto-handoff there is unreliable.
+                      // editor. Files opened from the floating sidebar (whose row
+                      // keeps Qt WebEngine's activeElement) are handed off by the
+                      // hover-to-focus listener below instead.
                       const editorNode = editor.getDomNode();
                       const focusEditor = () => {
                         try {
@@ -453,6 +453,29 @@ export const Canvas: React.FC = () => {
                       focusEditor();
                       requestAnimationFrame(focusEditor);
                       [60, 140, 260].forEach((d) => setTimeout(focusEditor, d));
+
+                      // Hover-to-focus: moving the pointer onto the canvas pulls the
+                      // caret into this editor. Because it runs inside a genuine mouse
+                      // gesture, Qt WebEngine honors it — the thing the programmatic
+                      // focus-on-open (from the overlaid sidebar row) could not. This
+                      // one listener covers every source (sidebar, chat panel, popups)
+                      // since they all end with the pointer entering the canvas. Skips
+                      // when focus is already in this editor or rests in an editable
+                      // field elsewhere, so it never yanks the caret out of active typing.
+                      const hoverFocus = () => {
+                        try {
+                          const ae = document.activeElement as HTMLElement | null;
+                          if (editorNode && ae && editorNode.contains(ae)) return;
+                          if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+                          editor.focus();
+                        } catch { /* editor torn down mid-hover */ }
+                      };
+                      if (editorNode) editorNode.addEventListener('mouseenter', hoverFocus);
+                      try {
+                        editor.onDidDispose(() => {
+                          try { editorNode?.removeEventListener('mouseenter', hoverFocus); } catch { /* noop */ }
+                        });
+                      } catch { /* noop */ }
 
                       registerFindWidgetCrossFileNav(editor, monaco, pane.id);
 

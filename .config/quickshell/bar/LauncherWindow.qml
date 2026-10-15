@@ -133,6 +133,7 @@ Item {
             property bool webShowError: false
             property bool webShowBookmarks: false
             property bool webShowCredentials: false
+            property bool webShowPrefs: false
             // Search-box text for the bookmarks / credentials dropdowns (they
             // can outgrow the scroll height, so both are filterable).
             property string webBookmarkQuery: ""
@@ -493,6 +494,7 @@ Item {
                     win.webShowError = false
                     win.searxDown = false
                     win.webShowBookmarks = false
+                    win.webShowPrefs = false
                     if (win.tab === "websearch") win.switchTab("launcher")
                 }
             }
@@ -1540,6 +1542,12 @@ Item {
 
             // ── Web-Search tab: SearXNG JSON (curl) + docker lifecycle ────
             readonly property string searxBase: "http://127.0.0.1:8080"
+            // True only while the active websearch tab is showing the SearXNG
+            // origin (home page or a search results page). Gates the header
+            // preferences button: it is meaningless on third-party sites.
+            readonly property bool webOnSearx: (win.webRev, win.tab === "websearch"
+                && !!(win.activeView) && String(win.activeView.url || "").indexOf(win.searxBase) === 0)
+            onWebOnSearxChanged: if (!webOnSearx) webShowPrefs = false
 
             Timer {
                 id: webDebounce
@@ -3393,6 +3401,7 @@ Item {
                                 required property color tint
                                 required property var handler
                                 property int glyphSize: 15
+                                property string tip: ""
                                 width: 34; height: 30; radius: 8
                                 color: wnMa.containsMouse
                                        ? Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.70)
@@ -3412,7 +3421,9 @@ Item {
                                     hoverEnabled: true
                                     enabled: parent.enabled
                                     cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                    onClicked: parent.handler()
+                                    onEntered: if (parent.tip.length) BarTipState.show(parent.tip, parent)
+                                    onExited: BarTipState.hide()
+                                    onClicked: { BarTipState.hide(); parent.handler() }
                                 }
                             }
 
@@ -3590,12 +3601,13 @@ Item {
                                         Layout.topMargin: 10
                                         Layout.bottomMargin: 2
                                         spacing: 6
-                                        WebNavBtn { glyphSize: 19; glyph: "\u{2302}"; tint: Theme.cOnSurf; handler: function () { win.webNavigateActive(win.searxBase) } }
-                                        WebNavBtn { glyph: "\u{F0453}"; tint: Theme.cOnSurf; handler: function () { if (win.activeView) win.activeView.reload() } }
+                                        WebNavBtn { glyphSize: 19; glyph: "\u{2302}"; tint: Theme.cOnSurf; tip: "Home"; handler: function () { win.webNavigateActive(win.searxBase) } }
+                                        WebNavBtn { glyph: "\u{F0453}"; tint: Theme.cOnSurf; tip: "Reload"; handler: function () { if (win.activeView) win.activeView.reload() } }
                                         WebNavBtn {
                                             glyphSize: 19
                                             glyph: "\u{21B6}"; enabled: win.activeView ? win.activeView.canGoBack : false
                                             tint: (win.webRev, win.activeView && win.activeView.canGoBack) ? Theme.cOnSurf : Qt.alpha(Theme.cOnSurf, 0.35)
+                                            tip: "Back"
                                             handler: function () { if (win.activeView && win.activeView.canGoBack) win.activeView.goBack() }
                                         }
 
@@ -3664,6 +3676,7 @@ Item {
                                             glyphSize: 19
                                             glyph: "\u{21B7}"; enabled: win.activeView ? win.activeView.canGoForward : false
                                             tint: (win.webRev, win.activeView && win.activeView.canGoForward) ? Theme.cOnSurf : Qt.alpha(Theme.cOnSurf, 0.35)
+                                            tip: "Forward"
                                             handler: function () { if (win.activeView && win.activeView.canGoForward) win.activeView.goForward() }
                                         }
 
@@ -3671,6 +3684,7 @@ Item {
                                         WebNavBtn {
                                             glyph: (win.webRev, WebBookmarksState.isBookmarked(win.activeView ? win.activeView.url : "")) ? "\u{F00C1}" : "\u{F00C0}"
                                             tint: (win.webRev, WebBookmarksState.isBookmarked(win.activeView ? win.activeView.url : "")) ? Theme.cPrimary : Theme.cOnSurf
+                                            tip: "Bookmark page"
                                             handler: function () { if (win.activeView) win.webToggleBookmark(win.activeView.url, win.activeView.title) }
                                         }
 
@@ -3678,16 +3692,19 @@ Item {
                                         WebNavBtn {
                                             glyph: "\u{F00C3}"
                                             tint: win.webShowBookmarks ? Theme.cPrimary : Theme.cOnSurf
-                                            handler: function () { win.webShowBookmarks = !win.webShowBookmarks; win.webShowCredentials = false }
+                                            tip: "Bookmarks"
+                                            handler: function () { win.webShowBookmarks = !win.webShowBookmarks; win.webShowCredentials = false; win.webShowPrefs = false }
                                         }
 
                                         // Open the saved-credentials (cookies) library.
                                         WebNavBtn {
                                             glyph: "\u{EDE4}"
                                             tint: win.webShowCredentials ? Theme.cPrimary : Theme.cOnSurf
+                                            tip: "Saved sign-ins"
                                             handler: function () {
                                                 win.webShowCredentials = !win.webShowCredentials
                                                 win.webShowBookmarks = false
+                                                win.webShowPrefs = false
                                                 if (win.webShowCredentials) win.webRefreshCredOrigins()
                                             }
                                         }
@@ -3698,6 +3715,7 @@ Item {
                                         WebNavBtn {
                                             glyph: win.webAdBlockEnabled ? "\u{F0565}" : "\u{F099E}"
                                             tint: win.webAdBlockEnabled ? Theme.cPrimary : Qt.alpha(Theme.cOnSurf, 0.4)
+                                            tip: win.webAdBlockEnabled ? "Ad-blocker: On" : "Ad-blocker: Off"
                                             handler: function () { win.webToggleAdBlock() }
                                         }
 
@@ -3708,9 +3726,25 @@ Item {
                                         WebNavBtn {
                                             glyph: "\u{F059F}"
                                             tint: Theme.cOnSurf
+                                            tip: "Open in default browser"
                                             handler: function () {
                                                 var v = win.activeView
                                                 if (v && v.url) Qt.openUrlExternally(v.url.toString())
+                                            }
+                                        }
+
+                                        // Search-engine preferences: opens the in-card
+                                        // settings.yml editor overlay. Only shown on the
+                                        // SearXNG origin (home / search results).
+                                        WebNavBtn {
+                                            visible: win.webOnSearx
+                                            glyph: "\u{F08BB}"
+                                            tint: win.webShowPrefs ? Theme.cPrimary : Theme.cOnSurf
+                                            tip: "Search preferences"
+                                            handler: function () {
+                                                win.webShowPrefs = !win.webShowPrefs
+                                                win.webShowBookmarks = false
+                                                win.webShowCredentials = false
                                             }
                                         }
                                     }
@@ -3813,6 +3847,16 @@ Item {
                                                 onLoadingChanged: function (loadRequest) { win._onViewLoad(tabId, loadRequest) }
                                                 onTitleChanged: win._onViewTitle(tabId, title)
                                                 onUrlChanged: win._onViewUrl(tabId, url)
+                                                // Popup / window.open requests (e.g. OAuth
+                                                // sign-in dialogs) cannot complete their
+                                                // window.opener handshake inside a detached
+                                                // embedded view, so we consume the request
+                                                // and deliberately open nothing (no openIn
+                                                // call), which drops the popup instead of
+                                                // letting Qt spawn an unusable transient
+                                                // window. Users reach those flows via the
+                                                // header's "Open in default browser" button.
+                                                onNewWindowRequested: function (request) { }
                                                 onFullScreenRequested: function (request) { win._onViewFullScreen(tabId, request) }
                                                 // Installing this handler stops QtWebEngine forwarding every page
                                                 // console message to the log. Chromium + third-party pages emit a lot
@@ -4059,6 +4103,20 @@ Item {
                                                         }
                                                     }
                                                 }
+                                            }
+                                        }
+
+                                        // ── Search-engine preferences overlay ────────────
+                                        // Full-card scrim + a themed settings editor
+                                        // bound to the SearXNG settings.yml. Instantiated
+                                        // only while shown (fresh read each open).
+                                        Loader {
+                                            anchors.fill: parent
+                                            z: 201
+                                            visible: active
+                                            active: win.webShowPrefs && win.tab === "websearch"
+                                            sourceComponent: Component {
+                                                WebSearchPrefs { onDismissed: win.webShowPrefs = false }
                                             }
                                         }
 

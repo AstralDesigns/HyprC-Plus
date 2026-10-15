@@ -281,6 +281,7 @@ ShellRoot {
     Loader { active: LicenseState.activated && CaptureMenuState.visible; source: "CaptureMenuPopup.qml" }
     Loader { active: WorkspacesPopupState.visible; source: "WorkspacesPopup.qml" }
     Loader { active: WorkspacesPopupState.tileTooltipVisible; source: "WorkspaceTileTooltip.qml" }
+    Loader { active: BarTipState.visible; source: "BarTipWindow.qml" }
 
     // ── Idle-inhibitor anchor — always mapped so the Wayland protocol object
     //    survives bar autohide (bar.visible = false unmaps the bar surface).

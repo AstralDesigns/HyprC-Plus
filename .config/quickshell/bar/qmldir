@@ -60,6 +60,7 @@ SsBtn 1.0 SsBtn.qml
 ShellLayer 1.0 ShellLayer.qml
 
 singleton WorkspacesPopupState 1.0 WorkspacesPopupState.qml
+singleton BarTipState 1.0 BarTipState.qml
 WorkspacesPopup 1.0 WorkspacesPopup.qml
 
 singleton LockTransitionState 1.0 LockTransitionState.qml
@@ -74,6 +75,7 @@ singleton GroupsState 1.0 GroupsState.qml
 singleton WebBookmarksState 1.0 WebBookmarksState.qml
 singleton TrashState 1.0 TrashState.qml
 CCSegmented 1.0 CCSegmented.qml
+WebSearchPrefs 1.0 WebSearchPrefs.qml
 DockWindow 1.0 DockWindow.qml
 LauncherWindow 1.0 LauncherWindow.qml
 TrashDialog 1.0 TrashDialog.qml
