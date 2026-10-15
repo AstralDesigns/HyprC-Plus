@@ -89,6 +89,7 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 
 export const App: React.FC = () => {
   const [store] = useStore();
+  const appRootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     storeActions.refreshPendingFiles();
@@ -157,9 +158,35 @@ export const App: React.FC = () => {
       if (ev.ctrlKey && ev.key === 'Tab') {
         ev.preventDefault();
         storeActions.cycleActivePane(ev.shiftKey ? -1 : 1);
+        return;
+      }
+      // Ctrl+O opens a folder via the native picker.
+      if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'o' || ev.key === 'O')) {
+        ev.preventDefault();
+        storeActions.openFolderDialog();
+        return;
+      }
+      // Ctrl+1 / Ctrl+2 toggle the floating side panels (same key shows/hides).
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === '1') {
+        ev.preventDefault();
+        storeActions.toggleSidebar();
+        return;
+      }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === '2') {
+        ev.preventDefault();
+        storeActions.toggleChat();
       }
     };
     window.addEventListener('keydown', onKeyDown);
+
+    // The host webview only receives key events once it holds keyboard focus,
+    // which the compositor grants lazily. Give the page a focused element from
+    // mount so the global keybinds above fire at workspace startup, before the
+    // user clicks into a canvas (which is otherwise what pulls focus in).
+    const focusRoot = () => { try { appRootRef.current?.focus({ preventScroll: true }); } catch { /* noop */ } };
+    focusRoot();
+    requestAnimationFrame(focusRoot);
+    setTimeout(focusRoot, 150);
 
     // Auto-activate last active Cloud tab model/provider if saved from previous session.
     {
@@ -255,7 +282,7 @@ export const App: React.FC = () => {
 
   return (
     <AppErrorBoundary>
-      <div className="app-container">
+      <div className="app-container" ref={appRootRef} tabIndex={-1}>
         <Header />
 
         <div className="workspace-container" ref={workspaceRef}>

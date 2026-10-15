@@ -3546,6 +3546,70 @@ body,
   background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 15%, transparent) !important;
 }
 
+/* ── Monaco Find/Replace widget input text-selection ──────────────── */
+/* Recolor the browser-default blue highlight on the (carried) search/replace
+   term to a matugen primary tint at 0.15 alpha. Covers both the find and
+   replace fields (input + the replace textarea). */
+.monaco-editor .find-widget .input::selection,
+.monaco-editor .find-widget textarea::selection {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 15%, transparent) !important;
+  color: var(--matugen-on-surface, #dfe3e6) !important;
+}
+
+/* ── Global custom tooltip (app-wide, replaces native title) ───────── */
+.hc-tooltip {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+  max-width: 320px;
+  padding: 4px 9px;
+  border-radius: 10px;
+  background: var(--matugen-on-secondary, #1d343c);
+  color: var(--matugen-primary, #a0c9dc);
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 22%, transparent);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  font-size: 12px;
+  line-height: 1.3;
+  letter-spacing: 0.2px;
+  white-space: normal;
+  word-break: break-word;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+  will-change: left, top, opacity;
+}
+
+.hc-tooltip.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Monaco simple hover widget (find/replace action buttons) ─────── */
+/* Monaco's own hover (used by the find/replace prev/next/close/toggle-replace
+   buttons, which expose aria-label instead of title so the global tooltip
+   can't catch them) — matched to the tooltip look. Scoped to .monaco-hover,
+   NOT the larger .monaco-editor-hover content hover, so code hovers stay
+   untouched. */
+.monaco-hover {
+  background: var(--matugen-on-secondary, #1d343c) !important;
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 22%, transparent) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+.monaco-hover,
+.monaco-hover .monaco-hover-content,
+.monaco-hover .hover-contents {
+  color: var(--matugen-primary, #a0c9dc) !important;
+  font-size: 12px;
+}
+
+.monaco-hover .hover-pointer {
+  background: var(--matugen-on-secondary, #1d343c) !important;
+}
+
 /* ── Monaco Right-Click Context Menu ───────────────────────────────── */
 .context-view.monaco-menu-container,
 .context-view .monaco-menu,

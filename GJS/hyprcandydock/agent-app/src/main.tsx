@@ -6,6 +6,7 @@ import * as monaco from 'monaco-editor';
 import { App } from './App';
 import { storeActions, getStore, setStore } from './store';
 import { agentEngine } from './engine/agent-engine';
+import { initGlobalTooltips } from './utils/tooltip';
 import './theme.css';
 
 // Configure Monaco to use locally bundled package rather than CDN
@@ -30,3 +31,6 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <App />
   </React.StrictMode>
 );
+
+// App-wide styled tooltips (also covers Monaco's find/replace buttons).
+initGlobalTooltips();

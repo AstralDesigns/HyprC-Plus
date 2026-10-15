@@ -533,6 +533,10 @@ Item {
             // The view of the ACTIVE tab (null until it exists). Chrome rows
             // bind through this handle; re-emitted via webRev when it moves.
             property var activeView: null
+            // Handle to the persistent agent workspace view (set by agentView on
+            // completion). The websearch activeView is a different view, so the
+            // window-level focus calls route the agent tab through this instead.
+            property var agentViewRef: null
             // Background truth about the SearXNG container (health checks set
             // it); deliberately NOT what paints the overlay anymore (2c).
             property bool searxDown: false
@@ -2167,7 +2171,8 @@ Item {
                 if (id === "agent") win.agentEnsureUp()
                 win.syncWebSurface()
                 Qt.callLater(function() {
-                    if (win.tab === "websearch" || win.tab === "agent") { if (win.activeView) win.activeView.forceActiveFocus() }
+                    if (win.tab === "agent") { if (win.agentViewRef) win.agentViewRef.forceActiveFocus() }
+                    else if (win.tab === "websearch") { if (win.activeView) win.activeView.forceActiveFocus() }
                     else searchInput.forceActiveFocus()
                 })
             }
@@ -2225,7 +2230,8 @@ Item {
                     if (win.tab === "agent" && win._wsResolved) win.agentEnsureUp()
                     win.syncWebSurface()
                     Qt.callLater(function() {
-                        if (win.tab === "websearch" || win.tab === "agent") { if (win.activeView) win.activeView.forceActiveFocus() }
+                        if (win.tab === "agent") { if (win.agentViewRef) win.agentViewRef.forceActiveFocus() }
+                        else if (win.tab === "websearch") { if (win.activeView) win.activeView.forceActiveFocus() }
                         else searchInput.forceActiveFocus()
                     })
                 }
@@ -3864,6 +3870,10 @@ Item {
                                                 backgroundColor: "transparent"
                                                 settings.javascriptEnabled: true
                                                 onVisibleChanged: if (visible) forceActiveFocus()
+                                                // Publish ourselves for the window-level focus
+                                                // calls and grab keyboard focus on first creation
+                                                // (onVisibleChanged won't fire when built visible).
+                                                Component.onCompleted: { win.agentViewRef = agentView; if (visible) Qt.callLater(function() { agentView.forceActiveFocus() }) }
                                             }
                                         }
                                         // Gated so the agent view is instantiated only

@@ -254,6 +254,11 @@ export function registerMatugenTheme(monaco: any): void {
       'quickInput.border':                    '#' + strip(primary),
       'quickInputList.focusBackground':       scrollbarIdle,
       'quickInputList.focusForeground':       '#' + strip(primary),
+      // Mouse-hover in Monaco lists (command palette, find history, references).
+      // Default is a flat grey; tint it with primary so cursor hover matches the
+      // keyboard-nav (focus) highlight instead of clashing with it.
+      'list.hoverBackground':                 withAlpha(primary, 18),
+      'list.hoverForeground':                 '#' + strip(primary),
       'editorSuggestWidget.background':       '#' + strip(onSecondary),
       'editorSuggestWidget.border':           '#' + strip(surfaceVariant),
       'editorSuggestWidget.foreground':       ensureReadable(textPrimary, lightBase),

@@ -648,6 +648,18 @@ export const storeActions = {
   // Floating panel toggles
   toggleSidebar: () => setStore(prev => ({ sidebarVisible: !prev.sidebarVisible })),
   toggleChat: () => setStore(prev => ({ chatVisible: !prev.chatVisible })),
+  // Open a directory through the native folder picker and load it as the project.
+  openFolderDialog: async () => {
+    try {
+      const picked = await bridge.openFileDialog({ directory: true, currentFolder: currentState.projectPath });
+      if (picked) {
+        setStore({ projectPath: picked });
+        storeActions.navigateTo(picked);
+      }
+    } catch (e) {
+      console.warn('Open folder error:', e);
+    }
+  },
   setSidebarWidth: (width: number) => setStore({ sidebarWidth: width }),
   setChatWidth: (width: number) => setStore({ chatWidth: width }),
   setMonacoTheme: (theme: string) => {

@@ -294,8 +294,8 @@ export const Canvas: React.FC = () => {
 
         <div className="canvas-shortcuts-card">
           <div className="canvas-shortcut-row">
-            <span className="shortcut-label">Open Directory / File</span>
-            <kbd className="shortcut-key">Explorer</kbd>
+            <span className="shortcut-label">Open Folder</span>
+            <kbd className="shortcut-key">Ctrl + O</kbd>
           </div>
           <div className="canvas-shortcut-row">
             <span className="shortcut-label">Save Current File</span>
@@ -303,11 +303,11 @@ export const Canvas: React.FC = () => {
           </div>
           <div className="canvas-shortcut-row">
             <span className="shortcut-label">Toggle Files & Project</span>
-            <kbd className="shortcut-key">Left Panel</kbd>
+            <kbd className="shortcut-key">Ctrl + 1</kbd>
           </div>
           <div className="canvas-shortcut-row">
             <span className="shortcut-label">Toggle Agent Chat</span>
-            <kbd className="shortcut-key">Right Panel</kbd>
+            <kbd className="shortcut-key">Ctrl + 2</kbd>
           </div>
         </div>
 
