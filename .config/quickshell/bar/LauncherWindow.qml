@@ -4094,6 +4094,7 @@ Item {
                                                         MouseArea {
                                                             id: bmRowMa
                                                             anchors.fill: parent
+                                                            z: -1
                                                             hoverEnabled: true
                                                             cursorShape: Qt.PointingHandCursor
                                                             onClicked: {
