@@ -149,6 +149,14 @@ export const App: React.FC = () => {
       if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'n' || ev.key === 'N')) {
         ev.preventDefault();
         storeActions.createSession();
+        return;
+      }
+      // Ctrl+Tab / Ctrl+Shift+Tab cycles the active canvas tab. Handled at the
+      // window level so it works regardless of whether focus is in the editor,
+      // a tab, or the chat composer.
+      if (ev.ctrlKey && ev.key === 'Tab') {
+        ev.preventDefault();
+        storeActions.cycleActivePane(ev.shiftKey ? -1 : 1);
       }
     };
     window.addEventListener('keydown', onKeyDown);

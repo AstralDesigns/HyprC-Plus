@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import {
   Music,
@@ -18,15 +18,30 @@ import { registerCustomLanguages, attachDiagnostics } from '../utils/monacoLangu
 import { getMediaUrl } from '../utils/media';
 
 /**
- * Cross-file find navigation: Ctrl+Alt+Down / Ctrl+Alt+Up cycle to the next
- * /previous open tab that also contains the current find-widget search term,
- * carrying the term over and re-opening find there — convenient when editing
- * the same variable/instance across several files. Monaco's find controller
- * is a stable-but-"internal" contribution API (no public typing in
- * @monaco-editor/react), hence the `as any` casts; the shape has been
- * consistent across Monaco versions for years.
+ * Find-widget carry + cross-file navigation.
+ *
+ * The active pane's editor is remounted on every tab switch, so Monaco tears
+ * its find/replace widget down with the old instance. We snapshot the widget
+ * state live (search term, replace term, the matchCase/wholeWord/isRegex/
+ * preserveCase toggles, and whether the replace row was shown) and silently
+ * re-open it on the next code/markdown editor mount, so the widget appears to
+ * stay open as you move between files — even with non-code canvases in between
+ * — until you explicitly close it (a real close clears the carry). Editor
+ * teardown disposes the find state without firing a close event, so switching
+ * does NOT clear it.
+ *
+ * Ctrl+Alt+Down / Ctrl+Alt+Up additionally cycle to the next/previous open
+ * code/markdown tab that CONTAINS the current term (a targeted find-across-
+ * files), reusing the same carry to re-open find there. Monaco's find
+ * controller is a stable-but-internal contribution API (no public typing in
+ * @monaco-editor/react), hence the `any` casts.
  */
-let pendingCrossFileFind: string | null = null;
+type CarriedFind = {
+  searchTerm: string; replaceTerm: string;
+  caseSensitive: boolean; wholeWord: boolean; isRegex: boolean; preserveCase: boolean;
+  replaceRevealed: boolean;
+};
+let carriedFind: CarriedFind | null = null;
 
 function jumpToPaneWithTerm(currentPaneId: string, term: string, direction: 1 | -1) {
   if (!term) return;
@@ -38,7 +53,8 @@ function jumpToPaneWithTerm(currentPaneId: string, term: string, direction: 1 | 
     const rawIdx = (idx + direction * step) % panes.length;
     const next = panes[(rawIdx + panes.length) % panes.length];
     if (next.content.toLowerCase().includes(needle)) {
-      pendingCrossFileFind = term;
+      // carriedFind already holds the live term/options; the target's mount
+      // re-opens the widget from it. Just move focus to the matching pane.
       storeActions.setActivePane(next.id);
       return;
     }
@@ -46,37 +62,68 @@ function jumpToPaneWithTerm(currentPaneId: string, term: string, direction: 1 | 
 }
 
 function registerFindWidgetCrossFileNav(editor: any, monaco: any, paneId: string) {
-  const getFindController = () => editor.getContribution('editor.contrib.findController');
+  const controller = editor.getContribution?.('editor.contrib.findController');
+  const state = controller && typeof controller.getState === 'function' ? controller.getState() : null;
+  if (!controller || !state) return;
 
-  const openFindWithTerm = (term: string) => {
-    const controller = getFindController();
-    if (!controller) return;
-    try {
-      controller.setSearchString(term);
-      controller.start({
-        forceRevealReplace: false,
-        seedSearchStringFromSelection: 'none',
-        seedSearchStringFromNonEmptySelection: false,
-        shouldFocus: 1,
-        shouldAnimate: true,
-        updateSearchScope: false,
-        loop: true,
-      });
-    } catch { /* best-effort — internal API, degrade silently if it changes */ }
-  };
+  const readCarry = (): CarriedFind => ({
+    searchTerm: state.searchString || '',
+    replaceTerm: state.replaceString || '',
+    caseSensitive: !!state.matchCase,
+    wholeWord: !!state.wholeWord,
+    isRegex: !!state.isRegex,
+    preserveCase: !!state.preserveCase,
+    replaceRevealed: !!state.isReplaceRevealed,
+  });
 
-  // If we just switched panes to satisfy a cross-file jump, resume the
-  // search here with the carried-over term.
-  if (pendingCrossFileFind) {
-    const term = pendingCrossFileFind;
-    pendingCrossFileFind = null;
-    setTimeout(() => openFindWithTerm(term), 30);
+  // Re-open the carried widget on a plain tab switch (no keybind needed). Order
+  // matters: controller.start() CONSTRUCTS/reveals the find widget, and the
+  // widget only pushes state into its visible fields on a searchString change
+  // event it receives AFTER it exists. So reveal first, then set the terms —
+  // setting them before start() computed the match count but left the input
+  // blank. Two short attempts cover a freshly-mounted editor not being ready on
+  // the first pass; both no-op once the widget is already revealed.
+  if (carriedFind) {
+    const reopen = () => {
+      const cf = carriedFind;
+      if (!cf || state.isRevealed) return;
+      try {
+        controller.start({
+          forceRevealReplace: cf.replaceRevealed,
+          seedSearchStringFromSelection: 'none',
+          seedSearchStringFromNonEmptySelection: false,
+          shouldFocus: 1, shouldAnimate: false, updateSearchScope: false, loop: true,
+        });
+        // Widget now exists and is visible — populate the fields so the carried
+        // search/replace text actually shows (not just the match count).
+        state.change({
+          searchString: cf.searchTerm,
+          replaceString: cf.replaceTerm,
+          matchCase: cf.caseSensitive, wholeWord: cf.wholeWord,
+          isRegex: cf.isRegex, preserveCase: cf.preserveCase,
+          isReplaceRevealed: cf.replaceRevealed,
+        }, false, false);
+      } catch { /* degrade silently */ }
+    };
+    setTimeout(reopen, 40);
+    setTimeout(reopen, 160);
   }
 
-  const currentTerm = () => {
-    try { return getFindController()?.getState()?.searchString || ''; } catch { return ''; }
-  };
+  // Keep the carry current while the widget is open; drop it on an intentional
+  // close (a change event that toggles isRevealed off). Non-reveal events while
+  // hidden are ignored so nothing nulls the carry by accident.
+  let sub: any = null;
+  try {
+    sub = state.onFindReplaceStateChange((e: any) => {
+      try {
+        if (state.isRevealed) carriedFind = readCarry();
+        else if (e && e.isRevealed) carriedFind = null;
+      } catch { /* noop */ }
+    });
+  } catch { /* internal API drift */ }
+  try { editor.onDidDispose(() => { try { sub?.dispose?.(); } catch { /* noop */ } }); } catch { /* noop */ }
 
+  const currentTerm = () => { try { return state.searchString || ''; } catch { return ''; } };
   editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.DownArrow, () => {
     jumpToPaneWithTerm(paneId, currentTerm(), 1);
   });
@@ -137,7 +184,19 @@ export const Canvas: React.FC = () => {
   const activePane = store.panes.find(p => p.id === store.activePaneId);
   const monacoRef = useRef<any>(null);
   const markerDispRef = useRef<any>(null);
+  const editorRef = useRef<any>(null);
+  const lastEmittedRef = useRef<string>('');
   const [diffView, setDiffView] = useState(false);
+
+  // Stable change handler: a fresh closure every render makes the library
+  // tear down/re-add its onDidChangeModelContent subscription on each commit,
+  // which can drop a keystroke under rapid typing. Track what we emitted so the
+  // external-sync effect can tell our own edits apart from a background reload.
+  const activePaneId = store.activePaneId;
+  const handleEditChange = useCallback((val: string | undefined) => {
+    lastEmittedRef.current = val || '';
+    if (activePaneId) storeActions.updatePaneContent(activePaneId, val || '');
+  }, [activePaneId]);
 
   const pendingEdit = activePane?.path ? store.pendingFiles[activePane.path] : undefined;
   const pendingCount = Object.keys(store.pendingFiles).length;
@@ -179,6 +238,47 @@ export const Canvas: React.FC = () => {
   useEffect(() => () => {
     try { markerDispRef.current?.dispose(); } catch { /* noop */ }
     markerDispRef.current = null;
+  }, []);
+
+  // Push EXTERNAL content reloads (reject / revert / re-open) into the mounted
+  // editor imperatively. Typing is uncontrolled (defaultValue below) so the
+  // library's full-document value-sync can't fire mid-keystroke and collapse
+  // the selection to the end of the file. External reloads always set
+  // isUnsaved=false while the user's edits set it true, so gating on
+  // !isUnsaved applies only the former — and restoring the position keeps a
+  // background refresh seamless instead of yanking the caret.
+  useEffect(() => {
+    const ap = activePane;
+    if (!ap?.path) return;
+    const ed = editorRef.current;
+    if (!ed) return;
+    let model: any;
+    try { model = ed.getModel(); } catch { return; }
+    if (!model || model.isDisposed?.()) return;
+    if (ap.isUnsaved) return;
+    if (model.getValue() === ap.content) return;
+    // A store update that just echoes our own keystroke isn't an external edit.
+    if (lastEmittedRef.current === ap.content) return;
+    const pos = ed.getPosition();
+    try {
+      ed.setValue(ap.content);
+      if (pos) { ed.setPosition(pos); ed.revealPositionInCenterIfOutsideViewport(pos); }
+    } catch { /* editor torn down mid-switch */ }
+  }, [activePane?.id, activePane?.path, activePane?.content, activePane?.isUnsaved]);
+
+  // When the app window regains focus with nothing else focused (e.g. coming
+  // back from another workspace), hand the caret to the open Monaco file so
+  // it's immediately typeable. Guarded on activeElement so it never steals
+  // focus from the chat box or any other active input.
+  useEffect(() => {
+    const refocusCanvas = () => {
+      const ae = document.activeElement;
+      if (!ae || ae === document.body || ae === document.documentElement) {
+        try { editorRef.current?.focus(); } catch { /* noop */ }
+      }
+    };
+    window.addEventListener('focus', refocusCanvas);
+    return () => window.removeEventListener('focus', refocusCanvas);
   }, []);
 
   if (!activePane) {
@@ -291,6 +391,7 @@ export const Canvas: React.FC = () => {
                     theme={targetTheme}
                     beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); monacoRef.current = monaco; }}
                     onMount={(editor, monaco) => {
+                      editorRef.current = editor;
                       // Explicitly force the correct theme after all themes are registered.
                       // The `theme` prop alone can race with defineTheme; this guarantees winner.
                       try { monaco.editor.setTheme(targetTheme); } catch (_) {}
@@ -332,7 +433,26 @@ export const Canvas: React.FC = () => {
                       if (typeof pane.scrollTop === 'number') {
                         editor.setScrollTop(pane.scrollTop);
                       }
-                      editor.focus();
+                      // Auto-focus the file on open / tab switch / workspace resume
+                      // (each remounts the active pane's editor). Re-assert across
+                      // the next frames because a new file also inserts a header tab
+                      // whose re-render + Monaco re-layout can drop the caret. Focus
+                      // only when the caret is nowhere (body) or already inside this
+                      // editor. NOTE: files opened from the floating sidebar are left
+                      // as-is — Qt WebEngine keeps active focus on the overlaid
+                      // sidebar row, so an auto-handoff there is unreliable.
+                      const editorNode = editor.getDomNode();
+                      const focusEditor = () => {
+                        try {
+                          const ae = document.activeElement;
+                          const insideEditor = !!(editorNode && ae && editorNode.contains(ae));
+                          const nowhere = !ae || ae === document.body || ae === document.documentElement;
+                          if (insideEditor || nowhere) editor.focus();
+                        } catch { /* editor torn down mid-switch */ }
+                      };
+                      focusEditor();
+                      requestAnimationFrame(focusEditor);
+                      [60, 140, 260].forEach((d) => setTimeout(focusEditor, d));
 
                       registerFindWidgetCrossFileNav(editor, monaco, pane.id);
 
@@ -348,8 +468,8 @@ export const Canvas: React.FC = () => {
                       });
                     }}
                     language={pane.language || 'plaintext'}
-                    value={pane.content}
-                    onChange={(value) => storeActions.updatePaneContent(pane.id, value || '')}
+                    defaultValue={pane.content}
+                    onChange={handleEditChange}
                     options={{
                       minimap: { enabled: true, side: 'right', showSlider: 'always', renderCharacters: false, maxColumn: 120 },
                       fontSize: 13,

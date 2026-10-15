@@ -1102,6 +1102,18 @@ export const storeActions = {
     setStore({ activePaneId: id, activeOpenFile: id });
   },
 
+  // Cycle the active canvas tab (Ctrl+Tab forward, Ctrl+Shift+Tab back).
+  // Wraps around the full pane list, including non-code canvases.
+  cycleActivePane: (direction: 1 | -1) => {
+    setStore(prev => {
+      const panes = prev.panes;
+      if (panes.length < 2) return {};
+      const idx = panes.findIndex(p => p.id === prev.activePaneId);
+      const next = panes[(((idx + direction) % panes.length) + panes.length) % panes.length];
+      return { activePaneId: next.id, activeOpenFile: next.id };
+    });
+  },
+
   updatePaneContent: (id: string, content: string) => {
     setStore(prev => ({
       panes: prev.panes.map(p => p.id === id ? { ...p, content, isUnsaved: true } : p),

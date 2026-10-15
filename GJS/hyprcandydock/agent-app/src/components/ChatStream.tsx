@@ -453,6 +453,23 @@ export const ChatStream: React.FC = () => {
     };
   }, [activeSession?.id]);
 
+  // On session switch / resume — including the initial load of the last active
+  // chat when the workspace starts — jump to the end so the panel focuses where
+  // the conversation ended. The incremental follow effect above only scrolls
+  // when already near the bottom, so a freshly-mounted list would otherwise
+  // stay pinned to the top. The rAF + short settle re-scroll covers late
+  // markdown/image/diff layout that grows scrollHeight after the first commit.
+  useEffect(() => {
+    if (!store.chatVisible) return;
+    const node = containerRef.current || bottomRef.current?.parentElement;
+    if (!node) return;
+    const jump = () => node.scrollTo({ top: node.scrollHeight, behavior: 'auto' });
+    jump();
+    const raf = requestAnimationFrame(jump);
+    const settle = setTimeout(jump, 120);
+    return () => { cancelAnimationFrame(raf); clearTimeout(settle); };
+  }, [activeSession?.id, store.chatVisible]);
+
   const jumpToBottom = () => {
     const node = containerRef.current || bottomRef.current?.parentElement;
     if (node) {
