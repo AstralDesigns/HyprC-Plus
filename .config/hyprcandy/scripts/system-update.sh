@@ -35,6 +35,29 @@ get_aur_helper() {
 get_aur_helper
 export -f pkg_installed
 
+# Ensure ~/.cargo/bin is on PATH in the active login shell's rc, appending the
+# block only when it is missing. Mirrors Candy_Update so whichever update path
+# runs first retro-fits cargo PATH for existing HyprCandy+ installs.
+ensure_cargo_path() {
+  local sh rc marker
+  marker="# HyprCandy: cargo bin on PATH"
+  sh="$(basename "${SHELL:-$(getent passwd "$(id -u)" | cut -d: -f7)}")"
+  case "$sh" in
+    fish) rc="$HOME/.config/fish/config.fish" ;;
+    zsh)  rc="$HOME/.zshrc" ;;
+    bash) rc="$HOME/.bashrc" ;;
+    *)    return 0 ;;
+  esac
+  [ -f "$rc" ] || return 0
+  grep -qF "$marker" "$rc" && return 0
+  if [ "$sh" = "fish" ]; then
+    printf '\n%s\nif test -d ~/.cargo/bin\n    set -x PATH ~/.cargo/bin $PATH\nend\n' "$marker" >> "$rc"
+  else
+    printf '\n%s\ncase ":$PATH:" in\n  *":$HOME/.cargo/bin:"*) ;;\n  *) [ -d "$HOME/.cargo/bin" ] && export PATH="$HOME/.cargo/bin:$PATH" ;;\nesac\n' "$marker" >> "$rc"
+  fi
+  print_status "Added cargo bin to PATH in $rc"
+}
+
 clean_cache() {
     echo
     print_warning "Clearing the cache frees disk space but requires redownloading if you need to downgrade later."
@@ -79,6 +102,7 @@ if [ "$1" == "up" ]; then
   command="
     $0 upgrade
     ${aur_helper} -Syu
+    command -v cargo >/dev/null && cargo install-update -a
     if command -v checkrebuild >/dev/null; then
         echo
         print_status \"Checking for packages requiring a rebuild...\"
@@ -120,6 +144,10 @@ if [ "$1" == "run" ]; then
     "$official_updates_now" "$aur_helper" "$aur_updates_now" "$flatpak_updates_now"
 
   ${aur_helper} -Syu
+
+  command -v cargo >/dev/null && cargo install-update -a
+
+  ensure_cargo_path
 
   if command -v checkrebuild >/dev/null; then
       echo

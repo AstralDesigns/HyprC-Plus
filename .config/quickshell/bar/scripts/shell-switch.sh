@@ -153,6 +153,28 @@ alias sea='asciiquarium'
 EOF
 }
 
+# ── cargo bin on PATH (idempotent patch for pre-existing configs) ────────────
+# Appends the block to an already-present rc only when the marker is missing,
+# so switching to a shell whose config predates cargo retro-fits the PATH.
+ensure_cargo_path() {
+    local sh="$1" rc marker
+    marker="# HyprCandy: cargo bin on PATH"
+    case "$sh" in
+        fish) rc="$HOME/.config/fish/config.fish" ;;
+        zsh)  rc="$HOME/.zshrc" ;;
+        bash) rc="$HOME/.bashrc" ;;
+        *)    return 0 ;;
+    esac
+    [ -f "$rc" ] || return 0
+    grep -qF "$marker" "$rc" && return 0
+    if [ "$sh" = "fish" ]; then
+        printf '\n%s\nif test -d ~/.cargo/bin\n    set -x PATH ~/.cargo/bin $PATH\nend\n' "$marker" >> "$rc"
+    else
+        printf '\n%s\ncase ":$PATH:" in\n  *":$HOME/.cargo/bin:"*) ;;\n  *) [ -d "$HOME/.cargo/bin" ] && export PATH="$HOME/.cargo/bin:$PATH" ;;\nesac\n' "$marker" >> "$rc"
+    fi
+    ok "Added cargo bin to PATH in $rc"
+}
+
 # ── Bash: full first-time setup + completion/fzf plugins ──────────────────────
 setup_bash() {
     pkgs bash bash-completion starship fzf fastfetch git curl
@@ -176,6 +198,12 @@ EOF
 case ":$PATH:" in
   *":$HOME/.local/bin:"*) ;;
   *) [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+
+# HyprCandy: cargo bin on PATH
+case ":$PATH:" in
+  *":$HOME/.cargo/bin:"*) ;;
+  *) [ -d "$HOME/.cargo/bin" ] && export PATH="$HOME/.cargo/bin:$PATH" ;;
 esac
 
 shopt -s histappend
@@ -214,6 +242,7 @@ EOF
         info "Bash config already present — ensuring Starship init."
         grep -q 'starship init bash' "$rc" || \
             printf '\ncommand -v starship >/dev/null 2>&1 && eval "$(starship init bash)"\n' >> "$rc"
+        ensure_cargo_path bash
     fi
 }
 
@@ -257,6 +286,11 @@ if [ -d "$HOME/.local/bin" ]; then
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
+# HyprCandy: cargo bin on PATH
+if [ -d "$HOME/.cargo/bin" ]; then
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
 source $ZSH/oh-my-zsh.sh
 
 EOF
@@ -281,6 +315,7 @@ EOF
         info "Zsh config already present — ensuring Starship init."
         grep -q 'starship init zsh' "$rc" || \
             printf '\ncommand -v starship >/dev/null 2>&1 && eval "$(starship init zsh)"\n' >> "$rc"
+        ensure_cargo_path zsh
     fi
 }
 
@@ -317,6 +352,11 @@ set -x TERMINAL kitty
 
 if test -d ~/.local/bin
     set -x PATH ~/.local/bin $PATH
+end
+
+# HyprCandy: cargo bin on PATH
+if test -d ~/.cargo/bin
+    set -x PATH ~/.cargo/bin $PATH
 end
 
 # Aliases
@@ -374,6 +414,7 @@ EOF
         info "Fish config already present — ensuring Starship init."
         grep -q 'starship init fish' "$rc" || \
             printf '\nif type -q starship\n    starship init fish | source\nend\n' >> "$rc"
+        ensure_cargo_path fish
     fi
 }
 

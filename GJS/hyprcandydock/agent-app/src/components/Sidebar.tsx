@@ -31,30 +31,12 @@ import {
 import { useStore, setStore, storeActions, FileSystemItem } from '../store';
 import { bridge } from '../bridge';
 import { fileStatusClass, fileStatusLetter, buildFolderStatus } from '../utils/gitStatus';
+import { FileIcon } from '../utils/fileIcons';
 
 function getFileIcon(name: string, isDir: boolean) {
-  // Same live-palette mapping as the tab glyphs (see Header.getTabIcon).
-  if (isDir) return <Folder size={13} color="var(--wallust-color1, #c16f4c)" />;
-  const ext = name.split('.').pop()?.toLowerCase() || '';
-  if (['ts', 'tsx', 'js', 'jsx', 'py', 'sh', 'bash', 'c', 'cpp', 'rs', 'go', 'html', 'css'].includes(ext)) {
-    return <FileCode size={13} color="var(--matugen-primary, #a0c9dc)" />;
-  }
-  if (['json', 'yaml', 'yml', 'toml', 'ini'].includes(ext)) {
-    return <FileJson size={13} color="var(--wallust-color4, #a85b27)" />;
-  }
-  if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'].includes(ext)) {
-    return <ImageIcon size={13} color="var(--wallust-color2, #b3a40a)" />;
-  }
-  if (['mp4', 'webm', 'mov', 'mkv'].includes(ext)) {
-    return <Video size={13} color="var(--wallust-color3, #3589d0)" />;
-  }
-  if (['mp3', 'wav', 'ogg', 'flac'].includes(ext)) {
-    return <Music size={13} color="var(--wallust-color5, #69852d)" />;
-  }
-  if (['md', 'txt', 'log'].includes(ext)) {
-    return <FileText size={13} color="var(--matugen-secondary, #b6c489)" />;
-  }
-  return <File size={13} color="var(--matugen-outline, #838673)" />;
+  // Centralized VSCode-style per-format glyphs (see utils/fileIcons); colors
+  // stay on the live theme palette so they re-tint with the wallpaper.
+  return <FileIcon name={name} isDir={isDir} size={13} />;
 }
 
 function formatSize(bytes?: number): string {
@@ -64,7 +46,7 @@ function formatSize(bytes?: number): string {
   return (bytes / (1024 * 1024)).toFixed(1) + 'M';
 }
 
-type ProjectEntry = { name: string; isDir: boolean; size: number; path: string };
+type ProjectEntry = { name: string; isDir: boolean; size: number; path: string; relPath?: string };
 
 export const Sidebar: React.FC = () => {
   const [store] = useStore();
@@ -82,6 +64,28 @@ export const Sidebar: React.FC = () => {
   const [loadingFolders, setLoadingFolders] = useState<Set<string>>(new Set());
   const [loadingProject, setLoadingProject] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: ProjectEntry } | null>(null);
+  // In-app themed delete confirmation (QtWebEngine can't reliably show window.confirm).
+  const [pendingDelete, setPendingDelete] = useState<ProjectEntry | null>(null);
+  // Nautilus-style recursive search matches, surfaced as a flat top section.
+  const [fileResults, setFileResults] = useState<ProjectEntry[] | null>(null);
+  const [projectResults, setProjectResults] = useState<ProjectEntry[] | null>(null);
+  // Last-seen mtime per watched directory, for the explorer auto-refresh poll.
+  const dirMtimeRef = useRef<Record<string, number>>({});
+  // Breadcrumb row slides horizontally on vertical wheel (it overflows, not scrolls).
+  const breadcrumbsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = breadcrumbsRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      const delta = e.deltaY || e.deltaX;
+      if (!delta) return;
+      e.preventDefault();
+      el.scrollLeft += delta;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [store.sidebarMode, store.currentPath]);
 
   // Resize handling
   const isResizing = useRef(false);
@@ -116,16 +120,33 @@ export const Sidebar: React.FC = () => {
     storeActions.refreshDirectory();
   }, [store.currentPath]);
 
+  // List a folder into sorted tree entries (dirs first, case-insensitive name).
+  const listFolder = async (folderPath: string): Promise<ProjectEntry[]> => {
+    const items = await bridge.listDirectory(folderPath);
+    return items
+      .map(i => ({ name: i.name, isDir: i.isDir, size: i.size, path: `${folderPath.replace(/\/$/, '')}/${i.name}` }))
+      .sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
+  };
+
+  // Push freshly-listed entries into the right bucket: project root goes to
+  // projectFiles, any nested folder updates its cached children.
+  const applyFolderEntries = (folderPath: string, entries: ProjectEntry[]) => {
+    const root = store.projectPath.replace(/\/$/, '');
+    if (store.sidebarMode === 'project' && folderPath.replace(/\/$/, '') === root) {
+      setProjectFiles(entries);
+      setStore({ projectFiles: entries });
+    } else {
+      setFolderChildren(prev => ({ ...prev, [folderPath]: entries }));
+    }
+  };
+
   // Load project root
   const loadProjectDir = async (dirPath: string) => {
     setLoadingProject(true);
     try {
-      const items = await bridge.listDirectory(dirPath);
-      const sorted: ProjectEntry[] = items
-        .map(i => ({ ...i, path: `${dirPath.replace(/\/$/, '')}/${i.name}` }))
-        .sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
+      const sorted = await listFolder(dirPath);
       setProjectFiles(sorted);
-        setStore({ projectFiles: sorted, projectPath: dirPath });
+      setStore({ projectFiles: sorted, projectPath: dirPath });
       storeActions.refreshGitStatus();
       setFolderChildren({});
       setExpandedFolders(new Set());
@@ -143,24 +164,173 @@ export const Sidebar: React.FC = () => {
   }, [store.projectPath]);
 
   const shellQuote = (value: string) => `'${value.replace(/'/g, `'\\''`)}'`;
+  const parentDirOf = (p: string) => p.slice(0, p.lastIndexOf('/')) || '/';
+  const navFolder = () => (store.sidebarMode === 'project' ? store.projectPath : store.currentPath);
+
+  // After a copy/move/delete, refresh just the affected folder(s) in place so
+  // the tree doesn't reset expansion, and nudge git status in project mode.
+  const refreshAfterMutation = async (srcPath: string, destDir?: string) => {
+    if (store.sidebarMode === 'project') {
+      const parent = parentDirOf(srcPath);
+      try { applyFolderEntries(parent, await listFolder(parent)); } catch { /* folder vanished */ }
+      if (destDir && destDir.replace(/\/$/, '') !== parent.replace(/\/$/, '')) {
+        try { applyFolderEntries(destDir, await listFolder(destDir)); } catch { /* dest not tracked */ }
+      }
+      storeActions.refreshGitStatus();
+    } else {
+      await storeActions.refreshDirectory();
+    }
+  };
+
   const runFileAction = async (action: 'copy' | 'move' | 'delete' | 'copy-path') => {
     const entry = contextMenu?.entry;
     setContextMenu(null);
     if (!entry) return;
-    if (action === 'copy-path') {
-      await navigator.clipboard?.writeText(entry.path);
+    if (action === 'copy-path') { void bridge.copyToClipboard(entry.path); return; }
+    if (action === 'delete') { setPendingDelete(entry); return; }
+    if (action === 'copy' || action === 'move') {
+      const destination = await bridge.openFileDialog({ directory: true, currentFolder: navFolder() });
+      if (!destination) return;
+      await bridge.execCommand(`${action === 'copy' ? 'cp -R' : 'mv'} ${shellQuote(entry.path)} ${shellQuote(destination)}`, navFolder() || undefined);
+      await refreshAfterMutation(entry.path, destination);
+    }
+  };
+
+  const confirmDelete = async () => {
+    const entry = pendingDelete;
+    setPendingDelete(null);
+    if (!entry) return;
+    await bridge.execCommand(`rm -rf -- ${shellQuote(entry.path)}`, navFolder() || undefined);
+    await refreshAfterMutation(entry.path);
+  };
+
+  // Nautilus-style recursive search: debounce a query, fetch flat matches, and
+  // render them as a top section (so a deep file shows even if its collapsed
+  // ancestors aren't in the loaded tree).
+  useEffect(() => {
+    if (store.sidebarMode !== 'files') { setFileResults(null); return; }
+    const q = filterSearch.trim();
+    if (!q || !store.currentPath) { setFileResults(null); return; }
+    let cancelled = false;
+    setFileResults(null); // show "Searching…" while in flight
+    const t = setTimeout(async () => {
+      let rows: ProjectEntry[] = [];
+      try {
+        const r = await bridge.searchFiles(store.currentPath, q);
+        if (Array.isArray(r)) rows = r.map(x => ({ name: x.name, isDir: x.isDir, size: x.size, path: x.path, relPath: x.relPath }));
+      } catch { /* host offline / stale server: fall through to empty */ }
+      if (!cancelled) setFileResults(rows); // always an array — never leaves it stuck
+    }, 220);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [filterSearch, store.sidebarMode, store.currentPath]);
+
+  useEffect(() => {
+    if (store.sidebarMode !== 'project') { setProjectResults(null); return; }
+    const q = projectSearch.trim();
+    if (!q || !store.projectPath) { setProjectResults(null); return; }
+    let cancelled = false;
+    setProjectResults(null); // show "Searching…" while in flight
+    const t = setTimeout(async () => {
+      let rows: ProjectEntry[] = [];
+      try {
+        const r = await bridge.searchFiles(store.projectPath, q);
+        if (Array.isArray(r)) rows = r.map(x => ({ name: x.name, isDir: x.isDir, size: x.size, path: x.path, relPath: x.relPath }));
+      } catch { /* host offline / stale server: fall through to empty */ }
+      if (!cancelled) setProjectResults(rows); // always an array — never leaves it stuck
+    }, 220);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [projectSearch, store.sidebarMode, store.projectPath]);
+
+  const handleSearchEntryClick = (entry: ProjectEntry) => {
+    if (entry.isDir) {
+      // Navigate/reveal the folder and drop the query so the listing is useful.
+      if (store.sidebarMode === 'files') { setFilterSearch(''); storeActions.navigateTo(entry.path); }
+      else { setProjectSearch(''); void toggleProjectFolderParentReveal(entry.path); }
       return;
     }
-    if (action === 'delete' && !window.confirm(`Delete ${entry.name}?`)) return;
-    if (action === 'copy' || action === 'move') {
-      const destination = await bridge.openFileDialog({ directory: true, currentFolder: store.projectPath });
-      if (!destination) return;
-      await bridge.execCommand(`${action === 'copy' ? 'cp -R' : 'mv'} ${shellQuote(entry.path)} ${shellQuote(destination)}`, store.projectPath);
-    } else if (action === 'delete') {
-      await bridge.execCommand(`rm -rf -- ${shellQuote(entry.path)}`, store.projectPath);
-    }
-    await loadProjectDir(store.projectPath);
+    storeActions.openFileByPath(entry.path);
   };
+
+  // Reveal a search-hit folder in the project tree: expand every ancestor.
+  const toggleProjectFolderParentReveal = async (folderPath: string) => {
+    const root = store.projectPath.replace(/\/$/, '');
+    const rel = folderPath.replace(/\/$/, '').slice(root.length).split('/').filter(Boolean);
+    let accum = root;
+    for (const seg of rel) {
+      accum = `${accum}/${seg}`;
+      if (!expandedFolders.has(accum) && !folderChildren[accum]) {
+        try { const kids = await listFolder(accum); setFolderChildren(prev => ({ ...prev, [accum]: kids })); } catch { /* noop */ }
+      }
+    }
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      let a = root;
+      for (const seg of rel) { a = `${a}/${seg}`; next.add(a); }
+      return next;
+    });
+  };
+
+  // The exact, bounded set of directories the UI can currently see: the active
+  // listing, any expanded project folders, and the parent of every open file.
+  // Handed to the host inotify watcher (non-recursive) so it monitors just
+  // these — small enough that no tree size can exhaust inotify watches.
+  const visibleWatchDirs = (): string[] => {
+    const dirs = new Set<string>();
+    if (store.sidebarMode === 'project') { if (store.projectPath) dirs.add(store.projectPath); expandedFolders.forEach(d => dirs.add(d)); }
+    else if (store.currentPath) dirs.add(store.currentPath);
+    store.panes.forEach(p => { if (p.path) dirs.add(p.path.slice(0, p.path.lastIndexOf('/')) || '/'); });
+    return Array.from(dirs);
+  };
+
+  // (Re)point the host watcher whenever the visible set changes.
+  const panePathsKey = store.panes.map(p => p.path || '').join('|');
+  useEffect(() => {
+    void bridge.watchPaths(visibleWatchDirs());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.sidebarMode, store.currentPath, store.projectPath, expandedFolders, panePathsKey]);
+
+  // Explorer auto-refresh (mtime fallback): reload any visible folder whose
+  // mtime moved since we last listed it. Runs regardless of focus; the inotify
+  // fast path (below) usually beats it, but this covers a missing inotifywait.
+  useEffect(() => {
+    const pollDirs = async () => {
+      const dirs = store.sidebarMode === 'project'
+        ? Array.from(new Set([store.projectPath, ...expandedFolders].filter(Boolean)))
+        : [store.currentPath].filter(Boolean) as string[];
+      if (!dirs.length) return;
+      let res: Record<string, number>;
+      try { res = await bridge.statFiles([], dirs); } catch { return; }
+      for (const d of dirs) {
+        const m = res[d];
+        if (!m) { delete dirMtimeRef.current[d]; continue; }
+        const prev = dirMtimeRef.current[d];
+        if (prev === undefined) { dirMtimeRef.current[d] = m; continue; }
+        if (m === prev) continue;
+        dirMtimeRef.current[d] = m;
+        if (store.sidebarMode === 'files') { await storeActions.refreshDirectory(); }
+        else { try { applyFolderEntries(d, await listFolder(d)); } catch { /* noop */ } }
+      }
+    };
+    pollDirs();
+    const id = setInterval(pollDirs, 5000);
+    window.addEventListener('focus', pollDirs);
+    return () => { clearInterval(id); window.removeEventListener('focus', pollDirs); };
+  }, [store.sidebarMode, store.currentPath, store.projectPath, expandedFolders]);
+
+  // Apply inotify-reported changes (drained in App.handleFsEvents): refresh just
+  // the dirty folders in place, preserving tree expansion.
+  useEffect(() => {
+    if (!store.fsRev) return;
+    const dirty = store.fsDirtyDirs || {};
+    const reload = async (d: string) => { try { applyFolderEntries(d, await listFolder(d)); } catch { /* noop */ } };
+    if (store.sidebarMode === 'files') {
+      if (dirty[store.currentPath]) void storeActions.refreshDirectory();
+    } else {
+      if (dirty[store.projectPath]) void reload(store.projectPath);
+      expandedFolders.forEach(d => { if (dirty[d]) void reload(d); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store.fsRev]);
 
   // Expand / collapse folder in project tree
   const toggleProjectFolder = async (folderPath: string) => {
@@ -177,10 +347,7 @@ export const Sidebar: React.FC = () => {
     if (!folderChildren[folderPath]) {
       setLoadingFolders(prev => new Set(prev).add(folderPath));
       try {
-        const items = await bridge.listDirectory(folderPath);
-        const sorted: ProjectEntry[] = items
-          .map(i => ({ ...i, path: `${folderPath.replace(/\/$/, '')}/${i.name}` }))
-          .sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
+        const sorted = await listFolder(folderPath);
         setFolderChildren(prev => ({ ...prev, [folderPath]: sorted }));
         setStore(prev => ({ projectFiles: [...prev.projectFiles, ...sorted.filter(item => !prev.projectFiles.some(existing => existing.path === item.path))] }));
 
@@ -384,13 +551,10 @@ export const Sidebar: React.FC = () => {
             >
               {store.showDotfiles ? <Eye size={13} /> : <EyeOff size={13} />}
             </button>
-            <button type="button" className="nav-btn" onClick={() => storeActions.refreshDirectory()} title="Refresh">
-              <RefreshCw size={13} />
-            </button>
           </div>
 
           {/* Breadcrumbs path */}
-          <div className="sidebar-breadcrumbs">
+          <div className="sidebar-breadcrumbs" ref={breadcrumbsRef}>
             {breadcrumbs.map((crumb, idx) => (
               <span key={crumb.path} className="breadcrumb-segment-wrap">
                 {idx > 0 && <span className="breadcrumb-separator">/</span>}
@@ -425,7 +589,30 @@ export const Sidebar: React.FC = () => {
 
           {/* Files List */}
           <div className="sidebar-items-list">
-            {filteredFiles.length === 0 ? (
+            {filterSearch.trim() ? (
+              fileResults === null ? (
+                <div className="sidebar-empty-notice">Searching…</div>
+              ) : fileResults.length === 0 ? (
+                <div className="sidebar-empty-notice">No matches in this folder</div>
+              ) : (
+                <>
+                  <div className="sidebar-search-section-label">Matches (recursive)</div>
+                  {fileResults.map(entry => (
+                    <div
+                      key={entry.path}
+                      className="sidebar-file-row sidebar-search-row"
+                      onClick={() => handleSearchEntryClick(entry)}
+                      onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, entry }); }}
+                      title={entry.path}
+                    >
+                      {getFileIcon(entry.name, entry.isDir)}
+                      <span className="file-row-name">{entry.name}</span>
+                      <span className="file-row-relpath">{entry.relPath}</span>
+                    </div>
+                  ))}
+                </>
+              )
+            ) : filteredFiles.length === 0 ? (
               <div className="sidebar-empty-notice">No files found</div>
             ) : (
               filteredFiles.map(item => {
@@ -441,6 +628,7 @@ export const Sidebar: React.FC = () => {
                         storeActions.openFileByPath(item.path);
                       }
                     }}
+                    onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, entry: { name: item.name, isDir: item.type === 'folder', size: item.size || 0, path: item.path } }); }}
                     title={item.path}
                   >
                     {getFileIcon(item.name, item.type === 'folder')}
@@ -473,9 +661,6 @@ export const Sidebar: React.FC = () => {
               <span className="project-root-name">{projectFolderName}</span>
             </div>
             <div className="project-actions">
-              <button type="button" className="nav-btn" onClick={() => loadProjectDir(store.projectPath)} title="Refresh">
-                <RefreshCw size={12} className={loadingProject ? 'spin' : ''} />
-              </button>
               <button type="button" className="nav-btn" onClick={handlePickProjectFolder} title="Open project folder...">
                 <FolderSearch size={13} />
               </button>
@@ -501,7 +686,30 @@ export const Sidebar: React.FC = () => {
 
           {/* Project tree */}
           <div className="sidebar-items-list">
-            {projectFiles.length === 0 && !loadingProject ? (
+            {projectSearch.trim() ? (
+              projectResults === null ? (
+                <div className="sidebar-empty-notice">Searching…</div>
+              ) : projectResults.length === 0 ? (
+                <div className="sidebar-empty-notice">No matches in project</div>
+              ) : (
+                <>
+                  <div className="sidebar-search-section-label">Matches (recursive)</div>
+                  {projectResults.map(entry => (
+                    <div
+                      key={entry.path}
+                      className="sidebar-file-row sidebar-search-row"
+                      onClick={() => handleSearchEntryClick(entry)}
+                      onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, entry }); }}
+                      title={entry.path}
+                    >
+                      {getFileIcon(entry.name, entry.isDir)}
+                      <span className="file-row-name">{entry.name}</span>
+                      <span className="file-row-relpath">{entry.relPath}</span>
+                    </div>
+                  ))}
+                </>
+              )
+            ) : projectFiles.length === 0 && !loadingProject ? (
               <div className="sidebar-empty-notice">No files in project</div>
             ) : (
               projectFiles.map(entry => renderProjectEntry(entry, 0))
@@ -510,11 +718,29 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
       {contextMenu && createPortal(
-        <div className="agent-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()}>
+        <div className="agent-context-menu tab-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onPointerDown={(event) => event.stopPropagation()} onContextMenu={(event) => event.preventDefault()}>
           <button onClick={() => void runFileAction('copy')}><Copy size={12} /> Copy to...</button>
           <button onClick={() => void runFileAction('move')}><Move size={12} /> Move to...</button>
           <button onClick={() => void runFileAction('copy-path')}><Clipboard size={12} /> Copy path</button>
+          <div className="menu-separator" />
           <button className="danger" onClick={() => void runFileAction('delete')}><Trash2 size={12} /> Delete</button>
+        </div>,
+        document.body,
+      )}
+      {pendingDelete && createPortal(
+        <div className="agent-dialog-overlay" onPointerDown={() => setPendingDelete(null)}>
+          <div className="agent-dialog" onPointerDown={(event) => event.stopPropagation()}>
+            <div className="agent-dialog-title">Delete {pendingDelete.isDir ? 'folder' : 'file'}?</div>
+            <div className="agent-dialog-body">
+              <span className="agent-dialog-name">{pendingDelete.name}</span>
+              {!pendingDelete.isDir && <span className="agent-dialog-hint">This removes it from disk. This can't be undone.</span>}
+              {pendingDelete.isDir && <span className="agent-dialog-hint">This recursively removes the folder and everything in it.</span>}
+            </div>
+            <div className="agent-dialog-actions">
+              <button type="button" className="agent-dialog-btn" onClick={() => setPendingDelete(null)}>Cancel</button>
+              <button type="button" className="agent-dialog-btn danger" onClick={() => void confirmDelete()}>Delete</button>
+            </div>
+          </div>
         </div>,
         document.body,
       )}

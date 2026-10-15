@@ -144,6 +144,10 @@ export interface FilePane {
   data?: any;
   cursorPosition?: { lineNumber: number; column: number };
   scrollTop?: number;
+  /** mtime (ms) recorded at the last poll baseline; undefined until first probe. */
+  diskMtime?: number;
+  /** On-disk file changed while this tab held unsaved edits — surfaced as a badge. */
+  externalChanged?: boolean;
 }
 
 export interface FileSystemItem {
@@ -252,6 +256,11 @@ export interface AppState {
   gitStatus: Record<string, GitFileStatus>;
   // Absolute paths whose open editor currently reports >=1 error marker.
   errorFiles: Record<string, true>;
+
+  // Filesystem event feed (inotify): a revision bumped on each drain batch, and
+  // the directories touched in the latest batch (keyed for O(1) membership).
+  fsRev: number;
+  fsDirtyDirs: Record<string, true>;
 
   // Monaco editor theme
   monacoTheme: string;
@@ -362,6 +371,8 @@ function loadInitialState(): AppState {
     pendingFiles: {},
     gitStatus: {},
     errorFiles: {},
+    fsRev: 0,
+    fsDirtyDirs: {},
 
     monacoTheme: 'matugen',
 
@@ -1184,14 +1195,108 @@ export const storeActions = {
     try {
       const res = await bridge.writeFile(pane.path, pane.content);
       if (res && res.success !== false) {
+        // Clear diskMtime so the next poll re-baselines against our own write
+        // instead of mistaking it for an external edit and reloading.
         setStore(prev => ({
-          panes: prev.panes.map(p => p.id === paneId ? { ...p, isUnsaved: false } : p),
+          panes: prev.panes.map(p => p.id === paneId ? { ...p, isUnsaved: false, diskMtime: undefined, externalChanged: false } : p),
         }));
         storeActions.refreshGitStatus();
       }
     } catch (e) {
       console.error('Failed to save file:', e);
     }
+  },
+
+  /** Reload a single open pane's content straight from disk, clearing the
+   * unsaved + external-change flags. Used when the user accepts an on-disk
+   * edit that landed while their tab was dirty. */
+  reloadPaneFromDisk: async (id: string) => {
+    const pane = getStore().panes.find(p => p.id === id);
+    if (!pane?.path) return;
+    try {
+      const content = await bridge.readFile(pane.path);
+      setStore(prev => ({
+        panes: prev.panes.map(p => p.id === id ? { ...p, content, isUnsaved: false, externalChanged: false, diskMtime: undefined } : p),
+        openFileContents: { ...prev.openFileContents, [id]: content },
+      }));
+    } catch (e) { console.warn('reloadPaneFromDisk failed:', e); }
+  },
+
+  /**
+   * Poll open text-backed editors for external on-disk changes (focus + a
+   * coalescing interval call this). A clean tab reloads silently from disk so
+   * Monaco shows the new content; a dirty tab is left untouched and only
+   * flagged (externalChanged) so the user's unsaved work is never clobbered.
+   * The first probe per tab just records a baseline mtime without acting.
+   */
+  pollFilesystem: (() => {
+    let inFlight = false;
+    return async () => {
+      if (inFlight) return;
+      const st = getStore();
+      const editable = st.panes.filter(p => p.path && (p.type === 'code' || p.type === 'markdown'));
+      if (!editable.length) return;
+      inFlight = true;
+      try {
+        const paths = Array.from(new Set(editable.map(p => p.path!)));
+        const res = await bridge.statFiles(paths, []);
+        for (const p of editable) {
+          const m = res[p.path!];
+          if (m === undefined || m === 0) continue;
+          if (p.diskMtime === undefined) {
+            setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, diskMtime: m } : x) }));
+            continue;
+          }
+          if (m === p.diskMtime) continue;
+          if (p.isUnsaved) {
+            setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, externalChanged: true } : x) }));
+          } else {
+            try {
+              const content = await bridge.readFile(p.path!);
+              setStore(prev => ({
+                panes: prev.panes.map(x => x.id === p.id ? { ...x, content, isUnsaved: false, externalChanged: false, diskMtime: m } : x),
+                openFileContents: { ...prev.openFileContents, [p.id]: content },
+              }));
+            } catch { /* file may be gone; retry next poll */ }
+          }
+        }
+      } catch { /* best-effort: loopback offline */ }
+      finally { inFlight = false; }
+    };
+  })(),
+
+  /**
+   * Apply a batch of inotify-reported paths (drained from the loopback server):
+   * reload/flag open editors whose exact file changed, and record the touched
+   * directories so the explorer refreshes just those (see the Sidebar fsRev
+   * effect). This is the instant fast path; the mtime poll stays as the net for
+   * dirs/files inotify isn't watching (e.g. when inotifywait is unavailable).
+   */
+  handleFsEvents: async (paths: string[]) => {
+    if (!paths || !paths.length) return;
+    const changed = new Set(paths);
+    const st = getStore();
+    for (const p of st.panes) {
+      if (!p.path || !changed.has(p.path)) continue;
+      if (p.type !== 'code' && p.type !== 'markdown') continue;
+      if (p.isUnsaved) {
+        setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, externalChanged: true } : x) }));
+      } else {
+        try {
+          const content = await bridge.readFile(p.path);
+          setStore(prev => ({
+            panes: prev.panes.map(x => x.id === p.id ? { ...x, content, isUnsaved: false, externalChanged: false, diskMtime: undefined } : x),
+            openFileContents: { ...prev.openFileContents, [p.id]: content },
+          }));
+        } catch { /* file may be gone */ }
+      }
+    }
+    const dirty: Record<string, true> = {};
+    for (const path of paths) {
+      dirty[path.slice(0, path.lastIndexOf('/')) || '/'] = true;
+      dirty[path] = true; // a watched dir that itself moved/created matches by its own path
+    }
+    setStore(prev => ({ fsDirtyDirs: dirty, fsRev: prev.fsRev + 1 }));
   },
 
   createNewFile: () => {
@@ -1296,21 +1401,25 @@ export const storeActions = {
 
   // Filesystem Navigation (Matching CandyCode useFileSystem)
   navigateTo: (path: string) => {
+    // Guard on the real current path, not the history tail: on startup resume
+    // currentPath is persisted but navigationHistory resets to [home], so the
+    // tail can equal a breadcrumb target while we're actually deeper (made the
+    // $USER crumb a no-op until another crumb was clicked first).
+    if (currentState.currentPath === path) return;
     const history = [...currentState.navigationHistory];
     const currentIndex = currentState.historyIndex;
     if (currentIndex < history.length - 1) {
       history.splice(currentIndex + 1);
     }
-    const current = history[history.length - 1];
-    if (current !== path) {
+    if (history[history.length - 1] !== path) {
       history.push(path);
-      setStore({
-        navigationHistory: history,
-        historyIndex: history.length - 1,
-        currentPath: path,
-      });
-      storeActions.refreshDirectory();
     }
+    setStore({
+      navigationHistory: history,
+      historyIndex: history.length - 1,
+      currentPath: path,
+    });
+    storeActions.refreshDirectory();
   },
 
   navigateBack: () => {

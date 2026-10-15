@@ -37,6 +37,9 @@ import os
 import re
 import sys
 import json
+import time
+import shutil
+import threading
 import subprocess
 import mimetypes
 import datetime as _dt
@@ -59,6 +62,11 @@ RUNTIME_URL = os.environ.get("HC_RUNTIME_URL", "http://127.0.0.1:17900")
 DEFAULT_PROJECT_ROOT = os.path.join(
     HOME, ".hyprcandy", "GJS", "hyprcandydock")
 COLORS_CSS = os.path.join(HOME, ".config", "gtk-4.0", "colors.css")
+# Wallust regenerates this alongside colors.css on wallpaper changes; matugen
+# only drives colors.css, so without reading this file the injected
+# --wallust-* tokens stayed frozen at their static theme.css fallbacks.
+COLORS_WALLUST_CSS = os.path.join(HOME, ".config", "gtk-4.0",
+                                  "colors-wallust.css")
 # Durable agent-store blob (provider/model/sessions). The app mirrors its
 # localStorage payload here through the store_persist bridge action and
 # rehydrates from it at bootstrap, so a hard kill can no longer reset the
@@ -138,6 +146,18 @@ def read_theme_map():
         for name, val in re.findall(
                 r"@define-color\s+([a-zA-Z0-9_-]+)\s+([^;]+);", text):
             out[name] = val.strip()
+    except Exception:  # noqa: BLE001
+        pass
+    # Wallust palette lives in a separate file and is prefixed so applyTheme
+    # maps each entry to --wallust-<name> (bridge.ts wallust_ branch). Without
+    # this the file was never shipped and --wallust-* never hot-reloaded.
+    try:
+        with open(COLORS_WALLUST_CSS, "r", encoding="utf-8",
+                  errors="replace") as f:
+            wtext = f.read()
+        for name, val in re.findall(
+                r"@define-color\s+([a-zA-Z0-9_-]+)\s+([^;]+);", wtext):
+            out["wallust_" + name] = val.strip()
     except Exception:  # noqa: BLE001
         pass
     return out
@@ -363,6 +383,101 @@ def handle_take_screenshot(id_, payload):
         return {"id": id_, "type": "response", "error": str(err)}
 
 
+# ── Clipboard (QtWebEngine blocks navigator.clipboard) ─────────────────────
+def handle_copy_to_clipboard(id_, payload):
+    text = payload.get("text")
+    if not isinstance(text, str):
+        return {"id": id_, "type": "response", "error": "copy_to_clipboard requires string text"}
+    # Prefer wl-copy (Wayland), fall back to xclip/xsel for an X11 session.
+    for cmd in (["wl-copy"], ["xclip", "-selection", "clipboard", "-in"],
+                ["xsel", "--clipboard", "--input"]):
+        try:
+            p = subprocess.run(cmd, input=text.encode("utf-8"), timeout=5)
+            if p.returncode == 0:
+                return {"id": id_, "type": "response", "payload": {"ok": True}}
+        except (FileNotFoundError, OSError):
+            continue
+        except Exception:  # noqa: BLE001
+            continue
+    return {"id": id_, "type": "response", "error": "no clipboard helper (wl-copy/xclip/xsel)"}
+
+
+# ── Filesystem change polling (external-edit auto-refresh) ─────────────────
+def handle_stat_files(id_, payload):
+    """Return {path: mtime_ms} for every requested path (0 when missing).
+
+    One batched round-trip for the app's focus/interval poll: open editor
+    paths plus the directories the explorer is showing, so the React side can
+    diff mtimes against what it last loaded without a per-file request."""
+    out = {}
+    targets = set()
+    for key in ("paths", "dirs"):
+        val = payload.get(key)
+        if isinstance(val, list):
+            targets.update(str(x) for x in val if x)
+    for path in targets:
+        try:
+            out[path] = int(os.stat(path).st_mtime * 1000)
+        except OSError:
+            out[path] = 0
+    return {"id": id_, "type": "response", "payload": out}
+
+
+# VCS / build dirs a recursive search should never descend into.
+_SEARCH_SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv",
+                "target", "dist", "build", ".mypy_cache", ".cache"}
+
+
+def handle_search_files(id_, payload):
+    """Nautilus-style recursive name search under a root, ranked + bounded.
+
+    Returns flat matches (dirs first, then shallowest, then name) so a deep
+    file surfaces at the top even when its parent folders stay collapsed."""
+    root = payload.get("root") or HOME
+    query = str(payload.get("query") or "").strip().lower()
+    limit = int(payload.get("limit") or 300)
+    if not query:
+        return {"id": id_, "type": "response", "payload": []}
+    results = []
+    scanned = 0
+    # Bound the walk by wall-clock so a huge tree returns partial matches well
+    # inside the client's request timeout instead of hanging the spinner.
+    deadline = time.monotonic() + 6.0
+    try:
+        for dirpath, dirnames, filenames in os.walk(root):
+            # Prune heavy/noise dirs only. Hidden dirs stay searchable because a
+            # config tree keeps real files under dot-folders (e.g. .candyinstall).
+            dirnames[:] = [d for d in dirnames if d not in _SEARCH_SKIP]
+            for name in dirnames + filenames:
+                scanned += 1
+                if query not in name.lower():
+                    continue
+                full = os.path.join(dirpath, name)
+                is_dir = os.path.isdir(full)
+                try:
+                    size = 0 if is_dir else os.path.getsize(full)
+                except OSError:
+                    size = 0
+                results.append({
+                    "name": name,
+                    "path": full,
+                    "isDir": bool(is_dir),
+                    "size": int(size),
+                    "relPath": os.path.relpath(full, root),
+                    "depth": rel_depth(full, root),
+                })
+            if len(results) >= limit or scanned > 200000 or time.monotonic() > deadline:
+                break
+    except Exception as err:  # noqa: BLE001
+        return {"id": id_, "type": "response", "error": str(err)}
+    results.sort(key=lambda r: (not r["isDir"], r["depth"], r["name"].lower()))
+    return {"id": id_, "type": "response", "payload": results[:limit]}
+
+
+def rel_depth(path, root):
+    return len(os.path.relpath(path, root).split("/"))
+
+
 def handle_file_dialog(id_, payload):
     is_dir = bool(payload.get("directory"))
     curr = payload.get("currentFolder") or HOME
@@ -414,6 +529,92 @@ def handle_theme(id_, _payload):
     return {"type": "theme_update", "payload": read_theme_map()}
 
 
+# ── inotify-backed filesystem event feed (external-change detection) ──────
+# The React app tells us exactly which directories it is showing (watch_paths);
+# we run ONE non-recursive inotifywait over that bounded set and buffer touched
+# paths. The app drains them (fs_drain) on a short tick, so updates are near-
+# instant and independent of window focus — unlike mtime polling. Non-recursive
+# keeps the watch count tiny (visible folders + open files' parents only), so a
+# huge tree can never exhaust inotify limits.
+FS_LOCK = threading.Lock()
+FS_CHANGED = set()      # absolute paths touched since the last drain
+FS_WATCH_DIRS = set()   # dirs the live inotifywait is monitoring
+FS_PROC = None
+
+
+def _fs_reader(proc):
+    # Use explicit readline() (not `for line in stdout`) so each event is picked
+    # up the instant it is written instead of waiting for Python's iterator to
+    # fill its read-ahead buffer.
+    try:
+        stream = proc.stdout
+        if stream is None:
+            return
+        readline = stream.readline
+        while True:
+            line = readline()
+            if not line:
+                break
+            p = line.strip()
+            if p:
+                with FS_LOCK:
+                    if len(FS_CHANGED) < 8000:
+                        FS_CHANGED.add(p)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _fs_restart_watcher(dirs):
+    global FS_PROC, FS_WATCH_DIRS
+    if FS_PROC:
+        try:
+            FS_PROC.kill()
+            FS_PROC.wait(timeout=1)
+        except Exception:  # noqa: BLE001
+            pass
+        FS_PROC = None
+    FS_WATCH_DIRS = set(dirs)
+    with FS_LOCK:
+        FS_CHANGED.clear()
+    if not dirs:
+        return
+    inotify_cmd = [
+        "inotifywait", "-mq",
+        "-e", "close_write", "-e", "create", "-e", "delete",
+        "-e", "moved_to", "-e", "moved_from",
+        "--format", "%w%f", *sorted(dirs),
+    ]
+    # inotifywait block-buffers stdout when piped; force line-buffering so a
+    # single create/modify surfaces immediately rather than after a 4 KB flush.
+    if shutil.which("stdbuf"):
+        inotify_cmd = ["stdbuf", "-oL", *inotify_cmd]
+    try:
+        proc = subprocess.Popen(
+            inotify_cmd,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, bufsize=1)
+    except (FileNotFoundError, OSError):
+        return  # inotifywait absent: the mtime-poll fallback still runs
+    FS_PROC = proc
+    threading.Thread(target=_fs_reader, args=(proc,), daemon=True).start()
+
+
+def handle_watch_paths(id_, payload):
+    dirs = [str(d) for d in (payload.get("dirs") or []) if d and os.path.isdir(d)]
+    with FS_LOCK:
+        same = set(dirs) == FS_WATCH_DIRS
+    alive = FS_PROC is not None and FS_PROC.poll() is None
+    if not (same and alive):
+        _fs_restart_watcher(dirs)
+    return {"id": id_, "type": "response", "payload": {"ok": True}}
+
+
+def handle_fs_drain(id_, _payload):
+    with FS_LOCK:
+        paths = list(FS_CHANGED)
+        FS_CHANGED.clear()
+    return {"id": id_, "type": "response", "payload": {"paths": paths}}
+
+
 ACTIONS = {
     "runtime_request": handle_runtime_request,
     "list_directory": handle_list_directory,
@@ -423,6 +624,11 @@ ACTIONS = {
     "fetch_url": handle_fetch_url,
     "take_screenshot": handle_take_screenshot,
     "file_dialog": handle_file_dialog,
+    "copy_to_clipboard": handle_copy_to_clipboard,
+    "stat_files": handle_stat_files,
+    "search_files": handle_search_files,
+    "watch_paths": handle_watch_paths,
+    "fs_drain": handle_fs_drain,
     "searxng_start": handle_searxng_start,
     "secret_store": handle_secret_store,
     "secret_lookup": handle_secret_lookup,

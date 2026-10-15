@@ -12,6 +12,12 @@ QS_CMD="${QS_CMD:-qs -c bar}"
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
 pkill -f 'qs -c bar' 2>/dev/null
+# The agent loopback server is detached (reparented to init) and survives the
+# core kill, so it keeps holding its private port with whatever code it last
+# booted. On the next session the fresh quickshell health-checks that port, gets
+# a 200 from the STALE server, and never respawns — so any server-side edits
+# would silently not take effect. Kill it here so the new session starts it fresh.
+pkill -f 'agent_loopback_server.py' 2>/dev/null
 # Wait for full exit + IPC deregistration: starting the new instance while
 # the old one still holds the registry yields "already running" -> bar dead
 # (hit for real 2026-10-06).

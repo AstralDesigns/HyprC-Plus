@@ -187,6 +187,17 @@ class AgentBridge {
           this.handleIncoming({ id, type: 'response', payload: { exitCode: 0, stdout: `Executed: ${payload.command}`, stderr: '' } });
         } else if (action === 'file_dialog') {
           this.handleIncoming({ id, type: 'response', payload: null });
+        } else if (action === 'copy_to_clipboard') {
+          try { await navigator.clipboard?.writeText(payload.text || ''); } catch { /* noop */ }
+          this.handleIncoming({ id, type: 'response', payload: { ok: true } });
+        } else if (action === 'stat_files') {
+          this.handleIncoming({ id, type: 'response', payload: {} });
+        } else if (action === 'search_files') {
+          this.handleIncoming({ id, type: 'response', payload: [] });
+        } else if (action === 'watch_paths') {
+          this.handleIncoming({ id, type: 'response', payload: { ok: true } });
+        } else if (action === 'fs_drain') {
+          this.handleIncoming({ id, type: 'response', payload: { paths: [] } });
         } else {
           this.handleIncoming({ id, type: 'response', payload: { status: 'mock_ok' } });
         }
@@ -289,6 +300,39 @@ class AgentBridge {
 
   public openFileDialog(options?: { title?: string; directory?: boolean; currentFolder?: string }): Promise<string | null> {
     return this.postToHost('file_dialog', options || {});
+  }
+
+  /**
+   * Copy text to the system clipboard through the host (wl-copy).
+   * QtWebEngine blocks navigator.clipboard, so the launcher routes clipboard
+   * writes to the loopback server; falls back to navigator in the dev harness.
+   */
+  public async copyToClipboard(text: string): Promise<boolean> {
+    if (this.hasWebKit) {
+      try { await this.postToHost('copy_to_clipboard', { text }, 5000); return true; }
+      catch (e) { console.warn('[bridge] copyToClipboard failed:', e); return false; }
+    }
+    try { await navigator.clipboard?.writeText(text); return true; } catch { return false; }
+  }
+
+  /** Batched mtime probe: returns { path: mtimeMs } (0 for missing paths). */
+  public statFiles(paths: string[], dirs: string[] = []): Promise<Record<string, number>> {
+    return this.postToHost('stat_files', { paths, dirs }, 8000);
+  }
+
+  /** Recursive, ranked name search under `root` (Nautilus-style). */
+  public searchFiles(root: string, query: string, limit = 300): Promise<Array<{ name: string; path: string; isDir: boolean; size: number; relPath: string; depth: number }>> {
+    return this.postToHost('search_files', { root, query, limit }, 15000);
+  }
+
+  /** (Re)point the host inotify watcher at an explicit, bounded dir set. */
+  public watchPaths(dirs: string[]): Promise<{ ok: boolean }> {
+    return this.postToHost('watch_paths', { dirs }, 5000);
+  }
+
+  /** Drain buffered filesystem events accumulated by the host watcher. */
+  public fsDrain(): Promise<{ paths: string[] }> {
+    return this.postToHost('fs_drain', {}, 5000);
   }
 
   public webSearch(query: string): Promise<Array<{ title: string; url: string; content?: string }>> {

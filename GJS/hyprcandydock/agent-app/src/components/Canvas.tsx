@@ -422,17 +422,33 @@ export const Canvas: React.FC = () => {
                         }
                       } catch (_) {}
 
-                      // Restore where you left off — Canvas unmounts/remounts
-                      // a fresh editor on every tab switch (only the active
-                      // pane renders), so without this every switch lands
-                      // back at line 1 with no focus.
-                      if (pane.cursorPosition) {
-                        editor.setPosition(pane.cursorPosition);
-                        editor.revealPositionInCenter(pane.cursorPosition);
-                      }
-                      if (typeof pane.scrollTop === 'number') {
-                        editor.setScrollTop(pane.scrollTop);
-                      }
+                      // Restore where you left off — Canvas unmounts/remounts a
+                      // fresh editor on every tab switch (only the active pane
+                      // renders). Force a synchronous layout() first: under
+                      // automaticLayout the editor isn't measured yet at onMount,
+                      // so a bare setScrollTop clamps to 0 (scrollBeyondLastLine
+                      // is off) and the file lands at the top — the original bug.
+                      // Apply the saved *scroll* before the caret so it resumes
+                      // exactly where the user scrolled to even if they never
+                      // moved the cursor (setPosition alone doesn't scroll); the
+                      // caret is only centered when no offset was recorded. Re-
+                      // assert on the next frame to survive the async ResizeObserver.
+                      const restoreViewState = () => {
+                        try {
+                          editor.layout();
+                          if (typeof pane.scrollTop === 'number') {
+                            editor.setScrollTop(pane.scrollTop);
+                          }
+                          if (pane.cursorPosition) {
+                            editor.setPosition(pane.cursorPosition);
+                            if (typeof pane.scrollTop !== 'number') {
+                              editor.revealPositionInCenter(pane.cursorPosition);
+                            }
+                          }
+                        } catch { /* editor torn down mid-restore */ }
+                      };
+                      restoreViewState();
+                      requestAnimationFrame(restoreViewState);
                       // Auto-focus the file on open / tab switch / workspace resume
                       // (each remounts the active pane's editor). Re-assert across
                       // the next frames because a new file also inserts a header tab
@@ -471,24 +487,43 @@ export const Canvas: React.FC = () => {
                         } catch { /* editor torn down mid-hover */ }
                       };
                       if (editorNode) editorNode.addEventListener('mouseenter', hoverFocus);
-                      try {
-                        editor.onDidDispose(() => {
-                          try { editorNode?.removeEventListener('mouseenter', hoverFocus); } catch { /* noop */ }
-                        });
-                      } catch { /* noop */ }
 
                       registerFindWidgetCrossFileNav(editor, monaco, pane.id);
 
+                      // Persist view state on BOTH caret moves and pure scrolls
+                      // (mouse wheel / scrollbar drag / keyboard page-down that
+                      // doesn't move the caret), so switching tabs and back
+                      // resumes the last scroll position regardless of where the
+                      // caret sits or which element has focus. Debounced to
+                      // coalesce bursts, but flushed synchronously on dispose so a
+                      // quick scroll→switch still records the final offset.
                       let saveTimer: ReturnType<typeof setTimeout> | null = null;
-                      editor.onDidChangeCursorPosition((e) => {
-                        if (saveTimer) clearTimeout(saveTimer);
-                        saveTimer = setTimeout(() => {
+                      const writeViewState = () => {
+                        try {
+                          const pos = editor.getPosition();
                           storeActions.setPaneViewState(pane.id, {
-                            cursorPosition: { lineNumber: e.position.lineNumber, column: e.position.column },
+                            cursorPosition: pos
+                              ? { lineNumber: pos.lineNumber, column: pos.column }
+                              : pane.cursorPosition,
                             scrollTop: editor.getScrollTop(),
                           });
-                        }, 400);
-                      });
+                        } catch { /* editor torn down mid-save */ }
+                      };
+                      const scheduleViewStateSave = () => {
+                        if (saveTimer) clearTimeout(saveTimer);
+                        saveTimer = setTimeout(() => { saveTimer = null; writeViewState(); }, 400);
+                      };
+                      try {
+                        editor.onDidChangeCursorPosition(scheduleViewStateSave);
+                        editor.onDidScrollChange(scheduleViewStateSave);
+                      } catch { /* internal API drift */ }
+
+                      try {
+                        editor.onDidDispose(() => {
+                          try { editorNode?.removeEventListener('mouseenter', hoverFocus); } catch { /* noop */ }
+                          if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; writeViewState(); }
+                        });
+                      } catch { /* noop */ }
                     }}
                     language={pane.language || 'plaintext'}
                     defaultValue={pane.content}

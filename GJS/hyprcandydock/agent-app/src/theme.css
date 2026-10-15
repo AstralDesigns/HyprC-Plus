@@ -335,7 +335,10 @@ body,
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid transparent;
-  color: var(--text-secondary);
+  /* Inactive+no-hover tab text: keep it at ~0.8 of the primary ink so it stays
+     legible on light-mode surfaces. --text-secondary (matugen on_surface_variant)
+     washed out against light backgrounds; hover/active still promote to full. */
+  color: color-mix(in srgb, var(--text-primary) 80%, transparent);
   font-size: 11px;
   cursor: pointer;
   white-space: nowrap;
@@ -981,7 +984,10 @@ body,
   border-radius: var(--radius-xs);
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  /* Inactive files/project tab label: keep full opacity (--text-muted carries a
+     0.50 alpha and washed out). Active state already differs via --accent-cyan,
+     so no dimming is needed to signal inactivity. */
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
@@ -1621,6 +1627,129 @@ body,
   height: 1px;
   margin: 4px 6px;
   background: var(--border-subtle);
+}
+
+/* Tab flagged because its file changed on disk while the tab held unsaved
+   edits; click to reload from disk. */
+.tab-external-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-yellow, #d9a441) 30%, transparent);
+  color: var(--accent-yellow, #d9a441);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tab-external-badge:hover {
+  background: color-mix(in srgb, var(--accent-yellow, #d9a441) 55%, transparent);
+}
+
+/* Nautilus-style recursive search section in the explorer. */
+.sidebar-search-section-label {
+  padding: 6px 10px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  opacity: .7;
+}
+
+.sidebar-search-row .file-row-relpath {
+  margin-left: 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+  opacity: .6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+
+/* In-app themed confirmation dialog (replaces window.confirm for deletes). */
+.agent-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .5);
+}
+
+.agent-dialog {
+  min-width: 260px;
+  max-width: 340px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 45%, transparent);
+  border-radius: 12px;
+  background: var(--matugen-on-secondary, #1d343c);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .55);
+}
+
+.agent-dialog-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.agent-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-bottom: 14px;
+}
+
+.agent-dialog-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-cyan, var(--text-primary));
+  word-break: break-all;
+}
+
+.agent-dialog-hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.agent-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.agent-dialog-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-dialog-btn:hover {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 18%, transparent);
+}
+
+.agent-dialog-btn.danger {
+  border-color: color-mix(in srgb, var(--accent-red, #f08080) 55%, transparent);
+  color: var(--accent-red, #f08080);
+}
+
+.agent-dialog-btn.danger:hover {
+  background: color-mix(in srgb, var(--accent-red, #f08080) 22%, transparent);
 }
 
 .context-chip {

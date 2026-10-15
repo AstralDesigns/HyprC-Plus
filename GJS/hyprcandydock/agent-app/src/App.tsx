@@ -265,19 +265,42 @@ export const App: React.FC = () => {
     return () => el.removeEventListener('scroll', enforceZeroScrollLeft);
   }, []);
 
-  // Keep git badges fresh: refresh on window focus and periodically while
-  // focused, so agent writes / external edits land without threading a
-  // refresh through every code path. refreshGitStatus coalesces, so an
-  // overlapping tick is a no-op beyond the queued follow-up run.
+  // External-change detection. The inotify feed (fs_drain, separate effect
+  // below) is the instant path; pollFilesystem is the mtime fallback that also
+  // covers files outside the watched set. Neither is gated on
+  // document.hasFocus() — in an embedded QtWebEngine view that flag is
+  // unreliable and was why a background edit could go unnoticed. git status
+  // churn stays focus-gated. refreshGitStatus/pollFilesystem coalesce.
   useEffect(() => {
     const tick = () => {
+      storeActions.pollFilesystem();
       if (document.hasFocus() && getStore().projectPath) storeActions.refreshGitStatus();
     };
     tick();
-    const id = setInterval(tick, 6000);
-    const onFocus = () => storeActions.refreshGitStatus();
+    const id = setInterval(tick, 5000);
+    const onFocus = () => { storeActions.pollFilesystem(); storeActions.refreshGitStatus(); };
     window.addEventListener('focus', onFocus);
     return () => { clearInterval(id); window.removeEventListener('focus', onFocus); };
+  }, []);
+
+  // Drain buffered inotify events from the host watcher and apply them. Cheap
+  // (the server returns a small list), so a short tick + focus gives near-
+  // real-time updates without per-file polling.
+  useEffect(() => {
+    let busy = false;
+    const drain = async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const res = await bridge.fsDrain();
+        const paths = res?.paths;
+        if (paths && paths.length) await storeActions.handleFsEvents(paths);
+      } catch { /* loopback offline / stale server: the mtime poll covers it */ }
+      finally { busy = false; }
+    };
+    const id = setInterval(drain, 1200);
+    window.addEventListener('focus', drain);
+    return () => { clearInterval(id); window.removeEventListener('focus', drain); };
   }, []);
 
   return (

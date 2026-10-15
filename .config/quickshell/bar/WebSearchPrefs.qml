@@ -172,7 +172,7 @@ Rectangle {
                     root.toastKind = "err"
                     return
                 }
-                restart()
+                setProc.restart()
             }
         }
         // kick a container restart (stop + start re-reads the bind-mounted file)
@@ -196,10 +196,13 @@ Rectangle {
     }
 
     // ── health poll: curl status code until 200 (or give up) ─────────────
+    // Uses the html search route, NOT format=json: the json format can 403 at
+    // runtime (disabled/limiter) even when the service is healthy, which left
+    // the busy state stuck on "Applying…" until the popup was reopened.
     Process {
         id: healthProc
         command: ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-                  "--max-time", "4", root.searxBase + "/search?q=ping&format=json"]
+                  "--max-time", "4", root.searxBase + "/search?q=ping"]
         stdout: StdioCollector {
             onStreamFinished: {
                 healthProc.running = false

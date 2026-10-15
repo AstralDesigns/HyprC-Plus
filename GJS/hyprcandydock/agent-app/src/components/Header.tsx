@@ -26,17 +26,13 @@ import {
 } from 'lucide-react';
 import { useStore, setStore, storeActions, PRESET_MODELS, FilePane } from '../store';
 import { fileStatusClass, fileStatusLetter } from '../utils/gitStatus';
+import { FileIcon } from '../utils/fileIcons';
 import { bridge } from '../bridge';
 
 function getTabIcon(pane: FilePane) {
-  // File-type glyphs follow the live Material-You / wallust palette (set by
-  // bridge.applyTheme) instead of the fixed accent colors, so they re-tint
-  // with the wallpaper. Fallbacks only apply before the first theme_update.
-  if (pane.type === 'image-gallery' || pane.type === 'image') return <ImageIcon size={12} color="var(--wallust-color2, #b3a40a)" />;
-  if (pane.type === 'video-gallery' || pane.type === 'video') return <Video size={12} color="var(--wallust-color3, #3589d0)" />;
-  if (pane.type === 'audio') return <Music size={12} color="var(--wallust-color4, #a85b27)" />;
-  if (pane.type === 'markdown') return <FileText size={12} color="var(--matugen-secondary, #b6c489)" />;
-  return <Code size={12} color="var(--matugen-primary, #a0c9dc)" />;
+  // Same centralized per-format glyph set as the explorer (see utils/fileIcons),
+  // resolved from the tab's file name so each format reads distinctly.
+  return <FileIcon name={pane.name} size={12} />;
 }
 
 export const Header: React.FC = () => {
@@ -90,8 +86,8 @@ export const Header: React.FC = () => {
       case 'close-right': storeActions.closePanesToRight(id); break;
       case 'close-saved': storeActions.closeSavedPanes(); break;
       case 'close-all': storeActions.closeAllPanes(); break;
-      case 'copy-path': if (pane?.path) void navigator.clipboard?.writeText(pane.path); break;
-      case 'copy-relative': if (pane?.path) void navigator.clipboard?.writeText(relativeToProject(pane.path)); break;
+      case 'copy-path': if (pane?.path) void bridge.copyToClipboard(pane.path); break;
+      case 'copy-relative': if (pane?.path) void bridge.copyToClipboard(relativeToProject(pane.path)); break;
     }
   };
 
@@ -347,6 +343,14 @@ export const Header: React.FC = () => {
             >
               {getTabIcon(pane)}
               {pane.isUnsaved && <span className="tab-unsaved-dot" title="Unsaved changes" />}
+              {pane.externalChanged && (
+                <button
+                  type="button"
+                  className="tab-external-badge"
+                  title="Changed on disk - click to reload"
+                  onClick={(e) => { e.stopPropagation(); void storeActions.reloadPaneFromDisk(pane.id); }}
+                >!</button>
+              )}
               <span className="tab-title">{pane.name}</span>
               {fileStatusClass(pane.path, store.gitStatus, store.errorFiles) && (
                 <span

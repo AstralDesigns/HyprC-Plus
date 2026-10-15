@@ -6,11 +6,11 @@ import {
   Plus,
   Trash2,
   X,
-  FileCode,
   Pencil,
   Check,
 } from 'lucide-react';
 import { useStore, storeActions, setStore } from '../store';
+import { FileIcon } from '../utils/fileIcons';
 import { ChatStream } from './ChatStream';
 import { Composer } from './Composer';
 import { getMediaUrl } from '../utils/media';
@@ -224,7 +224,7 @@ export const ChatPanel: React.FC = () => {
           <span className="context-chips-label">CONTEXT</span>
           {store.contextFiles.map(cf => (
             <span key={cf.path} className="context-chip">
-              <FileCode size={11} color="var(--accent-cyan)" />
+              <FileIcon name={cf.name} size={11} />
               <span className="context-chip-name">{cf.name}</span>
               <button
                 type="button"

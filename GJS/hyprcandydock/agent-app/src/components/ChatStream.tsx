@@ -8,6 +8,8 @@ import {
   X,
 } from 'lucide-react';
 import { useStore, getStore, Message, ToolCallData, storeActions, setStore, type PlanTask, type SuggestionsData, type SuggestionOption } from '../store';
+import { bridge } from '../bridge';
+import { FileIcon } from '../utils/fileIcons';
 import { DiffWidget } from './DiffWidget';
 import { CommandWidget } from './CommandWidget';
 import { agentEngine } from '../engine/agent-engine';
@@ -600,11 +602,13 @@ const UserBubble: React.FC<{
     }
   };
 
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(message.content || '').then(() => {
+  const handleCopy = async () => {
+    // Route through the host (wl-copy): navigator.clipboard is silently blocked
+    // in the embedded QtWebEngine view.
+    if (await bridge.copyToClipboard(message.content || '')) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }
   };
 
   return (
@@ -634,7 +638,7 @@ const UserBubble: React.FC<{
             }
             return (
               <span key={att.path} className="bubble-file-chip">
-                <FileText size={11} /> {att.name}
+                <FileIcon name={att.name} size={11} /> {att.name}
               </span>
             );
           })}
@@ -685,11 +689,13 @@ const AgentTurn: React.FC<{
     ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
 
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(message.content || '').then(() => {
+  const handleCopy = async () => {
+    // Route through the host (wl-copy): navigator.clipboard is silently blocked
+    // in the embedded QtWebEngine view.
+    if (await bridge.copyToClipboard(message.content || '')) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    }
   };
 
   const taskComplete = message.tools?.find(tool => tool.name === 'task_complete' && tool.status === 'completed');
@@ -877,7 +883,7 @@ const AgentTurn: React.FC<{
               if (att.kind === 'video') {
                 return <video key={att.path} src={source} controls style={{ maxWidth: 220, maxHeight: 120, borderRadius: 'var(--radius-sm)' }} />;
               }
-              return <span key={att.path} className="bubble-file-chip"><FileText size={11} /> {att.name}</span>;
+              return <span key={att.path} className="bubble-file-chip"><FileIcon name={att.name} size={11} /> {att.name}</span>;
             })}
           </div>
         )}
