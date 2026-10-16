@@ -1839,7 +1839,7 @@ PanelWindow {
                                         }
                                         CCToggle { label:"Power Profiles";   value:Config.tipPowerProfiles;    onToggled:function(v){Config.tipPowerProfiles=v} }
                                         CCToggle { label:"Overview";         value:Config.tipOverview;         onToggled:function(v){Config.tipOverview=v} }
-                                        CCToggle { label:"Power Button";     value:Config.tipPower;            onToggled:function(v){Config.tipPower=v} }
+                                        CCToggle { label:"System Menu";     value:Config.tipPower;            onToggled:function(v){Config.tipPower=v} }
                                         CCToggle { label:"System Tray";      value:Config.tipSystemTray;       onToggled:function(v){Config.tipSystemTray=v} }
                                         CCToggle { label:"Notifications";    value:Config.tipNotifications;    onToggled:function(v){Config.tipNotifications=v} }
                                         CCToggle { label:"Media Player";     value:Config.tipMedia;            onToggled:function(v){Config.tipMedia=v} }
