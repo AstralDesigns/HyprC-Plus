@@ -20,12 +20,23 @@ type MessageCallback = (payload: any) => void;
 class AgentBridge {
   private pendingRequests = new Map<string, { resolve: (val: any) => void; reject: (err: any) => void }>();
   private themeListeners: Array<(cssVars: Record<string, string>) => void> = [];
-  private hasWebKit = false;
+
+  // The host bridge surface (`window.webkit.messageHandlers.agent`) is NOT
+  // provided natively by QtWebEngine — it exists only because the loopback
+  // server splices BRIDGE_SHIM into <head> at document-start. Whether it is
+  // present when this module's `new AgentBridge()` runs is a boot race (a
+  // restored session can init the bundle before the shim lands). Latching the
+  // flag once in the constructor used to freeze that race outcome: a false
+  // read stuck the whole app in the dev-fallback mock path (folder expand /
+  // search / open / save / clipboard / chat silently degraded) until the
+  // WebEngineView was recreated. Re-probe live instead so the first action
+  // after the shim attaches uses the real host.
+  private get hostReady(): boolean {
+    const w = typeof window !== 'undefined' ? (window as any) : undefined;
+    return !!(w?.webkit?.messageHandlers?.agent);
+  }
 
   constructor() {
-    this.hasWebKit = typeof window !== 'undefined' && 
-      !!(window as any).webkit?.messageHandlers?.agent;
-
     if (typeof window !== 'undefined') {
       // Direct hook called by GJS run_javascript / evaluate_javascript
       (window as any).__hyprcandy_agent_dispatch = (msg: HostMessage) => {
@@ -139,7 +150,7 @@ class AgentBridge {
 
       const envelope = { id, action, payload };
 
-      if (this.hasWebKit) {
+      if (this.hostReady) {
         try {
           (window as any).webkit.messageHandlers.agent.postMessage(JSON.stringify(envelope));
         } catch (e: any) {
@@ -314,7 +325,7 @@ class AgentBridge {
    * writes to the loopback server; falls back to navigator in the dev harness.
    */
   public async copyToClipboard(text: string): Promise<boolean> {
-    if (this.hasWebKit) {
+    if (this.hostReady) {
       try { await this.postToHost('copy_to_clipboard', { text }, 5000); return true; }
       catch (e) { console.warn('[bridge] copyToClipboard failed:', e); return false; }
     }
@@ -384,7 +395,7 @@ class AgentBridge {
    */
   public async runtimeRequest(endpoint: string, payload: any = {}, method: 'GET' | 'POST' | 'DELETE' = 'POST', timeoutMs = 30000): Promise<any> {
     const url = `http://127.0.0.1:17900${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
-    if (this.hasWebKit) {
+    if (this.hostReady) {
       return this.postToHost('runtime_request', { url, method, payload }, timeoutMs);
     }
     // Dev fallback: direct fetch
@@ -400,7 +411,7 @@ class AgentBridge {
    * Used for the Pro checkout link in the Cloud tab.
    */
   public openExternalUrl(url: string): void {
-    if (this.hasWebKit) {
+    if (this.hostReady) {
       this.postToHost('open_external_url', { url }).catch(() => {});
     } else {
       window.open(url, '_blank', 'noopener');
@@ -417,7 +428,7 @@ class AgentBridge {
       action: 'model_status_update',
       payload: { running, modelName: modelName || '' },
     });
-    if (this.hasWebKit) {
+    if (this.hostReady) {
       try {
         (window as any).webkit.messageHandlers.agent.postMessage(envelope);
       } catch (_) { /* best-effort, no reply expected */ }
@@ -429,7 +440,7 @@ class AgentBridge {
    * Falls back to localStorage in dev mode.
    */
   public async storeSecret(account: string, secret: string, service = 'hyprcandy_byok'): Promise<boolean> {
-    if (this.hasWebKit) {
+    if (this.hostReady) {
       try {
         const res = await this.postToHost('secret_store', { service, account, secret });
         return !!res?.ok;
@@ -451,7 +462,7 @@ class AgentBridge {
    * Falls back to localStorage in dev mode.
    */
   public async lookupSecret(account: string, service = 'hyprcandy_byok'): Promise<string | null> {
-    if (this.hasWebKit) {
+    if (this.hostReady) {
       try {
         const res = await this.postToHost('secret_lookup', { service, account });
         return res?.secret || null;
@@ -471,7 +482,7 @@ class AgentBridge {
    * Delete a credential securely via GJS CredentialsManager (GNOME Secrets / libsecret 1).
    */
   public async clearSecret(account: string, service = 'hyprcandy_byok'): Promise<boolean> {
-    if (this.hasWebKit) {
+    if (this.hostReady) {
       try {
         const res = await this.postToHost('secret_clear', { service, account });
         return !!res?.ok;

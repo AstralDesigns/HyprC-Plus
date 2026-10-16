@@ -3896,10 +3896,10 @@ Item {
                                         // A SECOND live WebEngineView is safe on this patched
                                         // Qt 6.11 build (validated 45s+, no SIGTRAP) provided
                                         // it shares the single win.webProfile -- a second
-                                        // PROFILE still aborts. Its url is bound ONLY to
-                                        // agentReady (never re-navigated on tab switch), so the
-                                        // React+Monaco app loads once and the workspace state
-                                        // survives hide/show + tab round-trips without a reload.
+                                        // PROFILE still aborts. Its url advances on agentReady
+                                        // through a load-once latch (never re-navigated on tab
+                                        // switch), so the React+Monaco app loads once and the
+                                        // workspace state survives hide/show + round-trips.
                                         // Hidden (parent webSearchPage off the agent/websearch
                                         // tabs) the page stays loaded, just not rendered.
                                         Component {
@@ -3910,7 +3910,19 @@ Item {
                                                 visible: win.tab === "agent"
                                                 focus: true
                                                 profile: win.webProfile
-                                                url: win.agentReady ? win.agentUrl : "about:blank"
+                                                // Advance onto the agent app once the loopback
+                                                // server passes health (agentReady), but never
+                                                // retreat to about:blank within this view's life:
+                                                // an agentReady flip during boot/restore used to
+                                                // navigate agentUrl -> about:blank -> agentUrl,
+                                                // aborting/reloading the page and leaving the
+                                                // restored app mounted-but-unwired (the "toggle
+                                                // OFF/ON fixes it" race). _onApp resets only when
+                                                // the Loader recreates the view, so a genuine
+                                                // re-enable still gates on server health.
+                                                property bool _onApp: false
+                                                url: (win.agentReady || agentView._onApp) ? win.agentUrl : "about:blank"
+                                                onUrlChanged: if (win.agentReady) agentView._onApp = true
                                                 backgroundColor: "transparent"
                                                 settings.javascriptEnabled: true
                                                 onVisibleChanged: if (visible) forceActiveFocus()
