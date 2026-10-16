@@ -295,10 +295,17 @@ export interface AppState {
 const STORAGE_KEY = 'hyprcandy_agent_state_v2';
 
 function getHomeDir(): string {
-  if (typeof window !== 'undefined' && (window as any).__USER_HOME__) {
-    return (window as any).__USER_HOME__;
+  // The real user's HOME is only known at runtime: the host delivers it via
+  // the 'runtime_config' bridge message (bridge.ts sets __hyprcandyHome).
+  // Before that arrives (fresh install) we return a neutral '' placeholder —
+  // never a hardcoded path, which used to leak the original developer's own
+  // home directory into new users' file browser. bridge.ts
+  // corrects currentPath/navigationHistory once the real home is known.
+  if (typeof window !== 'undefined') {
+    const w = window as any;
+    return w.__hyprcandyHome || w.__USER_HOME__ || '';
   }
-  return '/home/king';
+  return '';
 }
 
 function createDefaultSession(): Session {
@@ -325,9 +332,9 @@ function loadInitialState(): AppState {
     activeModel: 'openrouter/free',
     modelStatus: 'ready',
     downloadProgress: { progress: 0, text: '' },
-    // Placeholder until the GJS host reports the real HOME via the
-    // 'runtime_config' message (see bridge.ts) — never a hardcoded path,
-    // since that used to be the original developer's own home directory.
+    // Projects stay empty until the user picks a folder in the Project tab
+    // (Sidebar.tsx). Nothing auto-seeds this — the host's HOME only drives the
+    // Files tab (currentPath below), never a project root.
     projectPath: '',
     projectFiles: [],
     selectedFile: null,
@@ -484,7 +491,7 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     panes: Array.isArray(parsed.panes) ? parsed.panes : [],
     activePaneId: parsed.activePaneId || null,
     sidebarVisible: typeof parsed.sidebarVisible === 'boolean' ? parsed.sidebarVisible : true,
-    chatVisible: true,
+    chatVisible: typeof parsed.chatVisible === 'boolean' ? parsed.chatVisible : true,
     contextMode: 'minimal',
     sidebarWidth: typeof parsed.sidebarWidth === 'number' ? parsed.sidebarWidth : 260,
     chatWidth: typeof parsed.chatWidth === 'number' ? parsed.chatWidth : 380,

@@ -44,14 +44,20 @@ class AgentBridge {
   private handleIncoming(msg: HostMessage) {
     if (msg.type === 'runtime_config' && msg.payload) {
       if (msg.payload.homeDir) (window as any).__hyprcandyHome = msg.payload.homeDir;
-      // The frontend bundle has no way to know the real user's HOME at
-      // build time, so projectPath starts unset until GJS reports the real
-      // one here — including on a fresh install where nothing's been
-      // opened yet. Once the user opens a real project via the folder
-      // picker, that choice is persisted and this no longer applies.
+      // The explorer's Files tab initializes to a '' placeholder (the real
+      // user's HOME is unknown at build time). Once the host reports it, seed
+      // the Files tab root — but never clobber a returning user's persisted
+      // location, which store_state hydration already restored above. This is
+      // purely the Files-tab home; it never seeds a project. Projects stay
+      // empty until the user picks a folder via the sidebar dialog
+      // (Sidebar.tsx -> setStore({ projectPath })), honoring "only resolve
+      // what the user selects" on a fresh install.
       const store = (window as any).agent?.store?.();
-      if (!store?.projectPath && msg.payload.defaultProjectRoot) {
-        (window as any).agent?.setStore?.({ projectPath: msg.payload.defaultProjectRoot });
+      if (msg.payload.homeDir && !store?.currentPath) {
+        (window as any).agent?.setStore?.({
+          currentPath: msg.payload.homeDir,
+          navigationHistory: [msg.payload.homeDir],
+        });
       }
       window.dispatchEvent(new CustomEvent('agent_runtime_config', { detail: msg.payload }));
       return;

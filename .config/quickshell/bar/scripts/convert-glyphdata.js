@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 
 const src = process.argv[2]
-    || "/home/king/.hyprcandy/GJS/hyprcandydock/glyphData.js";
+    || path.join(process.env.HOME || "", ".hyprcandy", "GJS", "hyprcandydock", "glyphData.js");
 const out = process.argv[3]
     || path.join(__dirname, "..", "glyphData.json");
 

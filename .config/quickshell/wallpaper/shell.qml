@@ -215,7 +215,7 @@ ShellRoot {
             onRead: function(line) {
                 const trimmed = line.trim()
                 if (trimmed) {
-                    const home = Quickshell.env("HOME") || "/home/king"
+                    const home = Quickshell.env("HOME")
                     root.currentWallpaper = trimmed.replace(/^~/, home)
                 }
             }
@@ -452,7 +452,7 @@ ShellRoot {
                 const trimmed = line.trim()
                 const match = trimmed.match(/^wallhaven-([a-zA-Z0-9]+)\./)
                 if (match && match[1]) {
-                    const home = Quickshell.env("HOME") || "/home/king"
+                    const home = Quickshell.env("HOME")
                     let dlMap = Object.assign({}, root.wallhavenDownloaded)
                     dlMap[match[1]] = home + "/Pictures/Wallhaven/" + trimmed
                     root.wallhavenDownloaded = dlMap
@@ -502,7 +502,7 @@ ShellRoot {
         const job = root._whDlQueue.shift()
         const item = job.item
         const ext = (item.path.split('.').pop() || "jpg").toLowerCase()
-        const home = Quickshell.env("HOME") || "/home/king"
+        const home = Quickshell.env("HOME")
         const dest = home + "/Pictures/Wallhaven/wallhaven-" + item.id + "." + ext
         const url  = item.path
         const script = home + "/.config/quickshell/wallpaper/wallhaven-download.sh"
@@ -518,7 +518,7 @@ ShellRoot {
 
     function downloadWallhaven(item, autoApply) {
         if (!item || !item.id || !item.path) return
-        const home = Quickshell.env("HOME") || "/home/king"
+        const home = Quickshell.env("HOME")
         const ext = (item.path.split('.').pop() || "jpg").toLowerCase()
         const dest = home + "/Pictures/Wallhaven/wallhaven-" + item.id + "." + ext
 

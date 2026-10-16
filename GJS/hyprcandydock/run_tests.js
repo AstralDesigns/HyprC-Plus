@@ -1,5 +1,5 @@
 const fs = require('fs');
-const src = fs.readFileSync(process.argv[2] || '/home/king/.hyprcandy/GJS/hyprcandydock/app-launcher.js', 'utf8');
+const src = fs.readFileSync(process.argv[2] || (process.env.HOME + '/.hyprcandy/GJS/hyprcandydock/app-launcher.js'), 'utf8');
 let FAIL = 0;
 function check(cond, msg) {
     if (!cond) { console.log('  FAIL: ' + msg); FAIL++; }

@@ -6,7 +6,7 @@ The HyprCandy agent launcher UI occasionally hangs when the agent workspace is a
 
 ## Root Cause Analysis
 
-After thorough examination of the codebase (`/home/king/.hyprcandy/GJS/hyprcandydock/agent-app`), the following factors contribute to the UI hang:
+After thorough examination of the codebase (`~/.hyprcandy/GJS/hyprcandydock/agent-app`), the following factors contribute to the UI hang:
 
 ### 1. Improper Cleanup of Electron Processes
 

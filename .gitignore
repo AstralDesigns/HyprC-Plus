@@ -8,3 +8,8 @@
 # keeps `git status` (and the editor's untracked badges) fast and relevant.
 **/node_modules/
 **/dist/
+
+# Runtime logs: personal artifacts (contain the original developer's HOME
+# paths), never part of a clean store — ignore so they never get committed.
+*.log
+**/*.log

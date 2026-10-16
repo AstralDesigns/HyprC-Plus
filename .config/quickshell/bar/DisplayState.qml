@@ -17,7 +17,7 @@ import Quickshell.Io
 Singleton {
     id: ds
 
-    readonly property string home: Quickshell.env("HOME") || "/home/king"
+    readonly property string home: Quickshell.env("HOME")
     readonly property string luaPath: home + "/.config/hypr/monitors.lua"
 
     // ── Live + working state ───────────────────────────────────────────────
