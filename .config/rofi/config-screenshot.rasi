@@ -107,7 +107,7 @@ textbox-prompt-colon {
     expand:                      false;
     str:                         " ";
     padding:                     1em;
-    text-color:                  @on-primary-fixed-variant;
+    text-color:                  @inverse-primary;
     border-radius:               2em 0em 0em 2em;
     background-color:            @color11;
     background-image:            url("~/.config/hyprcandy/cache/current_wallpaper", width);
@@ -174,7 +174,7 @@ button {
 }
 
 button selected {
-    background-color:            @on-primary-fixed-variant;
+    background-color:            @inverse-primary;
     text-color:                  @color11;
 }
 
@@ -190,7 +190,7 @@ element {
 }
 
 element selected.normal {
-    background-color:            @on-primary-fixed-variant;
+    background-color:            @inverse-primary;
     text-color:                  @color11;
     border-radius:               @border-radius;
 }
