@@ -104,14 +104,23 @@ function onOver(e: MouseEvent) {
     return;
   }
 
-  const el = target.closest('[title]');
+  // Prefer a native `title` (stash+drop it so only the styled tip shows), but
+  // also accept `data-tip` for our own React controls: an element that carries
+  // data-tip never has a native title, so QtWebEngine has nothing to render as
+  // its default tooltip -- eliminating the rare mouseover/suppression race that
+  // could briefly flash the unstyled native tip before ours took over.
+  const el = target.closest('[title], [data-tip]');
   if (!el || el === current) return;
-  reset();
-  const text = (el.getAttribute('title') || '').trim();
+  const native = el.hasAttribute('title');
+  const text = (native ? (el.getAttribute('title') || '') : (el.getAttribute('data-tip') || '')).trim();
   if (!text) return;
-  // Stash then drop the native title so only the styled tip shows.
-  el.setAttribute('data-hc-tip', el.getAttribute('title') || '');
-  el.removeAttribute('title');
+  reset();
+  if (native) {
+    // Stash then drop the native title so only the styled tip shows; restored
+    // on leave via reset() so author intent / a11y is never permanently lost.
+    el.setAttribute('data-hc-tip', el.getAttribute('title') || '');
+    el.removeAttribute('title');
+  }
   scheduleShow(el, text);
 }
 

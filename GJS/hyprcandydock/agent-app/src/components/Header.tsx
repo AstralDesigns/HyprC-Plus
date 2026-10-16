@@ -235,7 +235,7 @@ export const Header: React.FC = () => {
           type="button"
           onClick={() => storeActions.toggleSidebar()}
           className={`header-icon-btn ${store.sidebarVisible ? 'active' : ''}`}
-          title={store.sidebarVisible ? 'Hide explorer panel' : 'Show explorer panel'}
+          data-tip="Toggle explorer panel"
         >
           <Menu size={15} />
         </button>
@@ -245,7 +245,7 @@ export const Header: React.FC = () => {
             type="button"
             onClick={() => setShowDropdown(!showDropdown)}
             className={`header-menu-toggle-btn ${showDropdown ? 'active' : ''}`}
-            title="File menu"
+            data-tip="File menu"
           >
             <span>File</span>
             <ChevronDown size={11} className={showDropdown ? 'rotate-180' : ''} />
@@ -289,7 +289,7 @@ export const Header: React.FC = () => {
             type="button"
             onClick={() => setStore({ profileOpen: !store.profileOpen })}
             className="header-profile-btn"
-            title="User profile & GitHub integration"
+            data-tip="User profile & GitHub integration"
             style={{
               width: '24px',
               height: '24px',
@@ -323,7 +323,7 @@ export const Header: React.FC = () => {
               ref={(el) => { tabRefs.current[pane.id] = el; }}
               className={`header-tab ${isActive ? 'active' : ''} ${dragOverId === pane.id ? 'tab-drag-over' : ''} ${draggedId === pane.id ? 'tab-dragging' : ''}`}
               onClick={() => { if (!suppressClickRef.current) storeActions.setActivePane(pane.id); }}
-              title={pane.path || pane.name}
+              data-tip={pane.path || pane.name}
               onContextMenu={(e) => {
                 // Suppress the Qt WebEngine native menu and show our own.
                 e.preventDefault();
@@ -342,12 +342,12 @@ export const Header: React.FC = () => {
               }}
             >
               {getTabIcon(pane)}
-              {pane.isUnsaved && <span className="tab-unsaved-dot" title="Unsaved changes" />}
+              {pane.isUnsaved && <span className="tab-unsaved-dot" data-tip="Unsaved changes" />}
               {pane.externalChanged && (
                 <button
                   type="button"
                   className="tab-external-badge"
-                  title="Changed on disk - click to reload"
+                  data-tip="Changed on disk - click to reload"
                   onClick={(e) => { e.stopPropagation(); void storeActions.reloadPaneFromDisk(pane.id); }}
                 >!</button>
               )}
@@ -355,7 +355,7 @@ export const Header: React.FC = () => {
               {fileStatusClass(pane.path, store.gitStatus, store.errorFiles) && (
                 <span
                   className={`tab-status-badge ${fileStatusClass(pane.path, store.gitStatus, store.errorFiles)}`}
-                  title={fileStatusLetter(pane.path, store.gitStatus, store.errorFiles) === '!' ? 'Syntax error' : `Git: ${store.gitStatus[pane.path!]}`}
+                  data-tip={fileStatusLetter(pane.path, store.gitStatus, store.errorFiles) === '!' ? 'Syntax error' : `Git: ${store.gitStatus[pane.path!]}`}
                 >
                   {fileStatusLetter(pane.path, store.gitStatus, store.errorFiles)}
                 </span>
@@ -367,7 +367,7 @@ export const Header: React.FC = () => {
                   e.stopPropagation();
                   storeActions.closePane(pane.id);
                 }}
-                title="Close tab"
+                data-tip="Close tab"
               >
                 <X size={11} />
               </button>
@@ -391,7 +391,7 @@ export const Header: React.FC = () => {
           type="button"
           className="model-chip"
           onClick={() => setStore({ modelManagerOpen: true })}
-          title="Configure inference backend"
+          data-tip="Configure inference backend"
         >
           <div
             className={`status-dot ${modelStatusClass}`}
@@ -497,7 +497,7 @@ export const Header: React.FC = () => {
           type="button"
           onClick={() => setStore({ memoryPanelOpen: true })}
           className="header-icon-btn"
-          title="Agent memories"
+          data-tip="Agent memories"
         >
           <BookOpen size={15} />
         </button>
@@ -506,7 +506,7 @@ export const Header: React.FC = () => {
           type="button"
           onClick={() => setStore({ chatVisible: !store.chatVisible })}
           className={`header-icon-btn ${store.chatVisible ? 'active' : ''}`}
-          title={store.chatVisible ? 'Hide chat panel' : 'Show chat panel'}
+          data-tip="Toggle chat panel"
         >
           <MessageSquare size={15} />
         </button>
