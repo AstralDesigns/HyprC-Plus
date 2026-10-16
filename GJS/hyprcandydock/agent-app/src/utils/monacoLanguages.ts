@@ -344,9 +344,9 @@ function lintLua(monaco: any, model: any): void {
 /**
  * QML and RASI have no browser parser / Monaco worker, so this is a
  * conservative structural check shared by both: it walks the source (skipping
- * line comments, block comments and string literals) and flags mismatched or
- * never-closed braces, brackets and parens. It intentionally reports only
- * clear-cut errors to avoid noisy false positives.
+ * line comments, block comments, string / template literals and regex literals)
+ * and flags mismatched or never-closed braces, brackets and parens. It
+ * intentionally reports only clear-cut errors to avoid noisy false positives.
  */
 function lintBrackets(monaco: any, model: any): void {
   const text = model.getValue?.() || '';
@@ -354,11 +354,18 @@ function lintBrackets(monaco: any, model: any): void {
   const stack: Array<{ ch: string; line: number; col: number }> = [];
   const closing: Record<string, string> = { '}': '{', ']': '[', ')': '(' };
   const opening = new Set(['{', '[', '(']);
+  // A '/' starts a regex literal (not division) only when the previous
+  // significant char is an operator or an opener; after a value (letter, digit,
+  // ')' or ']') it is division. Without this, .replace(/'/g, …) is scanned as
+  // code: the apostrophe opens a phantom string and every quote/brace after it
+  // mis-pairs, cascading false 'Unmatched'/'never closed' errors down the file.
+  const regexAllowedAfter = new Set(['', '(', '[', '{', ',', ';', ':', '=', '!', '&', '|', '?', '+', '-', '*', '%', '<', '>', '^', '~']);
 
   let line = 1;
   let col = 1;
   let i = 0;
   const n = text.length;
+  let lastSig = ''; // last non-space, non-comment character seen
   const advance = () => {
     if (text[i] === '\n') { line++; col = 1; } else { col++; }
     i++;
@@ -378,25 +385,61 @@ function lintBrackets(monaco: any, model: any): void {
       advance(); advance();
       continue;
     }
-    if (ch === '"' || ch === "'") { // string literal
+    if (ch === '"' || ch === "'") { // string literal — QML allows raw newlines inside
       const quote = ch;
       const startLine = line, startCol = col;
       advance();
       while (i < n && text[i] !== quote) {
         if (text[i] === '\\') { advance(); advance(); continue; }
-        if (text[i] === '\n') break; // unterminated on this line
-        advance();
+        advance(); // newlines are legal inside a QML string literal (e.g. splitMarker: ")
       }
-      if (i >= n || text[i] !== quote) {
+      if (i >= n) {
         markers.push(mkError(monaco, model, 'Unterminated string literal', startLine, startCol, line, col));
       } else {
         advance(); // closing quote
       }
+      lastSig = quote;
+      continue;
+    }
+    if (ch === '`') { // template literal (QML/JS) — may span lines; skip its whole body
+      // Without this, the nested quotes/brackets inside a backtick string (e.g.
+      // the shell-command builders in Config.qml) get scanned as code and
+      // mis-pair, producing false 'Unmatched'/'never closed' squiggles. RASI has
+      // no template literals, which is why only QML showed the phantom errors.
+      const startLine = line, startCol = col;
+      advance();
+      while (i < n && text[i] !== '`') {
+        if (text[i] === '\\') { advance(); advance(); continue; }
+        advance(); // newlines are legal inside a template literal
+      }
+      if (i >= n) {
+        markers.push(mkError(monaco, model, 'Unterminated template literal', startLine, startCol, line, col));
+      } else {
+        advance(); // closing backtick
+      }
+      lastSig = '`';
+      continue;
+    }
+    if (ch === '/' && regexAllowedAfter.has(lastSig)) { // regex literal (JS in QML)
+      advance(); // opening /
+      let inClass = false;
+      while (i < n) {
+        const c = text[i];
+        if (c === '\n') break; // a regex can't span lines; bail conservatively
+        if (c === '\\') { advance(); advance(); continue; }
+        if (inClass) { if (c === ']') inClass = false; advance(); continue; }
+        if (c === '[') { inClass = true; advance(); continue; }
+        if (c === '/') { advance(); break; } // closing /
+        advance();
+      }
+      while (i < n && /[a-z]/i.test(text[i])) advance(); // trailing flags (g, i, …)
+      lastSig = '/';
       continue;
     }
     if (opening.has(ch)) {
       stack.push({ ch, line, col });
       advance();
+      lastSig = ch;
       continue;
     }
     if (ch in closing) {
@@ -405,9 +448,11 @@ function lintBrackets(monaco: any, model: any): void {
         markers.push(mkError(monaco, model, `Unmatched '${ch}'`, line, col, line, col + 1));
       }
       advance();
+      lastSig = ch;
       continue;
     }
     advance();
+    if (ch !== ' ' && ch !== '\t' && ch !== '\r' && ch !== '\n') lastSig = ch;
   }
 
   for (const s of stack) {
