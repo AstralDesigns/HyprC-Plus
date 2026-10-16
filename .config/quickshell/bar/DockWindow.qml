@@ -143,6 +143,32 @@ PanelWindow {
         }
     }
 
+    // Desktop entries populate lazily after qs boot. dockModel resolves a
+    // running app's display name via DesktopPinnedState._findEntry(); if a
+    // window's row is built before those entries are ready the lookup returns
+    // null and the button falls back to the raw WM class (e.g. showing
+    // "org.gnome.Nautilus" instead of "Files"), staying wrong until the next
+    // window event. Mirror LauncherWindow/PinnedAppsState: bump _classEpoch (a
+    // dockModel dependency) once entries arrive and whenever they change.
+    Connections {
+        target: DesktopEntries
+        function onApplicationsChanged() { dock._classEpoch++ }
+    }
+    Timer {
+        id: _entriesReadyPoller
+        interval: 250
+        repeat: true
+        running: DesktopEntries.applications.count === 0
+        property int _attempts: 0
+        onTriggered: {
+            _attempts++
+            if (DesktopEntries.applications.count > 0 || _attempts >= 40) {
+                dock._classEpoch++
+                stop()
+            }
+        }
+    }
+
     Component.onCompleted: {
         Hyprland.refreshToplevels()
         dock._classEpoch++
@@ -577,7 +603,7 @@ PanelWindow {
             if (b.tipText !== undefined) {
                 dock._tipText = b.tipText
             } else {
-                const n = String(b.app.name ?? "")
+                const n = dock._displayName(b.app)
                 dock._tipText = b.instances.length > 1 ? n + " (" + b.instances.length + ")" : n
             }
             const p = b.mapToItem(dock.contentItem, b.width / 2, b.height / 2)
@@ -585,6 +611,21 @@ PanelWindow {
             dock._tipSY = dock.originY + p.y
             if (dock._tipText !== "") dock._tipVisible = true
         }
+    }
+
+    // Running-app names are baked into dockModel, whose last recompute (the
+    // 0/150/900ms class/title epoch bumps) can still precede DesktopEntries
+    // populating on a cold boot, leaving the row name as the raw WM class.
+    // Icons already self-heal by re-running the matcher live at paint time
+    // (_iconSource); do the same for the tooltip so a stale "org.gnome.Nautilus"
+    // resolves to "Files" once entries exist, independent of dockModel timing.
+    function _displayName(app) {
+        const key = String(app.desktopId || app.id || app.class || "")
+        if (key) {
+            const e = DesktopPinnedState._findEntry(key)
+            if (e && e.name) return String(e.name)
+        }
+        return String(app.name ?? key)
     }
 
     // Shared icon resolution chain (buttons + picker rows):
