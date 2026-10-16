@@ -53,6 +53,18 @@ QtObject {
         }
     }
 
+    // Live-update the text for the module that currently owns the tooltip.
+    // Stateful modules (Idle Inhibitor, Power Profiles) call this from a
+    // property-change handler so an already-open tooltip reflects a status/mode
+    // change the instant it happens, instead of only re-snapshotting on the next
+    // cursor enter. No-op unless `item` is the active target, so a background
+    // poll that changes state while another (or no) tooltip is shown can't steal
+    // the text, and the reveal/hide timers are left untouched.
+    function refresh(t, item) {
+        if (root.target === item)
+            root.text = t
+    }
+
     function hide(item) {
         // Stale exit: the tooltip already moved on to a different module, so
         // this leave belongs to the one we swapped away from — ignore it.

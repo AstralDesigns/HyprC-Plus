@@ -16,6 +16,12 @@ Item {
     // Mirror the shared state so the icon stays in sync.
     readonly property bool _active: InhibitorState.active
 
+    // Single source for the hover tooltip, kept as a binding so a live
+    // InhibitorState toggle refreshes an already-open tooltip (onTipTextChanged
+    // -> BarTipState.refresh) rather than waiting for the cursor to re-enter.
+    readonly property string tipText: "Left-click: Toggle idle-inhibitor\nStatus: " + (root._active ? "On" : "Off")
+    onTipTextChanged: if (Config.tipIdleInhibitor) BarTipState.refresh(root.tipText, root)
+
     Text {
         id: icon
         anchors.centerIn: parent
@@ -35,7 +41,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onEntered: if (Config.tipIdleInhibitor) BarTipState.show("Left-click: Toggle idle-inhibitor\nStatus: " + (root._active ? "On" : "Off"), parent)
+        onEntered: if (Config.tipIdleInhibitor) BarTipState.show(root.tipText, parent)
         onExited: BarTipState.hide(parent)
         onClicked: InhibitorState.toggle()
     }

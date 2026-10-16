@@ -37,6 +37,12 @@ Item {
         }
     }
 
+    // Hover tooltip text, kept as a binding so a profile change (click-cycle or
+    // the 10 s poll picking up an external set) refreshes an already-open tooltip
+    // via onTipTextChanged -> BarTipState.refresh instead of re-enter.
+    readonly property string tipText: "Left-click: Cycle power profile\nMode: " + root._profileLabel
+    onTipTextChanged: if (Config.tipPowerProfiles) BarTipState.refresh(root.tipText, root)
+
     // Poll current profile on startup and every 10 s
     Process {
         id: getProc
@@ -85,7 +91,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onEntered: if (Config.tipPowerProfiles) BarTipState.show("Left-click: Cycle power profile\nMode: " + root._profileLabel, parent)
+        onEntered: if (Config.tipPowerProfiles) BarTipState.show(root.tipText, parent)
         onExited: BarTipState.hide(parent)
         onClicked: root._cycleProfile()
     }
