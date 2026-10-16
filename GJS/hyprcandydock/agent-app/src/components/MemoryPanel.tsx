@@ -1,5 +1,5 @@
 import { useEffect, useState, type FC } from 'react';
-import { BookOpen, RefreshCw, ExternalLink, Trash2, Loader, Brain } from 'lucide-react';
+import { BookOpen, ExternalLink, Trash2, Loader, Brain } from 'lucide-react';
 import { useStore, setStore, storeActions } from '../store';
 import { bridge } from '../bridge';
 
@@ -43,6 +43,16 @@ export const MemoryPanel: FC = () => {
 
   useEffect(() => {
     if (store.memoryPanelOpen) void load();
+  }, [store.memoryPanelOpen]);
+
+  // Live-refresh while open: the engine fires this after the agent's
+  // save_memory / delete_memory tool completes, so a newly written memory
+  // appears without any manual reload.
+  useEffect(() => {
+    if (!store.memoryPanelOpen) return;
+    const onChanged = () => void load();
+    window.addEventListener('agent-memories-changed', onChanged);
+    return () => window.removeEventListener('agent-memories-changed', onChanged);
   }, [store.memoryPanelOpen]);
 
   const handleDelete = async (topic: string) => {
@@ -115,9 +125,6 @@ export const MemoryPanel: FC = () => {
               Agent Memories
             </div>
           </div>
-          <button className="bubble-action-btn" onClick={load} title="Reload" disabled={loading}>
-            {loading ? <Loader size={13} className="agent-activity-spin" /> : <RefreshCw size={13} />}
-          </button>
         </div>
 
         {/* Body */}

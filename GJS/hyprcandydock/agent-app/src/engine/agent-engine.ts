@@ -458,6 +458,14 @@ export class AgentEngine {
                 );
                 updateToolInBlocks(data.id, t => ({ ...t, status: 'completed', result: data.result }));
 
+                // Durable-memory edits land on disk here; tell the Memories panel
+                // to refresh live so it never needs a manual reload.
+                if (matched?.name === 'save_memory' || matched?.name === 'delete_memory') {
+                  if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('agent-memories-changed'));
+                  }
+                }
+
                 if (matched?.name === 'write_file' && data.result && typeof data.result === 'object' && data.result.success) {
                   const r = data.result;
                   const diff: DiffData = {
