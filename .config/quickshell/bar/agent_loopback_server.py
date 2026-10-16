@@ -98,15 +98,24 @@ BRIDGE_SHIM = """<script>
     else if (tries < 100) { setTimeout(function () { dispatchWhenReady(obj, tries + 1); }, 50); }
   }
   function post(raw) {
+    // Echo a transport failure back against the request id so the bridge
+    // rejects immediately instead of stranding the entry in pendingRequests
+    // until its 30s timeout (silent-swallow used to freeze search/file
+    // actions whenever a fetch was aborted -- e.g. the view suspending while
+    // hidden, or the server being momentarily down).
+    var id = null;
+    try { id = JSON.parse(raw).id || null; } catch (e) {}
+    function fail() { if (id) dispatch({ id: id, error: 'bridge transport failed' }); }
     try {
       fetch('/bridge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: String(raw)
-      }).then(function (r) { return r.json(); })
-        .then(function (obj) { if (obj) dispatch(obj); })
-        .catch(function () {});
-    } catch (e) {}
+      }).then(function (r) {
+        if (!r.ok) { fail(); return; }
+        return r.json().then(function (obj) { if (obj) dispatch(obj); });
+      }).catch(function () { fail(); });
+    } catch (e) { fail(); }
   }
   window.webkit = window.webkit || {};
   window.webkit.messageHandlers = window.webkit.messageHandlers || {};

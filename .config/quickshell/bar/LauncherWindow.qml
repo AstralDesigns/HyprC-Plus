@@ -2300,6 +2300,15 @@ Item {
                 repeat: false
                 onTriggered: {
                     if (win.visible) return
+                    // The agent workspace view shares win.webProfile (a 2nd
+                    // in-process profile aborts this build), and clearHttpCache()
+                    // aborts in-flight fetches at the network service for the WHOLE
+                    // profile -- so trimming while the workspace is live severs the
+                    // app's loopback bridge requests (list_directory / search_files /
+                    // open / save), which is the "hidden a while -> re-show ->
+                    // explorer stuck" bug. Never-trimming is not a leak (Chromium's
+                    // disk-cache LRU bounds it), so skip when the workspace is on.
+                    if (win.wsEnabled && win.agentReady) return
                     win._anyActiveMedia(function (active) {
                         if (active) return
                         win._webClearCache()
