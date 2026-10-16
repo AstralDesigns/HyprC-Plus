@@ -1206,6 +1206,17 @@ body,
   color: var(--text-primary);
 }
 
+/* Brief flash on a folder the user jumped to from a recursive search hit, so
+   the eye lands on it after the tree scrolls it into view. */
+.tree-item-revealed {
+  animation: tree-reveal-flash 1.2s ease-out;
+}
+
+@keyframes tree-reveal-flash {
+  0%, 40% { background: color-mix(in srgb, var(--accent-cyan) 32%, transparent); }
+  100% { background: transparent; }
+}
+
 .tree-arrow {
   color: var(--text-muted);
   flex-shrink: 0;

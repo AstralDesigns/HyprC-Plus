@@ -5,14 +5,14 @@
  * "basic" languages (lua, yaml, xml, ini, rust, go, …) and full worker-backed
  * validation for TypeScript/JavaScript, JSON, CSS and HTML. What it does *not*
  * provide out of the box is (a) a mapping from the many file extensions this
- * desktop actually edits to those language ids, (b) tokenizers for QML and
- * TOML, and (c) any diagnostics for languages without a Monaco worker.
+ * desktop actually edits to those language ids, (b) tokenizers for QML, TOML
+ * and RASI, and (c) any diagnostics for languages without a Monaco worker.
  *
  * This module fills those gaps:
  *   • a broad extension → language-id table,
- *   • custom QML and TOML grammars,
+ *   • custom QML, TOML and RASI grammars,
  *   • best-effort live syntax markers for Lua (via the `luaparse` parser) and
- *     QML (a bracket-balance scanner), since neither has a Monaco worker.
+ *     QML / RASI (a bracket-balance scanner), since none has a Monaco worker.
  */
 import { parse as luaParse } from 'luaparse';
 
@@ -44,7 +44,7 @@ export const EXTENSION_LANGUAGE_MAP: Record<string, string> = {
   properties: 'ini', env: 'ini', dockerfile: 'dockerfile',
   tf: 'hcl', tfvars: 'hcl', nomad: 'hcl',
   // HyprCandy / Qt / KDE desktop files
-  qml: 'qml' /* ✱ */, qrc: 'xml', desktop: 'ini',
+  qml: 'qml' /* ✱ */, qrc: 'xml', desktop: 'ini', rasi: 'rasi' /* ✱ */,
   // Misc
   svg: 'xml', diff: 'plaintext',
 };
@@ -97,6 +97,7 @@ export function registerCustomLanguages(monaco: any): void {
   } catch { /* worker API drift — leave defaults in place */ }
   registerQml(monaco);
   registerToml(monaco);
+  registerRasi(monaco);
 }
 
 function registerQml(monaco: any): void {
@@ -226,6 +227,62 @@ function registerToml(monaco: any): void {
   });
 }
 
+/** RASI (Rofi Advanced Style Information) — the theme format used by rofi and
+ * the HyprCandy launcher. Monaco ships no grammar for it, so register a light
+ * Monarch tokenizer; its tokens (type / keyword / string / number / comment /
+ * delimiter.bracket) inherit colors from the matugen theme rules. */
+function registerRasi(monaco: any): void {
+  monaco.languages.register({ id: 'rasi' });
+  monaco.languages.setMonarchTokensProvider('rasi', {
+    defaultToken: '',
+    tokenPostfix: '.rasi',
+    tokenizer: {
+      root: [
+        { include: '@whitespace' },
+        [/\/\*/, 'comment', '@blockComment'],
+        [/@(import|media|supports)(?=[\s(])/, 'keyword.control'],
+        [/@[a-zA-Z0-9_-]+/, 'variable.name'],
+        [/"([^"\\]|\\.)*"/, 'string'],
+        [/"/, 'string', '@string'],
+        [/[a-zA-Z_][a-zA-Z0-9_-]*(?=\s*:)/, 'property.name'],
+        [/[a-zA-Z_][a-zA-Z0-9_-]*(?=\s*\{)/, 'type'],
+        [/[#][0-9a-fA-F]{3,8}\b/, 'number.hex'],
+        [/-?\d+(\.\d+)?(px|em|ex|ch|rem|vw|vh|vm|ppc|pt|%|deg|rad|turn|s|ms)?/, 'number'],
+        [/[{}]/, 'delimiter.bracket'],
+        [/[;,\[\]():]/, 'delimiter'],
+        [/>/, 'operator'],
+        [/[a-zA-Z_][a-zA-Z0-9_-]*/, 'identifier'],
+      ],
+      whitespace: [
+        [/[ \t\r\n]+/, ''],
+        [/\/\/.*$/, 'comment'],
+      ],
+      blockComment: [
+        [/[^\/*]+/, 'comment'],
+        [/\*\//, 'comment', '@pop'],
+        [/[\/*]/, 'comment'],
+      ],
+      string: [
+        [/[^"\\]+/, 'string'],
+        [/\\./, 'string.escape'],
+        [/"/, 'string', '@pop'],
+      ],
+    },
+  } as any);
+  monaco.languages.setLanguageConfiguration('rasi', {
+    comments: { lineComment: '//', blockComment: ['/*', '*/'] },
+    brackets: [['{', '}'], ['[', ']'], ['(', ')']],
+    autoClosingPairs: [
+      { open: '{', close: '}' }, { open: '[', close: ']' }, { open: '(', close: ')' },
+      { open: '"', close: '"' },
+    ],
+    surroundingPairs: [
+      { open: '{', close: '}' }, { open: '[', close: ']' }, { open: '(', close: ')' },
+      { open: '"', close: '"' },
+    ],
+  });
+}
+
 const LINT_OWNER = 'hyprcandy-lint';
 
 /**
@@ -254,7 +311,7 @@ export function attachDiagnostics(monaco: any, editor: any): void {
 function lintModel(monaco: any, model: any): void {
   const lang = model.getLanguageId?.();
   if (lang === 'lua') return lintLua(monaco, model);
-  if (lang === 'qml') return lintQml(monaco, model);
+  if (lang === 'qml' || lang === 'rasi') return lintBrackets(monaco, model);
   // No custom provider for this language: clear any stale hyprcandy markers so
   // switching files doesn't leave old squiggles behind.
   monaco.editor.setModelMarkers(model, LINT_OWNER, []);
@@ -285,13 +342,13 @@ function lintLua(monaco: any, model: any): void {
 }
 
 /**
- * QML has no browser parser, so this is a conservative structural check: it
- * walks the source (skipping line comments, block comments and string
- * literals) and flags mismatched or never-closed braces, brackets and parens.
- * It intentionally reports only clear-cut errors to avoid noisy false
- * positives.
+ * QML and RASI have no browser parser / Monaco worker, so this is a
+ * conservative structural check shared by both: it walks the source (skipping
+ * line comments, block comments and string literals) and flags mismatched or
+ * never-closed braces, brackets and parens. It intentionally reports only
+ * clear-cut errors to avoid noisy false positives.
  */
-function lintQml(monaco: any, model: any): void {
+function lintBrackets(monaco: any, model: any): void {
   const text = model.getValue?.() || '';
   const markers: any[] = [];
   const stack: Array<{ ch: string; line: number; col: number }> = [];

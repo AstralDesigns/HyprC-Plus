@@ -69,6 +69,9 @@ export const Sidebar: React.FC = () => {
   // Nautilus-style recursive search matches, surfaced as a flat top section.
   const [fileResults, setFileResults] = useState<ProjectEntry[] | null>(null);
   const [projectResults, setProjectResults] = useState<ProjectEntry[] | null>(null);
+  // Folder the project tree should scroll to + flash after a search "jump to".
+  const [revealPath, setRevealPath] = useState<string | null>(null);
+  const projectTreeRef = useRef<HTMLDivElement>(null);
   // Last-seen mtime per watched directory, for the explorer auto-refresh poll.
   const dirMtimeRef = useRef<Record<string, number>>({});
   // Breadcrumb row slides horizontally on vertical wheel (it overflows, not scrolls).
@@ -245,30 +248,69 @@ export const Sidebar: React.FC = () => {
     if (entry.isDir) {
       // Navigate/reveal the folder and drop the query so the listing is useful.
       if (store.sidebarMode === 'files') { setFilterSearch(''); storeActions.navigateTo(entry.path); }
-      else { setProjectSearch(''); void toggleProjectFolderParentReveal(entry.path); }
+      else {
+        setProjectSearch('');
+        const root = store.projectPath.replace(/\/$/, '');
+        const segSrc = entry.relPath && entry.relPath !== '.'
+          ? entry.relPath
+          : entry.path.replace(/\/$/, '').slice(root.length);
+        const segs = segSrc.replace(/\/$/, '').split('/').filter(Boolean);
+        const paths: string[] = [];
+        let a = root;
+        for (const s of segs) { a = `${a}/${s}`; paths.push(a); }
+        // Expand synchronously inside the click batch — this mirrors the manual
+        // folder toggle (which works); setting expansion from a later async
+        // continuation was silently not reaching the render. Then load each
+        // folder's children async and queue the scroll.
+        setExpandedFolders(prev => { const next = new Set(prev); paths.forEach(p => next.add(p)); return next; });
+        void (async () => {
+          for (const p of paths) {
+            if (!folderChildren[p]) {
+              try {
+                const kids = await listFolder(p);
+                setFolderChildren(prev => (prev[p] ? prev : { ...prev, [p]: kids }));
+              } catch { /* noop */ }
+            }
+          }
+          setRevealPath(paths[paths.length - 1] || root);
+        })();
+      }
       return;
     }
     storeActions.openFileByPath(entry.path);
   };
 
-  // Reveal a search-hit folder in the project tree: expand every ancestor.
-  const toggleProjectFolderParentReveal = async (folderPath: string) => {
-    const root = store.projectPath.replace(/\/$/, '');
-    const rel = folderPath.replace(/\/$/, '').slice(root.length).split('/').filter(Boolean);
-    let accum = root;
-    for (const seg of rel) {
-      accum = `${accum}/${seg}`;
-      if (!expandedFolders.has(accum) && !folderChildren[accum]) {
-        try { const kids = await listFolder(accum); setFolderChildren(prev => ({ ...prev, [accum]: kids })); } catch { /* noop */ }
+  // After a search jump the ancestors are expanded (above); scroll the hit into
+  // view and flash it. The node only exists once the revealed branch has
+  // re-rendered AND the taller tree has laid out, so poll across ~1.2s. Match
+  // by walking [data-tree-path] nodes (avoids CSS.escape/attribute quirks) and
+  // scroll the list container directly instead of scrollIntoView, which can
+  // scroll an outer ancestor and land wrong for a deep node.
+  useEffect(() => {
+    if (!revealPath) return;
+    let cancelled = false;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const attempt = () => {
+      if (cancelled) return;
+      const container = projectTreeRef.current;
+      const all = container ? Array.from(container.querySelectorAll<HTMLElement>('[data-tree-path]')) : [];
+      const node = all.find(el => el.getAttribute('data-tree-path') === revealPath);
+      if (node && container) {
+        const cRect = container.getBoundingClientRect();
+        const nRect = node.getBoundingClientRect();
+        container.scrollTop += (nRect.top - cRect.top) - (container.clientHeight / 2 - nRect.height / 2);
+        node.classList.add('tree-item-revealed');
+        setTimeout(() => node.classList.remove('tree-item-revealed'), 1200);
+        setRevealPath(null);
+        return;
       }
-    }
-    setExpandedFolders(prev => {
-      const next = new Set(prev);
-      let a = root;
-      for (const seg of rel) { a = `${a}/${seg}`; next.add(a); }
-      return next;
-    });
-  };
+      if (tries++ < 40) { timer = setTimeout(attempt, 30); return; }
+      setRevealPath(null);
+    };
+    timer = setTimeout(attempt, 30);
+    return () => { cancelled = true; if (timer) clearTimeout(timer); };
+  }, [revealPath]);
 
   // The exact, bounded set of directories the UI can currently see: the active
   // listing, any expanded project folders, and the parent of every open file.
@@ -421,6 +463,7 @@ export const Sidebar: React.FC = () => {
       <React.Fragment key={entry.path}>
         <div
           className="sidebar-tree-item"
+          data-tree-path={entry.path}
           style={{ paddingLeft: `${8 + depth * 12}px` }}
           onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, entry }); }}
           onClick={() => {
@@ -685,7 +728,7 @@ export const Sidebar: React.FC = () => {
           </div>
 
           {/* Project tree */}
-          <div className="sidebar-items-list">
+          <div className="sidebar-items-list" ref={projectTreeRef}>
             {projectSearch.trim() ? (
               projectResults === null ? (
                 <div className="sidebar-empty-notice">Searching…</div>
