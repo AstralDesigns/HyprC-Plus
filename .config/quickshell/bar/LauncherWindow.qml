@@ -3422,7 +3422,7 @@ Item {
                                     enabled: parent.enabled
                                     cursorShape: parent.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                     onEntered: if (parent.tip.length) BarTipState.show(parent.tip, parent)
-                                    onExited: BarTipState.hide()
+                                    onExited: BarTipState.hide(parent)
                                     onClicked: { BarTipState.hide(); parent.handler() }
                                 }
                             }

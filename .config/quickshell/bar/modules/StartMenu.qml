@@ -75,6 +75,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         z: 3
+        onEntered: if (Config.tipStartMenu) BarTipState.show("Left-click: Applications", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: StartMenuState.toggle()
     }
 }

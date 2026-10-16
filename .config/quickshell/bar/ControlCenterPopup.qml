@@ -1828,6 +1828,30 @@ PanelWindow {
                                         CCSlider { label:"Grouped Spacing"; from:0;to:12; value:Config.groupedSpacing; onMoved:function(v){Config.groupedSpacing=v} }
                                         CCSlider { label:"Module Pad H";    from:3;to:20; value:Config.modPadH;        onMoved:function(v){Config.modPadH=v} }
 
+                                        CCSection { text: "Module Tooltips" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Toggle each pill to show/hide that module's hover tooltip"
+                                            color: Theme.cOnSurf
+                                            opacity: 0.65
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                            wrapMode: Text.Wrap
+                                        }
+                                        CCToggle { label:"Power Profiles";   value:Config.tipPowerProfiles;    onToggled:function(v){Config.tipPowerProfiles=v} }
+                                        CCToggle { label:"Overview";         value:Config.tipOverview;         onToggled:function(v){Config.tipOverview=v} }
+                                        CCToggle { label:"Power Button";     value:Config.tipPower;            onToggled:function(v){Config.tipPower=v} }
+                                        CCToggle { label:"System Tray";      value:Config.tipSystemTray;       onToggled:function(v){Config.tipSystemTray=v} }
+                                        CCToggle { label:"Notifications";    value:Config.tipNotifications;    onToggled:function(v){Config.tipNotifications=v} }
+                                        CCToggle { label:"Media Player";     value:Config.tipMedia;            onToggled:function(v){Config.tipMedia=v} }
+                                        CCToggle { label:"Weather";          value:Config.tipWeather;          onToggled:function(v){Config.tipWeather=v} }
+                                        CCToggle { label:"Battery";          value:Config.tipBattery;          onToggled:function(v){Config.tipBattery=v} }
+                                        CCToggle { label:"Clock";            value:Config.tipClock;            onToggled:function(v){Config.tipClock=v} }
+                                        CCToggle { label:"Date";             value:Config.tipDate;             onToggled:function(v){Config.tipDate=v} }
+                                        CCToggle { label:"Wallpaper";        value:Config.tipWallpaper;        onToggled:function(v){Config.tipWallpaper=v} }
+                                        CCToggle { label:"Updates";          value:Config.tipUpdates;          onToggled:function(v){Config.tipUpdates=v} }
+                                        CCToggle { label:"Control Center";   value:Config.tipControlCenter;    onToggled:function(v){Config.tipControlCenter=v} }
+                                        CCToggle { label:"Idle Inhibitor";   value:Config.tipIdleInhibitor;    onToggled:function(v){Config.tipIdleInhibitor=v} }
+
                                         Item { height: 10 }
                                     }
                                 }

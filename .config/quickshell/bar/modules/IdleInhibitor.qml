@@ -35,6 +35,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onEntered: if (Config.tipIdleInhibitor) BarTipState.show("Left-click: Toggle idle-inhibitor\nStatus: " + (root._active ? "On" : "Off"), parent)
+        onExited: BarTipState.hide(parent)
         onClicked: InhibitorState.toggle()
     }
 }

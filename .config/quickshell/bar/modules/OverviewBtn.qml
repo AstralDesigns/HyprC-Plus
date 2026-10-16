@@ -28,6 +28,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onEntered: if (Config.tipOverview) BarTipState.show("Left-click: Overview", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: if (!ovProc.running) ovProc.running = true
     }
 }

@@ -74,6 +74,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: if (Config.tipNotifications) BarTipState.show("Left-click: Notifications\nRight-click: Do Not Disturb", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: function(ev) {
             if (ev.button === Qt.RightButton)
                 NotificationsState.dndToggle()

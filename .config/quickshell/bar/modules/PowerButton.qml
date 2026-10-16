@@ -15,6 +15,10 @@ Item {
     // Rotation target — incremented by 360 on each click to chain cleanly
     property real _rotationTarget: 0
 
+    // This button sits at the trailing (right) edge, so nudge its tooltip left by
+    // the active mode's side margin to keep the popup off the screen edge.
+    readonly property real _tipMargin: Config.barMode === "shell" ? Config.popupSideMargin * 3 : Config.popupSideMargin * 2
+
     Process {
         id: smProc
         command: [Config.scriptsDir + "/startmenu.sh"]
@@ -50,6 +54,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onEntered: if (Config.tipPower) BarTipState.show("Left-click: Start menu", parent, -root._tipMargin)
+        onExited: BarTipState.hide(parent)
         onClicked: {
             root._spinning = true
             root._rotationTarget += 360

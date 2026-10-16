@@ -110,6 +110,20 @@ QtObject {
         v = _settings.value("borderCava"); if (v !== undefined && v !== null) borderCava = _toBool(v)
         v = _settings.value("borderDistro"); if (v !== undefined && v !== null) borderDistro = _toBool(v)
         v = _settings.value("borderStartTrash"); if (v !== undefined && v !== null) borderStartTrash = _toBool(v)
+        v = _settings.value("tipPowerProfiles"); if (v !== undefined && v !== null) tipPowerProfiles = _toBool(v)
+        v = _settings.value("tipOverview"); if (v !== undefined && v !== null) tipOverview = _toBool(v)
+        v = _settings.value("tipPower"); if (v !== undefined && v !== null) tipPower = _toBool(v)
+        v = _settings.value("tipSystemTray"); if (v !== undefined && v !== null) tipSystemTray = _toBool(v)
+        v = _settings.value("tipNotifications"); if (v !== undefined && v !== null) tipNotifications = _toBool(v)
+        v = _settings.value("tipMedia"); if (v !== undefined && v !== null) tipMedia = _toBool(v)
+        v = _settings.value("tipWeather"); if (v !== undefined && v !== null) tipWeather = _toBool(v)
+        v = _settings.value("tipBattery"); if (v !== undefined && v !== null) tipBattery = _toBool(v)
+        v = _settings.value("tipClock"); if (v !== undefined && v !== null) tipClock = _toBool(v)
+        v = _settings.value("tipDate"); if (v !== undefined && v !== null) tipDate = _toBool(v)
+        v = _settings.value("tipWallpaper"); if (v !== undefined && v !== null) tipWallpaper = _toBool(v)
+        v = _settings.value("tipUpdates"); if (v !== undefined && v !== null) tipUpdates = _toBool(v)
+        v = _settings.value("tipControlCenter"); if (v !== undefined && v !== null) tipControlCenter = _toBool(v)
+        v = _settings.value("tipIdleInhibitor"); if (v !== undefined && v !== null) tipIdleInhibitor = _toBool(v)
         v = _settings.value("islandBorderVar"); if (v !== undefined && v !== null) islandBorderVar = v
         v = _settings.value("islandBorderMode"); if (v !== undefined && v !== null) islandBorderMode = v
         v = _settings.value("islandBorderWallustVar"); if (v !== undefined && v !== null) islandBorderWallustVar = v
@@ -348,6 +362,20 @@ QtObject {
         _settings.setValue("borderCava", borderCava)
         _settings.setValue("borderDistro", borderDistro)
         _settings.setValue("borderStartTrash", borderStartTrash)
+        _settings.setValue("tipPowerProfiles", tipPowerProfiles)
+        _settings.setValue("tipOverview", tipOverview)
+        _settings.setValue("tipPower", tipPower)
+        _settings.setValue("tipSystemTray", tipSystemTray)
+        _settings.setValue("tipNotifications", tipNotifications)
+        _settings.setValue("tipMedia", tipMedia)
+        _settings.setValue("tipWeather", tipWeather)
+        _settings.setValue("tipBattery", tipBattery)
+        _settings.setValue("tipClock", tipClock)
+        _settings.setValue("tipDate", tipDate)
+        _settings.setValue("tipWallpaper", tipWallpaper)
+        _settings.setValue("tipUpdates", tipUpdates)
+        _settings.setValue("tipControlCenter", tipControlCenter)
+        _settings.setValue("tipIdleInhibitor", tipIdleInhibitor)
         _settings.setValue("islandBorderVar", islandBorderVar)
         _settings.setValue("islandBorderMode", islandBorderMode)
         _settings.setValue("islandBorderWallustVar", islandBorderWallustVar)
@@ -673,6 +701,24 @@ QtObject {
     property bool borderCava: true
     property bool borderDistro: true
     property bool borderStartTrash: true
+
+    // ── Bar-module hover tooltips — each gates whether that module shows its
+    //  hover tooltip (driven by BarTipState). The tooltip text lives in the
+    //  module itself; these toggles only turn the popup on/off per module.
+    property bool tipPowerProfiles: true
+    property bool tipOverview: true
+    property bool tipPower: true
+    property bool tipSystemTray: true
+    property bool tipNotifications: true
+    property bool tipMedia: true
+    property bool tipWeather: true
+    property bool tipBattery: true
+    property bool tipClock: true
+    property bool tipDate: true
+    property bool tipWallpaper: true
+    property bool tipUpdates: true
+    property bool tipControlCenter: true
+    property bool tipIdleInhibitor: true
 
     // ── Main bar border (bar mode only) ──────────────────────────────────
     property int  barBorderWidth: 2    // px — 0 to hide

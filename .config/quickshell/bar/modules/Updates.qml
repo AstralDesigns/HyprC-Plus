@@ -206,6 +206,8 @@ Item {
         hoverEnabled: true
         cursorShape:  Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: if (Config.tipUpdates) BarTipState.show("Left-click: Updates", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: function(mouse) {
             const cx = root.mapToItem(null, root.width / 2, 0).x
             UpdatesPopupState.toggle(cx, root._tooltip, root._hasUpdates)

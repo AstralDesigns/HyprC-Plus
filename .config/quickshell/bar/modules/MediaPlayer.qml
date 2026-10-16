@@ -103,6 +103,8 @@ Item {
                 	MouseArea {
                     	    id: discMa; anchors.fill: parent; hoverEnabled: true
                     	    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    	    onEntered: if (Config.tipMedia) BarTipState.show("Left-click: Player\nRight-click: Widget", parent)
+                    	    onExited: BarTipState.hide(parent)
                     	    cursorShape: Qt.PointingHandCursor
                     	    onClicked: function(ev) {
                     	        if (ev.button === Qt.RightButton) {

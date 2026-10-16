@@ -28,6 +28,8 @@ Item {
         id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
+        onEntered: if (Config.tipCpu) BarTipState.show("Left-click: System monitor", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: Quickshell.execDetached(["kitty", "-e", "btop"])
     }
 }

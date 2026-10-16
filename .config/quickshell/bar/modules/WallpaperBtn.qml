@@ -32,6 +32,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: if (Config.tipWallpaper) BarTipState.show("Left-click: Wallpaper\nRight-click: Recolor\nScroll: Cycle wallpapers", parent)
+        onExited: BarTipState.hide(parent)
 
         // Left-click: launch picker on press so it feels as instant as OverviewBtn.
         // Using onPressed instead of onClicked avoids the click-disambiguation delay

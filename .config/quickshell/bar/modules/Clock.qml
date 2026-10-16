@@ -96,6 +96,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: if (Config.tipClock) BarTipState.show("Left-click: Clock\nRight-click: Widget", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: function(ev) {
             if (ev.button === Qt.RightButton)
                 ClockPopupState.toggleWidget()

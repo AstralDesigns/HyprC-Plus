@@ -60,6 +60,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape:  Qt.PointingHandCursor
+        onEntered: if (Config.tipSystemTray) BarTipState.show("Left-click: System tray", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: {
             // Pass the horizontal centre of this button in screen-space
             const cx = root.mapToItem(null, root.width / 2, 0).x

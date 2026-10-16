@@ -28,6 +28,15 @@ Item {
         }
     }
 
+    // Human-readable profile name for the hover tooltip's mode line.
+    readonly property string _profileLabel: {
+        switch (root._profile) {
+            case "performance": return "Performance"
+            case "power-saver":  return "Power Save"
+            default:             return "Balanced"
+        }
+    }
+
     // Poll current profile on startup and every 10 s
     Process {
         id: getProc
@@ -76,6 +85,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
+        onEntered: if (Config.tipPowerProfiles) BarTipState.show("Left-click: Cycle power profile\nMode: " + root._profileLabel, parent)
+        onExited: BarTipState.hide(parent)
         onClicked: root._cycleProfile()
     }
 }

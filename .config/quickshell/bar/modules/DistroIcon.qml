@@ -25,6 +25,8 @@ Item {
         id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
+        onEntered: if (Config.tipDistro) BarTipState.show("Left-click: Launcher", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: LauncherState.toggle()
     }
 }

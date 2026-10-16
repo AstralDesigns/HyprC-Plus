@@ -39,6 +39,8 @@ Item {
         id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
+        onEntered: if (Config.tipNetwork) BarTipState.show("Left-click: Network", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: NetworkPopupState.toggle()
     }
 }

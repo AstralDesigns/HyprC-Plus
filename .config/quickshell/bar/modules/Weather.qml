@@ -58,6 +58,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: if (Config.tipWeather) BarTipState.show("Left-click: Forecast\nRight-click: Widget\nScroll: °C / °F", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: function(ev) {
             if (ev.button === Qt.RightButton)
                 WeatherPopupState.toggleWidget()

@@ -88,6 +88,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         z: 3
+        onEntered: if (Config.tipControlCenter) BarTipState.show("Left-click: Control center", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: ControlCenterState.toggle()
     }
 }

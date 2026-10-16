@@ -11,6 +11,10 @@ Item {
 
     // Detected once at startup: true = laptop (has battery), false = desktop PC.
     property bool _hasBattery: false
+    
+    // This button sits at the trailing (right) edge, so nudge its tooltip left by
+    // the active mode's side margin to keep the popup off the screen edge.
+    readonly property real _tipMargin: Config.barMode === "shell" ? Config.popupSideMargin * 1.5 : Config.popupSideMargin * 2
 
     Process {
         id: batDetectProc
@@ -164,6 +168,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: if (Config.tipBattery) BarTipState.show("Left-click: System monitor\nRight-click: Widget", parent, -root._tipMargin)
+        onExited: BarTipState.hide(parent)
         onClicked: function(ev) {
             if (ev.button === Qt.RightButton)
                 SystemMonitorPopupState.toggleWidget()

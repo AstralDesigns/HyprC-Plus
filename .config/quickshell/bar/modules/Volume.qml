@@ -36,6 +36,8 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: if (Config.tipVolume) BarTipState.show("Left-click: Volume\nRight-click: Mute", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: function(mouse) {
             if (mouse.button === Qt.RightButton) {
                 VolumeState.toggleMute();

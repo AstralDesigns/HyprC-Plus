@@ -48,6 +48,8 @@ Item {
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onEntered: if (Config.tipDate) BarTipState.show("Left-click: Calendar\nRight-click: Configure", parent)
+        onExited: BarTipState.hide(parent)
         onClicked: function(mouse) {
             if (mouse.button === Qt.RightButton) {
                 if (!calProc.running) calProc.running = true
