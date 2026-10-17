@@ -1317,9 +1317,9 @@ body,
 }
 
 .composer-action-btn {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
   border: 0;
   border-radius: 50%;
   display: inline-flex;
@@ -1345,8 +1345,15 @@ body,
   cursor: not-allowed;
 }
 
+/* Subtle reverse pulse: rests at the button's default size and dips slightly
+   smaller, then returns — unlike the shared `pulse` it never grows past base or
+   fades opacity, so the stop button reads calm instead of throbbing. */
+@keyframes stopPulseSubtle {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.9); }
+}
 .composer-stop-btn {
-  animation: pulse 1.5s ease-in-out infinite;
+  animation: stopPulseSubtle 1.5s ease-in-out infinite;
 }
 
 .chat-session-btn-title {
