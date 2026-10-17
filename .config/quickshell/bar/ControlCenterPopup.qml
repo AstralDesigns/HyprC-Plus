@@ -2917,6 +2917,7 @@ PanelWindow {
                                 }
 
                                 // ── Background ─────────────────────────────
+                                CCScrollPane {
                                 ColumnLayout {
                                         width: parent.width; spacing: 5
 
@@ -2945,10 +2946,10 @@ PanelWindow {
 
                                         Item { height: 4 }
 
-                                        CCSection { text: "Bar / Tri + Dock Fill Style" }
+                                        CCSection { text: "Bar / Shell / Tri + Dock Fill Style" }
                                         Text {
                                             Layout.fillWidth: true
-                                            text: "Background fill style for the outer bar strip in 'bar' mode and 'tri'-island mode + dock."
+                                            text: "Background fill style for the bar strip in 'bar' and 'shell' modes (shell paints the frame + center island), the 'tri' islands, and the dock."
                                 	    color: Theme.cOnSurf
             				    opacity: 0.65
                                             font.family: Config.labelFont; font.pixelSize: 11
@@ -3016,6 +3017,7 @@ PanelWindow {
                                         CCSlider { label:"Distro";        from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.distroBgOpacity;       onMoved:function(v){Config.distroBgOpacity=v} }
 
                                         Item { height: 10 }
+                                }
                                 }
 
                                 // ── Visibility ─────────────────────────────

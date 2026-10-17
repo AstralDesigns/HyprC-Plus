@@ -907,6 +907,12 @@ PanelWindow {
         readonly property int   _mh:     Config.moduleHeight
         readonly property int   _bw:     Config.barBorderWidth
         readonly property color _fill:   Theme.blurBackground
+        // Shell-mode gradient fill (mirrors the bar/tri gradient stops) driven by
+        // the same Config.barRectBgStyle toggle. The center-island tab is carved
+        // from this one path, so a single gradient paints the arms AND the island.
+        readonly property bool  _gradient: Config.barRectBgStyle === "gradient"
+        readonly property color _gradEdge: Theme.cScrim
+        readonly property color _gradMid:  Theme.cInversePrimary
         readonly property color _border: Qt.rgba(Config.barBorderColor.r,
                                                   Config.barBorderColor.g,
                                                   Config.barBorderColor.b,
@@ -930,6 +936,9 @@ PanelWindow {
         on_BwChanged:      requestPaint()
         on_FillChanged:    requestPaint()
         on_BorderChanged:  requestPaint()
+        on_GradientChanged: requestPaint()
+        on_GradEdgeChanged: requestPaint()
+        on_GradMidChanged:  requestPaint()
         onVisibleChanged:  if (visible) requestPaint()
         on_IsTopChanged:   requestPaint()
         on_IsBotChanged:   requestPaint()
@@ -945,7 +954,15 @@ PanelWindow {
             const bw = _bw
 
             // ── Pass 1: fill — outer rect minus rounded inner (hollow) rect ──
-            ctx.fillStyle = _fill.toString()
+            if (_gradient) {
+                const grad = ctx.createLinearGradient(0, 0, 0, H)
+                grad.addColorStop(0.0, _gradEdge.toString())
+                grad.addColorStop(0.5, _gradMid.toString())
+                grad.addColorStop(1.0, _gradEdge.toString())
+                ctx.fillStyle = grad
+            } else {
+                ctx.fillStyle = _fill.toString()
+            }
             ctx.beginPath()
             ctx.rect(0, 0, W, H)
             _shellHollowPath(ctx, W, H, ri, false)
