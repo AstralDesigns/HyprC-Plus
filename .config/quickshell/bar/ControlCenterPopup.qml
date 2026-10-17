@@ -4021,51 +4021,6 @@ PanelWindow {
                                 }
                             }
 
-                            // ── Window Background Alpha ────────────────────────────────────────
-                            // Patches alpha(@on_secondary, N.NN) in both GTK matugen templates.
-                            // Also derives the on_secondary RGB from the already-rendered
-                            // qt5ct/qt6ct colors/matugen.conf (position 10 = Window role) and
-                            // writes a matching rgba() into a window-alpha.qss stylesheet that
-                            // qt5ct and qt6ct load via their stylesheets= key — giving Qt apps
-                            // the same glass transparency without needing Darkly or KDE globals.
-                            CCSection { text: "GTK Background Alpha" }
-                            Text {
-                                Layout.fillWidth: true
-                                text: "GTK app window background color opacity independent from Hyprland opacity setting. Wait around 5 seconds before the next value change"
-			 	color: Theme.cOnSurf
-				opacity: 0.85
-                                font.family: Config.labelFont; font.pixelSize: 11
-                                wrapMode: Text.Wrap
-                            }
-                            CCSlider {
-                                label: "Window Alpha"
-                                from: 0.10; to: 1.00; stepSize: 0.05; decimals: 2
-                                value: ccWin._winBgAlpha >= 0 ? ccWin._winBgAlpha : 1.00
-                                onMoved: function(v) {
-                                    ccWin._winBgAlpha = v
-                                    ccAppearanceSettings.winBgAlpha = v
-                                    const a = v.toFixed(2)
-                                    _winBgAlphaProc.command = ["bash", "-c",
-                                        // ── GTK matugen templates ─────────────────────────────
-                                        "for f in" +
-                                        " \"$HOME/.config/matugen/templates/gtk3.css\"" +
-                                        " \"$HOME/.config/matugen/templates/gtk4.css\"; do" +
-                                        "  [ -f \"$f\" ] && sed -i -E" +
-                                        "    \"15s/alpha\\\\(@on_secondary, [0-9]+(\\\\.[0-9]+)?\\\\)/alpha(@on_secondary, " + a + ")/g\"" +
-                                        "  \"$f\";" +
-                                        "done;" +
-                                        // ── Trigger GTK color rebuild ─────────────────────────
-                                        "bash \"$HOME/.config/hyprcandy/hooks/wallpaper_integration.sh\""
-                                    ]
-                                    _winBgAlphaProc.running = true
-                                }
-                            }
-                            Process {
-                                id: _winBgAlphaProc
-                                running: false
-                                onExited: running = false
-                            }
-
                             Item { height:10 }
                         }
                     }
