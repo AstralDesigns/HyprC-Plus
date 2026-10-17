@@ -536,7 +536,13 @@ const CloudTab: FC = () => {
         setLicenseError(res?.reason || 'License key invalid or expired');
         return;
       }
-      setStore({ byokLicenseKey: key });
+      // Recurring subscription: a key can validate (success) while the plan is
+      // cancelled (active:false). Refuse to unlock on a confirmed-inactive key.
+      if (res.active === false) {
+        setLicenseError('Subscription is inactive — renew on Gumroad to regain access.');
+        return;
+      }
+      setStore({ byokLicenseKey: key, licenseLastActiveAt: Date.now() });
       setLicenseInput('');
     } catch (e: any) {
       setLicenseError(e?.message || 'Validation failed — check internet connection');

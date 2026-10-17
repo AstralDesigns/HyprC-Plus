@@ -299,6 +299,9 @@ export interface AppState {
   byokLicenseKey: string;
   /** Lemon Squeezy instance_id returned on first activation — stored for periodic re-validation */
   byokLicenseInstanceId: string;
+  /** Unix ms of the last time the Gumroad subscription verified `active`. Drives the
+      24h grace window: an inactive key keeps the UI unlocked until this goes stale. */
+  licenseLastActiveAt: number;
 
   // ── Inline completions (Monaco ghost text) ────────────────────────────────
   /** Provider backing inline completions: 'cerebras' | 'openrouter' | 'groq' | null */
@@ -415,6 +418,7 @@ function loadInitialState(): AppState {
     byokModel: 'openrouter/free',
     byokLicenseKey: '',
     byokLicenseInstanceId: '',
+    licenseLastActiveAt: 0,
 
     // Inline completions defaults (opt-in; OpenRouter is the only provider whose
     // free-tier models reliably return inline completions, see below).
@@ -467,6 +471,7 @@ function persistedSnapshot() {
     inlineCompletionsEnabled: next.inlineCompletionsEnabled,
     byokLicenseKey: next.byokLicenseKey,
     byokLicenseInstanceId: next.byokLicenseInstanceId,
+    licenseLastActiveAt: next.licenseLastActiveAt,
     specMode: next.specMode,
     githubToken: next.githubToken,
     githubUser: next.githubUser,
@@ -540,6 +545,7 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     inlineCompletionsEnabled: typeof parsed.inlineCompletionsEnabled === 'boolean' ? parsed.inlineCompletionsEnabled : false,
     byokLicenseKey: typeof parsed.byokLicenseKey === 'string' ? parsed.byokLicenseKey : '',
     byokLicenseInstanceId: typeof parsed.byokLicenseInstanceId === 'string' ? parsed.byokLicenseInstanceId : '',
+    licenseLastActiveAt: typeof parsed.licenseLastActiveAt === 'number' ? parsed.licenseLastActiveAt : 0,
   };
 }
 

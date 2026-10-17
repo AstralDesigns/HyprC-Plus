@@ -303,6 +303,40 @@ export const App: React.FC = () => {
     return () => { clearInterval(id); window.removeEventListener('focus', drain); };
   }, []);
 
+  // Gumroad Agents subscription re-validation. Hourly (and once at boot) verify
+  // the stored key: an active signal refreshes the grace clock. A confirmed
+  // inactive key keeps the UI unlocked for a 24h grace — long enough for Gumroad
+  // auto-renewal or a re-entered key to flip it back — then clears the license,
+  // which re-gates the Agents tab and chat panel (both gate on byokLicenseKey).
+  // Transient network errors never re-gate; only a confirmed-inactive status
+  // past the grace window does, so an offline blip can't lock out a payer.
+  useEffect(() => {
+    const GRACE_MS = 24 * 60 * 60 * 1000;
+    const CHECK_MS = 60 * 60 * 1000;
+    let busy = false;
+    const recheck = async () => {
+      const key = getStore().byokLicenseKey;
+      if (!key || busy) return;
+      busy = true;
+      try {
+        const res = await bridge.runtimeRequest('/api/license/verify', { license_key: key });
+        if (res?.ok && res.active !== false) {
+          setStore({ licenseLastActiveAt: Date.now() });
+        } else if (res?.ok && res.active === false) {
+          const last = getStore().licenseLastActiveAt || 0;
+          if (Date.now() - last > GRACE_MS) {
+            setStore({ byokLicenseKey: '', byokLicenseInstanceId: '', licenseLastActiveAt: 0 });
+          }
+        }
+        // !res (unreachable / offline): leave state untouched, retry next tick.
+      } catch { /* offline: grace clock untouched */ }
+      finally { busy = false; }
+    };
+    recheck();
+    const id = setInterval(recheck, CHECK_MS);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <AppErrorBoundary>
       <div className="app-container" ref={appRootRef} tabIndex={-1}>

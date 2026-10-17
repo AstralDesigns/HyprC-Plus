@@ -545,8 +545,19 @@ async def license_verify(req: LicenseVerifyRequest):
     if data.get("success"):
         sale = data.get("sale") or {}
         email = sale.get("formatted_email") or sale.get("email") or data.get("email") or ""
-        return {"ok": True, "email": email}
-    return {"ok": False, "reason": data.get("message") or "License key invalid or expired."}
+        # The Agents product is a recurring subscription: Gumroad keeps returning
+        # success:true for a cancelled key until it fully lapses, and signals the
+        # paid-up state separately via `active` (+ `expires_at`). The frontend
+        # grace logic keys off `active`, so surface it. Default active to True
+        # only when the field is entirely absent (non-subscription/legacy).
+        has_active = "active" in data
+        return {
+            "ok": True,
+            "active": bool(data.get("active")) if has_active else True,
+            "expires_at": data.get("expires_at"),
+            "email": email,
+        }
+    return {"ok": False, "active": False, "expires_at": None, "reason": data.get("message") or "License key invalid or expired."}
 
 
 # ── Pending file edits (write_file diff review) ──────────────────────────────
