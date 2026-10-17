@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from agent_loop import run_agentic_turn
 from cloud_client import CLOUD_MODELS, stream_cloud, validate_license
-from byok_client import stream_byok, PROVIDERS, get_provider_models, fetch_remote_models
+from byok_client import stream_byok, PROVIDERS, get_provider_models, fetch_remote_models, complete_byok
 from tools import TOOLS_SCHEMA
 import tools as tools_module
 
@@ -35,6 +35,16 @@ _license_valid: Optional[bool] = None
 # ── In-memory BYOK key store: provider -> api_key ─────────────────────────────
 _byok_keys: dict[str, str] = {}
 _byok_active_provider: Optional[str] = None
+
+# ── Gumroad Agents license verification ───────────────────────────────────────
+# Verified server-side (httpx) so the embedded WebEngine never trips Gumroad's
+# CORS. product_id is the Gumroad permalink; swap for the numeric id if needed.
+GUMROAD_VERIFY_URL = "https://api.gumroad.com/v2/licenses/verify"
+# Gumroad's verify API keys the license to a specific product_id. The checkout
+# permalink works only if it is the exact product id Gumroad expects; override
+# with the real product id via HYPRCANDY_GUMROAD_PRODUCT_ID if verification
+# keeps returning "license does not exist for the provided product."
+GUMROAD_PRODUCT_ID = os.environ.get("HYPRCANDY_GUMROAD_PRODUCT_ID", "FPyBDGtwIdoMHQQKPo89ZQ==")
 
 # ── In-memory download task registry ─────────────────────────────────────────
 # task_id -> {percent, text, done, error, path, filename}
@@ -112,6 +122,19 @@ class BYOKSetRequest(BaseModel):
     provider: str
     api_key: str
     set_active: bool = True
+
+
+class LicenseVerifyRequest(BaseModel):
+    license_key: str
+
+
+class CompletionRequest(BaseModel):
+    provider: str
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+    prompt: str
+    max_tokens: Optional[int] = 64
+    stop: Optional[list[str]] = None
 
 
 class SteerRequest(BaseModel):
@@ -472,6 +495,58 @@ async def byok_revoke(provider: str):
     if _byok_active_provider == provider:
         _byok_active_provider = None
     return {"ok": True}
+
+
+@app.post("/api/byok/complete")
+async def byok_complete(req: CompletionRequest):
+    """Single non-streaming inline completion (Monaco ghost text).
+
+    Reads the saved key for the provider; never persists anything. Returns
+    { text } (possibly empty). Errors surface as HTTP 4xx/5xx which the client
+    swallows so a failed completion is simply no suggestion.
+    """
+    if req.provider not in PROVIDERS:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {req.provider}")
+    # Prefer the key riding in the request (survives server restarts, matching
+    # the chat path); fall back to whatever was saved in-memory.
+    key = (req.api_key or "").strip() or _byok_keys.get(req.provider, "")
+    if not key:
+        raise HTTPException(status_code=400, detail=f"No API key saved for {req.provider}")
+    try:
+        text = await complete_byok(
+            req.provider,
+            req.model or "",
+            key,
+            req.prompt,
+            max_tokens=req.max_tokens or 64,
+            stop=req.stop or None,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return {"text": text}
+
+
+@app.post("/api/license/verify")
+async def license_verify(req: LicenseVerifyRequest):
+    """Verify a Gumroad Agents license key server-side (avoids browser CORS)."""
+    key = (req.license_key or "").strip()
+    if not key:
+        return {"ok": False, "reason": "Enter a license key first."}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                GUMROAD_VERIFY_URL,
+                data={"product_id": GUMROAD_PRODUCT_ID, "license_key": key},
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+            data = resp.json()
+    except Exception as exc:
+        return {"ok": False, "reason": f"Could not reach Gumroad: {exc}"}
+    if data.get("success"):
+        sale = data.get("sale") or {}
+        email = sale.get("formatted_email") or sale.get("email") or data.get("email") or ""
+        return {"ok": True, "email": email}
+    return {"ok": False, "reason": data.get("message") or "License key invalid or expired."}
 
 
 # ── Pending file edits (write_file diff review) ──────────────────────────────

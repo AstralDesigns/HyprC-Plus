@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { bridge } from './bridge';
 import { EXTENSION_LANGUAGE_MAP } from './utils/monacoLanguages';
 import { fetchGitStatus, GitFileStatus } from './utils/gitStatus';
+import type { SelectionRef } from './utils/editorClipboard';
 
 export interface DiffData {
   filePath: string;
@@ -101,6 +102,10 @@ export interface Message {
   diffs?: DiffData[];
   command?: CommandData;
   attachments?: AttachmentData[];
+  /** Editor selections pasted into the composer ("edit this" references),
+   *  rendered as chips in the user bubble. Not sent verbatim to the model —
+   *  the composer serialises them into a <selection> block in the prompt. */
+  selectionRefs?: SelectionRef[];
 }
 
 export interface AttachmentData {
@@ -211,6 +216,10 @@ export interface AppState {
   chatVisible: boolean;
   chatWidth: number;
   modelManagerOpen: boolean;
+  /** Which sub-tab the model manager popup shows. Transient UI state (not
+   *  persisted); the chat gate flips this to 'agents' when opening the popup
+   *  from the license prompt. */
+  modelManagerTab: 'completions' | 'agents';
   profileOpen: boolean;
   githubToken: string;
   githubUser: {
@@ -290,6 +299,15 @@ export interface AppState {
   byokLicenseKey: string;
   /** Lemon Squeezy instance_id returned on first activation — stored for periodic re-validation */
   byokLicenseInstanceId: string;
+
+  // ── Inline completions (Monaco ghost text) ────────────────────────────────
+  /** Provider backing inline completions: 'cerebras' | 'openrouter' | 'groq' | null */
+  completionsProvider: string | null;
+  /** Selected completion model id for the completionsProvider */
+  completionsModel: string;
+  /** Opt-in master switch for Monaco inline ghost-text completions. Default
+   *  false so nothing fires provider requests until the user enables it. */
+  inlineCompletionsEnabled: boolean;
 }
 
 const STORAGE_KEY = 'hyprcandy_agent_state_v2';
@@ -352,6 +370,7 @@ function loadInitialState(): AppState {
     chatVisible: true,
     chatWidth: 380,
     modelManagerOpen: false,
+    modelManagerTab: 'completions' as const,
     profileOpen: false,
     githubToken: '',
     githubUser: null,
@@ -396,6 +415,12 @@ function loadInitialState(): AppState {
     byokModel: 'openrouter/free',
     byokLicenseKey: '',
     byokLicenseInstanceId: '',
+
+    // Inline completions defaults (opt-in; OpenRouter is the only provider whose
+    // free-tier models reliably return inline completions, see below).
+    completionsProvider: 'openrouter',
+    completionsModel: '',
+    inlineCompletionsEnabled: false,
   };
 
   const persisted = readPersistedBlob();
@@ -430,12 +455,18 @@ function persistedSnapshot() {
     workspaceStartupEnabled: next.workspaceStartupEnabled,
     // Which backend was active — restored on next launch so the header
     // chip and Model Manager view reflect it instead of resetting to the
-    // default. Secrets themselves (byokKeys, licenseKey) stay out of the
-    // blob; they're synced through secret-tool/libsecret instead.
+    // default. Provider API keys (byokKeys) stay out of the blob and are
+    // synced through secret-tool/libsecret; the Gumroad license key persists
+    // here like githubToken so Agents stay unlocked across a webview reload.
     inferenceMode: next.inferenceMode,
     byokProvider: next.byokProvider,
     byokModel: next.byokModel,
     cloudModel: next.cloudModel,
+    completionsProvider: next.completionsProvider,
+    completionsModel: next.completionsModel,
+    inlineCompletionsEnabled: next.inlineCompletionsEnabled,
+    byokLicenseKey: next.byokLicenseKey,
+    byokLicenseInstanceId: next.byokLicenseInstanceId,
     specMode: next.specMode,
     githubToken: next.githubToken,
     githubUser: next.githubUser,
@@ -502,6 +533,13 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     byokProvider: typeof parsed.byokProvider === 'string' && parsed.byokProvider ? parsed.byokProvider : 'openrouter',
     byokModel: typeof parsed.byokModel === 'string' && parsed.byokModel ? parsed.byokModel : 'openrouter/free',
     cloudModel: typeof parsed.cloudModel === 'string' ? parsed.cloudModel : defaultState.cloudModel,
+    completionsProvider: ['openrouter'].includes(parsed.completionsProvider)
+      ? parsed.completionsProvider
+      : 'openrouter',
+    completionsModel: typeof parsed.completionsModel === 'string' ? parsed.completionsModel : '',
+    inlineCompletionsEnabled: typeof parsed.inlineCompletionsEnabled === 'boolean' ? parsed.inlineCompletionsEnabled : false,
+    byokLicenseKey: typeof parsed.byokLicenseKey === 'string' ? parsed.byokLicenseKey : '',
+    byokLicenseInstanceId: typeof parsed.byokLicenseInstanceId === 'string' ? parsed.byokLicenseInstanceId : '',
   };
 }
 

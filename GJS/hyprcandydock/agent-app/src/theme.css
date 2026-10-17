@@ -3893,3 +3893,132 @@ body,
   max-width: 250px;
   line-height: 1.55;
 }
+
+/* ── Monaco inline-completion "Accept" toolbar ───────────────────────────────
+ * The ghost-text hints widget renders two stacked borders: the outer
+ * .inlineSuggestionsHints.withBorder (editorHoverWidget border) plus an inner
+ * action-bar outline/shadow, which reads as a doubled rectangle-in-rounded-box.
+ * Collapse it to a single subtle border and drop the inner decoration. */
+.monaco-editor .inlineSuggestionsHints.withBorder {
+  border: 1px solid var(--matugen-outline, rgba(160, 201, 220, 0.35)) !important;
+  box-shadow: none !important;
+  border-radius: 6px;
+}
+
+.monaco-editor .inlineSuggestionsHints .monaco-action-bar,
+.monaco-editor .inlineSuggestionsHints .actions-container,
+.monaco-editor .inlineSuggestionsHints .action-item {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Ghost text itself should never carry a box border. */
+.monaco-editor .ghost-text,
+.monaco-editor .ghost-text-decoration,
+.monaco-editor .ghost-text-decoration-preview {
+  border: none !important;
+}
+
+/* ── "Edit this selection" reference chips (composer + user bubble) ─────────
+   Compact Material-You pill: file name + line range + optional remove. Font
+   sits just under chat text so the chip height matches a single text line. */
+.selection-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 0 2px 6px;
+}
+.user-bubble-selections {
+  justify-content: flex-end;
+  padding: 0 2px 4px;
+}
+.selection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  max-width: 100%;
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--matugen-surface-variant, #40484c) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 32%, transparent);
+  border-radius: var(--radius-full, 9999px);
+}
+.selection-chip-icon {
+  color: var(--matugen-primary, #a0c9dc);
+  flex-shrink: 0;
+}
+.selection-chip-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 160px;
+}
+.selection-chip-range {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--matugen-primary, #a0c9dc);
+  opacity: 0.9;
+}
+.selection-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 1px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.selection-chip-x:hover {
+  opacity: 1;
+  color: var(--matugen-error, #ef4444);
+  background: color-mix(in srgb, var(--matugen-error, #ef4444) 22%, transparent);
+}
+
+/* ── Contenteditable composer with inline selection chips ───────────────
+   The input is a contenteditable div so pasted editor selections become
+   atomic pills that flow inline with the prompt text. */
+.composer-editable-row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  padding: 6px 8px 0;
+}
+.composer-editable {
+  height: auto;
+  min-height: 38px;
+  max-height: 160px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+  scrollbar-width: thin;
+}
+.composer-placeholder {
+  position: absolute;
+  top: 12px;
+  left: 18px;
+  right: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 20px;
+  pointer-events: none;
+  user-select: none;
+}
+.selection-chip-inline {
+  vertical-align: middle;
+  margin: 0 2px;
+  position: relative;
+  top: -1px;
+}

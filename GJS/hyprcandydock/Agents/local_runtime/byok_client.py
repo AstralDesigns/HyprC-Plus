@@ -67,6 +67,17 @@ PROVIDERS = {
             {"id": "groq/compound-mini",               "name": "Groq Compound Mini",      "desc": "Fast, cost-efficient Groq compound model for everyday tasks.",                                   "context": "128k tokens"},
         ],
     },
+    "cerebras": {
+        "name": "Cerebras",
+        "key_hint": "csk-...",
+        "api_key_url": "https://cloud.cerebras.ai",
+        "models": [
+            {"id": "qwen-2.5-coder-32b",          "name": "Qwen 2.5 Coder 32B",   "desc": "Cerebras fast-coder model tuned for inline code completion. Recommended.",                       "context": "128k tokens"},
+            {"id": "llama3.1-8b-instant",         "name": "Llama 3.1 8B Instant",  "desc": "Lowest-latency Cerebras model. Best for snappy ghost-text on a weak CPU.",                       "context": "128k tokens"},
+            {"id": "llama-3.3-70b-versatile",     "name": "Llama 3.3 70B",         "desc": "Higher-quality Cerebras completion model when you can spend a little more per call.",             "context": "128k tokens"},
+            {"id": "gpt-oss-20b",                 "name": "GPT-OSS 20B",           "desc": "OpenAI open-weights model served on Cerebras wafer-scale inference.",                             "context": "128k tokens"},
+        ],
+    },
     "google": {
         "name": "Google Gemini",
         "key_hint": "AIza...",
@@ -226,6 +237,29 @@ async def fetch_remote_models(provider: str, api_key: str | None = None) -> list
                         })
                     if models:
                         models.sort(key=lambda x: (0 if "llama-3.3" in x["id"] or "gpt-oss" in x["id"] or "qwen" in x["id"] else 1, x["name"]))
+                        return models
+
+            elif provider == "cerebras":
+                if not clean_key:
+                    return fallback
+                resp = await client.get(
+                    "https://api.cerebras.ai/v1/models",
+                    headers={"Authorization": f"Bearer {clean_key}"}
+                )
+                if resp.status_code == 200:
+                    data = resp.json().get("data", [])
+                    models = []
+                    for m in data:
+                        mid = m.get("id", "")
+                        if not mid or any(x in mid.lower() for x in ("embed", "whisper", "moderation")):
+                            continue
+                        name = mid.replace("-", " ").title()
+                        ctx_len = m.get("context_window") or m.get("max_model_len") or 128000
+                        ctx_str = f"{ctx_len // 1000}k tokens"
+                        desc = "Cerebras wafer-scale ultra-fast inference (~1,000+ t/s)."
+                        models.append({"id": mid, "name": name, "desc": desc, "context": ctx_str})
+                    if models:
+                        models.sort(key=lambda x: (0 if "coder" in x["id"] or "llama3.1-8b" in x["id"] or "gpt-oss" in x["id"] else 1, x["name"]))
                         return models
 
             elif provider == "google":
@@ -770,6 +804,13 @@ async def stream_byok(
         ):
             yield event
 
+    elif provider == "cerebras":
+        target_model = model.strip() if model and model.strip() else "qwen-2.5-coder-32b"
+        async for event in _stream_openai_compat(
+            messages, target_model, api_key, "https://api.cerebras.ai/v1", ts
+        ):
+            yield event
+
     elif provider == "google":
         async for event in _stream_google(messages, model, api_key, ts):
             yield event
@@ -792,3 +833,101 @@ async def stream_byok(
 
     else:
         yield {"type": "error", "message": f"Unknown BYOK provider: {provider}"}
+
+
+# ── Inline completion (non-streaming, single ghost-text suggestion) ────────────
+# OpenAI-compatible base URLs for the providers exposed in the Completions tab.
+_COMPLETION_BASE_URLS = {
+    "cerebras": "https://api.cerebras.ai/v1",
+    "groq": "https://api.groq.com/openai/v1",
+    "openrouter": "https://openrouter.ai/api/v1",
+}
+
+_COMPLETION_DEFAULT_MODELS = {
+    "cerebras": "qwen-2.5-coder-32b",
+    "groq": "llama-3.1-8b-instant",
+    # openrouter/free is a random router that returns empty for FIM prompts; pin a
+    # verified coder model so inline ghost text actually produces a continuation.
+    "openrouter": "deepseek/deepseek-v3.2",
+}
+
+
+async def complete_byok(
+    provider: str,
+    model: str,
+    api_key: str,
+    prompt: str,
+    max_tokens: int = 64,
+    stop: list[str] | None = None,
+    system: str = "You are a code completion engine. Output ONLY the code that should be inserted at the cursor. No explanations, no markdown fences, no restating the surrounding code.",
+) -> str:
+    """Single non-streaming completion for Monaco ghost text.
+
+    Sends the FIM prompt as a lone user turn to an OpenAI-compatible
+    chat/completions endpoint and returns the raw inserted text (possibly '').
+    Raises on transport/auth errors so the caller can swallow them silently.
+    """
+    base_url = _COMPLETION_BASE_URLS.get(provider)
+    if not base_url:
+        raise ValueError(f"Provider '{provider}' does not support inline completions")
+    clean_key = (api_key or "").strip()
+    if not clean_key:
+        raise ValueError("Missing API key for inline completions")
+    target_model = (model or "").strip() or _COMPLETION_DEFAULT_MODELS.get(provider, "")
+
+    payload: dict = {
+        "model": target_model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        "stream": False,
+        "temperature": 0.0,
+        "max_tokens": max(1, min(int(max_tokens or 64), 256)),
+        "n": 1,
+    }
+    if stop:
+        payload["stop"] = stop[:8]
+
+    headers = {
+        "Authorization": f"Bearer {clean_key}",
+        "Content-Type": "application/json",
+    }
+    if provider == "openrouter":
+        headers["HTTP-Referer"] = "https://hyprcandy.app"
+        headers["X-Title"] = "HyprCandy Workspace"
+
+    async with httpx.AsyncClient(timeout=12.0) as client:
+        resp = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
+        if resp.status_code != 200:
+            body = resp.text[:200]
+            raise RuntimeError(f"{provider} completion {resp.status_code}: {body}")
+        data = resp.json()
+
+    try:
+        text = data["choices"][0]["message"]["content"] or ""
+    except (KeyError, IndexError, TypeError):
+        text = ""
+    return _clean_completion(text)
+
+
+def _clean_completion(text: str) -> str:
+    """Normalise a raw completion into insertable ghost text.
+
+    Chat/coder models often wrap the continuation in a markdown code fence
+    (```lang ... ```) even when told not to; Monaco would render that fence as
+    literal ghost text. Strip a leading fence line and a trailing fence line,
+    then trim surrounding blank lines. Returns '' when nothing usable remains.
+    """
+    t = (text or "").strip("\n")
+    if not t:
+        return ""
+    lines = t.splitlines()
+    if lines and lines[0].lstrip().startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip().startswith("```"):
+        lines = lines[:-1]
+    t = "\n".join(lines).strip("\n")
+    if t.lstrip().startswith("```"):
+        return ""
+    return t

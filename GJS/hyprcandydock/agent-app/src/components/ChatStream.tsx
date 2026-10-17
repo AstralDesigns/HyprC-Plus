@@ -12,6 +12,7 @@ import { bridge } from '../bridge';
 import { FileIcon } from '../utils/fileIcons';
 import { DiffWidget } from './DiffWidget';
 import { CommandWidget } from './CommandWidget';
+import { SelectionChip } from './SelectionChip';
 import { agentEngine } from '../engine/agent-engine';
 
 /* ── Empty chat screen ──────────────────────────────────────────────── */
@@ -642,6 +643,14 @@ const UserBubble: React.FC<{
               </span>
             );
           })}
+        </div>
+      )}
+
+      {message.selectionRefs && message.selectionRefs.length > 0 && (
+        <div className="selection-chip-row user-bubble-selections">
+          {message.selectionRefs.map((r, i) => (
+            <SelectionChip key={`${r.path}:${r.startLine}:${r.endLine}:${i}`} sel={r} />
+          ))}
         </div>
       )}
 

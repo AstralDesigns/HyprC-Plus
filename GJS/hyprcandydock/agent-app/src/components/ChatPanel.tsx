@@ -8,12 +8,17 @@ import {
   X,
   Pencil,
   Check,
+  Sparkles,
+  KeyRound,
 } from 'lucide-react';
 import { useStore, storeActions, setStore } from '../store';
 import { FileIcon } from '../utils/fileIcons';
 import { ChatStream } from './ChatStream';
 import { Composer } from './Composer';
 import { getMediaUrl } from '../utils/media';
+import { bridge } from '../bridge';
+
+const GUMROAD_CHECKOUT_URL = 'https://mirukai.gumroad.com/l/HyprCandy-Workspace';
 
 function relativeTime(ts: number) {
   const diff = Date.now() - ts;
@@ -22,6 +27,75 @@ function relativeTime(ts: number) {
   if (diff < 86400_000) return Math.floor(diff / 3600_000) + 'h ago';
   return Math.floor(diff / 86400_000) + 'd ago';
 }
+
+/**
+ * Friendly Gumroad membership gate shown in place of the chat stream + composer
+ * until an Agents license is validated. Agentic chat needs the membership; free
+ * inline completions (Monaco ghost text) are ungated and live on the model
+ * manager's Completions tab, so we point locked users there too.
+ */
+const LockedGate: React.FC = () => {
+  const PRIMARY = 'var(--matugen-primary, #a0c9dc)';
+  const ON_PRIMARY = 'var(--matugen-on-secondary, #1d343c)';
+  return (
+    <div
+      style={{
+        flex: 1, minHeight: 0, overflowY: 'auto',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: '14px', padding: '28px 24px', textAlign: 'center',
+      }}
+    >
+      <div
+        style={{
+          width: 52, height: 52, borderRadius: 'var(--radius-lg, 14px)', background: PRIMARY,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 8px 24px rgba(0,0,0,.35)',
+        }}
+      >
+        <Sparkles size={26} color={ON_PRIMARY} />
+      </div>
+
+      <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
+        HyprCandy Agents
+      </div>
+
+      <p style={{ fontSize: '12.5px', lineHeight: 1.55, color: 'var(--text-muted)', maxWidth: '320px', margin: 0 }}>
+        Agentic chat — where the agent reads your project, edits files and runs
+        commands — needs an Agents membership. It's $5/mo and starts with a
+        1-week free trial. Prefer just code help? Free inline completions work
+        without any membership: open the model manager's Completions tab and add
+        a Cerebras, OpenRouter or Groq key.
+      </p>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '260px', marginTop: '4px' }}>
+        <button
+          type="button"
+          onClick={() => bridge.openExternalUrl(GUMROAD_CHECKOUT_URL)}
+          style={{
+            padding: '9px 14px', borderRadius: '9999px', border: 'none', cursor: 'pointer',
+            background: PRIMARY, color: ON_PRIMARY, fontSize: '12.5px', fontWeight: 700,
+            letterSpacing: '.01em',
+          }}
+        >
+          Start 1-week free trial
+        </button>
+        <button
+          type="button"
+          onClick={() => setStore({ modelManagerTab: 'agents', modelManagerOpen: true })}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+            padding: '8px 14px', borderRadius: '9999px', cursor: 'pointer',
+            background: 'transparent', color: PRIMARY, border: `1px solid ${PRIMARY}`,
+            fontSize: '12px', fontWeight: 700,
+          }}
+        >
+          <KeyRound size={13} />
+          <span>Enter license key</span>
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export const ChatPanel: React.FC = () => {
   const [store] = useStore();
@@ -210,6 +284,12 @@ export const ChatPanel: React.FC = () => {
 
       </div>
 
+      {/* Locked (no validated Agents license): show a friendly membership gate
+          in place of the stream + composer. Unlocked: the normal chat surface. */}
+      {!store.byokLicenseKey ? (
+        <LockedGate />
+      ) : (
+        <>
       {/* Minimal ambient gradient line — a subtle "the agent is thinking"
           signal distinct from the text-based activity timeline. */}
       {store.agentRunning && <div className="agent-thinking-line" />}
@@ -261,6 +341,8 @@ export const ChatPanel: React.FC = () => {
 
       {/* Composer at bottom */}
       <Composer />
+        </>
+      )}
     </div>
   );
 };

@@ -16,6 +16,7 @@ import { bridge } from '../bridge';
 import { registerMonacoThemes, applyMatugenThemeNow } from '../utils/monacoThemes';
 import { registerCustomLanguages, attachDiagnostics } from '../utils/monacoLanguages';
 import { getMediaUrl } from '../utils/media';
+import { setEditorCopy } from '../utils/editorClipboard';
 
 /**
  * Find-widget carry + cross-file navigation.
@@ -42,6 +43,190 @@ type CarriedFind = {
   replaceRevealed: boolean;
 };
 let carriedFind: CarriedFind | null = null;
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Inline ghost-text completions (Monaco InlineCompletionsProvider)
+//
+// Opt-in (store.inlineCompletionsEnabled) and inert until a completion provider
+// + key are configured. Requests are routed through the local Python runtime
+// (/api/byok/complete) so the embedded WebEngine never trips provider CORS. The
+// efficiency safeguards live here: a ~350ms debounce that Monaco's
+// CancellationToken aborts on the next keystroke, a minimum-context gate, a
+// hard max_tokens cap with stop sequences, n=1 (single item), and a small LRU
+// keyed on the FIM window to dedupe re-fires.
+// ═════════════════════════════════════════════════════════════════════════════
+const INLINE_FIM_PREFIX = 1500;   // chars of context before the cursor
+const INLINE_FIM_SUFFIX = 1000;   // chars of context after the cursor
+const INLINE_MIN_PREFIX = 12;     // don't fire on a near-empty prefix
+const INLINE_DEBOUNCE_MS = 350;
+const INLINE_MAX_TOKENS = 64;
+const INLINE_CACHE_MAX = 64;
+
+const INLINE_LANGUAGES = [
+  'typescript', 'javascript', 'typescriptreact', 'javascriptreact', 'json', 'jsonc',
+  'python', 'cpp', 'c', 'csharp', 'java', 'go', 'rust', 'ruby', 'php', 'swift',
+  'kotlin', 'dart', 'scala', 'r', 'sql', 'bash', 'shell', 'zsh', 'html', 'xml',
+  'css', 'scss', 'less', 'yaml', 'toml', 'ini', 'dockerfile', 'markdown', 'qml', 'lua',
+];
+
+const completionCache = new Map<string, string>();
+function cacheGet(k: string): string | undefined {
+  if (!completionCache.has(k)) return undefined;
+  const v = completionCache.get(k)!;
+  completionCache.delete(k); completionCache.set(k, v); // refresh recency
+  return v;
+}
+function cacheSet(k: string, v: string) {
+  if (completionCache.has(k)) completionCache.delete(k);
+  completionCache.set(k, v);
+  if (completionCache.size > INLINE_CACHE_MAX) {
+    const oldest = completionCache.keys().next().value;
+    if (oldest !== undefined) completionCache.delete(oldest);
+  }
+}
+function fnv(s: string): string {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36);
+}
+function stopSequencesFor(lang: string): string[] {
+  const stops = ['\n\n', '```'];
+  if (lang === 'python' || lang === 'yaml' || lang === 'bash' || lang === 'shell' || lang === 'zsh' || lang === 'ruby' || lang === 'r') stops.push('#');
+  else stops.push('//');
+  return stops;
+}
+function buildFimPrompt(prefix: string, suffix: string): string {
+  return `Context before the cursor:\n\`\`\`\n${prefix}\n\`\`\`\n\nContext after the cursor:\n\`\`\`\n${suffix}\n\`\`\`\n\nContinue exactly at the cursor. Return ONLY the code/text to insert (no fences, no commentary, do not repeat the surrounding code).`;
+}
+
+// Models often echo text that already surrounds the caret — repeating the token
+// just before it, or re-emitting the rest of the line after it (the `png""`
+// double-quote case). Inserting that verbatim yields a duplicate, so trim the
+// longest leading echo (a suffix of `prefix` that starts `text`) and the longest
+// trailing echo (a prefix of `suffix` that ends `text`). If nothing new remains
+// the completion was a pure echo and we drop it.
+function dedupeCompletion(text: string, prefix: string, suffix: string): string {
+  if (!text) return text;
+  let t = text;
+  const lead = Math.min(prefix.length, t.length);
+  for (let len = lead; len > 0; len--) {
+    if (t.startsWith(prefix.slice(-len))) { t = t.slice(len); break; }
+  }
+  const trail = Math.min(suffix.length, t.length);
+  for (let len = trail; len > 0; len--) {
+    if (t.endsWith(suffix.slice(0, len))) { t = t.slice(0, t.length - len); break; }
+  }
+  return t;
+}
+
+let inlineProviderRegistered = false;
+// The boot path (App.tsx) only re-hydrates the *chat* provider's key into the
+// store + server. A completions-only provider (e.g. Cerebras) is otherwise
+// invisible after a reload, and the runtime server keeps keys in memory only
+// (wiped on every restart). So we hydrate the completion key from libsecret on
+// demand and send it in the request body — mirroring how chat rides its key.
+let inlineKeyCache: { providerId: string; apiKey: string } | null = null;
+function ensureInlineCompletions(monaco: any) {
+  if (inlineProviderRegistered || !monaco?.languages?.registerInlineCompletionsProvider) return;
+  inlineProviderRegistered = true;
+  const provider = {
+    provideInlineCompletions: async (model: any, position: any, _context: any, token: any) => {
+      const empty = { items: [] as any[] };
+      const s = getStore();
+      if (!s.inlineCompletionsEnabled) return empty;
+      const providerId = s.completionsProvider;
+      if (!providerId) return empty;
+      let apiKey: string = s.byokKeys[providerId] || '';
+      if (!apiKey) {
+        if (inlineKeyCache && inlineKeyCache.providerId === providerId) {
+          apiKey = inlineKeyCache.apiKey;
+        } else {
+          try { const k = await bridge.lookupSecret(providerId); if (k) { apiKey = k; inlineKeyCache = { providerId, apiKey: k }; } } catch { /* noop */ }
+        }
+      }
+      if (!apiKey) return empty;
+
+      const full = model.getValue() as string;
+      const offset = model.getOffsetAt(position);
+      const prefix = full.slice(Math.max(0, offset - INLINE_FIM_PREFIX), offset);
+      const suffix = full.slice(offset, offset + INLINE_FIM_SUFFIX);
+      // Minimum-context gate: need a little real content before the caret.
+      if (prefix.trim().length < INLINE_MIN_PREFIX) return empty;
+      const lineContent: string = model.getLineContent(position.lineNumber);
+      if (!lineContent.trim()) return empty;
+
+      const lang: string = model.getLanguageId();
+      const cacheKey = `${providerId}|${s.completionsModel}|${lang}|${fnv(prefix.slice(-160))}|${fnv(suffix.slice(0, 60))}`;
+      const cached = cacheGet(cacheKey);
+      if (cached !== undefined) {
+        if (!cached) return empty;
+        const dedupedCached = dedupeCompletion(cached, prefix, suffix);
+        if (!dedupedCached.trim()) return empty;
+        return { items: [{ insertText: dedupedCached, range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column) }] };
+      }
+
+      // Standard Monaco behaviour: the editor already debounces inline-completion
+      // requests and cancels any superseded one through `token`, so we fire the
+      // request immediately instead of adding our own delay. Re-check the store
+      // gate in case the user toggled completions off or switched provider.
+      if (token.isCancellationRequested) return empty;
+      const s2 = getStore();
+      if (!s2.inlineCompletionsEnabled || s2.completionsProvider !== providerId) return empty;
+
+      const fimPrompt = buildFimPrompt(prefix, suffix);
+      const requestCompletion = async (modelId: string): Promise<string> => {
+        const res = await bridge.runtimeRequest('/api/byok/complete', {
+          provider: providerId,
+          api_key: apiKey,
+          model: modelId,
+          prompt: fimPrompt,
+          max_tokens: INLINE_MAX_TOKENS,
+          stop: stopSequencesFor(lang),
+        }, 'POST', 12000);
+        return (res?.text || '').toString().trim();
+      };
+
+      let text = '';
+      let lastErr = '';
+      try {
+        text = await requestCompletion(s2.completionsModel || '');
+      } catch (e: any) {
+        lastErr = String(e?.message || e);
+      }
+      // Self-heal: if the chosen model errored (a stale id for this provider) OR
+      // returned nothing (e.g. a chat model that won't do completions), retry once
+      // with the provider's known-good coder default so ghost text still works.
+      if ((lastErr || !text) && s2.completionsModel) {
+        try {
+          const fb = await requestCompletion('');
+          if (fb) { text = fb; lastErr = ''; }
+        } catch (e2: any) {
+          if (!text) lastErr = String(e2?.message || e2);
+        }
+      }
+      if (lastErr) {
+        // Surface the failure in devtools so a silent no-suggestion is diagnosable.
+        console.warn('[inline-completion]', providerId, s2.completionsModel, '->', lastErr);
+        cacheSet(cacheKey, ''); // brief negative cache so a dead provider doesn't refire per keystroke
+        return empty;
+      }
+      if (token.isCancellationRequested) return empty;
+      cacheSet(cacheKey, text);
+      if (!text) return empty;
+      // Insert at the caret (collapsed range) rather than overwriting the current
+      // word — the model returns a pure continuation, and a word range can net to
+      // an empty diff (model echoing the last token) which Monaco then hides.
+      // Strip any leading/trailing echo of existing text first so accepting never
+      // duplicates what's already there.
+      const deduped = dedupeCompletion(text, prefix, suffix);
+      if (!deduped.trim()) return empty;
+      return { items: [{ insertText: deduped, range: new monaco.Range(position.lineNumber, position.column, position.lineNumber, position.column) }] };
+    },
+  };
+  for (const lang of INLINE_LANGUAGES) {
+    try { monaco.languages.registerInlineCompletionsProvider(lang, provider); } catch { /* noop */ }
+  }
+}
 
 function jumpToPaneWithTerm(currentPaneId: string, term: string, direction: 1 | -1) {
   if (!term) return;
@@ -399,6 +584,10 @@ export const Canvas: React.FC = () => {
                       // (Lua via luaparse, QML structural check); JSON/CSS/HTML/TS
                       // are validated by their own workers.
                       try { attachDiagnostics(monaco, editor); } catch (_) {}
+                      // Register the opt-in ghost-text completion provider once.
+                      // It reads the live store gate on every request, so it stays
+                      // inert until the user enables inline completions + a key.
+                      try { ensureInlineCompletions(monaco); } catch (_) {}
 
                       // Mirror this file's error-marker state into the store so the
                       // tab + project tree can show a syntax-error badge. Only the
@@ -488,6 +677,30 @@ export const Canvas: React.FC = () => {
                       };
                       if (editorNode) editorNode.addEventListener('mouseenter', hoverFocus);
 
+                      // Record a copy (path + line range + text) so the chat
+                      // composer can turn a pasted selection into an "edit this"
+                      // reference chip. Reads the selection straight from the
+                      // model, so it doesn't depend on the clipboard write timing.
+                      const captureCopy = () => {
+                        try {
+                          const sel = editor.getSelection();
+                          const model = editor.getModel();
+                          if (!sel || sel.isEmpty() || !model) return;
+                          const text = model.getValueInRange(sel);
+                          if (!text.trim()) return;
+                          const p = pane.path || '';
+                          setEditorCopy({
+                            path: p,
+                            name: p.split('/').pop() || 'untitled',
+                            startLine: sel.startLineNumber,
+                            endLine: sel.endLineNumber,
+                            text,
+                            at: Date.now(),
+                          });
+                        } catch { /* editor torn down mid-copy */ }
+                      };
+                      if (editorNode) editorNode.addEventListener('copy', captureCopy);
+
                       registerFindWidgetCrossFileNav(editor, monaco, pane.id);
 
                       // Persist view state on BOTH caret moves and pure scrolls
@@ -521,6 +734,7 @@ export const Canvas: React.FC = () => {
                       try {
                         editor.onDidDispose(() => {
                           try { editorNode?.removeEventListener('mouseenter', hoverFocus); } catch { /* noop */ }
+                          try { editorNode?.removeEventListener('copy', captureCopy); } catch { /* noop */ }
                           if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; writeViewState(); }
                         });
                       } catch { /* noop */ }
@@ -542,6 +756,7 @@ export const Canvas: React.FC = () => {
                       smoothScrolling: true,
                       accessibilitySupport: 'off',
                       experimentalGpuAcceleration: 'off',
+                      inlineSuggest: { enabled: true },
                     }}
                   />
                 )}

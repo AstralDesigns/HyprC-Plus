@@ -2,26 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FC } from 'reac
 import {
   AlertTriangle, Check, Cpu,
   Eye, EyeOff, ExternalLink, Key, Loader,
-  RefreshCw, X, Zap, Sparkles, TestTube, Search,
+  RefreshCw, X, Search,
 } from 'lucide-react';
 import { useStore, setStore } from '../store';
 import { bridge } from '../bridge';
 
-// ── TESTING: set true to skip the BYOK Lemon Squeezy license gate ─────────────
-// Set false before production shipping. In dev test mode, all providers are shown.
-const DEV_BYPASS_BYOK_LICENSE = false;
-
-// ── LICENSE GATE: set false to re-enable Gumroad license requirement ───────────
-// Currently bypassed in anticipation of AI/ML referral partnership.
-// Set to false to re-enable Gumroad gating (e.g. if partnership doesn't happen).
-const BYPASS_BYOK_LICENSE_GATE = true;
+// ── LICENSE GATE ──────────────────────────────────────────────────────────────
+// The Agents tab (and the agentic chat panel) is gated behind a Gumroad
+// "HyprCandy Workspace" membership license, verified live via the local Python
+// runtime (/api/license/verify). Inline completions are never gated.
 
 // ── HIDE_PROVIDERS: Add provider IDs here to hide them from the UI ────────────
 // e.g. ["openrouter", "groq"]
-// §8.1 streamlining: keep only OpenRouter (new default) + Groq in the cloud
-// picker. The rest stay wired in the backend (BYOK_PROVIDERS / byok_client) but
-// their pills are filtered out by getVisibleProviders(); reversible in one line.
-export const HIDE_PROVIDERS: string[] = ['aimlapi', 'google', 'anthropic', 'openai', 'xai'];
+// §8.1 streamlining: the Agents tab shows only OpenRouter for now. Groq +
+// Cerebras are hidden (NOT deleted) because OpenRouter is currently the only
+// provider whose free-tier keys reliably serve requests; both stay fully wired
+// in the backend (BYOK_PROVIDERS / byok_client) and re-appear by removing their
+// id from this list. Their pills are filtered by getVisibleProviders().
+export const HIDE_PROVIDERS: string[] = ['aimlapi', 'google', 'anthropic', 'openai', 'xai', 'groq', 'cerebras'];
 
 // ── System Color Tokens (Matugen + Wallust) ───────────────────────────────────
 // The user explicitly requested:
@@ -34,8 +32,26 @@ const INVERSE_PRI = 'var(--matugen-inverse-primary, #a0c9dc)';
 const COLOR5_AMBER = 'var(--wallust-color5, #BA8C40)';
 const ERROR_COLOR = 'var(--matugen-error, #ffb4ab)';
 
-const LS_BYOK_PRODUCT_ID = ''; // Fill in after Lemon Squeezy approval
-const LS_BYOK_CHECKOUT_URL = 'https://mirukai.gumroad.com/l/HyprCandy-Workspace';
+const GUMROAD_CHECKOUT_URL = 'https://mirukai.gumroad.com/l/HyprCandy-Workspace';
+
+// Providers offered for inline completions (never gated). Only OpenRouter's
+// free-tier models reliably return a completion — Cerebras and Groq free keys
+// 404 on their coder models or return empty text — so both are Agents-only now.
+const COMPLETIONS_PROVIDER_IDS = ['openrouter'];
+const COMPLETIONS_RATES: Record<string, string> = {
+  cerebras: 'Fastest free tier - ~1M tokens/day, generous RPM, no card required. Best default for live ghost text.',
+  openrouter: 'Free router - 50 req/day on the free tier (1,000/day after a one-time $10 credit). Broad model choice.',
+  groq: 'Free tier - ~30 RPM and ~1k-14k req/day by model, with a lower token/min cap. Very fast coder models.',
+};
+
+// OpenRouter exposes no "completion-capable" flag (verified: every model only
+// lists supported_parameters, and empty-returning chat models advertise the
+// same params as coder ones), so we can't hard-filter without hiding working
+// models. Instead we rank the already-live auto-listed catalog: verified-good
+// ids first, then any coder-named model, then everything else (still visible +
+// searchable, so new coder models auto-promote).
+const COMPLETION_VERIFIED = ['deepseek/deepseek-v3.2', 'qwen/qwen3-coder-next'];
+const COMPLETION_CODEY = /(coder|code|starcoder|codellama|codestral|octocoder|wizardcoder|redmond|granite|devstral|deepseek|qwen|phi|gemma|llama|mistral)/i;
 
 // ── Official Provider SVG Icons ───────────────────────────────────────────────
 export const AIMLAPIIcon: FC<{ size?: number }> = ({ size = 16 }) => (
@@ -69,6 +85,24 @@ export const OpenRouterIcon: FC<{ size?: number }> = ({ size = 16 }) => (
 export const GroqIcon: FC<{ size?: number }> = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 34 36 54" fill="#F55036" xmlns="http://www.w3.org/2000/svg">
     <path d="M17.77,34.048C7.971,34.048,0,42.019,0,51.817s7.971,17.77,17.77,17.77h5.844v-6.664H17.77 c-6.124,0-11.106-4.982-11.106-11.106s4.982-11.106,11.106-11.106s11.132,4.982,11.132,11.106l0,0v16.365l0,0 c0,6.084-4.954,11.039-11.023,11.103c-2.904-0.024-5.681-1.191-7.729-3.25l-4.712,4.712c3.266,3.283,7.691,5.151,12.321,5.201 v0.003c0.04,0,0.08,0,0.119,0h0.125v-0.003c9.659-0.131,17.48-8.005,17.525-17.686l0.006-16.881 C35.302,41.785,27.422,34.048,17.77,34.048z" />
+  </svg>
+);
+
+// Cerebras wafer mark — a rounded-square die with a grid of cores.
+export const CerebrasIcon: FC<{ size?: number }> = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2.5" y="2.5" width="19" height="19" rx="4.5" stroke="#2AA9E0" strokeWidth="1.6" />
+    <g fill="#2AA9E0">
+      <circle cx="8" cy="8" r="1.35" />
+      <circle cx="12" cy="8" r="1.35" />
+      <circle cx="16" cy="8" r="1.35" />
+      <circle cx="8" cy="12" r="1.35" />
+      <circle cx="12" cy="12" r="1.35" />
+      <circle cx="16" cy="12" r="1.35" />
+      <circle cx="8" cy="16" r="1.35" />
+      <circle cx="12" cy="16" r="1.35" />
+      <circle cx="16" cy="16" r="1.35" />
+    </g>
   </svg>
 );
 
@@ -169,6 +203,22 @@ export const BYOK_PROVIDERS = [
       { id: 'qwen/qwen3-32b', name: 'Qwen3 32B', ctx: '128k tokens', desc: 'Alibaba open-weights high-speed coding & reasoning model on Groq.' },
       { id: 'groq/compound', name: 'Groq Compound', ctx: '128k tokens', desc: 'Groq compound model with integrated tool use & web search.' },
       { id: 'groq/compound-mini', name: 'Groq Compound Mini', ctx: '128k tokens', desc: 'Fast, cost-efficient Groq compound model for everyday tasks.' },
+    ],
+  },
+  {
+    id: 'cerebras',
+    name: 'Cerebras',
+    IconComponent: CerebrasIcon,
+    keyHint: 'csk-...',
+    apiKeyUrl: 'https://cloud.cerebras.ai',
+    keyLabel: 'Cerebras API key',
+    hasSearch: true,
+    defaultModel: 'qwen-2.5-coder-32b',
+    models: [
+      { id: 'qwen-2.5-coder-32b', name: 'Qwen 2.5 Coder 32B', ctx: '128k tokens', desc: 'Cerebras fast-coder model tuned for inline code completion. Recommended.' },
+      { id: 'llama3.1-8b-instant', name: 'Llama 3.1 8B Instant', ctx: '128k tokens', desc: 'Lowest-latency Cerebras model. Best for snappy ghost-text on a weak CPU.' },
+      { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B', ctx: '128k tokens', desc: 'Higher-quality Cerebras completion model when you can spend a little more per call.' },
+      { id: 'gpt-oss-20b', name: 'GPT-OSS 20B', ctx: '128k tokens', desc: 'OpenAI open-weights model served on Cerebras wafer-scale inference.' },
     ],
   },
   {
@@ -346,7 +396,7 @@ const CloudTab: FC = () => {
   const [licenseInput, setLicenseInput] = useState('');
   const [validatingLicense, setValidating] = useState(false);
   const [licenseError, setLicenseError] = useState('');
-  const hasBYOKLicense = !!store.byokLicenseKey;
+  const [showLicense, setShowLicense] = useState(false);
 
   const visibleProviders = getVisibleProviders();
 
@@ -475,35 +525,18 @@ const CloudTab: FC = () => {
     }
   }, [selectedProviderId]);
 
-  // ── Lemon Squeezy license validation ────────────────────────────────────────
+  // ── Gumroad Agents license validation (verified by the local runtime) ───────
   const handleValidateLicense = async () => {
     const key = licenseInput.trim();
     if (!key) return;
     setValidating(true); setLicenseError('');
     try {
-      const stored = store.byokLicenseInstanceId;
-      let endpoint = 'https://api.lemonsqueezy.com/v1/licenses/validate';
-      const body: any = { license_key: key };
-      if (!stored) {
-        endpoint = 'https://api.lemonsqueezy.com/v1/licenses/activate';
-        body.instance_name = 'HyprCandy-Desktop';
-      } else {
-        body.instance_id = stored;
-      }
-      const resp = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const data = await resp.json();
-      const valid = data?.activated || data?.valid || false;
-      if (!valid) {
-        const errMsg = data?.error || data?.meta?.status_formatted || 'License key invalid or expired';
-        setLicenseError(errMsg);
+      const res = await bridge.runtimeRequest('/api/license/verify', { license_key: key });
+      if (!res?.ok) {
+        setLicenseError(res?.reason || 'License key invalid or expired');
         return;
       }
-      const instanceId = data?.instance?.id || stored || '';
-      setStore({ byokLicenseKey: key, byokLicenseInstanceId: instanceId });
+      setStore({ byokLicenseKey: key });
       setLicenseInput('');
     } catch (e: any) {
       setLicenseError(e?.message || 'Validation failed — check internet connection');
@@ -677,8 +710,25 @@ const CloudTab: FC = () => {
     }
   };
 
-  // ── Locked state — no license key in non-dev/non-bypass mode ──────────────
-  if (!hasBYOKLicense && !DEV_BYPASS_BYOK_LICENSE && !BYPASS_BYOK_LICENSE_GATE) {
+  // Auto-scroll to the first matching model card while searching. Declared
+  // BEFORE the license gate's early return so the hook count is identical in
+  // the locked and unlocked renders — a conditional hook below caused React
+  // #310 ("rendered more hooks than during the previous render") whenever the
+  // Gumroad license was activated or revoked.
+  useEffect(() => {
+    if (!store.byokLicenseKey) return;
+    const provider = visibleProviders.find(p => p.id === selectedProviderId) || visibleProviders[0] || BYOK_PROVIDERS[0];
+    const raw = fetchedModels[provider.id] || (provider.models as any) || [];
+    const q = (searchQuery[provider.id] || '').trim().toLowerCase();
+    if (!q) return;
+    const first = (raw as Array<{ id: string; name: string; desc?: string }>).find(m =>
+      m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || (m.desc && m.desc.toLowerCase().includes(q)));
+    const el = first ? cardRefs.current[first.id] : null;
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [store.byokLicenseKey, selectedProviderId, searchQuery, fetchedModels, visibleProviders]);
+
+  // ── Agents gate — no Gumroad license ──────────────────────────────────────
+  if (!store.byokLicenseKey) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{
@@ -689,20 +739,13 @@ const CloudTab: FC = () => {
           backdropFilter: 'blur(8px)',
         }}>
           <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--text-primary)', marginBottom: '6px' }}>
-            BYOK — Bring Your Own Key
+            Agents membership
           </div>
           <div style={{ fontSize: '11.5px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            A flat monthly fee for the agent UI &amp; orchestration. You supply your own API keys — model calls go <strong>straight from your machine to your provider</strong>, never through our servers.
+            The agentic chat panel — multi-step tasks, tool use and repo edits — needs the HyprCandy Workspace membership. Bring your own OpenRouter / Groq keys; model calls go <strong>straight from your machine to your provider</strong>, never through our servers.
           </div>
-          <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {visibleProviders.map(p => (
-              <span key={p.id} style={{
-                fontSize: '10px', padding: '3px 10px', borderRadius: 'var(--radius-full)',
-                background: `color-mix(in srgb, ${PRIMARY} 14%, transparent)`, color: PRIMARY, fontWeight: 600,
-              }}>
-                {p.name}
-              </span>
-            ))}
+          <div style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+            Not ready to join? Inline code completions are free to set up right now on the <strong>Completions</strong> tab — no license required.
           </div>
           <div style={{ marginTop: '12px', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <span style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)' }}>$5</span>
@@ -712,14 +755,28 @@ const CloudTab: FC = () => {
 
         {/* License key input */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <Key size={12} /> License Key
-          </label>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+            <label style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Key size={12} /> Gumroad license key
+            </label>
+            <button onClick={() => bridge.openExternalUrl(GUMROAD_CHECKOUT_URL)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0, background: 'none', border: 'none', color: PRIMARY, fontSize: '11px', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              Get trial key <ExternalLink size={11} color={PRIMARY} />
+            </button>
+          </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <input type="password" value={licenseInput} onChange={e => setLicenseInput(e.target.value)}
-              placeholder="Paste key from your confirmation email…"
-              onKeyDown={e => e.key === 'Enter' && handleValidateLicense()}
-              style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-mono)', outline: 'none' }} />
+            <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+              <input type={showLicense ? 'text' : 'password'} value={licenseInput} onChange={e => setLicenseInput(e.target.value)}
+                placeholder="Paste key from your Gumroad confirmation email…"
+                onKeyDown={e => e.key === 'Enter' && handleValidateLicense()}
+                style={{ width: '100%', boxSizing: 'border-box', padding: '8px 32px 8px 12px', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '12px', fontFamily: 'var(--font-mono)', outline: 'none' }} />
+              {licenseInput && (
+                <button type="button" onClick={() => setShowLicense(v => !v)} data-tip={showLicense ? 'Hide key' : 'Show key'} aria-label="Toggle key visibility"
+                  style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', display: 'inline-flex', alignItems: 'center', padding: 0, background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  {showLicense ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
+              )}
+            </div>
             <button onClick={handleValidateLicense} disabled={!licenseInput.trim() || validatingLicense}
               style={{ padding: '8px 14px', background: PRIMARY, border: 'none', borderRadius: 'var(--radius-sm)', color: ON_PRIMARY, fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: (!licenseInput.trim() || validatingLicense) ? 0.5 : 1, whiteSpace: 'nowrap' }}>
               {validatingLicense ? 'Checking…' : 'Activate'}
@@ -731,17 +788,11 @@ const CloudTab: FC = () => {
             </div>
           )}
         </div>
-
-        {/* CTA */}
-        <button onClick={() => bridge.openExternalUrl(LS_BYOK_CHECKOUT_URL)}
-          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '11px', borderRadius: 'var(--radius-md)', background: PRIMARY, border: 'none', color: ON_PRIMARY, fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>
-          <Sparkles size={13} color={ON_PRIMARY} /> Start 1-week free trial <ExternalLink size={11} color={ON_PRIMARY} />
-        </button>
       </div>
     );
   }
 
-  // ── Unlocked view — Rounded Pill Provider Tab-Bar + Selected Provider Pane ──
+  // ── Unlocked Agents view — Rounded Pill Provider Tab-Bar + Selected Provider Pane ──
   const currentProvider = visibleProviders.find(p => p.id === selectedProviderId) || visibleProviders[0] || BYOK_PROVIDERS[0];
   const isCurrentActive = store.inferenceMode === 'byok' && store.byokProvider === currentProvider.id;
   const isCurrentConfigured = !!store.byokKeys[currentProvider.id];
@@ -777,17 +828,6 @@ const CloudTab: FC = () => {
     )
     : availableModels;
 
-  // Auto-scroll to first match when searching
-  useEffect(() => {
-    if (currentQuery && filteredModels.length > 0) {
-      const firstId = filteredModels[0].id;
-      const el = cardRefs.current[firstId];
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }
-  }, [currentQuery, filteredModels]);
-
   // Robust show/hide logic: reflects saved key or typed key
   const savedKey = store.byokKeys[currentProvider.id] || '';
   const hasTyped = keyInputs[currentProvider.id] !== undefined;
@@ -796,51 +836,29 @@ const CloudTab: FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Dev Testing Banner | Open Access strip | Licensed strip */}
-      {DEV_BYPASS_BYOK_LICENSE ? (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px',
-          background: `color-mix(in srgb, ${COLOR5_AMBER} 14%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${COLOR5_AMBER} 40%, transparent)`,
-          borderRadius: 'var(--radius-sm)',
-        }}>
-          <TestTube size={14} color={COLOR5_AMBER} style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: '11.5px', fontWeight: 700, color: COLOR5_AMBER }}>Dev Testing Mode</span>
-          <span style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>— license gate bypassed · all providers enabled · remove before shipping</span>
+      {/* Licensed strip — agents membership active */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px',
+        background: `color-mix(in srgb, ${PRIMARY} 12%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${PRIMARY} 35%, transparent)`,
+        borderRadius: 'var(--radius-sm)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <Check size={13} color={PRIMARY} />
+          <span style={{ fontSize: '11.5px', fontWeight: 600, color: PRIMARY }}>Agents unlocked</span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{store.byokLicenseKey?.slice(0, 8)}…</span>
         </div>
-      ) : BYPASS_BYOK_LICENSE_GATE ? (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '7px', padding: '8px 12px',
-          background: `color-mix(in srgb, ${PRIMARY} 10%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${PRIMARY} 28%, transparent)`,
-          borderRadius: 'var(--radius-sm)',
-        }}>
-          <Zap size={13} color={PRIMARY} style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: '11.5px', fontWeight: 600, color: PRIMARY }}>BYOK Open Access</span>
-          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>— bring your own API keys · calls go directly to your provider</span>
-        </div>
-      ) : (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px',
-          background: `color-mix(in srgb, ${PRIMARY} 12%, transparent)`,
-          border: `1px solid color-mix(in srgb, ${PRIMARY} 35%, transparent)`,
-          borderRadius: 'var(--radius-sm)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <Check size={13} color={PRIMARY} />
-            <span style={{ fontSize: '11.5px', fontWeight: 600, color: PRIMARY }}>BYOK Active</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{store.byokLicenseKey?.slice(0, 8)}…</span>
-          </div>
-          <button
-            onClick={() => setStore({ byokLicenseKey: '', byokLicenseInstanceId: '', byokProvider: null, byokKeys: {}, byokModel: '', inferenceMode: 'byok' })}
-            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}
-          >
-            <X size={11} /> Revoke License
-          </button>
-        </div>
-      )}
+        <button
+          onClick={() => setStore({ byokLicenseKey: '', byokLicenseInstanceId: '', byokProvider: null, byokKeys: {}, byokModel: '', inferenceMode: 'byok' })}
+          style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '10px', display: 'flex', alignItems: 'center', gap: '3px' }}
+        >
+          <X size={11} /> Revoke license
+        </button>
+      </div>
 
       {/* ── Scrollable Material-You Rounded Pill Tab-Bar ───────────────────── */}
+      {/* Hidden when only one provider is visible — the selection is redundant. */}
+      {visibleProviders.length > 1 && (
       <div>
         <div style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '8px' }}>
           Select Cloud Provider
@@ -913,6 +931,7 @@ const CloudTab: FC = () => {
           })}
         </div>
       </div>
+      )}
 
       {/* ── Active Provider Dedicated Pane ─────────────────────────────────── */}
       <div style={{
@@ -1286,10 +1305,371 @@ const CloudTab: FC = () => {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MAIN MODEL MANAGER MODAL
+// COMPLETIONS TAB — Inline ghost-text providers (never Gumroad-gated)
+// ═══════════════════════════════════════════════════════════════════════════════
+type CompletionModel = { id: string; name: string; desc: string; context?: string; ctx?: string };
+
+const CompletionsTab: FC = () => {
+  const [store] = useStore();
+  const providers = BYOK_PROVIDERS.filter(p => COMPLETIONS_PROVIDER_IDS.includes(p.id));
+
+  const [selectedId, setSelectedId] = useState<string>(() =>
+    COMPLETIONS_PROVIDER_IDS.includes(store.completionsProvider || '')
+      ? (store.completionsProvider as string)
+      : 'cerebras'
+  );
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+  const [showKey, setShowKey] = useState<Record<string, boolean>>({});
+  const [saving, setSaving] = useState<Record<string, boolean>>({});
+  const [provErrors, setProvErrors] = useState<Record<string, string>>({});
+  const [fetchedModels, setFetchedModels] = useState<Record<string, CompletionModel[]>>({});
+  const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState<Record<string, string>>({});
+  const [modelsLive, setModelsLive] = useState<Record<string, boolean>>({});
+
+  const provider = providers.find(p => p.id === selectedId) || providers[0];
+  const isUsingThis = store.completionsProvider === provider.id;
+
+  const fetchModels = useCallback(async (pid: string, force = false) => {
+    if (!force && fetchedModels[pid] && fetchedModels[pid].length > 0) return;
+    setLoadingModels(p => ({ ...p, [pid]: true }));
+    try {
+      const res = await bridge.runtimeRequest(`/api/byok/models/${pid}`, {}, 'GET');
+      if (res?.models && Array.isArray(res.models) && res.models.length > 0) {
+        setFetchedModels(p => ({ ...p, [pid]: res.models }));
+        setModelsLive(p => ({ ...p, [pid]: !!res.live }));
+      }
+    } catch (e) {
+      console.warn('[CompletionsTab] model fetch failed for', pid, e);
+    } finally {
+      setLoadingModels(p => ({ ...p, [pid]: false }));
+    }
+  }, [fetchedModels]);
+
+  useEffect(() => { fetchModels(selectedId); }, [selectedId, fetchModels]);
+
+  // Restore saved keys for the completion providers on mount.
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const found: Record<string, string> = {};
+      for (const p of providers) {
+        if (store.byokKeys[p.id]) continue;
+        let secret = await bridge.lookupSecret(p.id);
+        if (!secret) {
+          try { const r = await bridge.runtimeRequest(`/api/byok/key/${p.id}`, {}, 'GET'); if (r?.key) secret = r.key; } catch { }
+        }
+        if (secret) found[p.id] = secret;
+      }
+      if (mounted && Object.keys(found).length > 0) {
+        setStore(prev => ({ byokKeys: { ...prev.byokKeys, ...found } }));
+      }
+    })();
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ensureKeyLoaded = async (pid: string): Promise<string | null> => {
+    if (store.byokKeys[pid]) return store.byokKeys[pid];
+    let secret = await bridge.lookupSecret(pid);
+    if (!secret) { try { const r = await bridge.runtimeRequest(`/api/byok/key/${pid}`, {}, 'GET'); if (r?.key) secret = r.key; } catch { } }
+    if (secret) setStore(prev => ({ byokKeys: { ...prev.byokKeys, [pid]: secret! } }));
+    return secret;
+  };
+
+  const saveKey = async (pid: string) => {
+    const typed = keyInputs[pid];
+    const key = (typed !== undefined ? typed : store.byokKeys[pid])?.trim();
+    if (!key) return;
+    setSaving(p => ({ ...p, [pid]: true }));
+    setProvErrors(p => ({ ...p, [pid]: '' }));
+    try {
+      await bridge.storeSecret(pid, key);
+      // set_active:false — a completions key must not hijack the agents provider.
+      await bridge.runtimeRequest('/api/byok/set', { provider: pid, api_key: key, set_active: false });
+      const pdef = BYOK_PROVIDERS.find(p => p.id === pid);
+      setStore(prev => ({
+        byokKeys: { ...prev.byokKeys, [pid]: key },
+        completionsProvider: pid,
+        completionsModel: prev.completionsProvider === pid && prev.completionsModel
+          ? prev.completionsModel
+          : ((pdef as any)?.defaultModel || ''),
+      }));
+      setKeyInputs(p => { const n = { ...p }; delete n[pid]; return n; });
+      fetchModels(pid, true);
+    } catch (e: any) {
+      setProvErrors(p => ({ ...p, [pid]: e?.message || 'Failed to save key' }));
+    } finally {
+      setSaving(p => ({ ...p, [pid]: false }));
+    }
+  };
+
+  const revokeKey = async (pid: string) => {
+    try {
+      await bridge.clearSecret(pid);
+      await bridge.runtimeRequest(`/api/byok/revoke/${pid}`, {}, 'DELETE');
+      const nextKeys = { ...store.byokKeys }; delete nextKeys[pid];
+      setStore(prev => ({
+        byokKeys: nextKeys,
+        completionsProvider: prev.completionsProvider === pid ? null : prev.completionsProvider,
+        inlineCompletionsEnabled: prev.completionsProvider === pid ? false : prev.inlineCompletionsEnabled,
+      }));
+      setKeyInputs(p => { const n = { ...p }; delete n[pid]; return n; });
+    } catch (e: any) {
+      setProvErrors(p => ({ ...p, [pid]: e?.message || 'Revoke failed' }));
+    }
+  };
+
+  const useForCompletions = (pid: string) => {
+    const pdef = BYOK_PROVIDERS.find(p => p.id === pid);
+    setStore(prev => ({
+      completionsProvider: pid,
+      completionsModel: prev.completionsProvider === pid && prev.completionsModel
+        ? prev.completionsModel
+        : ((pdef as any)?.defaultModel || ''),
+    }));
+  };
+
+  const selectModel = (pid: string, modelId: string) => {
+    setStore({ completionsProvider: pid, completionsModel: modelId });
+  };
+
+  const toggleShowKey = async (pid: string) => {
+    const next = !showKey[pid];
+    if (next) await ensureKeyLoaded(pid);
+    setShowKey(p => ({ ...p, [pid]: next }));
+  };
+
+  // Model list (pin active to top) + search filter.
+  const availableModels = (() => {
+    const raw: CompletionModel[] = fetchedModels[provider.id] || (provider.models as any) || [];
+    const base = [...raw];
+    // Surface likely completion-capable models to the top (OpenRouter only;
+    // other providers already show a small curated list). See COMPLETION_VERIFIED.
+    if (provider.id === 'openrouter') {
+      const rank = (m: CompletionModel) => {
+        const id = (m.id || '').toLowerCase();
+        if (COMPLETION_VERIFIED.some(v => id === v || id.endsWith('/' + v) || v.endsWith('/' + id))) return 0;
+        return (COMPLETION_CODEY.test(id) || COMPLETION_CODEY.test(m.name || '')) ? 1 : 2;
+      };
+      base.sort((a, b) => rank(a) - rank(b));
+    }
+    if (isUsingThis && store.completionsModel) {
+      let idx = base.findIndex(m => m.id === store.completionsModel);
+      if (idx === -1) idx = base.findIndex(m => m.id.endsWith('/' + store.completionsModel) || store.completionsModel.endsWith('/' + m.id));
+      if (idx > 0) { const [pin] = base.splice(idx, 1); base.unshift(pin); }
+      else if (idx === -1) base.unshift({ id: store.completionsModel, name: store.completionsModel.split('/').pop() || store.completionsModel, desc: 'Current completion model', context: '' });
+    }
+    return base;
+  })();
+  const q = (searchQuery[provider.id] || '').trim().toLowerCase();
+  const filteredModels = q
+    ? availableModels.filter(m => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || (m.desc && m.desc.toLowerCase().includes(q)))
+    : availableModels;
+
+  const savedKey = store.byokKeys[provider.id] || '';
+  const hasTyped = keyInputs[provider.id] !== undefined;
+  const rawKeyValue = hasTyped ? keyInputs[provider.id] : savedKey;
+  const revealed = !!showKey[provider.id];
+  const canEnableInline = !!store.completionsProvider && !!store.byokKeys[store.completionsProvider];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* Enable inline completions master switch */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+        padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+        background: `color-mix(in srgb, ${PRIMARY} 10%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${PRIMARY} 28%, transparent)`,
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Inline completions</div>
+          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+            {canEnableInline
+              ? 'Ghost-text suggestions in the code/markdown editor from your chosen free provider.'
+              : 'Save a provider key below to enable.'}
+          </div>
+        </div>
+        <IosToggle
+          checked={store.inlineCompletionsEnabled}
+          disabled={!canEnableInline}
+          onChange={v => setStore({ inlineCompletionsEnabled: v })}
+          label={store.inlineCompletionsEnabled ? 'On' : 'Off'}
+        />
+      </div>
+
+      {/* Provider pills — hidden when only one completion provider is visible. */}
+      {providers.length > 1 && (
+      <div>
+        <div style={{ fontSize: '10.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: '8px' }}>
+          Completion provider
+        </div>
+        <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', paddingBottom: '4px', scrollbarWidth: 'none' }}>
+          {providers.map(p => {
+            const sel = selectedId === p.id;
+            const inUse = store.completionsProvider === p.id;
+            const hasKey = !!store.byokKeys[p.id];
+            const Icon = p.IconComponent;
+            return (
+              <button key={p.id} onClick={() => setSelectedId(p.id)} style={{
+                padding: '6px 14px', borderRadius: 'var(--radius-full, 9999px)',
+                border: sel ? `1px solid ${PRIMARY}` : '1px solid var(--border-subtle)',
+                background: sel ? PRIMARY : 'color-mix(in srgb, var(--matugen-surface-variant, #40484c) 20%, transparent)',
+                color: sel ? ON_PRIMARY : 'var(--text-secondary)', fontWeight: sel ? 700 : 500,
+                fontSize: '11.5px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}>
+                <Icon size={15} />
+                <span>{p.name}</span>
+                {inUse && <span style={{ width: 6, height: 6, borderRadius: '50%', background: sel ? ON_PRIMARY : PRIMARY, display: 'inline-block' }} />}
+                {!inUse && hasKey && <span style={{ fontSize: '8px', color: sel ? ON_PRIMARY : COLOR5_AMBER }}>●</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      )}
+
+      {/* Provider pane */}
+      <div style={{
+        borderRadius: 'var(--radius-md)',
+        border: `1px solid ${isUsingThis ? `color-mix(in srgb, ${PRIMARY} 45%, transparent)` : 'var(--border-subtle)'}`,
+        background: 'color-mix(in srgb, var(--matugen-surface, #0c1014) 22%, transparent)',
+        padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-sm)', background: `color-mix(in srgb, ${PRIMARY} 15%, transparent)`, border: `1px solid color-mix(in srgb, ${PRIMARY} 30%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <provider.IconComponent size={19} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)' }}>{provider.name}</div>
+            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginTop: '1px' }}>{COMPLETIONS_RATES[provider.id]}</div>
+          </div>
+        </div>
+
+        {/* API key row */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '5px' }}>
+            <label style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <Key size={10} /> {provider.keyLabel}
+            </label>
+            <a href={provider.apiKeyUrl} onClick={e => { e.preventDefault(); bridge.openExternalUrl(provider.apiKeyUrl); }}
+              style={{ fontSize: '10.5px', color: PRIMARY, display: 'flex', alignItems: 'center', gap: '3px', textDecoration: 'none' }}>
+              Get key <ExternalLink size={10} />
+            </a>
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ flex: 1, position: 'relative' }}>
+              <input type={revealed ? 'text' : 'password'} value={rawKeyValue}
+                onChange={e => setKeyInputs(p => ({ ...p, [provider.id]: e.target.value }))}
+                placeholder={provider.keyHint}
+                onKeyDown={e => e.key === 'Enter' && saveKey(provider.id)}
+                style={{ width: '100%', padding: '7px 32px 7px 10px', boxSizing: 'border-box', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '11.5px', fontFamily: 'var(--font-mono)', outline: 'none' }} />
+              <button type="button" onClick={() => toggleShowKey(provider.id)} data-tip={revealed ? 'Hide API key' : 'Show API key'}
+                style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: revealed ? PRIMARY : 'var(--text-muted)', cursor: 'pointer', display: 'flex', padding: '2px' }}>
+                {revealed ? <EyeOff size={13} /> : <Eye size={13} />}
+              </button>
+            </div>
+            <button onClick={() => saveKey(provider.id)}
+              disabled={saving[provider.id] || (savedKey && !hasTyped) || (hasTyped && !keyInputs[provider.id]?.trim())}
+              style={{ padding: '7px 14px', background: PRIMARY, border: 'none', borderRadius: 'var(--radius-sm)', color: ON_PRIMARY, fontSize: '11px', fontWeight: 700, cursor: 'pointer', opacity: (saving[provider.id] || (savedKey && !hasTyped) || (hasTyped && !keyInputs[provider.id]?.trim())) ? 0.5 : 1, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              {saving[provider.id] && <Loader size={10} style={{ animation: 'spin 1s linear infinite' }} />}
+              {savedKey ? 'Update Key' : 'Save key'}
+            </button>
+            {savedKey && (
+              <button onClick={() => revokeKey(provider.id)} data-tip="Revoke key from GNOME Secrets and disk"
+                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '7px 10px', background: `color-mix(in srgb, ${ERROR_COLOR} 12%, transparent)`, border: `1px solid color-mix(in srgb, ${ERROR_COLOR} 30%, transparent)`, borderRadius: 'var(--radius-sm)', color: ERROR_COLOR, fontSize: '11px', cursor: 'pointer' }}>
+                <X size={11} /> Revoke
+              </button>
+            )}
+          </div>
+          {provErrors[provider.id] && (
+            <div style={{ marginTop: '4px', fontSize: '11px', color: ERROR_COLOR, display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <AlertTriangle size={11} /> {provErrors[provider.id]}
+            </div>
+          )}
+        </div>
+
+        {/* Use-as-completion-provider toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px' }}>
+          <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+            {isUsingThis ? `Ghost text uses ${provider.name}` : 'Use this provider for completions'}
+          </span>
+          <IosToggle checked={isUsingThis} disabled={!savedKey && !keyInputs[provider.id]?.trim()}
+            onChange={v => { if (v) useForCompletions(provider.id); else setStore({ completionsProvider: null, inlineCompletionsEnabled: false }); }}
+            label={isUsingThis ? 'Active' : 'Inactive'} />
+        </div>
+
+        {/* Model search + list */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <Search size={13} color="var(--text-muted)" style={{ position: 'absolute', left: '10px', pointerEvents: 'none', flexShrink: 0 }} />
+          <input type="text" value={searchQuery[provider.id] || ''}
+            onChange={e => setSearchQuery(p => ({ ...p, [provider.id]: e.target.value }))}
+            placeholder={`Search ${provider.name} models (e.g. coder, llama, qwen)...`}
+            style={{ width: '100%', padding: '7px 30px 7px 30px', boxSizing: 'border-box', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '11.5px', outline: 'none' }} />
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.05em', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>Models ({filteredModels.length})</span>
+              {modelsLive[provider.id] && <span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: 'var(--radius-full)', background: `color-mix(in srgb, ${PRIMARY} 16%, transparent)`, color: PRIMARY, fontWeight: 600, textTransform: 'none', letterSpacing: 'normal' }}>Live API</span>}
+            </div>
+            <button onClick={() => fetchModels(provider.id, true)} disabled={loadingModels[provider.id]}
+              data-tip="Refresh models from provider"
+              style={{ background: 'transparent', border: 'none', color: loadingModels[provider.id] ? PRIMARY : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '10.5px', padding: '2px 4px' }}>
+              <RefreshCw size={11} style={{ animation: loadingModels[provider.id] ? 'spin 1s linear infinite' : 'none' }} />
+              <span>{loadingModels[provider.id] ? 'Fetching…' : 'Refresh'}</span>
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '200px', overflowY: 'auto', paddingRight: '2px' }}>
+            {filteredModels.length === 0 ? (
+              <div style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '11px', background: 'color-mix(in srgb, var(--matugen-surface, #0c1014) 15%, transparent)', borderRadius: 'var(--radius-sm)', border: '1px dashed var(--border-subtle)' }}>
+                {loadingModels[provider.id] ? 'Loading models…' : 'Save a key to list models, or clear the search.'}
+              </div>
+            ) : filteredModels.map(model => {
+              const selected = isUsingThis && (store.completionsModel === model.id || model.id.endsWith('/' + store.completionsModel) || store.completionsModel.endsWith('/' + model.id));
+              const ctxText = (model as any).ctx || (model as any).context || '';
+              return (
+                <button key={model.id} onClick={() => selectModel(provider.id, model.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
+                  background: selected ? `color-mix(in srgb, ${PRIMARY} 14%, transparent)` : 'color-mix(in srgb, var(--matugen-surface, #0c1014) 20%, transparent)',
+                  border: `1px solid ${selected ? PRIMARY : 'var(--border-subtle)'}`, borderRadius: 'var(--radius-sm)', cursor: 'pointer', textAlign: 'left', transition: 'all .12s ease',
+                }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: selected ? PRIMARY : 'color-mix(in srgb, var(--matugen-surface-variant, #40484c) 25%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {selected ? <Check size={10} color={ON_PRIMARY} /> : <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--text-muted)', display: 'block' }} />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                      <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{model.name}</span>
+                      {ctxText && <span style={{ fontSize: '10px', color: PRIMARY, flexShrink: 0 }}>{ctxText}</span>}
+                    </div>
+                    <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>{model.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div style={{ fontSize: '10px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+          Free tiers are rate-limited — upgrade any time in your {provider.name} dashboard for higher limits.
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN MODEL MANAGER MODAL — Completions (ungated) / Agents (Gumroad-gated)
 // ═══════════════════════════════════════════════════════════════════════════════
 export const ModelManager: FC = () => {
   const [store] = useStore();
+  // Sub-tab is store-controlled so other surfaces (the chat gate) can open the
+  // popup directly on the Agents tab. Defaults to Completions; transient (not
+  // persisted), so a fresh launch always starts on the ungated Completions pane.
+  const subTab = store.modelManagerTab ?? 'completions';
+  const setSubTab = (id: 'completions' | 'agents') => setStore({ modelManagerTab: id });
 
   if (!store.modelManagerOpen) return null;
 
@@ -1331,13 +1711,37 @@ export const ModelManager: FC = () => {
           </div>
         </div>
 
+        {/* Sub-tab segmented pill control (replaces the old BYOK Open Access card) */}
+        <div style={{ padding: '12px 20px 0' }}>
+          <div style={{
+            display: 'flex', gap: '4px', padding: '4px', borderRadius: '9999px',
+            background: 'var(--matugen-on-secondary, #1d343c)',
+            border: '1px solid var(--border-subtle)',
+          }}>
+            {([['completions', 'Completions'], ['agents', 'Agents']] as const).map(([id, label]) => {
+              const active = subTab === id;
+              return (
+                <button key={id} onClick={() => setSubTab(id)} style={{
+                  flex: 1, padding: '7px 0', borderRadius: '9999px', border: 'none', cursor: 'pointer',
+                  background: active ? PRIMARY : 'transparent',
+                  color: active ? ON_PRIMARY : PRIMARY,
+                  fontSize: '12px', fontWeight: 700, letterSpacing: '.01em',
+                  transition: 'all .18s cubic-bezier(0.16, 1, 0.3, 1)',
+                }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Content — no inline scrollbarWidth: setting the standard
             scrollbar-width makes WebKit ignore the themed ::-webkit-scrollbar
             rules in theme.css and repaint a default (white) bar. Leaving it
             unset lets the global 5px themed scrollbar apply, whose transparent
             track shows this popup's --matugen-on-secondary background. */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-          <CloudTab />
+          {subTab === 'completions' ? <CompletionsTab /> : <CloudTab />}
         </div>
       </div>
     </div>

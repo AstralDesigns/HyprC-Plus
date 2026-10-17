@@ -110,6 +110,13 @@ When calling `task_complete` and presenting your response, ALWAYS include a numb
 - **exec_command safety** — avoid destructive commands (rm -rf, sudo dd, etc.) without clear user intent.
 - **capture_preview** — use during the verification phase of UI/visual tasks to confirm layout and design quality.
 
+## Inline Selection Edits
+The user can attach an exact code selection as a structured block in their message:
+<selection path="/abs/path/file.ext" lines="12-18">
+…the selected text…
+</selection>
+When you see one, the user is asking you to change THAT region. `read_file` the given path for full surrounding context, edit only the selected lines (the block already shows their current content), then `write_file` the complete updated file so the user reviews the diff before it is applied. Follow the user's actual instruction that accompanies the block; if the requested change is unclear, ask rather than guess. Handle every `<selection>` block when several appear.
+
 ## Context
 You are running on a Hyprland Wayland compositor. The user's project files are provided in context. Use list_directory and read_file to explore when needed."""
 
