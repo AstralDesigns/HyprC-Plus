@@ -363,8 +363,7 @@ PanelWindow {
         bottomLeftRadius: bg.bottomLeftRadius
         bottomRightRadius: bg.bottomRightRadius
         color: "transparent"
-        border.width: Config.dockBackgroundStyle === "gradient"
-                    ? 0 : Config.barBorderWidth
+        border.width: Config.barBorderWidth
         border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
                               Config.barBorderColor.b, Config.barBorderAlpha)
         opacity: dock._ahHidden ? 0.0 : 1.0
