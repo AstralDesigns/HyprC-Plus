@@ -211,7 +211,13 @@ PanelWindow {
             }
 
             Rectangle {
-                anchors.fill: parent
+                anchors {
+                    fill: parent
+                    // Sit inside the parent's border ring so the border stays
+                    // visible over the gradient fill — gradient mode keeps the
+                    // user's border width + alpha just like glass.
+                    margins: parent.border.width
+                }
                 topLeftRadius:     parent.topLeftRadius
                 topRightRadius:    parent.topRightRadius
                 bottomLeftRadius:  parent.bottomLeftRadius
@@ -316,7 +322,13 @@ PanelWindow {
             }
 
             Rectangle {
-                anchors.fill: parent
+                anchors {
+                    fill: parent
+                    // Sit inside the parent's border ring so the border stays
+                    // visible over the gradient fill — gradient mode keeps the
+                    // user's border width + alpha just like glass.
+                    margins: parent.border.width
+                }
                 topLeftRadius:     parent.topLeftRadius
                 topRightRadius:    parent.topRightRadius
                 bottomLeftRadius:  parent.bottomLeftRadius
@@ -911,8 +923,8 @@ PanelWindow {
         // the same Config.barRectBgStyle toggle. The center-island tab is carved
         // from this one path, so a single gradient paints the arms AND the island.
         readonly property bool  _gradient: Config.barRectBgStyle === "gradient"
-        readonly property color _gradEdge: Theme.cScrim
-        readonly property color _gradMid:  Theme.cInversePrimary
+        readonly property color _gradEdge: Theme.cInversePrimary
+        readonly property color _gradMid:  Theme.cScrim
         readonly property color _border: Qt.rgba(Config.barBorderColor.r,
                                                   Config.barBorderColor.g,
                                                   Config.barBorderColor.b,
@@ -957,7 +969,25 @@ PanelWindow {
             if (_gradient) {
                 const grad = ctx.createLinearGradient(0, 0, 0, H)
                 grad.addColorStop(0.0, _gradEdge.toString())
+                grad.addColorStop(0.05, _gradMid.toString())
+                grad.addColorStop(0.1, _gradMid.toString())
+                grad.addColorStop(0.15, _gradMid.toString())
+                grad.addColorStop(0.2, _gradMid.toString())
+                grad.addColorStop(0.25, _gradMid.toString())
+                grad.addColorStop(0.3, _gradMid.toString())
+                grad.addColorStop(0.35, _gradMid.toString())
+                grad.addColorStop(0.4, _gradMid.toString())
+                grad.addColorStop(0.45, _gradMid.toString())
                 grad.addColorStop(0.5, _gradMid.toString())
+                grad.addColorStop(0.55, _gradMid.toString())
+                grad.addColorStop(0.6, _gradMid.toString())
+                grad.addColorStop(0.65, _gradMid.toString())
+                grad.addColorStop(0.7, _gradMid.toString())
+                grad.addColorStop(0.75, _gradMid.toString())
+                grad.addColorStop(0.8, _gradMid.toString())
+                grad.addColorStop(0.85, _gradMid.toString())
+                grad.addColorStop(0.9, _gradMid.toString())
+                grad.addColorStop(0.95, _gradMid.toString())
                 grad.addColorStop(1.0, _gradEdge.toString())
                 ctx.fillStyle = grad
             } else {
@@ -1172,7 +1202,13 @@ PanelWindow {
 
         // Gradient child — only visible when barRectBgStyle === "gradient" in bar mode
         Rectangle {
-            anchors.fill: parent
+            anchors {
+                fill: parent
+                // Sit inside the parent's border ring so the border stays visible
+                // over the gradient fill — gradient mode keeps the user's border
+                // width + alpha just like glass.
+                margins: parent.border.width
+            }
             topLeftRadius:     parent.topLeftRadius
             topRightRadius:    parent.topRightRadius
             bottomLeftRadius:  parent.bottomLeftRadius
@@ -1480,7 +1516,13 @@ PanelWindow {
             }
 
             Rectangle {
-                anchors.fill: parent
+                anchors {
+                    fill: parent
+                    // Sit inside the parent's border ring so the border stays
+                    // visible over the gradient fill — gradient mode keeps the
+                    // user's border width + alpha just like glass.
+                    margins: parent.border.width
+                }
                 topLeftRadius:     parent.topLeftRadius
                 topRightRadius:    parent.topRightRadius
                 bottomLeftRadius:  parent.bottomLeftRadius
@@ -1638,7 +1680,13 @@ PanelWindow {
             }
 
             Rectangle {
-                anchors.fill: parent
+                anchors {
+                    fill: parent
+                    // Sit inside the parent's border ring so the border stays
+                    // visible over the gradient fill — gradient mode keeps the
+                    // user's border width + alpha just like glass.
+                    margins: parent.border.width
+                }
                 topLeftRadius:     parent.topLeftRadius
                 topRightRadius:    parent.topRightRadius
                 bottomLeftRadius:  parent.bottomLeftRadius
@@ -1728,7 +1776,13 @@ PanelWindow {
             }
 
             Rectangle {
-                anchors.fill: parent
+                anchors {
+                    fill: parent
+                    // Sit inside the parent's border ring so the border stays
+                    // visible over the gradient fill — gradient mode keeps the
+                    // user's border width + alpha just like glass.
+                    margins: parent.border.width
+                }
                 topLeftRadius:     parent.topLeftRadius
                 topRightRadius:    parent.topRightRadius
                 bottomLeftRadius:  parent.bottomLeftRadius
