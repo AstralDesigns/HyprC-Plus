@@ -153,12 +153,16 @@ PanelWindow {
             Text {
                 width: parent.width
                 visible: UpdatesPopupState.hasUpdates
-                text:  UpdatesPopupState.text || ""
+                // Trim trailing + collapse blank-line runs from the checker's tooltip
+                // so stray newlines can't inflate the card (Column height = sum of children).
+                text: (UpdatesPopupState.text || "").replace(/\s+$/g, "").replace(/\n{2,}/g, "\n")
                 color: Theme.cOnSurfVar
                 font.family:    Config.labelFont
                 font.pixelSize: Config.labelFontSize
                 wrapMode: Text.WordWrap
                 lineHeight: 1.4
+                maximumLineCount: 8
+                elide: Text.ElideRight
             }
 
             Rectangle {
@@ -252,14 +256,19 @@ PanelWindow {
             Text {
                 width: parent.width
                 visible: UpdatesPopupState.hcHasUpdates || _hcBusy
-                text: (UpdatesPopupState.hcHasUpdates && UpdatesPopupState.hcTooltip)
-                    ? UpdatesPopupState.hcTooltip
-                    : (_hcBusy ? "Applying updates and workspace setup…" : "")
+                text: {
+                    var raw = (UpdatesPopupState.hcHasUpdates && UpdatesPopupState.hcTooltip)
+                        ? UpdatesPopupState.hcTooltip
+                        : (_hcBusy ? "Applying updates and workspace setup…" : "")
+                    return raw.replace(/\s+$/g, "").replace(/\n{2,}/g, "\n")
+                }
                 color: Theme.cOnSurfVar
                 font.family:    Config.labelFont
                 font.pixelSize: Config.labelFontSize
                 wrapMode: Text.WordWrap
                 lineHeight: 1.4
+                maximumLineCount: 8
+                elide: Text.ElideRight
             }
 
             Rectangle {
