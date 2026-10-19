@@ -15,7 +15,7 @@ PanelWindow {
     readonly property bool _barAtBottom:  Config.barPosition === "bottom"
     readonly property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop) : Config.outerMarginTop) + Config.barHeight + 4
     readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 4
-    readonly property real _panelMargin: Config.barMode === "shell" ? Config.shellModuleSideMargin : Config.outerMarginSide
+    readonly property real _panelMargin: Config.barMode === "shell" ? (Config.shellArmThickness + Config.shellModuleSideMargin) : Config.outerMarginSide
 
     readonly property real _calcLeft: WorkspacesPopupState.hoveredWsX >= 0
         ? Math.max(_panelMargin, _panelMargin + WorkspacesPopupState.hoveredWsX + (WorkspacesPopupState.hoveredWsWidth / 2) - (implicitWidth / 2))

@@ -594,9 +594,11 @@ QtObject {
     //  Resolved side margin for the active bar mode — popups (and the tri/shell
     //  islands themselves) should read this instead of outerMarginSide directly,
     //  so both track whichever mode is active off the SAME module-margin value
-    //  (no separate popup-only slider).
+    //  (no separate popup-only slider). In shell mode the island content edge is
+    //  offset by the frame arm (shellArmThickness) PLUS the module side margin, so
+    //  popups add the arm term too, keeping them aligned to the island edge.
     readonly property real popupSideMargin: barMode === "tri"   ? triModuleSideMargin
-        : barMode === "shell" ? shellModuleSideMargin
+        : barMode === "shell" ? shellArmThickness + shellModuleSideMargin
         : outerMarginSide
 
     //  Far-edge padding: extra inset from the barBg L/R edges to the first/last
