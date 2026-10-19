@@ -297,7 +297,12 @@ QtObject {
         v = _settings.value("dockStartIcon");      dockStartIcon      = v
         v = _settings.value("dockLayer");          dockLayer          = v
         v = _settings.value("dockReserveSpace");   dockReserveSpace   = _toBool(v)
-        v = _settings.value("dockVisible");        dockVisible        = _toBool(v)
+        // dockVisible is special: shell.qml gates the dock Loader on it, so an
+        // ABSENT key (fresh install / not-yet-migrated device) must read as
+        // visible. _toBool(null) would otherwise yield false and destroy the
+        // DockWindow + its reveal hotspot with no way back. An explicit stored
+        // value (true OR false) still wins, keeping the INI authoritative.
+        v = _settings.value("dockVisible", true);   dockVisible        = _toBool(v)
         v = _settings.value("desktopIconSize");    desktopIconSize    = parseInt(v)
         v = _settings.value("desktopLabelSize");   desktopLabelSize   = parseInt(v)
         v = _settings.value("desktopLabelRadius"); desktopLabelRadius = parseInt(v)
