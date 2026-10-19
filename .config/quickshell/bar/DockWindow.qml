@@ -352,9 +352,9 @@ PanelWindow {
         }
     }
 
-    // Island border follows the bar border settings (GJS dock-border.sh
-    // mirrored them; the CC Border W slider + Bar Border Color pickers are
-    // the single control surface).
+    // Island border follows the bar border settings (resolved straight from
+    // Config; the CC Border W slider + Bar Border Color pickers are the single
+    // control surface — no GJS mirror any more).
     Rectangle {
         anchors.fill: parent
         radius: bg.radius

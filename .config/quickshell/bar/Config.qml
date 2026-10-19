@@ -37,9 +37,9 @@ QtObject {
     }
 
     // ── Media equalizer (EasyEffects) persistence ────────────────────────
-    property var     eqGains:    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]   // 10 band gains, dB
-    property string  eqPreset:   "Flat"
-    property bool    eqExpanded: false
+    property var     eqGains   // 10 band gains, dB
+    property string  eqPreset
+    property bool    eqExpanded
 
     // QSettings INI backend stores booleans as "true"/"false" strings.
     // On read they come back as strings — coerce them to proper bools.
@@ -55,271 +55,262 @@ QtObject {
     }
 
     function _loadSettings() {
-        // cavaGradientEndColor is now computed from cavaEndMode/cavaEndVar — no seed needed
+        // The shipped config is the single source of truth: every key is read
+        // directly (no presence guards, no legacy fallbacks). Only type coercion
+        // is applied (the INI backend stores bools/numbers as strings).
+        var v
         // Tab 1: General
-        var v = _settings.value("barMode"); if (v !== undefined && v !== null) barMode = v
-        v = _settings.value("barPosition"); if (v !== undefined && v !== null) barPosition = v
-        v = _settings.value("barHeight"); if (v !== undefined && v !== null) barHeight = v
-        v = _settings.value("moduleHeight"); if (v !== undefined && v !== null) moduleHeight = v
-        v = _settings.value("outerMarginTop"); if (v !== undefined && v !== null) outerMarginTop = v
-        v = _settings.value("outerMarginBottom"); if (v !== undefined && v !== null) outerMarginBottom = v
-        v = _settings.value("outerMarginSide"); if (v !== undefined && v !== null) outerMarginSide = v
-        v = _settings.value("triModuleSideMargin"); if (v !== undefined && v !== null) triModuleSideMargin = parseInt(v)
-        v = _settings.value("barEdgePaddingLeft");  if (v !== undefined && v !== null) barEdgePaddingLeft  = v
-        v = _settings.value("barEdgePaddingRight"); if (v !== undefined && v !== null) barEdgePaddingRight = v
-        var oldRadius = 20
-        v = _settings.value("barRadius"); if (v !== undefined && v !== null) oldRadius = parseInt(v)
-        v = _settings.value("barTopLeftRadius");    barTopLeftRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
-        v = _settings.value("barTopRightRadius");   barTopRightRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
-        v = _settings.value("barBottomLeftRadius"); barBottomLeftRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
-        v = _settings.value("barBottomRightRadius");barBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : oldRadius
-        v = _settings.value("triLeftTopRightRadius");    triLeftTopRightRadius    = (v !== undefined && v !== null) ? parseInt(v) : barTopRightRadius
-        v = _settings.value("triLeftBottomRightRadius"); triLeftBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : barBottomRightRadius
-        // Legacy: outer left tri corners now share barTopLeft / barBottomLeft
-        v = _settings.value("triLeftTopLeftRadius")
-        if (v !== undefined && v !== null) barTopLeftRadius = parseInt(v)
-        v = _settings.value("triLeftBottomLeftRadius")
-        if (v !== undefined && v !== null) barBottomLeftRadius = parseInt(v)
-        v = _settings.value("triCenterTopLeftRadius");     triCenterTopLeftRadius     = (v !== undefined && v !== null) ? parseInt(v) : barTopLeftRadius
-        v = _settings.value("triCenterTopRightRadius");    triCenterTopRightRadius    = (v !== undefined && v !== null) ? parseInt(v) : barTopRightRadius
-        v = _settings.value("triCenterBottomLeftRadius");   triCenterBottomLeftRadius  = (v !== undefined && v !== null) ? parseInt(v) : barBottomLeftRadius
-        v = _settings.value("triCenterBottomRightRadius");  triCenterBottomRightRadius = (v !== undefined && v !== null) ? parseInt(v) : barBottomRightRadius
-        v = _settings.value("triRightTopLeftRadius");     triRightTopLeftRadius     = (v !== undefined && v !== null) ? parseInt(v) : 20
-        v = _settings.value("triRightBottomLeftRadius"); triRightBottomLeftRadius = (v !== undefined && v !== null) ? parseInt(v) : 20
-        // Legacy: outer right tri corners now share barTopRight / barBottomRight
-        v = _settings.value("triRightTopRightRadius")
-        if (v !== undefined && v !== null) barTopRightRadius = parseInt(v)
-        v = _settings.value("triRightBottomRightRadius")
-        if (v !== undefined && v !== null) barBottomRightRadius = parseInt(v)
-        v = _settings.value("shellArmThickness");          if (v !== undefined && v !== null) shellArmThickness          = parseInt(v)
-        v = _settings.value("shellInnerRadius");           if (v !== undefined && v !== null) shellInnerRadius           = parseInt(v)
-        v = _settings.value("shellModuleSideMargin");      if (v !== undefined && v !== null) shellModuleSideMargin      = parseInt(v)
-        v = _settings.value("shellModuleAutoHide");        if (v !== undefined && v !== null) shellModuleAutoHide        = _toBool(v)
-        v = _settings.value("shellModuleAutoHideDelay");   if (v !== undefined && v !== null) shellModuleAutoHideDelay   = parseInt(v)
-        v = _settings.value("shellCenterJunctionRadius");  if (v !== undefined && v !== null) shellCenterJunctionRadius  = parseInt(v)
-        v = _settings.value("islandRadius"); if (v !== undefined && v !== null) islandRadius = v
-        v = _settings.value("islandBorder"); if (v !== undefined && v !== null) islandBorder = v
-        v = _settings.value("islandBorderAlpha"); if (v !== undefined && v !== null) islandBorderAlpha = v
-        v = _settings.value("borderWs"); if (v !== undefined && v !== null) borderWs = _toBool(v)
-        v = _settings.value("borderClockDate"); if (v !== undefined && v !== null) borderClockDate = _toBool(v)
-        v = _settings.value("borderWeatherBat"); if (v !== undefined && v !== null) borderWeatherBat = _toBool(v)
-        v = _settings.value("borderLeftGroup"); if (v !== undefined && v !== null) borderLeftGroup = _toBool(v)
-        v = _settings.value("borderRightGroup"); if (v !== undefined && v !== null) borderRightGroup = _toBool(v)
-        v = _settings.value("borderStartMenu"); if (v !== undefined && v !== null) borderStartMenu = _toBool(v)
-        v = _settings.value("borderMedia"); if (v !== undefined && v !== null) borderMedia = _toBool(v)
-        v = _settings.value("borderCava"); if (v !== undefined && v !== null) borderCava = _toBool(v)
-        v = _settings.value("borderDistro"); if (v !== undefined && v !== null) borderDistro = _toBool(v)
-        v = _settings.value("borderStartTrash"); if (v !== undefined && v !== null) borderStartTrash = _toBool(v)
-        v = _settings.value("tipPowerProfiles"); if (v !== undefined && v !== null) tipPowerProfiles = _toBool(v)
-        v = _settings.value("tipOverview"); if (v !== undefined && v !== null) tipOverview = _toBool(v)
-        v = _settings.value("tipPower"); if (v !== undefined && v !== null) tipPower = _toBool(v)
-        v = _settings.value("tipSystemTray"); if (v !== undefined && v !== null) tipSystemTray = _toBool(v)
-        v = _settings.value("tipNotifications"); if (v !== undefined && v !== null) tipNotifications = _toBool(v)
-        v = _settings.value("tipMedia"); if (v !== undefined && v !== null) tipMedia = _toBool(v)
-        v = _settings.value("tipWeather"); if (v !== undefined && v !== null) tipWeather = _toBool(v)
-        v = _settings.value("tipBattery"); if (v !== undefined && v !== null) tipBattery = _toBool(v)
-        v = _settings.value("tipClock"); if (v !== undefined && v !== null) tipClock = _toBool(v)
-        v = _settings.value("tipDate"); if (v !== undefined && v !== null) tipDate = _toBool(v)
-        v = _settings.value("tipWallpaper"); if (v !== undefined && v !== null) tipWallpaper = _toBool(v)
-        v = _settings.value("tipUpdates"); if (v !== undefined && v !== null) tipUpdates = _toBool(v)
-        v = _settings.value("tipControlCenter"); if (v !== undefined && v !== null) tipControlCenter = _toBool(v)
-        v = _settings.value("tipIdleInhibitor"); if (v !== undefined && v !== null) tipIdleInhibitor = _toBool(v)
-        v = _settings.value("islandBorderVar"); if (v !== undefined && v !== null) islandBorderVar = v
-        v = _settings.value("islandBorderMode"); if (v !== undefined && v !== null) islandBorderMode = v
-        v = _settings.value("islandBorderWallustVar"); if (v !== undefined && v !== null) islandBorderWallustVar = v
-        v = _settings.value("islandBorderGradient"); if (v !== undefined && v !== null) islandBorderGradient = _toBool(v)
-        v = _settings.value("islandBorderSecondVar"); if (v !== undefined && v !== null) islandBorderSecondVar = v
-        v = _settings.value("islandBorderSecondMode"); if (v !== undefined && v !== null) islandBorderSecondMode = v
-        v = _settings.value("islandBorderSecondWallustVar"); if (v !== undefined && v !== null) islandBorderSecondWallustVar = v
-        v = _settings.value("islandBorderAngle"); if (v !== undefined && v !== null) islandBorderAngle = parseFloat(v)
-        v = _settings.value("barBorderWidth"); if (v !== undefined && v !== null) barBorderWidth = v
-        v = _settings.value("barBorderAlpha"); if (v !== undefined && v !== null) barBorderAlpha = v
-        v = _settings.value("barBorderVar"); if (v !== undefined && v !== null) barBorderVar = v
-        v = _settings.value("barBorderMode"); if (v !== undefined && v !== null) barBorderMode = v
-        v = _settings.value("barBorderWallustVar"); if (v !== undefined && v !== null) barBorderWallustVar = v
-        v = _settings.value("barBorderGradient"); if (v !== undefined && v !== null) barBorderGradient = _toBool(v)
-        v = _settings.value("barBorderSecondVar"); if (v !== undefined && v !== null) barBorderSecondVar = v
-        v = _settings.value("barBorderSecondMode"); if (v !== undefined && v !== null) barBorderSecondMode = v
-        v = _settings.value("barBorderSecondWallustVar"); if (v !== undefined && v !== null) barBorderSecondWallustVar = v
-        v = _settings.value("barBorderAngle"); if (v !== undefined && v !== null) barBorderAngle = parseFloat(v)
-        v = _settings.value("islandBgStyle");  if (v !== undefined && v !== null) islandBgStyle  = v
-        v = _settings.value("barRectBgStyle"); if (v !== undefined && v !== null) barRectBgStyle = v
-        v = _settings.value("moduleBgOpacity"); if (v !== undefined && v !== null) moduleBgOpacity = v
-        v = _settings.value("islandBgOpacityIsland"); if (v !== undefined && v !== null) islandBgOpacityIsland = v
-        v = _settings.value("islandSpacing"); if (v !== undefined && v !== null) islandSpacing = v
-        v = _settings.value("modPadH"); if (v !== undefined && v !== null) modPadH = v
-        v = _settings.value("modPadV"); if (v !== undefined && v !== null) modPadV = v
-        v = _settings.value("groupedSpacing"); if (v !== undefined && v !== null) groupedSpacing = v
-        v = _settings.value("glyphSize"); if (v !== undefined && v !== null) glyphSize = v
-        v = _settings.value("infoGlyphSize"); if (v !== undefined && v !== null) infoGlyphSize = v
-        v = _settings.value("mediaGlyphSize"); if (v !== undefined && v !== null) mediaGlyphSize = v
-        v = _settings.value("weatherIconSize"); if (v !== undefined && v !== null) weatherIconSize = v
-        v = _settings.value("infoFontSize");   if (v !== undefined && v !== null) infoFontSize   = v
-        v = _settings.value("labelFontSize");  if (v !== undefined && v !== null) labelFontSize  = v
-        v = _settings.value("mediaCtlSize"); if (v !== undefined && v !== null) mediaCtlSize = v
-        v = _settings.value("mediaThumbSize"); if (v !== undefined && v !== null) mediaThumbSize = v
-        v = _settings.value("batteryRadialVisible"); if (v !== undefined && v !== null) batteryRadialVisible = _toBool(v)
-        v = _settings.value("batteryRadialSize"); if (v !== undefined && v !== null) batteryRadialSize = v
-        v = _settings.value("batteryRadialWidth"); if (v !== undefined && v !== null) batteryRadialWidth = v
-        v = _settings.value("trayIconSz"); if (v !== undefined && v !== null) trayIconSz = v
-        v = _settings.value("trayItemPadH");   if (v !== undefined && v !== null) trayItemPadH   = v
-        v = _settings.value("trayItemSpacing"); if (v !== undefined && v !== null) trayItemSpacing = v
-        v = _settings.value("ccGlyph"); if (v !== undefined && v !== null) ccGlyph = v
-        v = _settings.value("ccGlyphColorA"); if (v !== undefined && v !== null) ccGlyphOpacity = Math.min(1, Math.max(0, parseFloat(v)))
-        v = _settings.value("wsCount"); if (v !== undefined && v !== null) wsCount = Math.min(10, Math.max(1, parseInt(v)))
-        v = _settings.value("barMonitors");
-        if (v !== undefined && v !== null) {
-            try {
-                const parsed = typeof v === "string" ? JSON.parse(v) : v
-                if (Array.isArray(parsed) && parsed.length > 0) barMonitors = parsed
-            } catch (e) {
-                barMonitors = [0]
-            }
+        v = _settings.value("barMode");            barMode = v
+        v = _settings.value("barPosition");        barPosition = v
+        v = _settings.value("moduleHeight");       moduleHeight = v
+        v = _settings.value("barPad");             barPad = Math.round(+v)
+        v = _settings.value("outerMarginTop");     outerMarginTop = v
+        v = _settings.value("outerMarginBottom");  outerMarginBottom = v
+        v = _settings.value("outerMarginSide");    outerMarginSide = v
+        v = _settings.value("triModuleSideMargin"); triModuleSideMargin = parseInt(v)
+        v = _settings.value("barEdgePaddingLeft");  barEdgePaddingLeft  = v
+        v = _settings.value("barEdgePaddingRight"); barEdgePaddingRight = v
+        // Corner radii — each reads its own key.
+        v = _settings.value("barTopLeftRadius");     barTopLeftRadius     = parseInt(v)
+        v = _settings.value("barTopRightRadius");    barTopRightRadius    = parseInt(v)
+        v = _settings.value("barBottomLeftRadius");  barBottomLeftRadius  = parseInt(v)
+        v = _settings.value("barBottomRightRadius"); barBottomRightRadius = parseInt(v)
+        v = _settings.value("triLeftTopRightRadius");    triLeftTopRightRadius    = parseInt(v)
+        v = _settings.value("triLeftBottomRightRadius"); triLeftBottomRightRadius = parseInt(v)
+        v = _settings.value("triCenterTopLeftRadius");    triCenterTopLeftRadius    = parseInt(v)
+        v = _settings.value("triCenterTopRightRadius");   triCenterTopRightRadius   = parseInt(v)
+        v = _settings.value("triCenterBottomLeftRadius"); triCenterBottomLeftRadius = parseInt(v)
+        v = _settings.value("triCenterBottomRightRadius");triCenterBottomRightRadius= parseInt(v)
+        v = _settings.value("triRightTopLeftRadius");    triRightTopLeftRadius    = parseInt(v)
+        v = _settings.value("triRightBottomLeftRadius"); triRightBottomLeftRadius = parseInt(v)
+        v = _settings.value("shellArmThickness");          shellArmThickness          = parseInt(v)
+        v = _settings.value("shellInnerRadius");           shellInnerRadius           = parseInt(v)
+        v = _settings.value("shellModuleSideMargin");      shellModuleSideMargin      = parseInt(v)
+        v = _settings.value("shellModuleAutoHide");        shellModuleAutoHide        = _toBool(v)
+        v = _settings.value("shellModuleAutoHideDelay");   shellModuleAutoHideDelay   = parseInt(v)
+        v = _settings.value("shellCenterJunctionRadius");  shellCenterJunctionRadius  = parseInt(v)
+        v = _settings.value("islandRadius"); islandRadius = v
+        v = _settings.value("islandBorder"); islandBorder = v
+        v = _settings.value("islandBorderAlpha"); islandBorderAlpha = v
+        v = _settings.value("borderWs"); borderWs = _toBool(v)
+        v = _settings.value("borderClockDate"); borderClockDate = _toBool(v)
+        v = _settings.value("borderWeatherBat"); borderWeatherBat = _toBool(v)
+        v = _settings.value("borderLeftGroup"); borderLeftGroup = _toBool(v)
+        v = _settings.value("borderRightGroup"); borderRightGroup = _toBool(v)
+        v = _settings.value("borderStartMenu"); borderStartMenu = _toBool(v)
+        v = _settings.value("borderMedia"); borderMedia = _toBool(v)
+        v = _settings.value("borderCava"); borderCava = _toBool(v)
+        v = _settings.value("borderDistro"); borderDistro = _toBool(v)
+        v = _settings.value("borderStartTrash"); borderStartTrash = _toBool(v)
+        v = _settings.value("tipPowerProfiles"); tipPowerProfiles = _toBool(v)
+        v = _settings.value("tipOverview"); tipOverview = _toBool(v)
+        v = _settings.value("tipPower"); tipPower = _toBool(v)
+        v = _settings.value("tipSystemTray"); tipSystemTray = _toBool(v)
+        v = _settings.value("tipNotifications"); tipNotifications = _toBool(v)
+        v = _settings.value("tipMedia"); tipMedia = _toBool(v)
+        v = _settings.value("tipWeather"); tipWeather = _toBool(v)
+        v = _settings.value("tipBattery"); tipBattery = _toBool(v)
+        v = _settings.value("tipClock"); tipClock = _toBool(v)
+        v = _settings.value("tipDate"); tipDate = _toBool(v)
+        v = _settings.value("tipWallpaper"); tipWallpaper = _toBool(v)
+        v = _settings.value("tipUpdates"); tipUpdates = _toBool(v)
+        v = _settings.value("tipControlCenter"); tipControlCenter = _toBool(v)
+        v = _settings.value("tipIdleInhibitor"); tipIdleInhibitor = _toBool(v)
+        v = _settings.value("islandBorderVar"); islandBorderVar = v
+        v = _settings.value("islandBorderMode"); islandBorderMode = v
+        v = _settings.value("islandBorderWallustVar"); islandBorderWallustVar = v
+        v = _settings.value("islandBorderGradient"); islandBorderGradient = _toBool(v)
+        v = _settings.value("islandBorderSecondVar"); islandBorderSecondVar = v
+        v = _settings.value("islandBorderSecondMode"); islandBorderSecondMode = v
+        v = _settings.value("islandBorderSecondWallustVar"); islandBorderSecondWallustVar = v
+        v = _settings.value("islandBorderAngle"); islandBorderAngle = parseFloat(v)
+        v = _settings.value("barBorderWidth"); barBorderWidth = v
+        v = _settings.value("barBorderAlpha"); barBorderAlpha = v
+        v = _settings.value("barBorderVar"); barBorderVar = v
+        v = _settings.value("barBorderMode"); barBorderMode = v
+        v = _settings.value("barBorderWallustVar"); barBorderWallustVar = v
+        v = _settings.value("barBorderGradient"); barBorderGradient = _toBool(v)
+        v = _settings.value("barBorderSecondVar"); barBorderSecondVar = v
+        v = _settings.value("barBorderSecondMode"); barBorderSecondMode = v
+        v = _settings.value("barBorderSecondWallustVar"); barBorderSecondWallustVar = v
+        v = _settings.value("barBorderAngle"); barBorderAngle = parseFloat(v)
+        v = _settings.value("islandBgStyle");  islandBgStyle  = v
+        v = _settings.value("barRectBgStyle"); barRectBgStyle = v
+        v = _settings.value("moduleBgOpacity"); moduleBgOpacity = v
+        v = _settings.value("islandBgOpacityIsland"); islandBgOpacityIsland = v
+        v = _settings.value("islandSpacing"); islandSpacing = v
+        v = _settings.value("modPadH"); modPadH = v
+        v = _settings.value("modPadV"); modPadV = v
+        v = _settings.value("groupedSpacing"); groupedSpacing = v
+        v = _settings.value("glyphSize"); glyphSize = v
+        v = _settings.value("infoGlyphSize"); infoGlyphSize = v
+        v = _settings.value("mediaGlyphSize"); mediaGlyphSize = v
+        v = _settings.value("weatherIconSize"); weatherIconSize = v
+        v = _settings.value("infoFontSize");   infoFontSize   = v
+        v = _settings.value("labelFontSize");  labelFontSize  = v
+        v = _settings.value("mediaCtlSize"); mediaCtlSize = v
+        v = _settings.value("mediaThumbSize"); mediaThumbSize = v
+        v = _settings.value("batteryRadialVisible"); batteryRadialVisible = _toBool(v)
+        v = _settings.value("batteryRadialSize"); batteryRadialSize = v
+        v = _settings.value("batteryRadialWidth"); batteryRadialWidth = v
+        v = _settings.value("trayIconSz"); trayIconSz = v
+        v = _settings.value("trayItemPadH");   trayItemPadH   = v
+        v = _settings.value("trayItemSpacing"); trayItemSpacing = v
+        v = _settings.value("ccGlyph"); ccGlyph = v
+        v = _settings.value("ccGlyphColorA"); ccGlyphOpacity = Math.min(1, Math.max(0, parseFloat(v)))
+        v = _settings.value("wsCount"); wsCount = Math.min(10, Math.max(1, parseInt(v)))
+        v = _settings.value("barMonitors")
+        try {
+            const parsed = typeof v === "string" ? JSON.parse(v) : v
+            if (Array.isArray(parsed) && parsed.length > 0) barMonitors = parsed
+        } catch (e) {
+            barMonitors = [0]
         }
-        v = _settings.value("wsIconMode"); if (v !== undefined && v !== null) wsIconMode = v
-        v = _settings.value("wsGlyphSize"); if (v !== undefined && v !== null) wsGlyphSize = v
-        v = _settings.value("wsSpacing"); if (v !== undefined && v !== null) wsSpacing = v
-        v = _settings.value("wsMarginLeft"); if (v !== undefined && v !== null) wsMarginLeft = v
-        v = _settings.value("wsMarginRight"); if (v !== undefined && v !== null) wsMarginRight = v
-        v = _settings.value("wsPadLeft"); if (v !== undefined && v !== null) wsPadLeft = v
-        v = _settings.value("wsPadRight"); if (v !== undefined && v !== null) wsPadRight = v
-        v = _settings.value("wsPadTop"); if (v !== undefined && v !== null) wsPadTop = v
-        v = _settings.value("wsPadBottom"); if (v !== undefined && v !== null) wsPadBottom = v
-        v = _settings.value("wsSeparators"); if (v !== undefined && v !== null) wsSeparators = _toBool(v)
-        v = _settings.value("wsSeparatorSize"); if (v !== undefined && v !== null) wsSeparatorSize = v
-        v = _settings.value("wsSeparatorPadLeft"); if (v !== undefined && v !== null) wsSeparatorPadLeft = v
-        v = _settings.value("wsSeparatorPadRight"); if (v !== undefined && v !== null) wsSeparatorPadRight = v
-        v = _settings.value("wsSeparatorGlyph"); if (v !== undefined && v !== null) wsSeparatorGlyph = v
-        v = _settings.value("wsDotActive"); if (v !== undefined && v !== null) wsDotActive = v
-        v = _settings.value("wsDotPersistent"); if (v !== undefined && v !== null) wsDotPersistent = v
-        v = _settings.value("wsDotEmpty"); if (v !== undefined && v !== null) wsDotEmpty = v
-        v = _settings.value("wsIcons"); if (v !== undefined && v !== null) { try { wsIcons = JSON.parse(v) } catch(e) {} }
-        v = _settings.value("wsActiveOpacity");     if (v !== undefined && v !== null) wsActiveOpacity     = v
-        v = _settings.value("wsPersistentOpacity"); if (v !== undefined && v !== null) wsPersistentOpacity = v
-        v = _settings.value("wsEmptyOpacity");      if (v !== undefined && v !== null) wsEmptyOpacity      = v
-        v = _settings.value("wsSeparatorOpacity");  if (v !== undefined && v !== null) wsSeparatorOpacity  = v
-        v = _settings.value("mediaInfoFontSize"); if (v !== undefined && v !== null) mediaInfoFontSize = v
-        v = _settings.value("mediaPadLeft"); if (v !== undefined && v !== null) mediaPadLeft = v
-        v = _settings.value("mediaPadRight"); if (v !== undefined && v !== null) mediaPadRight = v
-        v = _settings.value("mediaPadTop"); if (v !== undefined && v !== null) mediaPadTop = v
-        v = _settings.value("mediaPadBottom"); if (v !== undefined && v !== null) mediaPadBottom = v
-        v = _settings.value("cavaWidth"); if (v !== undefined && v !== null) cavaWidth = v
-        v = _settings.value("cavaBarSpacing"); if (v !== undefined && v !== null) cavaBarSpacing = v
-        v = _settings.value("cavaStyle"); if (v !== undefined && v !== null) cavaStyle = v
-        v = _settings.value("cavaWaveThickness"); if (v !== undefined && v !== null) cavaWaveThickness = v
-        v = _settings.value("cavaWaveSmooth"); if (v !== undefined && v !== null) cavaWaveSmooth = _toBool(v)
-        v = _settings.value("cavaTransparentWhenInactive"); if (v !== undefined && v !== null) cavaTransparentWhenInactive = _toBool(v)
-        v = _settings.value("eqGains"); if (v !== undefined && v !== null) { try { eqGains = JSON.parse(v) } catch(e) {} }
-        v = _settings.value("eqPreset"); if (v !== undefined && v !== null) eqPreset = v
-        v = _settings.value("eqExpanded"); if (v !== undefined && v !== null) eqExpanded = _toBool(v)
-        v = _settings.value("cavaActiveOpacity"); if (v !== undefined && v !== null) cavaActiveOpacity = v
-        v = _settings.value("cavaInactiveOpacity"); if (v !== undefined && v !== null) cavaInactiveOpacity = v
-        v = _settings.value("cavaAutoHide"); if (v !== undefined && v !== null) cavaAutoHide = _toBool(v)
-        v = _settings.value("cavaGradientEnabled"); if (v !== undefined && v !== null) cavaGradientEnabled = _toBool(v)
-        v = _settings.value("cavaGradientSplit"); if (v !== undefined && v !== null) cavaGradientSplit = parseFloat(v)
-        v = _settings.value("cavaStartMode"); if (v !== undefined && v !== null) cavaStartMode = v
-        v = _settings.value("cavaEndMode");   if (v !== undefined && v !== null) cavaEndMode   = v
-        v = _settings.value("cavaStartVar");  if (v !== undefined && v !== null) cavaStartVar  = v
-        v = _settings.value("cavaEndVar");    if (v !== undefined && v !== null) cavaEndVar    = v
-        v = _settings.value("cavaStartPywalVar"); if (v !== undefined && v !== null) cavaStartPywalVar = v
-        v = _settings.value("cavaEndPywalVar");   if (v !== undefined && v !== null) cavaEndPywalVar   = v
-        v = _settings.value("cavaStartWallustVar"); if (v !== undefined && v !== null) cavaStartWallustVar = v
-        v = _settings.value("cavaEndWallustVar");   if (v !== undefined && v !== null) cavaEndWallustVar   = v
-        v = _settings.value("cavaStartCustomColor"); if (v !== undefined && v !== null) _cavaStartCustomColor = v
-        v = _settings.value("cavaEndCustomColor");   if (v !== undefined && v !== null) _cavaEndCustomColor   = v
-        v = _settings.value("cavaGlyphCustomColor"); if (v !== undefined && v !== null) _cavaGlyphCustomColor = v
-        v = _settings.value("wsBgOpacity"); if (v !== undefined && v !== null) wsBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("groupedBgOpacity"); if (v !== undefined && v !== null) groupedBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("ungroupedBgOpacity"); if (v !== undefined && v !== null) ungroupedBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("clockDateBgOpacity");  if (v !== undefined && v !== null) clockDateBgOpacity  = Math.max(0, parseFloat(v))
-        v = _settings.value("weatherBatBgOpacity"); if (v !== undefined && v !== null) weatherBatBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("leftGroupBgOpacity");  if (v !== undefined && v !== null) leftGroupBgOpacity  = Math.max(0, parseFloat(v))
-        v = _settings.value("rightGroupBgOpacity"); if (v !== undefined && v !== null) rightGroupBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("trayBgOpacity"); if (v !== undefined && v !== null) trayBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("startMenuBgOpacity"); if (v !== undefined && v !== null) startMenuBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("mediaBgOpacity"); if (v !== undefined && v !== null) mediaBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("cavaBgOpacity"); if (v !== undefined && v !== null) cavaBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("distroBgOpacity"); if (v !== undefined && v !== null) distroBgOpacity = Math.max(0, parseFloat(v))
-        v = _settings.value("activeWindowBgOpacity"); if (v !== undefined && v !== null) activeWindowBgOpacity = v
-        v = _settings.value("activeWindowMinWidth"); if (v !== undefined && v !== null) activeWindowMinWidth = v
-        v = _settings.value("showClock"); if (v !== undefined && v !== null) showClock = _toBool(v)
-        v = _settings.value("showDate"); if (v !== undefined && v !== null) showDate = _toBool(v)
-        v = _settings.value("showWorkspaces"); if (v !== undefined && v !== null) showWorkspaces = _toBool(v)
-        v = _settings.value("showCava"); if (v !== undefined && v !== null) showCava = _toBool(v)
-        v = _settings.value("showWeather"); if (v !== undefined && v !== null) showWeather = _toBool(v)
-        v = _settings.value("showBattery"); if (v !== undefined && v !== null) showBattery = _toBool(v)
-        v = _settings.value("showMediaPlayer"); if (v !== undefined && v !== null) showMediaPlayer = _toBool(v)
-        v = _settings.value("showIdleInhibitor"); if (v !== undefined && v !== null) showIdleInhibitor = _toBool(v)
-        v = _settings.value("showUpdates"); if (v !== undefined && v !== null) showUpdates = _toBool(v)
-        v = _settings.value("showPowerProfiles"); if (v !== undefined && v !== null) showPowerProfiles = _toBool(v)
-        v = _settings.value("showOverview"); if (v !== undefined && v !== null) showOverview = _toBool(v)
-        v = _settings.value("showNotifications"); if (v !== undefined && v !== null) showNotifications = _toBool(v)
-        v = _settings.value("showWallpaper"); if (v !== undefined && v !== null) showWallpaper = _toBool(v)
-        v = _settings.value("showTray"); if (v !== undefined && v !== null) showTray = _toBool(v)
-        v = _settings.value("showBluetooth"); if (v !== undefined && v !== null) showBluetooth = _toBool(v)
-        //v = _settings.value("showWindow"); if (v !== undefined && v !== null) showWindow = v
-        v = _settings.value("showDistro"); if (v !== undefined && v !== null) showDistro = _toBool(v)
+        v = _settings.value("wsIconMode"); wsIconMode = v
+        v = _settings.value("wsGlyphSize"); wsGlyphSize = v
+        v = _settings.value("wsSpacing"); wsSpacing = v
+        v = _settings.value("wsMarginLeft"); wsMarginLeft = v
+        v = _settings.value("wsMarginRight"); wsMarginRight = v
+        v = _settings.value("wsPadLeft"); wsPadLeft = v
+        v = _settings.value("wsPadRight"); wsPadRight = v
+        v = _settings.value("wsPadTop"); wsPadTop = v
+        v = _settings.value("wsPadBottom"); wsPadBottom = v
+        v = _settings.value("wsSeparators"); wsSeparators = _toBool(v)
+        v = _settings.value("wsSeparatorSize"); wsSeparatorSize = v
+        v = _settings.value("wsSeparatorPadLeft"); wsSeparatorPadLeft = v
+        v = _settings.value("wsSeparatorPadRight"); wsSeparatorPadRight = v
+        v = _settings.value("wsSeparatorGlyph"); wsSeparatorGlyph = v
+        v = _settings.value("wsDotActive"); wsDotActive = v
+        v = _settings.value("wsDotPersistent"); wsDotPersistent = v
+        v = _settings.value("wsDotEmpty"); wsDotEmpty = v
+        v = _settings.value("wsIcons"); try { wsIcons = JSON.parse(v) } catch(e) {}
+        v = _settings.value("wsActiveOpacity");     wsActiveOpacity     = v
+        v = _settings.value("wsPersistentOpacity"); wsPersistentOpacity = v
+        v = _settings.value("wsEmptyOpacity");      wsEmptyOpacity      = v
+        v = _settings.value("wsSeparatorOpacity");  wsSeparatorOpacity  = v
+        v = _settings.value("mediaInfoFontSize"); mediaInfoFontSize = v
+        v = _settings.value("mediaPadLeft"); mediaPadLeft = v
+        v = _settings.value("mediaPadRight"); mediaPadRight = v
+        v = _settings.value("mediaPadTop"); mediaPadTop = v
+        v = _settings.value("mediaPadBottom"); mediaPadBottom = v
+        v = _settings.value("cavaWidth"); cavaWidth = v
+        v = _settings.value("cavaBarSpacing"); cavaBarSpacing = v
+        v = _settings.value("cavaStyle"); cavaStyle = v
+        v = _settings.value("cavaWaveThickness"); cavaWaveThickness = v
+        v = _settings.value("cavaWaveSmooth"); cavaWaveSmooth = _toBool(v)
+        v = _settings.value("cavaTransparentWhenInactive"); cavaTransparentWhenInactive = _toBool(v)
+        v = _settings.value("eqGains"); try { eqGains = JSON.parse(v) } catch(e) {}
+        v = _settings.value("eqPreset"); eqPreset = v
+        v = _settings.value("eqExpanded"); eqExpanded = _toBool(v)
+        v = _settings.value("cavaActiveOpacity"); cavaActiveOpacity = v
+        v = _settings.value("cavaInactiveOpacity"); cavaInactiveOpacity = v
+        v = _settings.value("cavaAutoHide"); cavaAutoHide = _toBool(v)
+        v = _settings.value("cavaGradientEnabled"); cavaGradientEnabled = _toBool(v)
+        v = _settings.value("cavaGradientSplit"); cavaGradientSplit = parseFloat(v)
+        v = _settings.value("cavaStartMode"); cavaStartMode = v
+        v = _settings.value("cavaEndMode");   cavaEndMode   = v
+        v = _settings.value("cavaStartVar");  cavaStartVar  = v
+        v = _settings.value("cavaEndVar");    cavaEndVar    = v
+        v = _settings.value("cavaStartPywalVar"); cavaStartPywalVar = v
+        v = _settings.value("cavaEndPywalVar");   cavaEndPywalVar   = v
+        v = _settings.value("cavaStartWallustVar"); cavaStartWallustVar = v
+        v = _settings.value("cavaEndWallustVar");   cavaEndWallustVar   = v
+        v = _settings.value("cavaStartCustomColor"); _cavaStartCustomColor = v
+        v = _settings.value("cavaEndCustomColor");   _cavaEndCustomColor   = v
+        v = _settings.value("cavaGlyphCustomColor"); _cavaGlyphCustomColor = v
+        v = _settings.value("wsBgOpacity"); wsBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("groupedBgOpacity"); groupedBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("ungroupedBgOpacity"); ungroupedBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("clockDateBgOpacity");  clockDateBgOpacity  = Math.max(0, parseFloat(v))
+        v = _settings.value("weatherBatBgOpacity"); weatherBatBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("leftGroupBgOpacity");  leftGroupBgOpacity  = Math.max(0, parseFloat(v))
+        v = _settings.value("rightGroupBgOpacity"); rightGroupBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("trayBgOpacity"); trayBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("startMenuBgOpacity"); startMenuBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("mediaBgOpacity"); mediaBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("cavaBgOpacity"); cavaBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("distroBgOpacity"); distroBgOpacity = Math.max(0, parseFloat(v))
+        v = _settings.value("activeWindowBgOpacity"); activeWindowBgOpacity = v
+        v = _settings.value("activeWindowMinWidth"); activeWindowMinWidth = v
+        v = _settings.value("showClock"); showClock = _toBool(v)
+        v = _settings.value("showDate"); showDate = _toBool(v)
+        v = _settings.value("showWorkspaces"); showWorkspaces = _toBool(v)
+        v = _settings.value("showCava"); showCava = _toBool(v)
+        v = _settings.value("showWeather"); showWeather = _toBool(v)
+        v = _settings.value("showBattery"); showBattery = _toBool(v)
+        v = _settings.value("showMediaPlayer"); showMediaPlayer = _toBool(v)
+        v = _settings.value("showIdleInhibitor"); showIdleInhibitor = _toBool(v)
+        v = _settings.value("showUpdates"); showUpdates = _toBool(v)
+        v = _settings.value("showPowerProfiles"); showPowerProfiles = _toBool(v)
+        v = _settings.value("showOverview"); showOverview = _toBool(v)
+        v = _settings.value("showNotifications"); showNotifications = _toBool(v)
+        v = _settings.value("showWallpaper"); showWallpaper = _toBool(v)
+        v = _settings.value("showTray"); showTray = _toBool(v)
+        v = _settings.value("showBluetooth"); showBluetooth = _toBool(v)
+        //v = _settings.value("showWindow"); showWindow = v
+        v = _settings.value("showDistro"); showDistro = _toBool(v)
         // ── Launcher (GJS app-launcher) ───────────────────────────────────
-        v = _settings.value("launcherSearchWidth");    if (v !== undefined && v !== null) launcherSearchWidth    = v
-        v = _settings.value("launcherIconSize");       if (v !== undefined && v !== null) launcherIconSize       = v
-        v = _settings.value("launcherTextFontSize");   if (v !== undefined && v !== null) launcherTextFontSize   = v
-        v = _settings.value("launcherFixedTileWidth"); if (v !== undefined && v !== null) launcherFixedTileWidth = v
-        v = _settings.value("launcherFixedTileHeight");if (v !== undefined && v !== null) launcherFixedTileHeight= v
-        v = _settings.value("launcherFrameWidth");     if (v !== undefined && v !== null) launcherFrameWidth     = v
-        v = _settings.value("launcherFrameHeight");    if (v !== undefined && v !== null) launcherFrameHeight    = v
-        v = _settings.value("launcherFrameWidthVert"); if (v !== undefined && v !== null) launcherFrameWidthVert = v
-        v = _settings.value("launcherFrameHeightVert");if (v !== undefined && v !== null) launcherFrameHeightVert= v
-        v = _settings.value("launcherBorderRadius");   if (v !== undefined && v !== null) launcherBorderRadius   = v
-        v = _settings.value("launcherBorderWidth");    if (v !== undefined && v !== null) launcherBorderWidth    = v
-        v = _settings.value("launcherSearchRadius");   if (v !== undefined && v !== null) launcherSearchRadius   = v
-        v = _settings.value("launcherListRadius");     if (v !== undefined && v !== null) launcherListRadius     = v
-        v = _settings.value("launcherInnerBorderWidth");if(v !== undefined && v !== null) launcherInnerBorderWidth=v
-        v = _settings.value("launcherInnerPadding");   if (v !== undefined && v !== null) launcherInnerPadding   = v
+        v = _settings.value("launcherSearchWidth");    launcherSearchWidth    = v
+        v = _settings.value("launcherIconSize");       launcherIconSize       = v
+        v = _settings.value("launcherTextFontSize");   launcherTextFontSize   = v
+        v = _settings.value("launcherFixedTileWidth"); launcherFixedTileWidth = v
+        v = _settings.value("launcherFixedTileHeight");launcherFixedTileHeight= v
+        v = _settings.value("launcherFrameWidth");     launcherFrameWidth     = v
+        v = _settings.value("launcherFrameHeight");    launcherFrameHeight    = v
+        v = _settings.value("launcherFrameWidthVert"); launcherFrameWidthVert = v
+        v = _settings.value("launcherFrameHeightVert");launcherFrameHeightVert= v
+        v = _settings.value("launcherBorderRadius");   launcherBorderRadius   = v
+        v = _settings.value("launcherBorderWidth");    launcherBorderWidth    = v
+        v = _settings.value("launcherSearchRadius");   launcherSearchRadius   = v
+        v = _settings.value("launcherListRadius");     launcherListRadius     = v
+        v = _settings.value("launcherInnerBorderWidth"); launcherInnerBorderWidth = v
+        v = _settings.value("launcherInnerPadding");   launcherInnerPadding   = v
         // Bar autohide + dock runtime state
-        v = _settings.value("barAutoHide");      if (v !== undefined && v !== null) barAutoHide      = _toBool(v)
-        v = _settings.value("barAutoHideDelay"); if (v !== undefined && v !== null) barAutoHideDelay = parseInt(v)
-        v = _settings.value("triLeftAutoHide");       if (v !== undefined && v !== null) triLeftAutoHide       = _toBool(v)
-        v = _settings.value("triLeftAutoHideDelay");  if (v !== undefined && v !== null) triLeftAutoHideDelay  = parseInt(v)
-        v = _settings.value("triCenterAutoHide");     if (v !== undefined && v !== null) triCenterAutoHide     = _toBool(v)
-        v = _settings.value("triCenterAutoHideDelay");if (v !== undefined && v !== null) triCenterAutoHideDelay = parseInt(v)
-        v = _settings.value("triRightAutoHide");      if (v !== undefined && v !== null) triRightAutoHide      = _toBool(v)
-        v = _settings.value("triRightAutoHideDelay"); if (v !== undefined && v !== null) triRightAutoHideDelay = parseInt(v)
-        v = _settings.value("dockAutoHide");     if (v !== undefined && v !== null) dockAutoHide     = _toBool(v)
-        v = _settings.value("dockAutoHideDelay");if (v !== undefined && v !== null) dockAutoHideDelay= parseInt(v)
-        v = _settings.value("dockMargin");       if (v !== undefined && v !== null) dockMargin       = parseInt(v)
+        v = _settings.value("barAutoHide");      barAutoHide      = _toBool(v)
+        v = _settings.value("barAutoHideDelay"); barAutoHideDelay = parseInt(v)
+        v = _settings.value("triLeftAutoHide");       triLeftAutoHide       = _toBool(v)
+        v = _settings.value("triLeftAutoHideDelay");  triLeftAutoHideDelay  = parseInt(v)
+        v = _settings.value("triCenterAutoHide");     triCenterAutoHide     = _toBool(v)
+        v = _settings.value("triCenterAutoHideDelay");triCenterAutoHideDelay = parseInt(v)
+        v = _settings.value("triRightAutoHide");      triRightAutoHide      = _toBool(v)
+        v = _settings.value("triRightAutoHideDelay"); triRightAutoHideDelay = parseInt(v)
+        v = _settings.value("dockAutoHide");     dockAutoHide     = _toBool(v)
+        v = _settings.value("dockAutoHideDelay");dockAutoHideDelay= parseInt(v)
+        v = _settings.value("dockMargin");       dockMargin       = parseInt(v)
         // ── Dock appearance (qs-native dock — source of truth, replaces GJS config.js) ──
-        v = _settings.value("dockIconSize");       if (v !== undefined && v !== null) dockIconSize       = parseInt(v)
-        v = _settings.value("dockStartIconSize");  if (v !== undefined && v !== null) dockStartIconSize  = parseInt(v)
-        v = _settings.value("dockTrashIconSize");  if (v !== undefined && v !== null) dockTrashIconSize  = parseInt(v)
-        v = _settings.value("dockButtonSpacing");  if (v !== undefined && v !== null) dockButtonSpacing  = parseInt(v)
-        v = _settings.value("dockInnerPadding");   if (v !== undefined && v !== null) dockInnerPadding   = parseInt(v)
-        v = _settings.value("dockPadding");        if (v !== undefined && v !== null) dockPadding        = parseInt(v)
-        v = _settings.value("dockRadius");         if (v !== undefined && v !== null) dockRadius         = parseInt(v)
-        v = _settings.value("dockTopLeftRadius");    if (v !== undefined && v !== null) dockTopLeftRadius    = parseInt(v)
-        v = _settings.value("dockTopRightRadius");   if (v !== undefined && v !== null) dockTopRightRadius   = parseInt(v)
-        v = _settings.value("dockBottomLeftRadius"); if (v !== undefined && v !== null) dockBottomLeftRadius = parseInt(v)
-        v = _settings.value("dockBottomRightRadius");if (v !== undefined && v !== null) dockBottomRightRadius= parseInt(v)
-        v = _settings.value("dockBorderWidth");    if (v !== undefined && v !== null) dockBorderWidth    = parseInt(v)
-        v = _settings.value("dockBorderAlpha");    if (v !== undefined && v !== null) dockBorderAlpha    = v
-        v = _settings.value("dockBorderColorVar"); if (v !== undefined && v !== null) dockBorderColorVar = v
-        v = _settings.value("dockBackgroundStyle");if (v !== undefined && v !== null) dockBackgroundStyle= v
-        v = _settings.value("dockPosition");       if (v !== undefined && v !== null) dockPosition       = v
-        v = _settings.value("dockStartIcon");      if (v !== undefined && v !== null) dockStartIcon      = v
-        v = _settings.value("dockLayer");          if (v !== undefined && v !== null) dockLayer          = v
-        v = _settings.value("dockReserveSpace");   if (v !== undefined && v !== null) dockReserveSpace   = _toBool(v)
-        v = _settings.value("desktopIconSize");    if (v !== undefined && v !== null) desktopIconSize    = parseInt(v)
-        v = _settings.value("desktopLabelSize");   if (v !== undefined && v !== null) desktopLabelSize   = parseInt(v)
-        v = _settings.value("desktopLabelRadius"); if (v !== undefined && v !== null) desktopLabelRadius = parseInt(v)
-        v = _settings.value("desktopVisible");     if (v !== undefined && v !== null) desktopVisible     = _toBool(v)
-        v = _settings.value("clockTextSize");      if (v !== undefined && v !== null) clockTextSize      = parseInt(v)
-        v = _settings.value("clockIconSize");      if (v !== undefined && v !== null) clockIconSize      = parseInt(v)
-        v = _settings.value("clockWorldCities");   if (v !== undefined && v !== null) { try { clockWorldCities = JSON.parse(v) } catch(e) {} }
+        v = _settings.value("dockIconSize");       dockIconSize       = parseInt(v)
+        v = _settings.value("dockStartIconSize");  dockStartIconSize  = parseInt(v)
+        v = _settings.value("dockTrashIconSize");  dockTrashIconSize  = parseInt(v)
+        v = _settings.value("dockButtonSpacing");  dockButtonSpacing  = parseInt(v)
+        v = _settings.value("dockInnerPadding");   dockInnerPadding   = parseInt(v)
+        v = _settings.value("dockPadding");        dockPadding        = parseInt(v)
+        v = _settings.value("dockRadius");         dockRadius         = parseInt(v)
+        v = _settings.value("dockTopLeftRadius");    dockTopLeftRadius    = parseInt(v)
+        v = _settings.value("dockTopRightRadius");   dockTopRightRadius   = parseInt(v)
+        v = _settings.value("dockBottomLeftRadius"); dockBottomLeftRadius = parseInt(v)
+        v = _settings.value("dockBottomRightRadius");dockBottomRightRadius= parseInt(v)
+        v = _settings.value("dockBorderWidth");    dockBorderWidth    = parseInt(v)
+        v = _settings.value("dockBorderAlpha");    dockBorderAlpha    = v
+        v = _settings.value("dockBorderColorVar"); dockBorderColorVar = v
+        v = _settings.value("dockBackgroundStyle");dockBackgroundStyle= v
+        v = _settings.value("dockPosition");       dockPosition       = v
+        v = _settings.value("dockStartIcon");      dockStartIcon      = v
+        v = _settings.value("dockLayer");          dockLayer          = v
+        v = _settings.value("dockReserveSpace");   dockReserveSpace   = _toBool(v)
+        v = _settings.value("dockVisible");        dockVisible        = _toBool(v)
+        v = _settings.value("desktopIconSize");    desktopIconSize    = parseInt(v)
+        v = _settings.value("desktopLabelSize");   desktopLabelSize   = parseInt(v)
+        v = _settings.value("desktopLabelRadius"); desktopLabelRadius = parseInt(v)
+        v = _settings.value("desktopVisible");     desktopVisible     = _toBool(v)
+        v = _settings.value("clockTextSize");      clockTextSize      = parseInt(v)
+        v = _settings.value("clockIconSize");      clockIconSize      = parseInt(v)
+        v = _settings.value("clockWorldCities");   try { clockWorldCities = JSON.parse(v) } catch(e) {}
     }
 
     function _saveSettings() {
         _settings.setValue("barMode", barMode)
         _settings.setValue("barPosition", barPosition)
-        _settings.setValue("barHeight", barHeight)
+        _settings.setValue("barPad", barPad)
         _settings.setValue("moduleHeight", moduleHeight)
         _settings.setValue("outerMarginTop", outerMarginTop)
         _settings.setValue("outerMarginBottom", outerMarginBottom)
@@ -552,6 +543,7 @@ QtObject {
         _settings.setValue("dockStartIcon",       dockStartIcon)
         _settings.setValue("dockLayer",           dockLayer)
         _settings.setValue("dockReserveSpace",    dockReserveSpace)
+        _settings.setValue("dockVisible",         dockVisible)
         _settings.setValue("desktopIconSize",    desktopIconSize)
         _settings.setValue("desktopLabelSize",   desktopLabelSize)
         _settings.setValue("desktopLabelRadius", desktopLabelRadius)
@@ -576,22 +568,28 @@ QtObject {
     //            Canvas inside Bar.qml itself (not a separate window).
     //            Left/right islands float inside the hollow. Center island is
     //            pinned to and protrudes inward from the active arm.
-    property string barMode: "bar"   // "bar" | "island" | "tri" | "shell"
-    property string barPosition: "top"   // "top" | "bottom" | "left" | "right"
+    property string barMode   // "bar" | "island" | "tri" | "shell"
+    property string barPosition   // "top" | "bottom" | "left" | "right"
 
     // ── Bar geometry ─────────────────────────────────────────────────────
-    //  barHeight   = reserved screen strip (PanelWindow exclusion zone)
-    //  moduleHeight = visual island/pill height (≤ barHeight)
-    //    Gap = (barHeight − moduleHeight) / 2 → "floating pill" look
-    property int barHeight:    34   // px — reserved screen strip
-    property int moduleHeight: 20   // px — visual island/pill height
+    //  barPad       = uniform inset on every side of the bar ("bar") and of the
+    //                 3 islands ("tri"/"shell"). Replaces the old Bar Height pad
+    //                 + the Edge Pad L/R sliders. "island" mode keeps its own
+    //                 edge spacing and is driven only by the derived strip.
+    //  moduleHeight = visual island/pill height
+    //  barHeight    = reserved screen strip (PanelWindow exclusion zone),
+    //                 DERIVED = moduleHeight + 2*barPad. All consumers (popups,
+    //                 reserved zone, island heights) keep reading barHeight.
+    property int barPad    // px — per-side padding ("Bar Pad" slider)
+    property int moduleHeight   // px — visual island/pill height
+    readonly property int barHeight: moduleHeight + 2 * barPad   // derived strip
 
     //  Outer margins from screen edges:
     // Widget-local — Top/Bottom sliders always match visual edge; values swap on top↔bottom flip.
-    property int outerMarginTop:    2   // px — gap from screen top (when bar at top)
-    property int outerMarginBottom: 0   // px — gap from screen bottom (when bar at bottom)
-    property int outerMarginSide:   6   // px — gap from left & right screen edges — used by "bar" & "island" modes
-    property int triModuleSideMargin: 6   // px — side margin for the left/right tri islands (split from outerMarginSide)
+    property int outerMarginTop   // px — gap from screen top (when bar at top)
+    property int outerMarginBottom   // px — gap from screen bottom (when bar at bottom)
+    property int outerMarginSide   // px — gap from left & right screen edges — used by "bar" & "island" modes
+    property int triModuleSideMargin   // px — side margin for the left/right tri islands (split from outerMarginSide)
 
     //  Resolved side margin for the active bar mode — popups (and the tri/shell
     //  islands themselves) should read this instead of outerMarginSide directly,
@@ -603,34 +601,34 @@ QtObject {
 
     //  Far-edge padding: extra inset from the barBg L/R edges to the first/last
     //  module group. Adds inner breathing room in "bar" mode.
-    property int barEdgePaddingLeft:  2   // px
-    property int barEdgePaddingRight: 2   // px
+    property int barEdgePaddingLeft   // px
+    property int barEdgePaddingRight   // px
 
     // ── Radii ────────────────────────────────────────────────────────────
     // Widget-local corners — sliders always match visual TL/TR/BL/BR.
     // On top↔bottom flip, values swap vertically so screen-edge rounding carries over.
-    property int barTopLeftRadius:     20
-    property int barTopRightRadius:    20
-    property int barBottomLeftRadius:  20
-    property int barBottomRightRadius: 20
+    property int barTopLeftRadius
+    property int barTopRightRadius
+    property int barBottomLeftRadius
+    property int barBottomRightRadius
     readonly property int barRadius: barTopLeftRadius
     // tri mode — outer corners share bar TL/BL (left) and TR/BR (right); inner corners independent
-    property int triLeftTopRightRadius:    20
-    property int triLeftBottomRightRadius: 20
-    property int triCenterTopLeftRadius:     20
-    property int triCenterTopRightRadius:    20
-    property int triCenterBottomLeftRadius:  20
-    property int triCenterBottomRightRadius: 20
-    property int triRightTopLeftRadius:     20
-    property int triRightBottomLeftRadius:  20
+    property int triLeftTopRightRadius
+    property int triLeftBottomRightRadius
+    property int triCenterTopLeftRadius
+    property int triCenterTopRightRadius
+    property int triCenterBottomLeftRadius
+    property int triCenterBottomRightRadius
+    property int triRightTopLeftRadius
+    property int triRightBottomLeftRadius
 
     // ── Shell mode properties ─────────────────────────────────────────────
-    property int shellArmThickness:         40   // px — frame arm width on all 4 sides
-    property int shellInnerRadius:          20   // px — inner corner radius (all 4)
-    property int shellCenterJunctionRadius: 20   // px — island junction corner radius
-    property int  shellModuleSideMargin:    6    // px — side margin for the module strip in shell mode
-    property bool shellModuleAutoHide:      false
-    property int  shellModuleAutoHideDelay: 5    // seconds
+    property int shellArmThickness   // px — frame arm width on all 4 sides
+    property int shellInnerRadius   // px — inner corner radius (all 4)
+    property int shellCenterJunctionRadius   // px — island junction corner radius
+    property int  shellModuleSideMargin    // px — side margin for the module strip in shell mode
+    property bool shellModuleAutoHide
+    property int  shellModuleAutoHideDelay    // seconds
 
     property string _lastBarPosition: ""
     property bool   _cornerSwapReady: false
@@ -666,93 +664,93 @@ QtObject {
         _lastBarPosition = barPosition
     }
 
-    property int islandRadius: 20   // px — island pill corner radius
+    property int islandRadius   // px — island pill corner radius
 
     // ── Island border ────────────────────────────────────────────────────
-    property int  islandBorder:      0     // px — 0 to remove
-    property real islandBorderAlpha: 0.22  // 0–1
-    property string islandBorderVar:        "$outline_variant"  // matugen variable
-    property string islandBorderMode:       "matugen"           // "matugen" | "wallust"
-    property string islandBorderWallustVar: "$color0"           // wallust color0–color15
+    property int  islandBorder     // px — 0 to remove
+    property real islandBorderAlpha  // 0–1
+    property string islandBorderVar  // matugen variable
+    property string islandBorderMode           // "matugen" | "wallust"
+    property string islandBorderWallustVar           // wallust color0–color15
     readonly property color islandBorderColor: islandBorderMode === "wallust"
         ? _wallustThemeColor(islandBorderWallustVar)
         : _cavaThemeColor(islandBorderVar)
     // island border gradient: a second colour + angle, rendered by the
     //  GradientBorder Canvas overlay when <prefix>BorderGradient is on.
-    property bool   islandBorderGradient: false
-    property string islandBorderSecondVar:        "$outline_variant"
-    property string islandBorderSecondMode:       "matugen"
-    property string islandBorderSecondWallustVar: "$color15"
+    property bool   islandBorderGradient
+    property string islandBorderSecondVar
+    property string islandBorderSecondMode
+    property string islandBorderSecondWallustVar
     readonly property color islandBorderColor2: islandBorderSecondMode === "wallust"
         ? _wallustThemeColor(islandBorderSecondWallustVar)
         : _cavaThemeColor(islandBorderSecondVar)
-    property real   islandBorderAngle: 45
+    property real   islandBorderAngle
 
     // ── Per-island border on/off toggles — each gates whether that
     //  island draws the border; all share the global islandBorder width
     //  (Island B-W) and islandBorderAlpha (Island B-α) above.
-    property bool borderWs: true
-    property bool borderClockDate: true
-    property bool borderWeatherBat: true
-    property bool borderLeftGroup: true
-    property bool borderRightGroup: true
-    property bool borderStartMenu: true
-    property bool borderMedia: true
-    property bool borderCava: true
-    property bool borderDistro: true
-    property bool borderStartTrash: true
+    property bool borderWs
+    property bool borderClockDate
+    property bool borderWeatherBat
+    property bool borderLeftGroup
+    property bool borderRightGroup
+    property bool borderStartMenu
+    property bool borderMedia
+    property bool borderCava
+    property bool borderDistro
+    property bool borderStartTrash
 
     // ── Bar-module hover tooltips — each gates whether that module shows its
     //  hover tooltip (driven by BarTipState). The tooltip text lives in the
     //  module itself; these toggles only turn the popup on/off per module.
-    property bool tipPowerProfiles: true
-    property bool tipOverview: true
-    property bool tipPower: true
-    property bool tipSystemTray: true
-    property bool tipNotifications: true
-    property bool tipMedia: true
-    property bool tipWeather: true
-    property bool tipBattery: true
-    property bool tipClock: true
-    property bool tipDate: true
-    property bool tipWallpaper: true
-    property bool tipUpdates: true
-    property bool tipControlCenter: true
-    property bool tipIdleInhibitor: true
+    property bool tipPowerProfiles
+    property bool tipOverview
+    property bool tipPower
+    property bool tipSystemTray
+    property bool tipNotifications
+    property bool tipMedia
+    property bool tipWeather
+    property bool tipBattery
+    property bool tipClock
+    property bool tipDate
+    property bool tipWallpaper
+    property bool tipUpdates
+    property bool tipControlCenter
+    property bool tipIdleInhibitor
 
     // ── Main bar border (bar mode only) ──────────────────────────────────
-    property int  barBorderWidth: 2    // px — 0 to hide
-    property real barBorderAlpha: 1.0  // opacity
-    property string barBorderVar:        "$on_secondary"  // matugen variable
-    property string barBorderMode:       "matugen"        // "matugen" | "wallust"
-    property string barBorderWallustVar: "$color7"        // wallust color0–color15
+    property int  barBorderWidth    // px — 0 to hide
+    property real barBorderAlpha  // opacity
+    property string barBorderVar  // matugen variable
+    property string barBorderMode        // "matugen" | "wallust"
+    property string barBorderWallustVar        // wallust color0–color15
     readonly property color barBorderColor: barBorderMode === "wallust"
         ? _wallustThemeColor(barBorderWallustVar)
         : _cavaThemeColor(barBorderVar)
     // bar border gradient: a second colour + angle, rendered by the
     //  GradientBorder Canvas overlay when <prefix>BorderGradient is on.
-    property bool   barBorderGradient: false
-    property string barBorderSecondVar:        "$outline_variant"
-    property string barBorderSecondMode:       "matugen"
-    property string barBorderSecondWallustVar: "$color15"
+    property bool   barBorderGradient
+    property string barBorderSecondVar
+    property string barBorderSecondMode
+    property string barBorderSecondWallustVar
     readonly property color barBorderColor2: barBorderSecondMode === "wallust"
         ? _wallustThemeColor(barBorderSecondWallustVar)
         : _cavaThemeColor(barBorderSecondVar)
-    property real   barBorderAngle: 45
+    property real   barBorderAngle
 
     // ── Island background opacity ─────────────────────────────────────────
     //  moduleBgOpacity  — flat tint alpha in bar mode (also used by islandBgOpacityBar)
     //  islandBgOpacityIsland — gradient alpha in island mode
-    property string islandBgStyle:  "flat"    // "flat" | "gradient" — island pill fill style
-    property string barRectBgStyle: "glass"   // "glass" | "gradient" — outer bar/tri rect fill
+    property string islandBgStyle    // "flat" | "gradient" — island pill fill style
+    property string barRectBgStyle   // "glass" | "gradient" — outer bar/tri rect fill
 
-    property real moduleBgOpacity:       0.5   // 0.0 transparent → 1.0 opaque
-    property real islandBgOpacityIsland: 1.0
+    property real moduleBgOpacity   // 0.0 transparent → 1.0 opaque
+    property real islandBgOpacityIsland
     property real islandBgAlpha:         0.7   // legacy alias
     readonly property real islandBgOpacityBar: moduleBgOpacity
 
     // ── Island spacing ────────────────────────────────────────────────────
-    property int islandSpacing: 4   // px — gap between all top-level items
+    property int islandSpacing   // px — gap between all top-level items
 
     // ── Module spacing & padding ─────────────────────────────────────────
     //  THREE-TIER MODEL
@@ -760,9 +758,9 @@ QtObject {
     //  groupedSpacing → between modules inside one island
     //  wsSpacing      → between workspace buttons (0 = truly no gap)
     //  modPadH/V      → per-side padding inside each module container
-    property int modPadH:        5   // px — per-side H padding in each module
-    property int modPadV:        2   // px — per-side V padding in each module
-    property int groupedSpacing: 0   // px — gap between modules within a group
+    property int modPadH   // px — per-side H padding in each module
+    property int modPadV   // px — per-side V padding in each module
+    property int groupedSpacing   // px — gap between modules within a group
 
     // ═══════════════════════════════════════════════════════════════════════
     //  TAB 2 · Icons
@@ -779,17 +777,17 @@ QtObject {
     //  infoGlyphSize  — icon glyph before clock, date, weather text
     //  wsGlyphSize    — workspace button icons (set separately in Tab 3)
     //  mediaGlyphSize — media player toggle button icon (󰝚)
-    property int glyphSize:      12   // px
-    property int infoGlyphSize:  12   // px — clock / date / weather icon
-    property int mediaGlyphSize: 12   // px — media player toggle glyph
-    property int weatherIconSize: 14  // px - weather bar module icon (was infoGlyphSize+2)
+    property int glyphSize   // px
+    property int infoGlyphSize   // px — clock / date / weather icon
+    property int mediaGlyphSize   // px — media player toggle glyph
+    property int weatherIconSize  // px - weather bar module icon (was infoGlyphSize+2)
 
     //  Text (label) sizes:
     //  infoFontSize  — time, date, weather value, battery %
     //  labelFontSize — active-window title, short labels
-    property int infoFontSize:      12   // px
-    property int mediaInfoFontSize: 10   // px — kept for compat (unused in bar media module)
-    property int labelFontSize:     10   // px
+    property int infoFontSize   // px
+    property int mediaInfoFontSize   // px — kept for compat (unused in bar media module)
+    property int labelFontSize   // px
 
     //  Convenience aliases (keep older modules unchanged):
     readonly property int fontSize:      glyphSize
@@ -815,8 +813,8 @@ QtObject {
     property color rightGroupColor:      Config.glyphColor
 
     // ── Clock popup sizing ────────────────────────────────────────────────
-    property int clockTextSize: 38   // C059 Bold Italic time font size in ClockPopup
-    property int clockIconSize: 32   // Nerd-font clock icon size in ClockPopup
+    property int clockTextSize   // C059 Bold Italic time font size in ClockPopup
+    property int clockIconSize   // Nerd-font clock icon size in ClockPopup
 
     // ── World clock cities ────────────────────────────────────────────────
     // Each entry: { city: "Display Name", timezone: "IANA/Timezone" }
@@ -835,16 +833,16 @@ QtObject {
     property color mediabtGlyphColor:    Qt.rgba(Theme.cInversePrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.80)
     property color powerGlyphColor:      Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 1.00)
     property color windowTextColor:      Theme.cInverseSurface
-    property real  ccGlyphOpacity:        1.0
+    property real  ccGlyphOpacity
     readonly property color ccGlyphColor: Qt.rgba(Theme.cWc13.r, Theme.cWc13.g, Theme.cWc13.b, ccGlyphOpacity)
 
     // ── Battery radial indicator ─────────────────────────────────────────
-    property bool batteryRadialVisible: true
-    property int  batteryRadialSize:    14   // px diameter
-    property int  batteryRadialWidth:   2    // px stroke
+    property bool batteryRadialVisible
+    property int  batteryRadialSize   // px diameter
+    property int  batteryRadialWidth    // px stroke
 
     // ── Control-center / startmenu glyphs ────────────────────────────────
-    property string ccGlyph:       ""     // nf-linux-hyprland
+    property string ccGlyph     // nf-linux-hyprland
     property string powerGlyph:    ""     // nf-fa-chevron_circle_down
     property bool   ccTransparentBg: true
 
@@ -863,11 +861,11 @@ QtObject {
     //  "dot"    — wsDotActive / wsDotPersistent / wsDotEmpty per state
     //  "number" — workspace number as text
     //  "icon"   — wsIcons array; falls back to state dots on empty entry
-    property string wsIconMode: "icon"
+    property string wsIconMode
 
-    property string wsDotActive:     "󰮯"
-    property string wsDotPersistent: "󰺕"
-    property string wsDotEmpty:      ""
+    property string wsDotActive
+    property string wsDotPersistent
+    property string wsDotEmpty
 
     property var wsIcons: [
         "",   // ws 1
@@ -891,9 +889,9 @@ QtObject {
     // ── Workspace colors ─────────────────────────────────────────────────
     //  Colors are readonly so their Theme.cPrimary binding is never broken.
     //  Sliders write to the opacity properties; colors always follow the live theme.
-    property real wsActiveOpacity:     1.0
-    property real wsPersistentOpacity: 0.7
-    property real wsEmptyOpacity:      0.55
+    property real wsActiveOpacity
+    property real wsPersistentOpacity
+    property real wsEmptyOpacity
     readonly property color wsActiveColor:     Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, wsActiveOpacity)
     readonly property color wsPersistentColor: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, wsPersistentOpacity)
     readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, wsEmptyOpacity)
@@ -902,64 +900,64 @@ QtObject {
     //  wsGlyphSize controls the font size of workspace button icons.
     //  Set independently from the global glyphSize so ws icons can be
     //  larger/smaller than other glyphs without affecting the whole bar.
-    property int wsGlyphSize: 12   // px
+    property int wsGlyphSize   // px
 
     // ── Workspace spacing & padding ───────────────────────────────────────
     //  wsSpacing = gap between buttons; 0 = truly no gap (button sized to glyph)
-    property int wsSpacing:     4   // px — between workspace buttons
-    property int wsMarginLeft:  0   // px — gap from bar-left edge to first ws
-    property int wsMarginRight: 0   // px — gap from bar-right edge to last ws
-    property int wsPadLeft:     0   // px — left inside each ws button
-    property int wsPadRight:    0   // px — right inside each ws button
-    property int wsPadTop:      2   // px — top inside each ws button
-    property int wsPadBottom:   2   // px — bottom inside each ws button
+    property int wsSpacing   // px — between workspace buttons
+    property int wsMarginLeft   // px — gap from bar-left edge to first ws
+    property int wsMarginRight   // px — gap from bar-right edge to last ws
+    property int wsPadLeft   // px — left inside each ws button
+    property int wsPadRight   // px — right inside each ws button
+    property int wsPadTop   // px — top inside each ws button
+    property int wsPadBottom   // px — bottom inside each ws button
 
     // ── Workspace separators ─────────────────────────────────────────────
-    property bool   wsSeparators:        false  // show glyph separator between buttons
-    property string wsSeparatorGlyph:    ""
-    property real   wsSeparatorOpacity:  0.3
+    property bool   wsSeparators  // show glyph separator between buttons
+    property string wsSeparatorGlyph
+    property real   wsSeparatorOpacity
     readonly property color wsSeparatorColor: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, wsSeparatorOpacity)
-    property int    wsSeparatorSize:     10    // px — font size of the separator glyph
-    property int    wsSeparatorPadLeft:  2     // px — space between left ws button and separator
-    property int    wsSeparatorPadRight: 2     // px — space between separator and right ws button
+    property int    wsSeparatorSize    // px — font size of the separator glyph
+    property int    wsSeparatorPadLeft     // px — space between left ws button and separator
+    property int    wsSeparatorPadRight     // px — space between separator and right ws button
 
     // ═══════════════════════════════════════════════════════════════════════
     //  TAB 4 · Media
     // ═══════════════════════════════════════════════════════════════════════
 
-    property int    mediaThumbSize:     18   // px — album art thumb (auto-hides when no art)
-    property int    mediaCtlSize:        11   // px — prev / play-pause / next glyph size
+    property int    mediaThumbSize   // px — album art thumb (auto-hides when no art)
+    property int    mediaCtlSize   // px — prev / play-pause / next glyph size
     property string mediaToggleGlyph:  "󰽲"  // nf-md-music_note — GJS toggle button glyph
     // mediaGlyphSize is defined in Tab 2 Icons
 
     //  Media island content-area padding (disc + controls + text group):
-    property int mediaPadLeft:   0   // px
-    property int mediaPadRight:  0   // px
-    property int mediaPadTop:    2   // px
-    property int mediaPadBottom: 2   // px
+    property int mediaPadLeft   // px
+    property int mediaPadRight   // px
+    property int mediaPadTop   // px
+    property int mediaPadBottom   // px
 
     // ═══════════════════════════════════════════════════════════════════════
     //  System Tray
     // ═══════════════════════════════════════════════════════════════════════
 
-    property int trayIconSz:     24   // px — icon image size
-    property int trayItemPadH:    3   // px — horizontal padding inside each tray slot
+    property int trayIconSz   // px — icon image size
+    property int trayItemPadH   // px — horizontal padding inside each tray slot
     property int trayItemPadV:    2   // px — vertical padding inside each tray slot
-    property int trayItemSpacing: 2   // px — gap between tray icons
+    property int trayItemSpacing   // px — gap between tray icons
 
     // ═══════════════════════════════════════════════════════════════════════
     //  TAB 5 · Cava
     // ═══════════════════════════════════════════════════════════════════════
 
-    property int cavaWidth: 25      // ASCII bar count (number of columns rendered by cava)
-    property real cavaBarSpacing: 0  // px — letter-spacing between bars (0 = no gap; fine increments)
+    property int cavaWidth      // ASCII bar count (number of columns rendered by cava)
+    property real cavaBarSpacing  // px — letter-spacing between bars (0 = no gap; fine increments)
 
     //  cavaStyle selects a preset — either an ASCII glyph ramp (cavaStyleMap)
     //  or a Canvas paint style (cavaPaintMap). Set to "" to use cavaBars.
     //  ASCII presets are amplitude RAMPS (index 0 = quiet -> last = loud); one
     //  glyph is picked per band, so the string must grow monotonically in
     //  density/height. Paint presets are drawn live by bar/scripts/cavapaint.js.
-    property string cavaStyle: "dots"
+    property string cavaStyle
 
     readonly property var cavaStyleMap: ({
         "dots":           "⣀⣄⣤⣦⣶⣷⣿⣿",
@@ -988,8 +986,8 @@ QtObject {
     property string cavaBars: "⣀⣄⣤⣦⣶⣷⣿"
 
     //  Paint renderer params (shared by every Canvas style)
-    property int  cavaWaveThickness: 2     // px - stroke width / dot size scale
-    property bool cavaWaveSmooth:    true  // smooth curves vs straight segments
+    property int  cavaWaveThickness     // px - stroke width / dot size scale
+    property bool cavaWaveSmooth  // smooth curves vs straight segments
 
     //  cavaEffectiveBars — resolved bars string (use this in Cava.qml)
     readonly property string cavaEffectiveBars: {
@@ -998,13 +996,13 @@ QtObject {
         return cavaBars
     }
 
-    property bool cavaTransparentWhenInactive: true
-    property real cavaActiveOpacity:   0.85
-    property real cavaInactiveOpacity: 0.0
+    property bool cavaTransparentWhenInactive
+    property real cavaActiveOpacity
+    property real cavaInactiveOpacity
     // cavaAutoHide: when true and showCava is enabled, cava auto-hides when no
     //   media is detected and auto-shows when media starts playing.
     //   When showCava is false, auto-hide is disabled and cava stays hidden.
-    property bool cavaAutoHide: false
+    property bool cavaAutoHide
 
     // ── Cava color ───────────────────────────────────────────────────────
     //  Single color: cavaGlyphColor
@@ -1016,14 +1014,14 @@ QtObject {
     //  re-evaluate automatically whenever Theme updates (wallpaper change).
 
     // Mode + selected variable for each color slot ("matugen" | "custom" | "pywal")
-    property string cavaStartMode:      "matugen"
-    property string cavaEndMode:        "matugen"
-    property string cavaStartVar:       "$primary"     // selected matugen variable
-    property string cavaEndVar:         "$scrim"       // selected matugen variable
-    property string cavaStartPywalVar:  "$color4"      // selected pywal variable
-    property string cavaEndPywalVar:    "$color1"      // selected pywal variable
-    property string cavaStartWallustVar: "$color4"     // selected wallust variable
-    property string cavaEndWallustVar:   "$color0"     // selected wallust variable
+    property string cavaStartMode
+    property string cavaEndMode
+    property string cavaStartVar     // selected matugen variable
+    property string cavaEndVar       // selected matugen variable
+    property string cavaStartPywalVar      // selected pywal variable
+    property string cavaEndPywalVar      // selected pywal variable
+    property string cavaStartWallustVar     // selected wallust variable
+    property string cavaEndWallustVar     // selected wallust variable
 
     // Resolve a matugen "$varname" → the live Theme.cXxx color.
     function _cavaThemeColor(varName) {
@@ -1107,9 +1105,9 @@ QtObject {
             : cavaStartMode === "wallust"
                 ? _wallustThemeColor(cavaStartWallustVar)
                 : _cavaGlyphCustomColor
-    property color _cavaGlyphCustomColor: Theme.cPrimary   // overwritten by CC custom pick
+    property color _cavaGlyphCustomColor   // overwritten by CC custom pick
 
-    property bool  cavaGradientEnabled:    false
+    property bool  cavaGradientEnabled
 
     property color cavaGradientStartColor: cavaStartMode === "matugen"
         ? _cavaThemeColor(cavaStartVar)
@@ -1118,7 +1116,7 @@ QtObject {
             : cavaStartMode === "wallust"
                 ? _wallustThemeColor(cavaStartWallustVar)
                 : _cavaStartCustomColor
-    property color _cavaStartCustomColor: Theme.cPrimary   // overwritten by CC custom pick
+    property color _cavaStartCustomColor   // overwritten by CC custom pick
 
     property color cavaGradientEndColor: cavaEndMode === "matugen"
         ? _cavaThemeColor(cavaEndVar)
@@ -1127,10 +1125,10 @@ QtObject {
             : cavaEndMode === "wallust"
                 ? _wallustThemeColor(cavaEndWallustVar)
                 : _cavaEndCustomColor
-    property color _cavaEndCustomColor: Theme.cScrim       // overwritten by CC custom pick
+    property color _cavaEndCustomColor       // overwritten by CC custom pick
 
     // Fraction of glyph height at which start→end color splits (0.0–1.0, default 0.5)
-    property real  cavaGradientSplit:       0.5
+    property real  cavaGradientSplit
 
     // ── Persist cava color settings to [cc-cava-colors-v1] in hyprcandy-bar.conf ──
     // Mirrors the same pattern used by the border scripts. Runs after load completes
@@ -1186,21 +1184,21 @@ QtObject {
     //  Values are written to ~/.config/hyprcandy/launcher-config.state
     //  and read by the GJS launcher on startup.
 
-    property real  launcherSearchWidth:       1.0
-    property int   launcherIconSize:          48
-    property int   launcherTextFontSize:      11
-    property int   launcherFixedTileWidth:    90
-    property int   launcherFixedTileHeight:   78
-    property int   launcherFrameWidth:        500
-    property int   launcherFrameHeight:       480
-    property int   launcherFrameWidthVert:    380
-    property int   launcherFrameHeightVert:   560
-    property int   launcherBorderRadius:      20
-    property int   launcherBorderWidth:       2
-    property int   launcherSearchRadius:      12
-    property int   launcherListRadius:        12
-    property int   launcherInnerBorderWidth:  1
-    property int   launcherInnerPadding:      10
+    property real  launcherSearchWidth
+    property int   launcherIconSize
+    property int   launcherTextFontSize
+    property int   launcherFixedTileWidth
+    property int   launcherFixedTileHeight
+    property int   launcherFrameWidth
+    property int   launcherFrameHeight
+    property int   launcherFrameWidthVert
+    property int   launcherFrameHeightVert
+    property int   launcherBorderRadius
+    property int   launcherBorderWidth
+    property int   launcherSearchRadius
+    property int   launcherListRadius
+    property int   launcherInnerBorderWidth
+    property int   launcherInnerPadding
 
     function _saveLauncherConfig() {
         const state = {
@@ -1241,62 +1239,62 @@ QtObject {
     //  opacity = 1  → full color.
 
     property color wsBgColor:   Theme.cOnSecondary
-    property real  wsBgOpacity: 0
+    property real  wsBgOpacity
 
     property color groupedBgColor:   Theme.cOnSecondary
-    property real  groupedBgOpacity: 0
+    property real  groupedBgOpacity
 
     property color ungroupedBgColor:   Theme.cOnSecondary
-    property real  ungroupedBgOpacity: 0
+    property real  ungroupedBgOpacity
 
     // Split from ungrouped — Clock & Date island / Weather & Battery islands
-    property real  clockDateBgOpacity:  ungroupedBgOpacity
-    property real  weatherBatBgOpacity: ungroupedBgOpacity
+    property real  clockDateBgOpacity
+    property real  weatherBatBgOpacity
 
     // Split from grouped — left app-group island / right app-group island
-    property real  leftGroupBgOpacity:  groupedBgOpacity
-    property real  rightGroupBgOpacity: groupedBgOpacity
+    property real  leftGroupBgOpacity
+    property real  rightGroupBgOpacity
 
     property color trayBgColor:   Theme.cOnSecondary
-    property real  trayBgOpacity: 0
+    property real  trayBgOpacity
 
     property color startMenuBgColor:   Theme.cSurfaceTint
-    property real  startMenuBgOpacity: 1.0
+    property real  startMenuBgOpacity
 
     property color mediaBgColor:   Theme.cOnSecondary
-    property real  mediaBgOpacity: 0
+    property real  mediaBgOpacity
 
     property color cavaBgColor:   Theme.cOnSecondary
-    property real  cavaBgOpacity: 0
+    property real  cavaBgOpacity
 
     property color distroBgColor:   Theme.cOnSecondary
-    property real  distroBgOpacity: 0
+    property real  distroBgOpacity
 
     property color activeWindowBgColor:   Theme.cOnSecondary
-    property real  activeWindowBgOpacity: 0
-    property int   activeWindowMinWidth:  23   // px — kept even when title is empty
+    property real  activeWindowBgOpacity
+    property int   activeWindowMinWidth   // px — kept even when title is empty
 
     // ═══════════════════════════════════════════════════════════════════════
     //  Module visibility
     // ═══════════════════════════════════════════════════════════════════════
 
-    property bool showClock:         true
-    property bool showDate:          true
-    property bool showWorkspaces:    true
-    property bool showCava:          true
-    property bool showWeather:       true
-    property bool showBattery:       true
-    property bool showMediaPlayer:   true
-    property bool showIdleInhibitor: true
-    property bool showUpdates:       true
-    property bool showPowerProfiles: true
-    property bool showOverview:      true
-    property bool showNotifications: true
-    property bool showWallpaper:     true
-    property bool showTray:          true
-    property bool showBluetooth:     true
-    property bool showWindow:        false
-    property bool showDistro:        true
+    property bool showClock
+    property bool showDate
+    property bool showWorkspaces
+    property bool showCava
+    property bool showWeather
+    property bool showBattery
+    property bool showMediaPlayer
+    property bool showIdleInhibitor
+    property bool showUpdates
+    property bool showPowerProfiles
+    property bool showOverview
+    property bool showNotifications
+    property bool showWallpaper
+    property bool showTray
+    property bool showBluetooth
+    property bool showWindow
+    property bool showDistro
 
     // ═══════════════════════════════════════════════════════════════════════
     //  Behaviour / intervals
@@ -1307,14 +1305,14 @@ QtObject {
     //  Bar auto-hide  (source of truth for QS bar; also written to
     //  hyprcandy-bar.conf so the GJS dock process can read the same file)
     // ═══════════════════════════════════════════════════════════════════════
-    property bool barAutoHide:      false
-    property int  barAutoHideDelay: 5       // seconds
-    property bool triLeftAutoHide:       false
-    property int  triLeftAutoHideDelay:  5
-    property bool triCenterAutoHide:     false
-    property int  triCenterAutoHideDelay: 5
-    property bool triRightAutoHide:      false
-    property int  triRightAutoHideDelay: 5
+    property bool barAutoHide
+    property int  barAutoHideDelay       // seconds
+    property bool triLeftAutoHide
+    property int  triLeftAutoHideDelay
+    property bool triCenterAutoHide
+    property int  triCenterAutoHideDelay
+    property bool triRightAutoHide
+    property int  triRightAutoHideDelay
     // Shell module strip auto-hide (separate from the full-bar auto-hide)
     // shellModuleAutoHide / shellModuleAutoHideDelay live above with the shell geometry props
 
@@ -1324,37 +1322,38 @@ QtObject {
     //  config.js @HCD sed/respawn plumbing is retired. Values persist in
     //  [qs-bar-config-v1] of ~/.config/hyprcandy/hyprcandy-bar.conf.
     // ═══════════════════════════════════════════════════════════════════════
-    property bool   dockAutoHide:      false
-    property int    dockAutoHideDelay: 5       // seconds
-    property int    dockMargin:        6       // px — screen-edge gap
-    property int    dockIconSize:      24      // px — app icon size
-    property int    dockStartIconSize: 15      // px - start badge glyph
-    property int    dockTrashIconSize: 15      // px - trash badge glyph
-    property int    dockButtonSpacing: 4       // px — gap between dock buttons
-    property int    dockInnerPadding:  16      // px — padding inside dock rect
-    property int    dockPadding:       4       // px — legacy extra padding
-    property int    dockRadius:        30      // px — default corner radius
-    property int    dockTopLeftRadius:     22
-    property int    dockTopRightRadius:    22
-    property int    dockBottomLeftRadius:  22
-    property int    dockBottomRightRadius: 22
-    property int    dockBorderWidth:   1       // px — dock rect border
-    property real   dockBorderAlpha:   0.45    // 0–1
-    property string dockBorderColorVar: "on_secondary"  // matugen var, $ optional
-    property string dockBackgroundStyle: "glass"        // "glass" | "gradient"
-    property string dockPosition:      "bottom"         // bottom|left|right|top
-    property string dockStartIcon:     ""               // glyph override (empty → 󰚾)
-    property string dockLayer:         "top"            // "top" | "overlay"
-    property bool   dockReserveSpace:  false            // exclusive zone on/off
+    property bool   dockAutoHide
+    property int    dockAutoHideDelay       // seconds
+    property int    dockMargin       // px — screen-edge gap
+    property int    dockIconSize      // px — app icon size
+    property int    dockStartIconSize      // px - start badge glyph
+    property int    dockTrashIconSize      // px - trash badge glyph
+    property int    dockButtonSpacing       // px — gap between dock buttons
+    property int    dockInnerPadding      // px — padding inside dock rect
+    property int    dockPadding       // px — legacy extra padding
+    property int    dockRadius      // px — default corner radius
+    property int    dockTopLeftRadius
+    property int    dockTopRightRadius
+    property int    dockBottomLeftRadius
+    property int    dockBottomRightRadius
+    property int    dockBorderWidth       // px — dock rect border
+    property real   dockBorderAlpha    // 0–1
+    property string dockBorderColorVar  // matugen var, $ optional
+    property string dockBackgroundStyle        // "glass" | "gradient"
+    property string dockPosition         // bottom|left|right|top
+    property string dockStartIcon               // glyph override (empty → 󰚾)
+    property string dockLayer            // "top" | "overlay"
+    property bool   dockReserveSpace            // exclusive zone on/off
+    property bool   dockVisible             // shown / user-hidden (replaces legacy dock.state)
     // Resolved border color — accepts "on_secondary" or "$on_secondary".
     readonly property color dockBorderColor: _cavaThemeColor(
         dockBorderColorVar.startsWith("$") ? dockBorderColorVar : "$" + dockBorderColorVar)
 
     // ── Desktop icon layer ───────────────────────────────────────────────
-    property int  desktopIconSize:    36   // px — app icon size
-    property int  desktopLabelSize:   11   // pt — label font size
-    property int  desktopLabelRadius: 10   // px — label background corner radius
-    property bool desktopVisible:     true // show/hide desktop icon layer
+    property int  desktopIconSize   // px — app icon size
+    property int  desktopLabelSize   // pt — label font size
+    property int  desktopLabelRadius   // px — label background corner radius
+    property bool desktopVisible // show/hide desktop icon layer
 
     // ═══════════════════════════════════════════════════════════════════════
     //  Hyprland compositor defaults  (from hyprviz.conf)
@@ -1371,7 +1370,7 @@ QtObject {
 
     readonly property bool wsScrollSwitch:  true
     readonly property int  weatherInterval: 300    // seconds
-    property int  wsCount:         5      // persistent workspace slots (1–10)
+    property int  wsCount      // persistent workspace slots (1–10)
     readonly property int  hoverDuration:   300    // ms — hover animation
 
     // ═══════════════════════════════════════════════════════════════════════

@@ -69,18 +69,7 @@ PanelWindow {
         onExited: running = false
     }
 
-    // ── Dock current values (read from config.js on open) ─────────────────
-    property string _dockSpacingVal:    "0"
-    property string _dockPaddingVal:    "0"
-    property string _dockBorderWVal:    "2"
-    property string _dockBorderTLVal:   "20"
-    property string _dockBorderTRVal:   "20"
-    property string _dockBorderBLVal:   "20"
-    property string _dockBorderBRVal:   "20"
-    property string _dockBorderColorVar: "on_secondary"
-    property string _dockIconSizeVal:   "24"
-    property string _dockStartIconVal:  ""
-    property string _dockRectBgStyle:   "glass"
+    // Dock geometry/values are owned directly by Config now (no config.js read).
     // Auto-hide + layer + margin — bar values come from Config directly;
     // dock values still need _confReadProc since GJS is a separate process
     property bool   _barAhEnabled:  Config.barAutoHide
@@ -486,42 +475,6 @@ PanelWindow {
                 ccWin._currentLayout = lines[9].trim().toLowerCase()
         }
     }
-    Process {
-        id: _dockValReader
-        command: ["bash", "-c",
-            "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\"; " +
-            "[ -f \"$f\" ] || exit 0; " +
-            "grep -oP 'buttonSpacing:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP 'innerPadding:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP 'borderWidth:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP 'borderRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP 'borderTopLeftRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP 'borderTopRightRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP 'borderBottomLeftRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP 'borderBottomRightRadius:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP 'appIconSize:\\s*\\K[0-9]+' \"$f\" | head -1; " +
-            "grep -oP \"startIcon:\\s*'\\K[^']+\" \"$f\" | head -1"]
-        running: false
-        property var _lines: []
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: function(l) { _dockValReader._lines.push(l.trim()) }
-        }
-        onExited: {
-            const ls = _lines
-            _lines = []
-            _dockSpacingVal   = (ls[0] !== undefined && ls[0]) ? ls[0] : "0"
-            _dockPaddingVal   = (ls[1] !== undefined && ls[1]) ? ls[1] : "0"
-            _dockBorderWVal   = (ls[2] !== undefined && ls[2]) ? ls[2] : "2"
-            const fallbackR   = (ls[3] !== undefined && ls[3]) ? ls[3] : "20"
-            _dockBorderTLVal  = (ls[4] !== undefined && ls[4]) ? ls[4] : fallbackR
-            _dockBorderTRVal  = (ls[5] !== undefined && ls[5]) ? ls[5] : fallbackR
-            _dockBorderBLVal  = (ls[6] !== undefined && ls[6]) ? ls[6] : fallbackR
-            _dockBorderBRVal  = (ls[7] !== undefined && ls[7]) ? ls[7] : fallbackR
-            _dockIconSizeVal  = (ls[8] !== undefined && ls[8]) ? ls[8] : "24"
-            _dockStartIconVal = (ls[9] !== undefined && ls[9]) ? ls[9] : ""
-        }
-    }
     // ── Shared conf writer for hyprcandy-bar.conf ────────────────────────────
     // All auto-hide and layer writes funnel through this single Process.
     // The caller sets _cmd then starts the process.  If a write is already
@@ -806,14 +759,6 @@ PanelWindow {
         }
         onExited: running = false
     }
-    // Dock background style writer — called from the Bar:Background switch so both
-    // bar and dock rect fill stay in sync from a single control.
-    Process {
-        id: _dockRectBgWrite
-        running: false
-        onExited: running = false
-    }
-
     // Geocoding search process — queries Open-Meteo geocoding API
     Process {
         id: _weatherGeoProc
@@ -1810,7 +1755,7 @@ PanelWindow {
 
                                          CCSection { text: "Dimensions" }
                                          CCSlider { visible: Config.barMode === "shell"; label:"Shell Pad";   from:4;to:120; stepSize:1;  value:Config.shellArmThickness;         onMoved:function(v){Config.shellArmThickness=v} }
-                                         CCSlider { label:"Bar Height";    from:20;to:50;  stepSize:2;  value:Config.barHeight;    onMoved:function(v){Config.barHeight=v} }
+                                         CCSlider { label:"Bar Pad";    from:0;to:24;  stepSize:1;  value:Config.barPad;    onMoved:function(v){Config.barPad=v} }
                                          CCSlider { label:"Module Height";  from:12;to:30;  stepSize:2;  value:Config.moduleHeight;  onMoved:function(v){Config.moduleHeight=v} }
 
                                          CCSection { text: "Screen Margins" }
@@ -1820,8 +1765,7 @@ PanelWindow {
                                          CCSlider { visible: Config.barMode !== "tri" && Config.barMode !== "shell"; label:"Side Margin";       from:0;to:200; value:Config.outerMarginSide;      onMoved:function(v){Config.outerMarginSide=v} }
                                          CCSlider { visible: Config.barMode === "tri";                              label:"Side Margin (Tri)";   from:0;to:200; value:Config.triModuleSideMargin;  onMoved:function(v){Config.triModuleSideMargin=v} }
                                          CCSlider { visible: Config.barMode === "shell";                            label:"Side Margin (Shell)"; from:0;to:200; value:Config.shellModuleSideMargin;onMoved:function(v){Config.shellModuleSideMargin=v} }
-                                         CCSlider { label:"Edge Pad Left"; from:0;to:30; value:Config.barEdgePaddingLeft; onMoved:function(v){Config.barEdgePaddingLeft=v} }
-                                         CCSlider { label:"Edge Pad Right";from:0;to:30; value:Config.barEdgePaddingRight;onMoved:function(v){Config.barEdgePaddingRight=v} }
+                                         // Edge Pad L/R folded into the "Bar Pad" slider (uniform padding) for bar/tri/shell.
 
                                         CCSection { text: "Spacing & Padding" }
                                         CCSlider { label:"Island Spacing";  from:0;to:24; value:Config.islandSpacing;  onMoved:function(v){Config.islandSpacing=v} }
@@ -1868,34 +1812,9 @@ PanelWindow {
                                              value: Config.barBorderWidth
                                              onMoved: function(v) {
                                                  Config.barBorderWidth = v
-                                                 _dockBorderWVal = v.toString()
-                                                 if (_barBorderWFromBarWrite.running) {
-                                                     _barBorderWFromBarWrite._pending = [scriptDir + "/dock-set.sh", "borderWidth", v.toString()]
-                                                 } else {
-                                                     _barBorderWFromBarWrite.command = [scriptDir + "/dock-set.sh", "borderWidth", v.toString()]
-                                                     _barBorderWFromBarWrite.running = true
-                                                 }
-                                                 _barBorderWStateWrite.command = ["bash", "-c",
-                                                     "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/dock-border-w.state\";" +
-                                                     "mkdir -p \"$(dirname \"$f\")\";" +
-                                                     "printf '%s\\n' '" + v.toString() + "' > \"$f\""
-                                                 ]
                                                  Config.launcherBorderWidth = Math.round(v)
-                                                 _barBorderWStateWrite.running = true   
                                             }
                                          }
-                                         Process {
-                                             id: _barBorderWFromBarWrite
-                                             property var _pending: null
-                                             running: false
-                                             onExited: {
-                                                 running = false
-                                                 if (_pending !== null) {
-                                                     command = _pending; _pending = null; running = true
-                                                 }
-                                             }
-                                         }
-                                         Process { id: _barBorderWStateWrite; running: false; onExited: running = false }
                                          CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
                                          CCSlider {
                                              label: "Island B-W"
@@ -1903,12 +1822,6 @@ PanelWindow {
                                              value: Config.islandBorder
                                              onMoved: function(v) {
                                                  Config.islandBorder = v
-                                                 if (_islBorderDockWrite.running) {
-                                                     _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", "width", v.toString()]
-                                                 } else {
-                                                     _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", "width", v.toString()]
-                                                     _islBorderDockWrite.running = true
-                                                 }
                                              }
                                          }
                                          CCSlider {
@@ -1917,12 +1830,6 @@ PanelWindow {
                                              value: Config.islandBorderAlpha
                                              onMoved: function(v) {
                                                  Config.islandBorderAlpha = v
-                                                 if (_islBorderDockWrite.running) {
-                                                     _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", "alpha", v.toString()]
-                                                 } else {
-                                                     _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", "alpha", v.toString()]
-                                                     _islBorderDockWrite.running = true
-                                                 }
                                              }
                                          }
 
@@ -1958,24 +1865,6 @@ PanelWindow {
                                                                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                 onClicked: {
                                                                     Config.barBorderMode = modelData
-                                                                    // Keep the GJS dock border in sync when switching
-                                                                    // modes without re-picking a swatch — otherwise the
-                                                                    // dock keeps whatever color was last written for
-                                                                    // whichever mode was active last time a swatch was
-                                                                    // clicked, instead of following the mode you just
-                                                                    // switched to.
-                                                                    const activeVar = modelData === "matugen"
-                                                                        ? Config.barBorderVar
-                                                                        : Config.barBorderWallustVar
-                                                                    if (activeVar) {
-                                                                        const gtk = activeVar.replace(/^\$/, "")
-                                                                        if (_barBorderDockWrite.running) {
-                                                                            _barBorderDockWrite._pending = [scriptDir + "/dock-border.sh", gtk]
-                                                                        } else {
-                                                                            _barBorderDockWrite.command = [scriptDir + "/dock-border.sh", gtk]
-                                                                            _barBorderDockWrite.running = true
-                                                                        }
-                                                                    }
                                                                 }
                                                             }
                                                             Behavior on color { ColorAnimation { duration: 120 } }
@@ -2017,14 +1906,6 @@ PanelWindow {
                                                                     hoverEnabled: true
                                                                     onClicked: {
                                                                         Config.barBorderVar = modelData.var
-                                                                        // Sync dock window border (line 10 of style.css)
-                                                                        const gtk = modelData.var.replace(/^\$/, "").replace(/_/g, "_")
-                                                                        if (_barBorderDockWrite.running) {
-                                                                            _barBorderDockWrite._pending = [scriptDir + "/dock-border.sh", gtk]
-                                                                        } else {
-                                                                            _barBorderDockWrite.command = [scriptDir + "/dock-border.sh", gtk]
-                                                                            _barBorderDockWrite.running = true
-                                                                        }
                                                                     }
                                                                 }
                                                                 Behavior on border.width { NumberAnimation { duration: 100 } }
@@ -2061,14 +1942,6 @@ PanelWindow {
                                                                     hoverEnabled: true
                                                                     onClicked: {
                                                                         Config.barBorderWallustVar = modelData.var
-                                                                        // Sync dock window border (line 10 of style.css) with wallust colorN name
-                                                                        const gtk = modelData.var.replace(/^\$/, "")
-                                                                        if (_barBorderDockWrite.running) {
-                                                                            _barBorderDockWrite._pending = [scriptDir + "/dock-border.sh", gtk]
-                                                                        } else {
-                                                                            _barBorderDockWrite.command = [scriptDir + "/dock-border.sh", gtk]
-                                                                            _barBorderDockWrite.running = true
-                                                                        }
                                                                     }
                                                                 }
                                                                 Behavior on border.width { NumberAnimation { duration: 100 } }
@@ -2078,18 +1951,6 @@ PanelWindow {
                                                 }
                                             }
                                         }
-                                        Process {
-                                            id: _barBorderDockWrite
-                                            property var _pending: null
-                                            running: false
-                                            onExited: {
-                                                running = false
-                                                if (_pending !== null) {
-                                                    command = _pending; _pending = null; running = true
-                                                }
-                                            }
-                                        }
-
                                         CCSection { text: "Island Border Color" }
                                         // ── matugen / wallust 2-option pill ─────────────────────────
                                         RowLayout {
@@ -2122,24 +1983,6 @@ PanelWindow {
                                                                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                 onClicked: {
                                                                     Config.islandBorderMode = modelData
-                                                                    // Keep the GJS dock island border in sync when
-                                                                    // switching modes without re-picking a swatch —
-                                                                    // otherwise the dock keeps whatever color was last
-                                                                    // written for whichever mode was active last time
-                                                                    // a swatch was clicked, instead of following the
-                                                                    // mode you just switched to.
-                                                                    const activeVar = modelData === "matugen"
-                                                                        ? Config.islandBorderVar
-                                                                        : Config.islandBorderWallustVar
-                                                                    if (activeVar) {
-                                                                        const gtk = activeVar.replace(/^\$/, "")
-                                                                        if (_islBorderDockWrite.running) {
-                                                                            _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", gtk]
-                                                                        } else {
-                                                                            _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", gtk]
-                                                                            _islBorderDockWrite.running = true
-                                                                        }
-                                                                    }
                                                                 }
                                                             }
                                                             Behavior on color { ColorAnimation { duration: 120 } }
@@ -2181,14 +2024,6 @@ PanelWindow {
                                                                     hoverEnabled: true
                                                                     onClicked: {
                                                                         Config.islandBorderVar = modelData.var
-                                                                        // Sync dock start/trash border (line 49 of style.css)
-                                                                        const gtk = modelData.var.replace(/^\$/, "")
-                                                                        if (_islBorderDockWrite.running) {
-                                                                            _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", gtk]
-                                                                        } else {
-                                                                            _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", gtk]
-                                                                            _islBorderDockWrite.running = true
-                                                                        }
                                                                     }
                                                                 }
                                                                 Behavior on border.width { NumberAnimation { duration: 100 } }
@@ -2225,14 +2060,6 @@ PanelWindow {
                                                                     hoverEnabled: true
                                                                     onClicked: {
                                                                         Config.islandBorderWallustVar = modelData.var
-                                                                        // Sync dock start/trash border (line 49 of style.css) with wallust colorN
-                                                                        const gtk = modelData.var.replace(/^\$/, "")
-                                                                        if (_islBorderDockWrite.running) {
-                                                                            _islBorderDockWrite._pending = [scriptDir + "/dock-island-border.sh", gtk]
-                                                                        } else {
-                                                                            _islBorderDockWrite.command = [scriptDir + "/dock-island-border.sh", gtk]
-                                                                            _islBorderDockWrite.running = true
-                                                                        }
                                                                     }
                                                                 }
                                                                 Behavior on border.width { NumberAnimation { duration: 100 } }
@@ -2242,18 +2069,6 @@ PanelWindow {
                                                 }
                                             }
                                         }
-                                        Process {
-                                            id: _islBorderDockWrite
-                                            property var _pending: null
-                                            running: false
-                                            onExited: {
-                                                running = false
-                                                if (_pending !== null) {
-                                                    command = _pending; _pending = null; running = true
-                                                }
-                                            }
-                                        }
-
                                         CCSection { text: "Per-Island Borders" }
                                         Text {
                                             Layout.fillWidth: true
@@ -2935,12 +2750,6 @@ PanelWindow {
                                             value: Config.islandBgStyle === "gradient"
                                             onToggled: function(v) {
                                                 Config.islandBgStyle = v ? "gradient" : "flat"
-                                                const style = v ? "gradient" : "flat"
-                                                const cmd = "sed -i \"s/islandBgStyle: '[^']*'/islandBgStyle: '" + style + "'/;\" " +
-                                                      "\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\" && " +
-                                                      "pkill -SIGUSR2 -f 'gjs dock-main.js' 2>/dev/null || true"
-                                                if (_confWriteProc.running) _confWriteProc._pendingCmd = cmd
-                                                else { _confWriteProc._cmd = cmd; _confWriteProc.running = true }
                                             }
                                         }
 
@@ -2962,35 +2771,6 @@ PanelWindow {
                                             onPicked: function(v) {
                                                 Config.barRectBgStyle = v
                                                 Config.dockBackgroundStyle = v
-                                                _dockRectBgStyle = v
-                                                // Write rectBgStyle and borderWidth in one sed pass so the dock
-                                                // reloads once with both values already in place — no stagger.
-                                                // Gradient → border 0.
-                                                // Glass → read from dock-border-w.state (written by the Border W
-                                                // slider on every non-zero move) so a wallpaper change that resets
-                                                // config.js to its template defaults doesn't leave the border at
-                                                // zero when switching back to glass. Falls back to _dockBorderWVal
-                                                // if the state file doesn't exist yet.
-                                                if (v === "gradient") {
-                                                    _dockRectBgWrite.command = ["bash", "-c",
-                                                        "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\"; " +
-                                                        "sed -i \"s/rectBgStyle: '[^']*'/rectBgStyle: 'gradient'/;" +
-                                                                 "s/borderWidth: [0-9]*/borderWidth: 0/\" \"$f\" && " +
-                                                        "pkill -SIGUSR2 -f 'gjs dock-main.js'"
-                                                    ]
-                                                } else {
-                                                    const fallback = _dockBorderWVal
-                                                    _dockRectBgWrite.command = ["bash", "-c",
-                                                        "sf=\"$HOME/.hyprcandy/GJS/hyprcandydock/dock-border-w.state\";" +
-                                                        "bw=$(cat \"$sf\" 2>/dev/null | tr -dc '0-9' | head -c4);" +
-                                                        "[ -z \"$bw\" ] && bw='" + fallback + "';" +
-                                                        "f=\"$HOME/.hyprcandy/GJS/hyprcandydock/config.js\"; " +
-                                                        "sed -i \"s/rectBgStyle: '[^']*'/rectBgStyle: 'glass'/;" +
-                                                                 "s/borderWidth: [0-9]*/borderWidth: $bw/\" \"$f\" && " +
-                                                        "pkill -SIGUSR2 -f 'gjs dock-main.js'"
-                                                    ]
-                                                }
-                                                _dockRectBgWrite.running = true
                                             }
                                         }
 

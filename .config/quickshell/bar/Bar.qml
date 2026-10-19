@@ -164,12 +164,11 @@ PanelWindow {
         margins {
             top:  bar._isTop    ? (Config.shellArmThickness + Config.outerMarginTop)    : 0
             bottom: bar._isBottom ? (Config.shellArmThickness + Config.outerMarginBottom) : 0
-            left: Config.shellModuleSideMargin
+            left: Config.shellArmThickness + Config.shellModuleSideMargin
         }
         implicitHeight: Config.barHeight
         implicitWidth:  shellLeftIslandRow.implicitWidth
-                        + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
-                        + Config.islandSpacing * 2
+                        + Config.barPad * 2
 
         HoverHandler {
             // Opacity-0 island windows still take hover; gate so only the
@@ -236,7 +235,7 @@ PanelWindow {
                 id: shellLeftIslandRow
                 anchors {
                     left:           parent.left
-                    leftMargin:     Config.islandSpacing + Config.barEdgePaddingLeft
+                    leftMargin:     Config.barPad
                     verticalCenter: parent.verticalCenter
                 }
                 spacing: Config.islandSpacing
@@ -275,12 +274,11 @@ PanelWindow {
         margins {
             top:    bar._isTop    ? (Config.shellArmThickness + Config.outerMarginTop)    : 0
             bottom: bar._isBottom ? (Config.shellArmThickness + Config.outerMarginBottom) : 0
-            right:  Config.shellModuleSideMargin
+            right:  Config.shellArmThickness + Config.shellModuleSideMargin
         }
         implicitHeight: Config.barHeight
         implicitWidth:  shellRightIslandRow.implicitWidth
-                        + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
-                        + Config.islandSpacing * 2
+                        + Config.barPad * 2
 
         HoverHandler {
             // Opacity-0 island windows still take hover; gate so only the
@@ -347,7 +345,7 @@ PanelWindow {
                 id: shellRightIslandRow
                 anchors {
                     right:          parent.right
-                    rightMargin:    Config.islandSpacing + Config.barEdgePaddingRight
+                    rightMargin:    Config.barPad
                     verticalCenter: parent.verticalCenter
                 }
                 spacing: Config.islandSpacing
@@ -1017,8 +1015,8 @@ PanelWindow {
             r = Math.min(r, (W - 2 * armT) / 2, (H - 2 * armT) / 2)
 
             const centerActive = (!bar._triCenterAhHidden || bar._triCenterPinned) && (Config.showClock || Config.showDate || Config.showCava || Config.showDistro)
-            const centerH = centerActive ? Math.max(Config.barHeight, Config.moduleHeight) : armT
-            const cWidth = centerActive ? (shellCenterRow.implicitWidth + Config.barEdgePaddingLeft + Config.barEdgePaddingRight + Config.islandSpacing * 2) : 0
+            const centerH = centerActive ? (Config.shellArmThickness + Config.moduleHeight + Config.barPad) : armT
+            const cWidth = centerActive ? (shellCenterRow.implicitWidth + Config.barPad * 2) : 0
             const cX1 = (W - cWidth) / 2
             const cX2 = (W + cWidth) / 2
             // Center-island radius: clamp to half the island's own depth/width so the
@@ -1361,8 +1359,8 @@ PanelWindow {
         opacity: (bar._ahHidden || bar._shellModHidden) ? 0.0 : 1.0
         readonly property int _minGap: 4
         property bool _mediaActive: MediaPlayerState.anyPlaying || MediaPlayerState.active
-        readonly property real _leftEdge:   Config.islandSpacing + Config.barEdgePaddingLeft
-        readonly property real _rightEdge:  Config.islandSpacing + Config.barEdgePaddingRight
+        readonly property real _leftEdge:   Config.barMode === "island" ? (Config.islandSpacing + Config.barEdgePaddingLeft)  : Config.barPad
+        readonly property real _rightEdge:  Config.barMode === "island" ? (Config.islandSpacing + Config.barEdgePaddingRight) : Config.barPad
         readonly property real _centerX:    width / 2
         readonly property real _leftMaxRight: _centerX - _minGap
         readonly property real _rightMinLeft: _centerX + _minGap
@@ -1388,7 +1386,7 @@ PanelWindow {
             visible: bar._isHorizontal && Config.barMode !== "tri" && Config.barMode !== "shell"
             anchors {
                 left: parent.left
-                leftMargin: Config.islandSpacing + Config.barEdgePaddingLeft
+                leftMargin: barLayout._leftEdge
                 verticalCenter: parent.verticalCenter
             }
             spacing: Config.islandSpacing
@@ -1439,7 +1437,7 @@ PanelWindow {
             visible: bar._isHorizontal && Config.barMode !== "tri" && Config.barMode !== "shell"
             anchors {
                 right: parent.right
-                rightMargin: Config.islandSpacing + Config.barEdgePaddingRight
+                rightMargin: barLayout._rightEdge
                 verticalCenter: parent.verticalCenter
             }
             spacing: Config.islandSpacing
@@ -1482,8 +1480,7 @@ PanelWindow {
             }
             height:       Config.barHeight
             implicitWidth: triLeftRow.implicitWidth
-                           + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
-                           + Config.islandSpacing * 2
+                           + Config.barPad * 2
             topLeftRadius:     Config.barTopLeftRadius
             topRightRadius:    Config.triLeftTopRightRadius
             bottomLeftRadius:  Config.barBottomLeftRadius
@@ -1542,7 +1539,7 @@ PanelWindow {
                 id: triLeftRow
                 anchors {
                     left:           parent.left
-                    leftMargin:     Config.islandSpacing + Config.barEdgePaddingLeft
+                    leftMargin:     Config.barPad
                     verticalCenter: parent.verticalCenter
                 }
                 spacing: Config.islandSpacing
@@ -1559,7 +1556,7 @@ PanelWindow {
                             const centerLeft = Config.barMode === "shell" ? shellCenter.x : triCenter.x
                             const available = centerLeft - leftRight - gap
                             if (available >= 0) return -1
-                            return Math.max(0, triLeft.width + available - (Config.barEdgePaddingLeft + Config.barEdgePaddingRight + Config.islandSpacing * 2))
+                            return Math.max(0, triLeft.width + available - (Config.barPad * 2))
                         }
                     }
                 }
@@ -1588,11 +1585,14 @@ PanelWindow {
             anchors {
                 horizontalCenter: parent.horizontalCenter
             }
-            y: bar._isTop ? 0 : (parent.height - height)
-            height: Math.max(Config.barHeight, Config.moduleHeight)
+            y: bar._isTop ? Config.shellArmThickness : (parent.height - height - Config.shellArmThickness)
+            // Center island hugs the shell arm: content sits flush with the arm's
+            // inner border (edge-side pad = 0), barPad only on the far side + sides.
+            // So depth = moduleHeight + ONE barPad (not the full 2*barPad strip),
+            // offset off the active edge by Shell Pad. Frame carve matches.
+            height: Config.moduleHeight + Config.barPad
             implicitWidth: shellCenterRow.implicitWidth
-                           + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
-                           + Config.islandSpacing * 2
+                           + Config.barPad * 2
 
             HoverHandler {
                 // While auto-hidden the island is only opacity-0 — without
@@ -1612,7 +1612,13 @@ PanelWindow {
 
             Row {
                 id: shellCenterRow
-                anchors.centerIn: parent
+                // Content flush to the active edge (arm inner border); barPad slack
+                // falls on the far side (top-pos → bottom, bottom-pos → top).
+                anchors {
+                    horizontalCenter: parent.horizontalCenter
+                    top:    bar._isTop    ? parent.top    : undefined
+                    bottom: bar._isBottom ? parent.bottom : undefined
+                }
                 spacing: Config.islandSpacing
                 onImplicitWidthChanged: shellFrame.requestPaint()
 
@@ -1647,8 +1653,7 @@ PanelWindow {
             }
             height: Config.barHeight
             implicitWidth: triCenterRow.implicitWidth
-                           + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
-                           + Config.islandSpacing * 2
+                           + Config.barPad * 2
             topLeftRadius:     Config.triCenterTopLeftRadius
             topRightRadius:    Config.triCenterTopRightRadius
             bottomLeftRadius:  Config.triCenterBottomLeftRadius
@@ -1706,7 +1711,7 @@ PanelWindow {
                 id: triCenterRow
                 anchors {
                     left:           parent.left
-                    leftMargin:     Config.islandSpacing + Config.barEdgePaddingLeft
+                    leftMargin:     Config.barPad
                     verticalCenter: parent.verticalCenter
                 }
                 spacing: Config.islandSpacing
@@ -1743,8 +1748,7 @@ PanelWindow {
             }
             height:       Config.barHeight
             implicitWidth: triRightRow.implicitWidth
-                           + Config.barEdgePaddingLeft + Config.barEdgePaddingRight
-                           + Config.islandSpacing * 2
+                           + Config.barPad * 2
             topLeftRadius:     Config.triRightTopLeftRadius
             topRightRadius:    Config.barTopRightRadius
             bottomLeftRadius:  Config.triRightBottomLeftRadius
@@ -1802,7 +1806,7 @@ PanelWindow {
                 id: triRightRow
                 anchors {
                     right:          parent.right
-                    rightMargin:    Config.islandSpacing + Config.barEdgePaddingRight
+                    rightMargin:    Config.barPad
                     verticalCenter: parent.verticalCenter
                 }
                 spacing: Config.islandSpacing
@@ -1850,7 +1854,7 @@ PanelWindow {
             left:   true
         }
         margins {
-            left: Config.barMode === "shell" ? Config.shellModuleSideMargin : barLayout.mapToItem(null, triLeft.x, 0).x
+            left: Config.barMode === "shell" ? (Config.shellArmThickness + Config.shellModuleSideMargin) : barLayout.mapToItem(null, triLeft.x, 0).x
         }
         implicitWidth:  Config.barMode === "shell" ? shellLeftPW.implicitWidth : triLeft.implicitWidth
         implicitHeight: 4
@@ -1929,7 +1933,7 @@ PanelWindow {
             left:   true
         }
         margins {
-            left: Config.barMode === "shell" ? (bar.width - Config.shellModuleSideMargin - shellRightPW.implicitWidth) : barLayout.mapToItem(null, triRight.x, 0).x
+            left: Config.barMode === "shell" ? (bar.width - (Config.shellArmThickness + Config.shellModuleSideMargin) - shellRightPW.implicitWidth) : barLayout.mapToItem(null, triRight.x, 0).x
         }
         implicitWidth:  Config.barMode === "shell" ? shellRightPW.implicitWidth : triRight.implicitWidth
         implicitHeight: 4

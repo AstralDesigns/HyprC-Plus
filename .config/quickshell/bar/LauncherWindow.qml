@@ -2286,19 +2286,27 @@ Item {
                     }
                 }
             }
-            // Idle HTTP-cache reclamation: fires once per hide, only acting if the
-            // window is still hidden when it elapses. clearHttpCache is async
-            // (emits clearHttpCacheCompleted) and safe to call repeatedly.
-            // Media guard: if any live view has an HTMLMediaElement with a
-            // source that hasn't ended (playing OR paused mid-stream), skip
-            // this trim. Next hide cycle gets its own shot; if the user keeps
-            // a YouTube tab open indefinitely, Chromium's own disk-cache LRU
-            // bounds the footprint so never-trimming is not a leak.
+            // Idle HTTP-cache reclamation: armed on every hide; when it elapses it
+            // only trims if the window is STILL hidden and nothing worth protecting
+            // is live. clearHttpCache is async (emits clearHttpCacheCompleted) and
+            // safe to call repeatedly.
+            // Gating (extended to the whole launcher): while ANY live websearch view
+            // holds an HTMLMediaElement that has not ended (playing OR paused
+            // mid-stream) -- regardless of which launcher tab is focused (emotes /
+            // clipboard / apps / a freshly opened websearch tab) or whether we
+            // switched away and back -- OR the agent workspace is live, the trim
+            // stays held off. A gated fire RE-ARMS the timer instead of abandoning
+            // the cycle, so the deferral persists and the clear only actually fires
+            // once no media tab is active AND the workspace is off. While deferred,
+            // Chromium's own 128 MiB disk-cache LRU bounds the footprint, so
+            // perpetual deferral is not a leak.
             Timer {
                 id: idleCacheTrim
                 interval: 10 * 60 * 1000   // 10 min after the launcher is hidden
                 repeat: false
                 onTriggered: {
+                    // Re-shown: onVisibleChanged already stopped us and the next
+                    // hide re-arms a fresh cooldown, so do NOT re-arm here.
                     if (win.visible) return
                     // The agent workspace view shares win.webProfile (a 2nd
                     // in-process profile aborts this build), and clearHttpCache()
@@ -2307,10 +2315,19 @@ Item {
                     // app's loopback bridge requests (list_directory / search_files /
                     // open / save), which is the "hidden a while -> re-show ->
                     // explorer stuck" bug. Never-trimming is not a leak (Chromium's
-                    // disk-cache LRU bounds it), so skip when the workspace is on.
-                    if (win.wsEnabled && win.agentReady) return
+                    // disk-cache LRU bounds it), so hold the trim off -- and RE-ARM
+                    // rather than abandon the cycle -- while the workspace is on.
+                    if (win.wsEnabled && win.agentReady) { idleCacheTrim.restart(); return }
                     win._anyActiveMedia(function (active) {
-                        if (active) return
+                        // Gating extended to the whole launcher: as long as ANY live
+                        // websearch view holds a media element that has not ended
+                        // (playing OR paused mid-stream) -- regardless of which
+                        // launcher tab is focused (emotes / clipboard / apps / a
+                        // freshly opened websearch tab) or whether we switched away
+                        // and back -- keep the trim deferred and re-probe next cycle
+                        // so playback / auto-advance survive; only trim once every
+                        // stream has ended.
+                        if (active) { idleCacheTrim.restart(); return }
                         win._webClearCache()
                     })
                 }
