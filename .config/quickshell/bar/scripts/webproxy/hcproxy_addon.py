@@ -28,6 +28,13 @@
 # The in-page script stays the always-on baseline: if this proxy is not running,
 # the launcher still blocks YouTube + top trackers. This layer only ADDS to it.
 #
+# Anti-adblock (fab) parity: adblock.js defuses YouTube's "ad blocker detected"
+# wall by letting ad/telemetry beacons physically reach Google's servers (a
+# local-only stub leaves the SERVER beacon log empty, which itself trips the
+# flag). The service-worker realm issues innertube beacons that userScripts
+# cannot hook, so THIS layer carries the same FAB allowlist: those beacons are
+# forwarded, not 204'd. See the FAB block below.
+#
 # API verified against ArniDagur/python-adblock master (src/lib.rs):
 #   FilterSet(); fs.add_filter_list(text); Engine(fs, optimize=True)
 #   engine.check_network_urls(url, source_url, request_type).matched
@@ -75,6 +82,55 @@ _EXT_TYPE = {
 SABR_RE = re.compile(
     r',\s*"serverAbr[^"]*"\s*:\s*(?:"(?:[^"\\]|\\.)*"'
     r'|-?\d+(?:\.\d+)?|true|false|null)')
+
+
+# ── YouTube anti-adblock (fab) beacon pass-through allowlist ───────────────
+# YouTube's server-side enforcement keys on whether it RECEIVES ad/telemetry
+# beacons, not only on whether the client renders an ad. adblock.js (the
+# in-page baseline) satisfies this by letting beacon fetches physically hit
+# Google's servers then handing the JS caller an empty 200 -- its comments
+# prove a LOCAL stub without network is the bug behind "loads straight into
+# the enforcement page" (zero beacons reach the server). But the service
+# worker (sw.js) runs innertube fetches in its own realm where userScripts
+# never reach (see the module header), so those beacons land HERE unhooked.
+# If the generic EasyList match 204s them, the request never hits origin =>
+# server sees zero beacons => "Ad blockers violate ToS" wall. Mirror the
+# in-page FAB list at the network layer: forward these untouched. FAB_EXCEPT
+# keeps the real third-party ad-DELIVERY endpoints on the normal block path.
+FAB = [
+    "youtube.com/pagead/",        # ad delivery + lvz detection beacon
+    "youtube.com/api/stats",      # generic + ad playback telemetry (qoe, ads)
+    "youtube.com/pcs/activeview",  # Google ActiveView measurement
+    "googlevideo.com/videostats",  # playback telemetry (ad + content)
+    "youtube.com/ptracking",       # ad beacon the player waits on
+    "youtube.com/watch_time",      # watch-time beacon
+    "youtube.com/generate_204",    # connectivity/ad-health probe
+    "youtube.com/ytranking",
+    "youtube.com/ytooffers",
+    "/adsid/", "/abstatus", "/antiadblock",
+]
+# Patterns that must stay blockable even if they'd otherwise match FAB:
+# googlesyndication / doubleclick ad delivery (not beacons).
+FAB_EXCEPT = [
+    "googlesyndication.com/pagead/ads",
+    "googlesyndication.com/iframe",
+    "googlesyndication.com/dai/",
+    "googlesyndication.com/bundle/",
+    "doubleclick.net/aclk",
+    "doubleclick.net/ad?",
+    "doubleclick.net/ads;",
+]
+
+
+def _is_fab(url):
+    u = (url or "").lower()
+    for pat in FAB_EXCEPT:
+        if pat in u:
+            return False
+    for pat in FAB:
+        if pat in u:
+            return True
+    return False
 
 
 def _log(*a):
@@ -218,19 +274,42 @@ class HCProxy:
         h["sec-ch-ua-mobile"] = "?0"
         h["sec-ch-ua-platform"] = '"Linux"'
 
-        # 2. Legacy YouTube midroll probes must be ANSWERED with an empty
-        #    ad-break JSON: a failed get_midroll_info makes the old player wait
-        #    forever at the scheduled break. Modern innertube /player/ad_break
-        #    is NOT stubbed here -- its schema differs and a wrong-shaped 200
-        #    kills the break module's promise chain (buffer freezes at the
-        #    midroll marker); it must fail like any blocked request instead.
+        # 2. Ad-block tier (skipped entirely when the shield is off, so the
+        #    proxy degrades to UA-rewrite only). Order matters: stub the two
+        #    detection probes first, then PASS beacons through, then let the
+        #    generic EasyList 204 below handle everything else.
         ph = flow.request.pretty_host
         if _adblock_on():
+            # 2a. Classic adblock probe: instream/ad_status.js must DEFINE the
+            #     global window.google_ad_status. EasyList otherwise 204s the
+            #     doubleclick host, leaving it undefined => the legacy "ad
+            #     blocker detected" check trips. Serve the expected stub (this
+            #     also covers the SW realm, which adblock.js cannot reach).
+            if "ad_status.js" in (flow.request.path or ""):
+                flow.response = http.Response.make(
+                    200, b"window.google_ad_status = 1;",
+                    {"content-type": "application/javascript"})
+                return
+            # 2b. Legacy YouTube midroll probes must be ANSWERED with an empty
+            #     ad-break JSON: a failed get_midroll_info makes the old player
+            #     wait forever at the scheduled break. Modern innertube
+            #     /player/ad_break is NOT stubbed here -- its schema differs and
+            #     a wrong-shaped 200 kills the break module's promise chain
+            #     (buffer freezes at the midroll marker); it must fail like any
+            #     blocked request instead.
             if "youtube.com" in ph and ("get_midroll_info" in ph
                                         or "get_midroll_info" in (flow.request.path or "")):
                 flow.response = http.Response.make(
                     200, b'{"emptyBookmarks":[]}',
                     {"content-type": "application/json"})
+                return
+            # 2c. FAB beacon PASS-THROUGH (see FAB block comment): forward
+            #     YouTube/Google ad-telemetry beacons to origin untouched so
+            #     the server-side beacon log is satisfied, instead of letting
+            #     the generic EasyList 204 below strand them locally. This is
+            #     the network-layer half of adblock.js's anti-adblock defusal
+            #     and the part the service-worker realm can only get here.
+            if _is_fab(flow.request.url):
                 return
 
         # 3. EasyList network match. source_url is approximated as the request's

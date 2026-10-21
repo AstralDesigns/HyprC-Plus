@@ -8,23 +8,31 @@ import Quickshell.Io
 // ═══════════════════════════════════════════════════════════════════════════
 //  WebBookmarksState.qml — launcher web-search bookmarks.
 //
-//  Byte-compatible with the GJS launcher web-state file:
-//    ~/.cache/hyprcandy/launcher_web_state.json
+//  Store: ~/.local/share/hyprcandy/launcher_web_state.json
 //    { "searxBookmarks": [ { "url":…, "title":…, "added":… }, … ], … }
+//
+//  Bookmarks used to live in ~/.cache/hyprcandy/launcher_web_state.json (the
+//  GJS launcher web-state file). Cache dirs are legitimately swept by every
+//  browser-data / cleanup action -- that's how "clear cookies to reset
+//  YouTube's adblock flag" also destroyed bookmarks -- so user data moves to
+//  the share root next to websearch-startup-state.json. The legacy file is
+//  copied up whenever it is newer than the store, and left in place for the
+//  retired GJS phase.
 //
 //  Only the `searxBookmarks` key is owned here; every other key (open tabs,
 //  active tab, …) is loaded, kept verbatim and re-emitted so the browser
 //  phase can share the same file without clobbering bookmarks. The file is
-//  watched, so edits from the GJS dock or tooling reload in place.
+//  watched, so edits from tooling reload in place.
 // ═══════════════════════════════════════════════════════════════════════════
 
 QtObject {
     id: root
 
     // Strip the file:// scheme StandardPaths returns in Qt6 so the python3
-    // writer targets the real ~/.cache/hyprcandy state file.
+    // writer targets the real ~/.local/share/hyprcandy state file.
     readonly property string _home: StandardPaths.writableLocation(StandardPaths.HomeLocation).toString().replace(/^file:\/\//, "")
-    readonly property string statePath: _home + "/.cache/hyprcandy/launcher_web_state.json"
+    readonly property string statePath: _home + "/.local/share/hyprcandy/launcher_web_state.json"
+    readonly property string _legacyPath: _home + "/.cache/hyprcandy/launcher_web_state.json"
 
     // Full parsed state object — other keys are preserved across writes.
     property var _state: ({})
@@ -41,6 +49,24 @@ QtObject {
         onTriggered: root._selfWrite = false
     }
 
+    // ── Migration from the old cache location ────────────────────────
+    // Copy when the legacy file is NEWER than the store (first run, or the
+    // still-running old singleton wrote a bookmark to the cache path after
+    // the store was seeded). Once this build is live nothing writes to the
+    // cache copy again, so a stale legacy file can never clobber the store.
+    property Process _migrate: Process {
+        command: ["python3", "-c",
+            "import os,shutil,sys\n" +
+            "old,new=sys.argv[1],sys.argv[2]\n" +
+            "os.makedirs(os.path.dirname(new),exist_ok=True)\n" +
+            "if os.path.exists(old) and (not os.path.exists(new)\n" +
+            "    or os.path.getmtime(old) > os.path.getmtime(new)):\n" +
+            "    shutil.copy2(old,new)",
+            root._legacyPath, root.statePath]
+        onExited: root._view.reload()
+    }
+    Component.onCompleted: root._migrate.running = true
+
     // ── Reader ──────────────────────────────────────────────────────────────
     property FileView _view: FileView {
         path: root.statePath
@@ -50,7 +76,6 @@ QtObject {
             if (root._selfWrite) return
             root._loadFromText(text())
         }
-        Component.onCompleted: reload()
     }
 
     function _loadFromText(t) {
