@@ -59,8 +59,21 @@ const INLINE_FIM_PREFIX = 1500;   // chars of context before the cursor
 const INLINE_FIM_SUFFIX = 1000;   // chars of context after the cursor
 const INLINE_MIN_PREFIX = 12;     // don't fire on a near-empty prefix
 const INLINE_DEBOUNCE_MS = 350;
-const INLINE_MAX_TOKENS = 64;
+const INLINE_MAX_TOKENS = 256;  // generous ceiling; the model's EOS + stop
+                                // sequences end it early, this only backstops
 const INLINE_CACHE_MAX = 64;
+// Client-side guardrail for the raised ceiling: some providers honor `stop`
+// imperfectly, so bound the result here too — a runaway must never dump a wall
+// of ghost text onto the caret.
+const INLINE_MAX_LINES = 12;
+const INLINE_MAX_CHARS = 600;
+
+// Next-edit jump hints (opt-in companion to ghost text): a separate, idle-
+// debounced call asks the model which nearby line most likely needs the next
+// edit. Window is generous but bounded; the reply is a tiny line directive.
+const JUMP_WINDOW_LINES = 40;   // +/- lines around the caret sent numbered
+const JUMP_DEBOUNCE_MS = 700;   // longer than the completion debounce (idle)
+const JUMP_MAX_TOKENS = 8;      // just enough for "JUMP:<line>"
 
 const INLINE_LANGUAGES = [
   'typescript', 'javascript', 'typescriptreact', 'javascriptreact', 'json', 'jsonc',
@@ -119,6 +132,44 @@ function dedupeCompletion(text: string, prefix: string, suffix: string): string 
   return t;
 }
 
+// Bound a completion client-side. The stop sequences already ask the model to
+// halt at a blank line / code fence, but providers don't always honor them, so
+// enforce the same boundaries plus a hard line/char cap here. Applied before
+// caching so both the fresh and cache-hit paths stay bounded.
+function trimInlineCompletion(text: string): string {
+  if (!text) return text;
+  let t = text.replace(/\r\n/g, '\n');
+  const blank = t.indexOf('\n\n');
+  if (blank !== -1) t = t.slice(0, blank);
+  const fence = t.indexOf('```');
+  if (fence !== -1) t = t.slice(0, fence);
+  const lines = t.split('\n');
+  if (lines.length > INLINE_MAX_LINES) t = lines.slice(0, INLINE_MAX_LINES).join('\n');
+  if (t.length > INLINE_MAX_CHARS) t = t.slice(0, INLINE_MAX_CHARS);
+  return t;
+}
+
+// Ask the model to name the single nearby line most likely to need the NEXT
+// edit. We hand it a line-numbered window so "line" is an absolute editor line
+// it can reference directly; the reply is a one-token directive we parse below.
+function buildJumpPrompt(numbered: string, caretLine: number): string {
+  return `Here is a slice of the file with line numbers (each row is "LINE|content"). The caret is at line ${caretLine}.\n\`\`\`\n${numbered}\`\`\`\n\nReply with ONLY one line: "JUMP:<line>" naming the single line number (one of those shown) that most likely needs the NEXT edit given where the caret is, or "NONE" if no other line is an obvious follow-up. No prose, no explanation.`;
+}
+
+// Pull a target line out of the model reply. Accept "JUMP:<n>" or a bare
+// leading integer; reject anything out of the shown window or equal to the
+// caret line (a jump to where you already are is a no-op we don't surface).
+function parseJumpLine(text: string, lo: number, hi: number, caretLine: number): number | null {
+  if (!text) return null;
+  let n: number | null = null;
+  const m = text.match(/JUMP:\s*(\d+)/i);
+  if (m) n = parseInt(m[1], 10);
+  else { const b = text.trim().match(/^(\d+)/); if (b) n = parseInt(b[1], 10); }
+  if (n == null || Number.isNaN(n)) return null;
+  if (n < lo || n > hi || n === caretLine) return null;
+  return n;
+}
+
 let inlineProviderRegistered = false;
 // The boot path (App.tsx) only re-hydrates the *chat* provider's key into the
 // store + server. A completions-only provider (e.g. Cerebras) is otherwise
@@ -126,6 +177,46 @@ let inlineProviderRegistered = false;
 // (wiped on every restart). So we hydrate the completion key from libsecret on
 // demand and send it in the request body — mirroring how chat rides its key.
 let inlineKeyCache: { providerId: string; apiKey: string } | null = null;
+
+// Shared provider/model/key resolution for both ghost text and jump hints.
+// Falls back to libsecret (the runtime server keeps keys in memory only, so a
+// completions-only provider is invisible to the store after a reload).
+async function resolveCompletionAuth(): Promise<{ providerId: string; model: string; apiKey: string } | null> {
+  const s = getStore();
+  const providerId = s.completionsProvider;
+  if (!providerId) return null;
+  let apiKey: string = s.byokKeys[providerId] || '';
+  if (!apiKey) {
+    if (inlineKeyCache && inlineKeyCache.providerId === providerId) {
+      apiKey = inlineKeyCache.apiKey;
+    } else {
+      try { const k = await bridge.lookupSecret(providerId); if (k) { apiKey = k; inlineKeyCache = { providerId, apiKey: k }; } } catch { /* noop */ }
+    }
+  }
+  if (!apiKey) return null;
+  return { providerId, model: s.completionsModel, apiKey };
+}
+
+// One tiny completion call that returns the model's raw "JUMP:<line>" reply
+// (caller parses + validates against the window). Errors collapse to ''.
+async function requestJumpText(numbered: string, caretLine: number): Promise<string> {
+  const auth = await resolveCompletionAuth();
+  if (!auth) return '';
+  try {
+    const res = await bridge.runtimeRequest('/api/byok/complete', {
+      provider: auth.providerId,
+      api_key: auth.apiKey,
+      model: auth.model,
+      prompt: buildJumpPrompt(numbered, caretLine),
+      max_tokens: JUMP_MAX_TOKENS,
+      stop: ['\n'],
+    }, 'POST', 12000);
+    return (res?.text || '').toString().trim();
+  } catch {
+    return '';
+  }
+}
+
 function ensureInlineCompletions(monaco: any) {
   if (inlineProviderRegistered || !monaco?.languages?.registerInlineCompletionsProvider) return;
   inlineProviderRegistered = true;
@@ -211,6 +302,7 @@ function ensureInlineCompletions(monaco: any) {
         return empty;
       }
       if (token.isCancellationRequested) return empty;
+      text = trimInlineCompletion(text);
       cacheSet(cacheKey, text);
       if (!text) return empty;
       // Insert at the caret (collapsed range) rather than overwriting the current
@@ -588,6 +680,114 @@ export const Canvas: React.FC = () => {
                       // It reads the live store gate on every request, so it stays
                       // inert until the user enables inline completions + a key.
                       try { ensureInlineCompletions(monaco); } catch (_) {}
+
+                      // ── Next-edit jump hints ───────────────────────────────
+                      // Opt-in companion to ghost text. After an idle pause we ask
+                      // the model which nearby line most likely needs the next edit;
+                      // if it names another line we show a "Tab → L<n>" hint and bind
+                      // Tab (via a gated context key) to JUMP the caret there — no
+                      // insert — then re-trigger the inline completion so the ghost
+                      // edit appears at the new location. Two-step: jump, then edit.
+                      try {
+                        const jumpCtx = editor.createContextKey<boolean>('hcJumpPending', false);
+                        const jumpDeco = editor.createDecorationsCollection([]);
+                        let pendingJumpLine: number | null = null;
+                        let jumpTimer: ReturnType<typeof setTimeout> | null = null;
+                        let jumpToken = 0;
+
+                        const clearJumpHint = () => {
+                          pendingJumpLine = null;
+                          try { jumpDeco.set([]); } catch { /* noop */ }
+                          jumpCtx.set(false);
+                        };
+                        const showJumpHint = (line: number) => {
+                          const pos = editor.getPosition();
+                          const model = editor.getModel();
+                          if (!pos || !model) return;
+                          pendingJumpLine = line;
+                          try {
+                            const maxCol = model.getLineMaxColumn(pos.lineNumber);
+                            jumpDeco.set([{
+                              range: new monaco.Range(pos.lineNumber, maxCol, pos.lineNumber, maxCol),
+                              options: { after: { content: '  \u21B3 Tab \u2192 L' + line, inlineClassName: 'hc-jump-hint' } },
+                            }]);
+                          } catch { /* noop */ }
+                          jumpCtx.set(true);
+                        };
+                        const firstNonBlankColumn = (ln: number): number => {
+                          try {
+                            const t: string = editor.getModel()!.getLineContent(ln);
+                            const i = t.search(/\S/);
+                            return i < 0 ? 1 : i + 1;
+                          } catch { return 1; }
+                        };
+                        const inlineGhostVisible = (): boolean => {
+                          try { return !!(editor as any)._contextKeyService?.getContextValue?.('inlineCompletionsVisible'); } catch { return false; }
+                        };
+
+                        const runJumpPredict = async (myToken: number) => {
+                          const s = getStore();
+                          if (!s.jumpSuggestionsEnabled || !s.inlineCompletionsEnabled) return;
+                          const model = editor.getModel();
+                          const pos = editor.getPosition();
+                          if (!model || !pos) return;
+                          const caretLine = pos.lineNumber;
+                          const total = model.getLineCount();
+                          const lo = Math.max(1, caretLine - JUMP_WINDOW_LINES);
+                          const hi = Math.min(total, caretLine + JUMP_WINDOW_LINES);
+                          let numbered = '';
+                          for (let ln = lo; ln <= hi; ln++) {
+                            try { numbered += ln + '|' + model.getLineContent(ln) + '\n'; } catch { /* noop */ }
+                          }
+                          if (!numbered.trim()) return;
+                          const text = await requestJumpText(numbered, caretLine);
+                          if (myToken !== jumpToken) return; // superseded by a newer edit
+                          const line = parseJumpLine(text, lo, hi, caretLine);
+                          if (!line) return;
+                          const nowPos = editor.getPosition();
+                          if (!nowPos || nowPos.lineNumber !== caretLine) return; // caret moved meanwhile
+                          if (inlineGhostVisible()) return;
+                          showJumpHint(line);
+                        };
+
+                        const scheduleJumpPredict = () => {
+                          jumpToken++;
+                          clearJumpHint();
+                          if (jumpTimer) { clearTimeout(jumpTimer); jumpTimer = null; }
+                          const s = getStore();
+                          if (!s.jumpSuggestionsEnabled || !s.inlineCompletionsEnabled) return;
+                          const myToken = jumpToken;
+                          jumpTimer = setTimeout(() => { jumpTimer = null; void runJumpPredict(myToken); }, JUMP_DEBOUNCE_MS);
+                        };
+
+                        editor.addAction({
+                          id: 'hc-jump-to-line',
+                          label: 'Jump to suggested line',
+                          keybindings: [monaco.KeyCode.Tab],
+                          precondition: 'hcJumpPending',
+                          run: () => {
+                            const ln = pendingJumpLine;
+                            clearJumpHint();
+                            if (ln == null) return;
+                            const col = firstNonBlankColumn(ln);
+                            editor.setPosition({ lineNumber: ln, column: col });
+                            editor.revealPositionInCenterIfOutsideViewport({ lineNumber: ln, column: col });
+                            editor.focus();
+                            try { editor.trigger('hc-jump', 'editor.action.inlineSuggest.trigger', {}); } catch { /* noop */ }
+                          },
+                        });
+
+                        editor.onDidChangeModelContent(scheduleJumpPredict);
+                        editor.onDidChangeCursorPosition(scheduleJumpPredict);
+
+                        try {
+                          editor.onDidDispose(() => {
+                            jumpToken++;
+                            if (jumpTimer) { clearTimeout(jumpTimer); jumpTimer = null; }
+                            try { clearJumpHint(); jumpCtx.set(false); } catch { /* noop */ }
+                          });
+                        } catch { /* noop */ }
+                      } catch { /* jump hints unavailable on this build */ }
 
                       // Mirror this file's error-marker state into the store so the
                       // tab + project tree can show a syntax-error badge. Only the

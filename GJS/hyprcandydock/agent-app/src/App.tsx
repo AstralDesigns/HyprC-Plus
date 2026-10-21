@@ -147,9 +147,28 @@ export const App: React.FC = () => {
     // §3.1 (rev. Option A) — Ctrl/Cmd+N starts a new Quest from the keyboard,
     // mirroring the ChatPanel Quests dropdown and the agent_new_chat host event.
     const onKeyDown = (ev: KeyboardEvent) => {
+      // Ctrl/Cmd+Shift+S = Save As (portal dialog → redirect tab); Ctrl/Cmd+S =
+      // plain save of the active pane. The Shift branch is tested first so the
+      // bare-save branch never swallows Ctrl+Shift+S.
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's' && ev.shiftKey) {
+        ev.preventDefault();
+        const id = getStore().activePaneId;
+        if (id) void storeActions.saveFileAs(id);
+        return;
+      }
+      if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 's') {
+        ev.preventDefault();
+        const id = getStore().activePaneId;
+        if (id) void storeActions.saveFile(id);
+        return;
+      }
+      // Ctrl/Cmd+N creates a new file tab (matches the File > New File label).
+      // New Quest (a fresh chat session) moves to Ctrl/Cmd+Shift+N so it stays
+      // on the keyboard.
       if ((ev.ctrlKey || ev.metaKey) && (ev.key === 'n' || ev.key === 'N')) {
         ev.preventDefault();
-        storeActions.createSession();
+        if (ev.shiftKey) storeActions.createSession();
+        else storeActions.createNewFile();
         return;
       }
       // Ctrl+Tab / Ctrl+Shift+Tab cycles the active canvas tab. Handled at the

@@ -308,41 +308,124 @@ const SteerMarker: React.FC<{ content: string }> = ({ content }) => (
   </div>
 );
 
-/* Tapping a chip dispatches its promptText: steer the running turn when one is
-   active (or when the option opts into it), otherwise start a fresh turn via the
-   composer's agent_user_prompt path. Consumed chips clear the composer row. */
-const dispatchSuggestion = (opt: SuggestionOption) => {
-  const text = (opt.promptText || opt.label || '').trim();
-  if (!text) return;
+/* Routes a finished answer string back to the agent: steer the running turn when
+   one is active (or forced), otherwise start a fresh turn via the composer's
+   agent_user_prompt path. Shared by single chips and the multi-question form. */
+const sendSuggestionText = (text: string, forceSteer = false) => {
+  const t = (text || '').trim();
+  if (!t) return;
   setStore({ activeSuggestions: null });
   const running = getStore().agentRunning;
-  if (opt.sendAs === 'steer' || running) {
-    void agentEngine.steer(text).then((ok) => {
-      if (!ok) window.dispatchEvent(new CustomEvent('agent_user_prompt', { detail: text }));
+  if (forceSteer || running) {
+    void agentEngine.steer(t).then((ok) => {
+      if (!ok) window.dispatchEvent(new CustomEvent('agent_user_prompt', { detail: t }));
     });
   } else {
-    window.dispatchEvent(new CustomEvent('agent_user_prompt', { detail: text }));
+    window.dispatchEvent(new CustomEvent('agent_user_prompt', { detail: t }));
   }
 };
 
-/* ── Suggestion chips (clarify / next-step) ──────────────────── */
-const SuggestionChips: React.FC<{ data: SuggestionsData }> = ({ data }) => (
-  <div className="suggestion-block animate-fade-in">
-    {data.question ? <div className="suggestion-question">{data.question}</div> : null}
-    <div className="suggestion-chips">
-      {data.options.map((opt, idx) => (
-        <button
-          key={`${opt.label}-${idx}`}
-          type="button"
-          className="suggestion-chip"
-          onClick={() => dispatchSuggestion(opt)}
-        >
-          {opt.label}
-        </button>
+const dispatchSuggestion = (opt: SuggestionOption) => {
+  sendSuggestionText((opt.promptText || opt.label || '').trim(), opt.sendAs === 'steer');
+};
+
+/* ── Multi-question clarification form (Qoder-style) ────────────────
+   Each question renders its choices as buttons plus a trailing free-text
+   "Other" field (the last choice). The user answers every question, then one
+   Submit composes all answers into a single follow-up message. */
+const ClarifyQuestions: React.FC<{ data: SuggestionsData }> = ({ data }) => {
+  const questions = data.questions || [];
+  const [picks, setPicks] = useState<(number | null)[]>(() => questions.map(() => null));
+  const [customs, setCustoms] = useState<string[]>(() => questions.map(() => ''));
+  const [submitted, setSubmitted] = useState(false);
+
+  const answerFor = (qi: number): string => {
+    const q = questions[qi];
+    const ci = picks[qi];
+    if (ci != null && q.options[ci]) return (q.options[ci].promptText || q.options[ci].label || '').trim();
+    if (q.allowCustom !== false && customs[qi].trim()) return customs[qi].trim();
+    return '';
+  };
+  const allAnswered = questions.length > 0 && questions.every((_, qi) => answerFor(qi).length > 0);
+
+  const choose = (qi: number, oi: number) => {
+    if (submitted) return;
+    setPicks(prev => prev.map((v, i) => (i === qi ? oi : v)));
+    setCustoms(prev => prev.map((v, i) => (i === qi ? '' : v)));
+  };
+  const typeCustom = (qi: number, val: string) => {
+    if (submitted) return;
+    setCustoms(prev => prev.map((v, i) => (i === qi ? val : v)));
+    if (val.trim()) setPicks(prev => prev.map((v, i) => (i === qi ? null : v)));
+  };
+  const submit = () => {
+    if (submitted || !allAnswered) return;
+    const composed = questions.map((q, qi) => `${q.question}\n→ ${answerFor(qi)}`).join('\n\n');
+    setSubmitted(true);
+    sendSuggestionText(composed);
+  };
+
+  return (
+    <div className={`clarify-form animate-fade-in${submitted ? ' clarify-form-done' : ''}`}>
+      {data.question ? <div className="clarify-intro">{data.question}</div> : null}
+      {questions.map((q, qi) => (
+        <div className="clarify-question" key={qi}>
+          <div className="clarify-question-text">{q.question}</div>
+          <div className="clarify-options">
+            {q.options.map((opt, oi) => (
+              <button
+                key={`${opt.label}-${oi}`}
+                type="button"
+                className={`clarify-option${picks[qi] === oi ? ' clarify-option-selected' : ''}`}
+                onClick={() => choose(qi, oi)}
+                disabled={submitted}
+              >
+                {opt.label}
+              </button>
+            ))}
+            {q.allowCustom !== false && (
+              <input
+                type="text"
+                className={`clarify-custom${customs[qi].trim() ? ' clarify-custom-active' : ''}`}
+                placeholder="Other — type your own answer…"
+                value={customs[qi]}
+                disabled={submitted}
+                onChange={e => typeCustom(qi, e.target.value)}
+              />
+            )}
+          </div>
+        </div>
       ))}
+      <div className="clarify-footer">
+        <button type="button" className="clarify-submit" onClick={submit} disabled={submitted || !allAnswered}>
+          {submitted ? 'Sent' : 'Submit answers'}
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+/* ── Suggestion chips (clarify / next-step) ──────────────────── */
+const SuggestionChips: React.FC<{ data: SuggestionsData }> = ({ data }) => {
+  if (data.questions && data.questions.length) return <ClarifyQuestions data={data} />;
+  return (
+    <div className="suggestion-block animate-fade-in">
+      {data.question ? <div className="suggestion-question">{data.question}</div> : null}
+      <div className="suggestion-chips">
+        {data.options.map((opt, idx) => (
+          <button
+            key={`${opt.label}-${idx}`}
+            type="button"
+            className="suggestion-chip"
+            onClick={() => dispatchSuggestion(opt)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /* ── Spec-driven plan card (§3.4): markdown + Approve/Revise/Cancel gate ── */
 const SpecCard: React.FC<{ markdown: string; status: 'drafting' | 'ready'; actionable: boolean }> = ({ markdown, status, actionable }) => {

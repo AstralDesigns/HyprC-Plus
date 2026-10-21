@@ -341,7 +341,7 @@ export const Composer: React.FC = () => {
   return (
     <div style={{ padding: '10px 12px 14px', background: 'transparent', flexShrink: 0 }}>
       <PendingFilesBar />
-      {store.activeSuggestions && store.activeSuggestions.options.length > 0 && (
+      {store.activeSuggestions && !store.activeSuggestions.questions?.length && store.activeSuggestions.options.length > 0 && (
         <div className="suggestion-block composer-suggestions">
           {store.activeSuggestions.question ? (
             <div className="suggestion-question">{store.activeSuggestions.question}</div>

@@ -35,8 +35,20 @@ dofile(home .. "/.config/hypr/hyprviz.lua")
 -- Mutable overrides written by Quickshell Control Center sliders/buttons.
 optional_dofile(home .. "/.config/hypr/hyprviz-state.lua", "HyprCandyPlus mutable Hyprland state")
 
+-- Custom settings file for user-preferences.
+optional_dofile(home .. "/.config/custom/custom.lua", "HyprCandyPlus custom user-preferences file")
+
 -- Animation preset selected by ~/.config/hypr/scripts/animations.sh.
 optional_dofile(home .. "/.config/hypr/animations.lua", "HyprCandyPlus animation preset")
+
+-- Default workspace rules settings.
+optional_dofile(home .. "/.config/hypr/workspace-rules.lua", "HyprCandyPlus animation preset")
+
+-- Default window rules settings.
+optional_dofile(home .. "/.config/hypr/window-rules.lua", "HyprCandyPlus animation preset")
+
+-- Default layer rules settings.
+optional_dofile(home .. "/.config/hypr/layer-rules.lua", "HyprCandyPlus animation preset")
 
 -- Future nwg-displays or conversion output. Current nwg-displays still writes
 -- Hyprlang monitors.conf, so this is only an optional future-safe hook.

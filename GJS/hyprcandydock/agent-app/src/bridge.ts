@@ -320,6 +320,14 @@ class AgentBridge {
   }
 
   /**
+   * System portal-style "Save As" picker (zenity --save on the host). Returns
+   * the chosen target path without creating it — the caller writes the bytes.
+   */
+  public saveFileDialog(options?: { title?: string; suggestedName?: string; currentFolder?: string }): Promise<string | null> {
+    return this.postToHost('file_dialog', { ...(options || {}), save: true });
+  }
+
+  /**
    * Copy text to the system clipboard through the host (wl-copy).
    * QtWebEngine blocks navigator.clipboard, so the launcher routes clipboard
    * writes to the loopback server; falls back to navigator in the dev harness.

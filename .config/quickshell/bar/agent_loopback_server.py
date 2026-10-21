@@ -489,9 +489,19 @@ def rel_depth(path, root):
 
 def handle_file_dialog(id_, payload):
     is_dir = bool(payload.get("directory"))
+    save_mode = bool(payload.get("save"))
     curr = payload.get("currentFolder") or HOME
-    args = ["zenity", "--file-selection", "--filename=%s/" % curr]
-    if is_dir:
+    suggested = payload.get("suggestedName")
+    # Save As: zenity returns the chosen target without creating it (the app
+    # writes the bytes). Pre-fill filename with dir+suggested and confirm any
+    # overwrite. Open/directory mode keeps the trailing-slash browse hint.
+    filename = os.path.join(curr, suggested) if (save_mode and suggested) else ("%s/" % curr)
+    args = ["zenity", "--file-selection", "--filename=%s" % filename]
+    if save_mode:
+        args += ["--save", "--confirm-overwrite"]
+        if payload.get("title"):
+            args += ["--title=%s" % payload["title"]]
+    elif is_dir:
         args.append("--directory")
     try:
         p = subprocess.run(args, capture_output=True, text=True, timeout=120)

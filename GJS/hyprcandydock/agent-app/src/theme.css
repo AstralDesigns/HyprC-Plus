@@ -735,6 +735,116 @@ body,
   transform: translateY(1px);
 }
 
+/* ── Multi-question clarification form (Qoder-style AskUserQuestion) ── */
+.clarify-form {
+  margin: 6px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 26%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 6%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.clarify-form-done {
+  opacity: 0.6;
+}
+.clarify-intro {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  margin-bottom: -4px;
+}
+.clarify-question {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.clarify-question-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.clarify-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.clarify-option {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--matugen-primary, #a0c9dc);
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 45%, transparent);
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 12%, transparent);
+  transition: background .12s ease, border-color .12s ease, transform .06s ease, color .12s ease;
+}
+.clarify-option:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 22%, transparent);
+  border-color: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 70%, transparent);
+}
+.clarify-option:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.clarify-option-selected {
+  color: var(--matugen-on-secondary, #1d343c);
+  background: var(--matugen-primary, #a0c9dc);
+  border-color: var(--matugen-primary, #a0c9dc);
+}
+.clarify-option:disabled {
+  cursor: default;
+}
+/* Free-text "Other" answer — the last choice of every question. */
+.clarify-custom {
+  flex: 1 1 160px;
+  min-width: 140px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  border: 1px solid var(--border-subtle, color-mix(in srgb, var(--matugen-primary, #a0c9dc) 26%, transparent));
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.clarify-custom::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+.clarify-custom:focus,
+.clarify-custom-active {
+  border-color: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 65%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--matugen-primary, #a0c9dc) 22%, transparent);
+}
+.clarify-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+.clarify-submit {
+  padding: 6px 16px;
+  font-size: 11.5px;
+  font-weight: 700;
+  border-radius: 999px;
+  cursor: pointer;
+  color: var(--matugen-on-secondary, #1d343c);
+  background: var(--matugen-primary, #a0c9dc);
+  border: 1px solid var(--matugen-primary, #a0c9dc);
+  transition: opacity .12s ease, transform .06s ease;
+}
+.clarify-submit:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.clarify-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.clarify-submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* ── P2: spec-driven plan card (§3.4) ───────────────────────────────── */
 .spec-card {
   margin: 6px 0 10px;
@@ -1738,6 +1848,24 @@ body,
 .agent-dialog-hint {
   font-size: 11px;
   color: var(--text-secondary);
+}
+
+.agent-dialog-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .22);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.agent-dialog-input:focus {
+  border-color: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 65%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--matugen-primary, #a0c9dc) 22%, transparent);
 }
 
 .agent-dialog-actions {
@@ -3925,6 +4053,16 @@ body,
 .monaco-editor .ghost-text-decoration,
 .monaco-editor .ghost-text-decoration-preview {
   border: none !important;
+}
+
+/* Next-edit jump hint: a muted inline "↳ Tab → L<n>" appended to the caret
+ * line (see Canvas.tsx hc-jump-hint decoration). Themed via tokens only. */
+.monaco-editor .hc-jump-hint {
+  font-style: italic;
+  color: var(--text-muted, rgba(160, 201, 220, 0.6));
+  opacity: 0.75;
+  letter-spacing: 0.02em;
+  pointer-events: none;
 }
 
 /* ── "Edit this selection" reference chips (composer + user bubble) ─────────

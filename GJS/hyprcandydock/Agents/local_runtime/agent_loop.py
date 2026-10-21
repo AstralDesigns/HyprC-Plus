@@ -12,7 +12,7 @@ Emits poll-ready dicts:
   {"type": "tool_result",  "data": {"id": "...", "name": "...", "result": any}}
   {"type": "tool_error",   "data": {"id": "...", "name": "...", "error": "..."}}
   {"type": "steer_ack",    "data": {"text": "..."}}                 # injected user instruction accepted
-  {"type": "suggestions",  "data": {"mode": "...", "question": str, "options": [...]}}
+  {"type": "suggestions",  "data": {"mode": "...", "question": str, "options": [...], "questions": [...]}}
   {"type": "spec",         "data": {"status": "drafting"|"ready", "markdown": str}}  # spec-driven plan
   {"type": "awaiting_approval", "data": {"question": str}}          # loop blocks until /approve
   {"type": "verification", "data": {"command": str, "status": "running"|"complete", "exitCode": int, "output": str, "passed": bool}}
@@ -104,7 +104,7 @@ When calling `task_complete` and presenting your response, ALWAYS include a numb
 ## Critical Rules
 - **task_complete is the final signal** — call it ONLY when the entire task is fully done and verified, not as a progress update.
 - **Memory** — you have durable, topic-scoped markdown memories that persist across sessions. At the start of a substantive task, glance at `list_memories` and `read_memory` any relevant topic before re-discovering facts. **Maintain memory proactively — never wait to be asked.** As you work, and especially right before you call `task_complete` at the end of the turn, briefly reflect on what you did and, whenever you judge it worthwhile, `save_memory` any durable fact (a stable project convention, an architecture / tech-stack fact, a reusable gotcha or decision, or a user preference) and `update` or `delete_memory` any that went stale. Use your own judgment about what deserves persisting — skip trivia and one-off details that won't help future sessions. Never store secrets (API keys, passwords, tokens) in memory.
-- **suggest_options** — when you need the user to make a choice before you can proceed, call it with `mode: "clarify"` and 2-4 concrete options; the turn will pause for their pick. Use `mode: "next-step"` to offer optional follow-ups after an answer. Never fabricate choices you can't act on.
+- **suggest_options** — when you need the user to make a choice before you can proceed, call it with `mode: "clarify"` and 2-4 concrete options; the turn will pause for their pick. For several decisions at once, pass `questions` (1-4) — each question shows its options plus a free-text "Other" field and the turn pauses until the user submits. Use `mode: "next-step"` to offer optional follow-ups after an answer. Never fabricate choices you can't act on.
 - **Normal answers don't need task_complete** — for conversational responses, just reply in Markdown and stop.
 - **Don't repeat failing tools** — if a tool fails 3 times with the same args, report the limitation and stop.
 - **exec_command safety** — avoid destructive commands (rm -rf, sudo dd, etc.) without clear user intent.
@@ -597,20 +597,22 @@ async def run_agentic_turn(
             elif name == "suggest_options":
                 mode = args.get("mode", "next-step")
                 options = args.get("options") or []
+                questions = args.get("questions") or []
                 question = args.get("question", "")
-                result = {"ok": True, "mode": mode, "options": options}
+                result = {"ok": True, "mode": mode, "options": options, "questions": questions}
                 yield {"type": "tool_start", "data": {"id": call["id"], "name": name, "arguments": args}}
-                yield {"type": "suggestions", "data": {"mode": mode, "question": question, "options": options}}
+                yield {"type": "suggestions", "data": {"mode": mode, "question": question, "options": options, "questions": questions}}
                 yield {"type": "tool_result", "data": {"id": call["id"], "name": name, "result": result}}
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
                     "content": json.dumps(result),
                 })
-                if mode == "clarify":
-                    # Hand control back — end this turn so the user can pick an option.
+                # A multi-question form is always a pause; a single-row clarify
+                # pauses too. next-step chips stay advisory (turn continues).
+                if mode == "clarify" or questions:
                     task_done = True
-                    full_response = question or "Choose an option to continue."
+                    full_response = question or "Answer the questions above to continue."
                 continue
 
             # All other tools dispatched to tools.py

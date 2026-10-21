@@ -382,7 +382,10 @@ TOOLS_SCHEMA = [
                 "Offer the user tappable follow-up or clarifying options instead of a wall "
                 "of prose. Use when you need a decision to proceed (mode 'clarify') or to "
                 "suggest convenient next steps after an answer (mode 'next-step'). Each "
-                "option carries a short label and the exact prompt text it will send."
+                "option carries a short label and the exact prompt text it will send. For a "
+                "richer Q&A, pass 'questions' (1-4) instead of a single 'options' row: each "
+                "question renders its choices as buttons plus a trailing free-text field for "
+                "the user's own answer, and the turn pauses until they submit."
             ),
             "parameters": {
                 "type": "object",
@@ -409,8 +412,31 @@ TOOLS_SCHEMA = [
                             "required": ["label", "promptText"],
                         },
                     },
+                    "questions": {
+                        "type": "array",
+                        "description": "Optional multi-question clarification form (1-4 questions). Preferred over a single 'options' row when several decisions are needed at once. Each question always gets a free-text 'Other' answer field as its last choice unless allowCustom is false.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "question": {"type": "string", "description": "The question text shown above this question's choices."},
+                                "options": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "label": {"type": "string", "description": "Choice text (1-5 words)."},
+                                            "promptText": {"type": "string", "description": "Answer text sent for this choice; defaults to the label."},
+                                        },
+                                        "required": ["label"],
+                                    },
+                                },
+                                "allowCustom": {"type": "boolean", "description": "Show a free-text field as the last choice. Defaults to true."},
+                            },
+                            "required": ["question", "options"],
+                        },
+                    },
                 },
-                "required": ["options"],
+                "required": [],
             },
         },
     },

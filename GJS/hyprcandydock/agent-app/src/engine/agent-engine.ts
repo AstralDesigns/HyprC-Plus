@@ -503,7 +503,9 @@ export class AgentEngine {
 
               } else if (type === 'suggestions') {
                 const sd = (typeof data === 'string' ? null : data) as SuggestionsData | null;
-                if (sd && Array.isArray(sd.options) && sd.options.length) {
+                const hasChips = Array.isArray(sd?.options) && sd!.options.length > 0;
+                const hasForm = Array.isArray(sd?.questions) && sd!.questions.length > 0;
+                if (sd && (hasChips || hasForm)) {
                   blocks = [...blocks, { type: 'suggestions', id: nextBlockId(), suggestions: sd }];
                   // Mirror to the composer chip row; clarify chips stay live after
                   // the turn ends, next-step ones are refreshed by the next run.

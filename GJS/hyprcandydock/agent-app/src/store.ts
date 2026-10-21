@@ -70,10 +70,27 @@ export interface SuggestionOption {
   sendAs?: 'send' | 'steer';
 }
 
+/** One choice inside a multi-question clarification. promptText defaults to label. */
+export interface ClarifyOption {
+  label: string;
+  promptText?: string;
+}
+
+/** A single question in a Qoder-style clarification form. Its choices render as
+ *  buttons plus a trailing free-text "Other" field (unless allowCustom is false). */
+export interface ClarifyQuestion {
+  question: string;
+  options: ClarifyOption[];
+  allowCustom?: boolean;
+}
+
 export interface SuggestionsData {
   mode: 'clarify' | 'next-step';
   question: string;
   options: SuggestionOption[];
+  /** Optional multi-question form. When present it takes precedence over the
+   *  single question/options row and pauses the turn until the user submits. */
+  questions?: ClarifyQuestion[];
 }
 
 export type MessageBlock =
@@ -311,6 +328,11 @@ export interface AppState {
   /** Opt-in master switch for Monaco inline ghost-text completions. Default
    *  false so nothing fires provider requests until the user enables it. */
   inlineCompletionsEnabled: boolean;
+  /** Opt-in "next-edit jump" hints: after an idle pause the model names the
+   *  line most likely needing the next edit and we surface a Tab-to-jump hint.
+   *  Rides the same completions provider/key, so it stays inert until both this
+   *  and inlineCompletionsEnabled are on. Default false. */
+  jumpSuggestionsEnabled: boolean;
 }
 
 const STORAGE_KEY = 'hyprcandy_agent_state_v2';
@@ -425,6 +447,7 @@ function loadInitialState(): AppState {
     completionsProvider: 'openrouter',
     completionsModel: '',
     inlineCompletionsEnabled: false,
+    jumpSuggestionsEnabled: false,
   };
 
   const persisted = readPersistedBlob();
@@ -469,6 +492,7 @@ function persistedSnapshot() {
     completionsProvider: next.completionsProvider,
     completionsModel: next.completionsModel,
     inlineCompletionsEnabled: next.inlineCompletionsEnabled,
+    jumpSuggestionsEnabled: next.jumpSuggestionsEnabled,
     byokLicenseKey: next.byokLicenseKey,
     byokLicenseInstanceId: next.byokLicenseInstanceId,
     licenseLastActiveAt: next.licenseLastActiveAt,
@@ -543,6 +567,7 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
       : 'openrouter',
     completionsModel: typeof parsed.completionsModel === 'string' ? parsed.completionsModel : '',
     inlineCompletionsEnabled: typeof parsed.inlineCompletionsEnabled === 'boolean' ? parsed.inlineCompletionsEnabled : false,
+    jumpSuggestionsEnabled: typeof parsed.jumpSuggestionsEnabled === 'boolean' ? parsed.jumpSuggestionsEnabled : false,
     byokLicenseKey: typeof parsed.byokLicenseKey === 'string' ? parsed.byokLicenseKey : '',
     byokLicenseInstanceId: typeof parsed.byokLicenseInstanceId === 'string' ? parsed.byokLicenseInstanceId : '',
     licenseLastActiveAt: typeof parsed.licenseLastActiveAt === 'number' ? parsed.licenseLastActiveAt : 0,
@@ -704,6 +729,19 @@ export function useStoreSelector<T>(selector: (s: AppState) => T, isEqual: (a: T
 }
 
 let untitledCount = 1;
+
+// Resolve a file path's display name + Monaco pane type/language purely from its
+// extension (no disk reads). Shared by openFileByPath and saveFileAs so a saved
+// or opened file lands on the right editor mode / tab label.
+function metaFromPath(path: string): { name: string; ext: string; type: FilePaneType; language: string } {
+  const name = path.split('/').pop() || path;
+  const ext = name.split('.').pop()?.toLowerCase() || '';
+  if (ext === 'md') return { name, ext, type: 'markdown', language: 'markdown' };
+  if (['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'].includes(ext)) return { name, ext, type: 'image-gallery', language: 'plaintext' };
+  if (['mp4', 'webm', 'mov', 'mkv'].includes(ext)) return { name, ext, type: 'video-gallery', language: 'plaintext' };
+  if (['mp3', 'wav', 'ogg', 'flac'].includes(ext)) return { name, ext, type: 'audio', language: 'plaintext' };
+  return { name, ext, type: 'code', language: getLanguageForExt(ext) };
+}
 
 /* Store Actions */
 export const storeActions = {
@@ -1258,6 +1296,69 @@ export const storeActions = {
     }
   },
 
+  /**
+   * Save As: prompt the host save dialog (zenity --save), write the pane's
+   * current content to the chosen path, then REDIRECT the tab to that new path
+   * (retitle, re-derive editor mode, clear the dirty flag). The original file
+   * (if any) is left untouched on disk.
+   */
+  saveFileAs: async (paneId: string) => {
+    const pane = getStore().panes.find(p => p.id === paneId);
+    if (!pane) return;
+    const dirOf = (p: string) => p.slice(0, p.lastIndexOf('/'));
+    const st = getStore();
+    const currentFolder = (pane.path ? dirOf(pane.path) : '') || st.projectPath || st.currentPath || undefined;
+    let newPath: string | null = null;
+    try {
+      newPath = await bridge.saveFileDialog({ currentFolder, suggestedName: pane.name, title: 'Save As' });
+    } catch (e) { console.warn('saveFileAs dialog failed:', e); return; }
+    if (!newPath) return;
+    try {
+      const res = await bridge.writeFile(newPath, pane.content);
+      if (!res || res.success === false) return;
+    } catch (e) { console.error('Failed to save-as file:', e); return; }
+    const meta = metaFromPath(newPath);
+    setStore(prev => ({
+      panes: prev.panes.map(p => p.id === paneId ? {
+        ...p, path: newPath, name: meta.name, type: meta.type, language: meta.language,
+        isUnsaved: false, diskMtime: undefined, externalChanged: false,
+      } : p),
+      activePaneId: paneId,
+      openFiles: prev.openFiles.includes(newPath) ? prev.openFiles : [...prev.openFiles, newPath],
+      openFileContents: { ...prev.openFileContents, [paneId]: pane.content },
+    }));
+    // Nudge the explorer so the new file shows, and refresh git badges.
+    setStore(prev => ({ fsRev: prev.fsRev + 1 }));
+    storeActions.refreshGitStatus();
+  },
+
+  /**
+   * Rename a file/folder on disk (mv) and repoint every open pane that tracked
+   * the old path (exact match, or any descendant of a renamed folder).
+   */
+  renamePath: async (oldPath: string, newPath: string): Promise<boolean> => {
+    if (!oldPath || !newPath || oldPath === newPath) return false;
+    const sq = (s: string) => `'` + s.replace(/'/g, `'\\''`) + `'`;
+    try {
+      await bridge.execCommand(`mv ${sq(oldPath)} ${sq(newPath)}`);
+    } catch (e) { console.error('rename failed:', e); return false; }
+    const prefix = oldPath + '/';
+    setStore(prev => ({
+      panes: prev.panes.map(p => {
+        if (p.path === oldPath) {
+          return { ...p, path: newPath, name: (newPath.split('/').pop() || newPath), diskMtime: undefined };
+        }
+        if (p.path && p.path.startsWith(prefix)) {
+          const np = newPath + p.path.slice(oldPath.length);
+          return { ...p, path: np, name: (np.split('/').pop() || np), diskMtime: undefined };
+        }
+        return p;
+      }),
+    }));
+    storeActions.refreshGitStatus();
+    return true;
+  },
+
   /** Reload a single open pane's content straight from disk, clearing the
    * unsaved + external-change flags. Used when the user accepts an on-disk
    * edit that landed while their tab was dirty. */
@@ -1367,52 +1468,29 @@ export const storeActions = {
   },
 
   openFileByPath: async (filePath: string) => {
-    const name = filePath.split('/').pop() || filePath;
-    const ext = name.split('.').pop()?.toLowerCase() || '';
-
-    const imageExtensions = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'];
-    const videoExtensions = ['mp4', 'webm', 'mov', 'mkv'];
-    const audioExtensions = ['mp3', 'wav', 'ogg', 'flac'];
-
-    let type: FilePaneType = 'code';
-    let language = 'plaintext';
+    const meta = metaFromPath(filePath);
+    const name = meta.name;
+    let type: FilePaneType = meta.type;
+    let language = meta.language;
     let content = '';
     let data: any = null;
 
-    if (ext === 'md') {
-      type = 'markdown';
-      language = 'markdown';
+    // text-backed panes read their bytes; image/video galleries also gather
+    // sibling media so the gallery surface can page across the folder.
+    if (type === 'markdown' || type === 'code') {
       try { content = await bridge.readFile(filePath); } catch (e) { console.warn(e); }
-    } else if (imageExtensions.includes(ext)) {
-      type = 'image-gallery';
+    } else if (type === 'image-gallery' || type === 'video-gallery') {
+      const set = type === 'image-gallery' ? ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'] : ['mp4', 'webm', 'mov', 'mkv'];
       const dirPath = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
       try {
         const items = await bridge.listDirectory(dirPath);
         const mediaFiles = items
-          .filter(i => !i.isDir && imageExtensions.includes(i.name.split('.').pop()?.toLowerCase() || ''))
+          .filter(i => !i.isDir && set.includes(i.name.split('.').pop()?.toLowerCase() || ''))
           .map(i => ({ name: i.name, path: `${dirPath.replace(/\/$/, '')}/${i.name}`, type: 'file' as const, size: i.size }));
         data = mediaFiles.length > 0 ? mediaFiles : [{ name, path: filePath, type: 'file', size: 0 }];
       } catch (e) {
         data = [{ name, path: filePath, type: 'file', size: 0 }];
       }
-    } else if (videoExtensions.includes(ext)) {
-      type = 'video-gallery';
-      const dirPath = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
-      try {
-        const items = await bridge.listDirectory(dirPath);
-        const mediaFiles = items
-          .filter(i => !i.isDir && videoExtensions.includes(i.name.split('.').pop()?.toLowerCase() || ''))
-          .map(i => ({ name: i.name, path: `${dirPath.replace(/\/$/, '')}/${i.name}`, type: 'file' as const, size: i.size }));
-        data = mediaFiles.length > 0 ? mediaFiles : [{ name, path: filePath, type: 'file', size: 0 }];
-      } catch (e) {
-        data = [{ name, path: filePath, type: 'file', size: 0 }];
-      }
-    } else if (audioExtensions.includes(ext)) {
-      type = 'audio';
-    } else {
-      type = 'code';
-      language = getLanguageForExt(ext);
-      try { content = await bridge.readFile(filePath); } catch (e) { console.warn(e); }
     }
 
     const existing = currentState.panes.find(p => p.id === filePath);

@@ -23,10 +23,12 @@ import {
   Check,
   Pin,
   ArrowRight,
+  PenLine,
 } from 'lucide-react';
 import { useStore, setStore, storeActions, PRESET_MODELS, FilePane } from '../store';
 import { fileStatusClass, fileStatusLetter } from '../utils/gitStatus';
 import { FileIcon } from '../utils/fileIcons';
+import { RenameDialog } from './RenameDialog';
 import { bridge } from '../bridge';
 
 function getTabIcon(pane: FilePane) {
@@ -48,6 +50,9 @@ export const Header: React.FC = () => {
 
   // Tab right-click menu (replaces the Qt WebEngine native context menu).
   const [tabMenu, setTabMenu] = useState<{ x: number; y: number; paneId: string } | null>(null);
+
+  // In-app rename prompt for the active tab's file (leaf-name swap on disk).
+  const [renamePane, setRenamePane] = useState<FilePane | null>(null);
 
   // Dismiss the tab menu on any outside press, Escape, or tab-row scroll.
   useEffect(() => {
@@ -88,6 +93,8 @@ export const Header: React.FC = () => {
       case 'close-all': storeActions.closeAllPanes(); break;
       case 'copy-path': if (pane?.path) void bridge.copyToClipboard(pane.path); break;
       case 'copy-relative': if (pane?.path) void bridge.copyToClipboard(relativeToProject(pane.path)); break;
+      case 'save-as': void storeActions.saveFileAs(id); break;
+      case 'rename': if (pane?.path) setRenamePane(pane); break;
     }
   };
 
@@ -225,6 +232,13 @@ export const Header: React.FC = () => {
     }
   };
 
+  const handleSaveAsActive = async () => {
+    setShowDropdown(false);
+    if (store.activePaneId) {
+      await storeActions.saveFileAs(store.activePaneId);
+    }
+  };
+
   const activePane = store.panes.find(p => p.id === store.activePaneId);
 
   return (
@@ -277,6 +291,16 @@ export const Header: React.FC = () => {
                 <Save size={13} color={activePane?.isUnsaved ? 'var(--accent-green)' : 'var(--text-muted)'} />
                 <span>Save Current</span>
                 <span className="dropdown-shortcut">Ctrl+S</span>
+              </button>
+              <button
+                type="button"
+                className="dropdown-item"
+                onClick={handleSaveAsActive}
+                disabled={!activePane}
+              >
+                <Save size={13} color={activePane ? 'var(--accent-green)' : 'var(--text-muted)'} />
+                <span>Save As…</span>
+                <span className="dropdown-shortcut">Ctrl+Shift+S</span>
               </button>
             </div>
           )}
@@ -536,6 +560,9 @@ export const Header: React.FC = () => {
               <button disabled={!anySaved} onClick={() => runTabAction('close-saved')}><Check size={13} /> Close Saved</button>
               <button onClick={() => runTabAction('close-all')}><X size={13} /> Close All</button>
               <div className="menu-separator" />
+              <button onClick={() => runTabAction('save-as')}><Save size={13} /> Save As<span className="menu-accel">Ctrl+Shift+S</span></button>
+              <button disabled={!pane.path} onClick={() => runTabAction('rename')}><PenLine size={13} /> Rename…</button>
+              <div className="menu-separator" />
               <button disabled={!pane.path} onClick={() => runTabAction('copy-path')}><Copy size={13} /> Copy Path<span className="menu-accel">Ctrl+Alt+C</span></button>
               <button disabled={!pane.path} onClick={() => runTabAction('copy-relative')}><Copy size={13} /> Copy Relative Path</button>
             </div>
@@ -543,6 +570,19 @@ export const Header: React.FC = () => {
         })(),
         document.body,
       )}
+      <RenameDialog
+        open={renamePane !== null}
+        initialName={renamePane?.name ?? ''}
+        onCancel={() => setRenamePane(null)}
+        onSubmit={(newName) => {
+          const p = renamePane;
+          setRenamePane(null);
+          if (!p?.path) return;
+          const parent = p.path.slice(0, p.path.lastIndexOf('/'));
+          const newPath = `${parent}/${newName}`;
+          if (newPath !== p.path) void storeActions.renamePath(p.path, newPath);
+        }}
+      />
     </header>
   );
 };

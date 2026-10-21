@@ -27,11 +27,13 @@ import {
   Clipboard,
   Trash2,
   Move,
+  PenLine,
 } from 'lucide-react';
 import { useStore, setStore, storeActions, FileSystemItem } from '../store';
 import { bridge } from '../bridge';
 import { fileStatusClass, fileStatusLetter, buildFolderStatus } from '../utils/gitStatus';
 import { FileIcon } from '../utils/fileIcons';
+import { RenameDialog } from './RenameDialog';
 
 function getFileIcon(name: string, isDir: boolean) {
   // Centralized VSCode-style per-format glyphs (see utils/fileIcons); colors
@@ -66,6 +68,8 @@ export const Sidebar: React.FC = () => {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; entry: ProjectEntry } | null>(null);
   // In-app themed delete confirmation (QtWebEngine can't reliably show window.confirm).
   const [pendingDelete, setPendingDelete] = useState<ProjectEntry | null>(null);
+  // In-app rename prompt (shared RenameDialog) for a tree entry.
+  const [pendingRename, setPendingRename] = useState<ProjectEntry | null>(null);
   // Nautilus-style recursive search matches, surfaced as a flat top section.
   const [fileResults, setFileResults] = useState<ProjectEntry[] | null>(null);
   const [projectResults, setProjectResults] = useState<ProjectEntry[] | null>(null);
@@ -185,12 +189,13 @@ export const Sidebar: React.FC = () => {
     }
   };
 
-  const runFileAction = async (action: 'copy' | 'move' | 'delete' | 'copy-path') => {
+  const runFileAction = async (action: 'copy' | 'move' | 'delete' | 'rename' | 'copy-path') => {
     const entry = contextMenu?.entry;
     setContextMenu(null);
     if (!entry) return;
     if (action === 'copy-path') { void bridge.copyToClipboard(entry.path); return; }
     if (action === 'delete') { setPendingDelete(entry); return; }
+    if (action === 'rename') { setPendingRename(entry); return; }
     if (action === 'copy' || action === 'move') {
       const destination = await bridge.openFileDialog({ directory: true, currentFolder: navFolder() });
       if (!destination) return;
@@ -204,6 +209,19 @@ export const Sidebar: React.FC = () => {
     setPendingDelete(null);
     if (!entry) return;
     await bridge.execCommand(`rm -rf -- ${shellQuote(entry.path)}`, navFolder() || undefined);
+    await refreshAfterMutation(entry.path);
+  };
+
+  // Rename keeps the entry in place: swap only the leaf name under its current
+  // parent, then refresh that parent folder (renamePath re-points any open tabs).
+  const confirmRename = async (newName: string) => {
+    const entry = pendingRename;
+    setPendingRename(null);
+    if (!entry) return;
+    const parent = parentDirOf(entry.path);
+    const newPath = `${parent === '/' ? '' : parent}/${newName}`;
+    if (newPath === entry.path) return;
+    await storeActions.renamePath(entry.path, newPath);
     await refreshAfterMutation(entry.path);
   };
 
@@ -766,6 +784,7 @@ export const Sidebar: React.FC = () => {
           <button onClick={() => void runFileAction('move')}><Move size={12} /> Move to...</button>
           <button onClick={() => void runFileAction('copy-path')}><Clipboard size={12} /> Copy path</button>
           <div className="menu-separator" />
+          <button onClick={() => void runFileAction('rename')}><PenLine size={12} /> Rename</button>
           <button className="danger" onClick={() => void runFileAction('delete')}><Trash2 size={12} /> Delete</button>
         </div>,
         document.body,
@@ -787,6 +806,13 @@ export const Sidebar: React.FC = () => {
         </div>,
         document.body,
       )}
+      <RenameDialog
+        open={pendingRename !== null}
+        initialName={pendingRename?.name ?? ''}
+        title={pendingRename?.isDir ? 'Rename folder' : 'Rename file'}
+        onCancel={() => setPendingRename(null)}
+        onSubmit={(newName) => void confirmRename(newName)}
+      />
     </div>
   );
 };

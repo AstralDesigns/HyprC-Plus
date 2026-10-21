@@ -1504,6 +1504,29 @@ const CompletionsTab: FC = () => {
         />
       </div>
 
+      {/* Next-edit jump hints — rides the inline-completions provider/key. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
+        padding: '10px 12px', borderRadius: 'var(--radius-sm)',
+        background: `color-mix(in srgb, ${PRIMARY} 10%, transparent)`,
+        border: `1px solid color-mix(in srgb, ${PRIMARY} 28%, transparent)`,
+      }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Next-edit jump hints</div>
+          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+            {canEnableInline && store.inlineCompletionsEnabled
+              ? 'After a pause, the model suggests a line to jump to (Tab), then shows the edit there.'
+              : 'Enable inline completions with a saved key first.'}
+          </div>
+        </div>
+        <IosToggle
+          checked={store.jumpSuggestionsEnabled}
+          disabled={!(canEnableInline && store.inlineCompletionsEnabled)}
+          onChange={v => setStore({ jumpSuggestionsEnabled: v })}
+          label={store.jumpSuggestionsEnabled ? 'On' : 'Off'}
+        />
+      </div>
+
       {/* Provider pills — hidden when only one completion provider is visible. */}
       {providers.length > 1 && (
       <div>
