@@ -838,8 +838,14 @@ PanelWindow {
     function _openOnWs(app, wsNum) {
         const exec = dock._execLine(app) || String(app.exec || app.id || "").replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
         if (exec === "") return
+        // Terminal=true entries need the tty wrapper before hitting the
+        // exec_cmd dispatcher, else the TUI dies with no window (TuiLaunch).
+        const e = dock._desktopEntry(app)
+        const tui = e ? (e.runInTerminal === true || e.terminal === true)
+                      : TuiLaunch.entryNeedsTerminal(app.desktopId, app.id)
+        const line = tui ? TuiLaunch.wsCommand(exec) : exec
         dock._hlDispatch("hl.dsp.focus({ workspace = " + wsNum + " })")
-        dock._wsPendingExec = exec.replace(/'/g, "")
+        dock._wsPendingExec = line.replace(/'/g, "")
         dock._wsPendingWs = wsNum
         _wsLaunchTimer.restart()
     }
@@ -1546,7 +1552,9 @@ PanelWindow {
 
     function _launch(app) {
         const e = dock._desktopEntry(app)
-        if (e) { e.execute(); return }
+        // TuiLaunch: entry.execute() silently ignores Terminal=true, which
+        // kills TUI applets (btop/htop/nvtop) with no window (see TuiLaunch).
+        if (e) { TuiLaunch.launchEntry(e, app.exec); return }
         if (app.exec && app.exec !== "") {
             launchProc._cmd = app.exec.replace(/%[a-zA-Z]/g, "").trim()
             launchProc.running = true

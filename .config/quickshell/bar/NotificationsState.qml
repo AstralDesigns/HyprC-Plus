@@ -130,7 +130,11 @@ Item {
                 const updated = Object.assign({}, h[hi], {
                     appName:      isMedia ? n.appName : h[hi].appName,
                     desktopEntry: isMedia ? n.desktopEntry : h[hi].desktopEntry,
-                    source_url:   isMedia ? n.source_url : h[hi].source_url,
+                    // Incoming notifs carry _sourceUrl (set at intake); the
+                    // old source_url key here never matched it, so media
+                    // history cards lost their link on every update.
+                    _sourceUrl:   (n._sourceUrl || n.source_url ||
+                                   h[hi]._sourceUrl || h[hi].source_url || ""),
                     summary:      n.summary,
                     body:         n.body,
                     iconPath:     n.iconPath || h[hi].iconPath,
@@ -215,6 +219,65 @@ Item {
         return ""
     }
 
+    // ── Source-URL resolution + browser open ──────────────────────────────
+    // First http(s) URL in a text blob (anchor href preferred, then bare).
+    function _extractUrl(text) {
+        if (!text) return ""
+        const hrefM = text.match(/href=["']?(https?:\/\/[^"'\s<>]+)/)
+        if (hrefM) return hrefM[1]
+        const bareM = text.match(/https?:\/\/[^\s"'<>]+/)
+        if (bareM) return bareM[0]
+        return ""
+    }
+
+    // Web home for known media players whose MPRIS notifications carry no
+    // source_url — links the toast/history to a track search on the site.
+    function _mediaSite(notif) {
+        const ap = (notif.appName || "").toLowerCase()
+        const q  = encodeURIComponent(notif.summary || "")
+        if (q === "") return ""
+        if (ap.includes("spotify"))        return "https://open.spotify.com/search/" + q
+        if (ap.includes("youtube") && ap.includes("music"))
+            return "https://music.youtube.com/search?q=" + q
+        if (ap.includes("youtube"))        return "https://www.youtube.com/results?search_query=" + q
+        return ""
+    }
+
+    // Best clickable source URL for a notification ("" when none):
+    // daemon-provided source_url → http(s) in body/summary → media site
+    // fallback → NotifAppState url remembered from earlier notifs.
+    function notifUrl(notif) {
+        if (!notif) return ""
+        const direct = String(notif._sourceUrl || notif.source_url || "").trim()
+        if (/^https?:\/\//i.test(direct)) return direct
+        const b = ns._extractUrl(notif.body)
+        if (b !== "") return b
+        const s = ns._extractUrl(notif.summary)
+        if (s !== "") return s
+        if (notif.category === "media.playing") {
+            const site = ns._mediaSite(notif)
+            if (site !== "") return site
+        }
+        const key = (notif.desktopEntry || notif.appName || "").toLowerCase()
+        if (key !== "") {
+            const stored = NotifAppState.lookup(key)
+            const su = stored && stored.url ? String(stored.url) : ""
+            if (/^https?:\/\//i.test(su)) return su
+        }
+        return ""
+    }
+
+    // Open the notification's source URL in the default browser (xdg-open).
+    // http(s) only — never a notification-supplied local path or odd scheme.
+    // Returns true when a URL was handed off.
+    function openUrl(notif) {
+        const u = ns.notifUrl(notif)
+        if (u === "") return false
+        urlOpenerProc._url = u
+        if (!urlOpenerProc.running) urlOpenerProc.running = true
+        return true
+    }
+
     // ── Primary redirect entry point ──────────────────────────────────────
     function redirectNotification(notif) {
         const ic = (notif.icon    || "").toLowerCase()
@@ -297,10 +360,10 @@ Item {
             // 3b. Focus running window
             Hyprland.dispatch("focuswindow", "address:" + client.address)
         } else if (desktopId) {
-            // 3c. Launch via DesktopEntry
+            // 3c. Launch via DesktopEntry (TuiLaunch handles Terminal=true)
             const entry = DesktopEntries.byId(desktopId)
             if (entry) {
-                entry.execute()
+                TuiLaunch.launchEntry(entry)
             } else {
                 _notifLaunchProc._cmd = desktopId.replace(".desktop","")
                 _notifLaunchTimer.restart()
@@ -338,14 +401,7 @@ Item {
             }
         }
 
-        function _extractUrl(text) {
-            if (!text) return ""
-            const hrefM = text.match(/href=["']?(https?:\/\/[^"'\s<>]+)/)
-            if (hrefM) return hrefM[1]
-            const bareM = text.match(/https?:\/\/[^\s"'<>]+/)
-            if (bareM) return bareM[0]
-            return ""
-        }
+        function _extractUrl(text) { return ns._extractUrl(text) }
         let url = (sourceUrl || "").trim()
             || _extractUrl(body) || _extractUrl(summary)
         if (!url && summary) {

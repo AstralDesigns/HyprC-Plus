@@ -594,6 +594,11 @@ Item {
                                     const exec = (contextMenu._app["exec"] || contextMenu._app["class"] || "")
                                                  .replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
                                     const ws   = _wsNum   // capture before hideMenu nulls the app
+                                    // Terminal=true probe also needs the record
+                                    // (entry lookup), so decide before hiding.
+                                    const tui  = TuiLaunch.entryNeedsTerminal(
+                                                 contextMenu._app["desktopId"] ?? "",
+                                                 contextMenu._app["class"] ?? "")
                                     win._hideMenu()
                                     if (exec === "") return
 
@@ -606,7 +611,9 @@ Item {
                                     _wsDispatchProc.running = true
 
                                     // Step 2: launch with workspace rule after 50 ms
-                                    win._wsPendingExec = exec
+                                    // (TUIs get the tty wrapper -- the exec_cmd
+                                    // dispatcher would run them bare, no tty)
+                                    win._wsPendingExec = tui ? TuiLaunch.wsCommand(exec) : exec
                                     win._wsPendingWs   = ws
                                     _wsLaunchTimer.restart()
                                 }
@@ -667,12 +674,14 @@ Item {
             }
 
             // Primary launch path: use entry.execute() when we have a valid ID.
+            // Terminal=true entries are routed through TuiLaunch (execute()
+            // ignores runInTerminal; see TuiLaunch.qml).
             function _launchEntry(desktopId, exec, cls) {
                 // Try DesktopEntries.byId with all the same variants that
                 // _resolveApps() tried so we never miss an entry at launch time.
                 if (desktopId && desktopId !== "") {
                     const entry = DesktopEntries.byId(desktopId)
-                    if (entry) { entry.execute(); return }
+                    if (entry) { TuiLaunch.launchEntry(entry, exec); return }
                 }
                 // byId miss — try common variants of the class name
                 const variants = [cls, cls.toLowerCase(),
@@ -680,7 +689,7 @@ Item {
                                   cls.split('.').pop().toLowerCase()]
                 for (const v of variants) {
                     const e = DesktopEntries.byId(v)
-                    if (e) { e.execute(); return }
+                    if (e) { TuiLaunch.launchEntry(e); return }
                 }
                 // Exec-binary scan: match cls against the binary name in each
                 // entry's Exec= field.  Handles wrapper-launcher desktops like
@@ -695,7 +704,7 @@ Item {
                     if (bin === normCls
                             || bin.startsWith(normCls + "-")
                             || bin.endsWith("-" + normCls)) {
-                        e.execute(); return
+                        TuiLaunch.launchEntry(e); return
                     }
                 }
                 // Final fallback: strip field codes and run via bash

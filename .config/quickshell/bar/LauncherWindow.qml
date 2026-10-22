@@ -1869,7 +1869,9 @@ Item {
             }
             function launchApp(rec) {
                 if (!rec) return
-                if (rec.entry) { rec.entry.execute(); return }
+                // Terminal=true entries need a tty wrapper: entry.execute()
+                // ignores runInTerminal entirely (see TuiLaunch.qml).
+                if (rec.entry) { TuiLaunch.launchEntry(rec.entry, rec.exec); return }
                 const line = win.cleanExec(rec)
                 if (line === "") return
                 launchProc._cmd = line + " &"
@@ -1949,12 +1951,20 @@ Item {
                 if (exec === "" && rec.entry && rec.entry.execString)
                     exec = String(rec.entry.execString).replace(/%[UuFfIiDdNnVvKk]/g, "").trim()
                 if (exec === "") return
+                // Terminal=true entries: the exec_cmd dispatcher runs the raw
+                // line through sh with no tty, so TUIs must be wrapped first
+                // (wsCommand emits a quote-safe one-line resolver). GPU env
+                // rides INSIDE the wrapper so the TUI itself inherits it.
+                let envStr = ""
                 if (envObj) {
-                    let envStr = ""
                     for (const [k, v] of Object.entries(envObj))
                         envStr += k + "=" + v + " "
-                    exec = envStr + exec
                 }
+                const tui = rec.entry
+                    ? (rec.entry.runInTerminal === true || rec.entry.terminal === true)
+                    : TuiLaunch.entryNeedsTerminal(rec.desktopId, rec.cls)
+                exec = tui ? TuiLaunch.wsCommand(exec, envStr) : envStr + exec
+                if (exec === "") return
                 win._hlDispatch("hl.dsp.focus({ workspace = " + wsNum + " })")
                 win._wsPendingExec = exec.replace(/'/g, "")
                 win._wsPendingWs = wsNum
@@ -2012,7 +2022,11 @@ Item {
                     }
                     rows.push({ kind: "sep" })
                 }
-                rows.push({ kind: "item", key: "newwin", text: "New Window", chev: "\u203A" })
+                // "chevron" is what the menu delegate reads: it renders the ›
+                // glyph AND arms hover-expansion of the ws sub-panel (the old
+                // "chev" key name here never matched, leaving that dead).
+                rows.push({ kind: "item", key: "newwin", text: "New Window",
+                            chevron: "\u203A" })
                 rows.push({ kind: "sep" })
                 rows.push({ kind: "item", key: "pindock",
                             text: win.isPinnedDock(rec) ? "Unpin from Dock" : "Pin to Dock" })
@@ -2045,7 +2059,7 @@ Item {
                     rows.push({ kind: "sep" })
                     for (let i = 0; i < win.gpuList.length; i++)
                         rows.push({ kind: "item", key: "gpu:" + i,
-                                    text: win.abbrevGpu(win.gpuList[i].name), chev: "\u203A" })
+                                    text: win.abbrevGpu(win.gpuList[i].name), chevron: "\u203A" })
                 }
                 win._menuRows = rows
                 win._menuOpen = true
@@ -2109,8 +2123,10 @@ Item {
                     if (inst[i]) win._raiseToplevel(inst[i])
                     win._hideMenu(); HCCLauncherState.close()
                 } else if (key === "newwin") {
+                    // Launches keep the launcher open (multi-launch); the
+                    // user hides it manually (toggle / Esc / dock menu).
                     win.launchApp(rec)
-                    win._hideMenu(); HCCLauncherState.close()
+                    win._hideMenu()
                 } else if (key === "pindock") {
                     win.togglePinDock(rec); win._hideMenu()
                 } else if (key === "pindesk") {
@@ -2141,7 +2157,7 @@ Item {
                     const g = win.gpuList[parseInt(key.substring(4), 10)]
                     const line = rec ? win.cleanExec(rec) : ""
                     if (g && line !== "") win.launchOnGpu(line, g.env ?? {})
-                    win._hideMenu(); HCCLauncherState.close()
+                    win._hideMenu()
                 } else {
                     win._hideMenu()
                 }
@@ -2159,7 +2175,8 @@ Item {
                 } else {
                     win.launchOnWs(rec, wsNum, null)
                 }
-                HCCLauncherState.close()
+                // Launcher stays open for follow-up launches (layer surface
+                // persists across the workspace focus move); hide is manual.
             }
 
             // ── Tab switching / dismissal ─────────────────────────────────
@@ -4724,7 +4741,7 @@ Item {
                     const list = filteredApps
                     const rec = win.focusIdx >= 0 && win.focusIdx < list.length
                                 ? list[win.focusIdx] : (list.length > 0 ? list[0] : null)
-                    if (rec) { win.launchApp(rec); HCCLauncherState.close() }
+                    if (rec) { win.launchApp(rec) }
                 } else if (win.tab === "clipboard") {
                     const list = win.clipFiltered
                     if (list.length > 0) {
@@ -4880,7 +4897,6 @@ Item {
                             return
                         }
                         win.launchApp(tile.rec)
-                        HCCLauncherState.close()
                     }
                 }
             }

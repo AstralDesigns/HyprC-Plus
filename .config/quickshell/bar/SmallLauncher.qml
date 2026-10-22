@@ -118,7 +118,7 @@ Item {
                     }
                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
                         if (root.filteredApps.length > 0 && root.selectedIndex >= 0 && root.selectedIndex < root.filteredApps.length) {
-                            root.filteredApps[root.selectedIndex].execute();
+                            TuiLaunch.launchEntry(root.filteredApps[root.selectedIndex]);
                             SmallLauncherState.close();
                         }
                         event.accepted = true;
@@ -254,7 +254,7 @@ Item {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 onClicked: {
-                                    delegateRect.modelData.execute();
+                                    TuiLaunch.launchEntry(delegateRect.modelData);
                                     SmallLauncherState.close();
                                 }
                                 onEntered: root.selectedIndex = delegateRect.index

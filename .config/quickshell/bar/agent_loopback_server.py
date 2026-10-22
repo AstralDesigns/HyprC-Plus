@@ -40,13 +40,14 @@ import json
 import time
 import shutil
 import threading
+import secrets
 import subprocess
 import mimetypes
 import datetime as _dt
 import urllib.request
 import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import unquote, quote
+from urllib.parse import unquote, quote, urlparse
 
 
 def _shq(s):
@@ -59,6 +60,29 @@ DIST = os.path.expanduser(os.environ.get(
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("HC_AGENT_PORT", "17842"))
 RUNTIME_URL = os.environ.get("HC_RUNTIME_URL", "http://127.0.0.1:17900")
+
+# ── Bridge access control ──────────────────────────────────────────────────
+# The /bridge endpoint dispatches privileged host actions (exec_command,
+# read/write_file, secret_lookup, the runtime proxy). It binds loopback only,
+# but with no origin/host check any local process -- or any web page that
+# DNS-rebinds its own hostname to 127.0.0.1 -- could call them. Two gates
+# close that:
+#   • Host + Origin/Referer must be the loopback origin of THIS server, and
+#   • every /bridge POST must carry the per-session token that is injected
+#     into the served SPA (foreign processes can't read it, and a rebinding
+#     page fails the Host check before the token is even considered).
+BRIDGE_TOKEN = secrets.token_hex(32)
+_ALLOWED_HOSTS = {
+    "127.0.0.1:%d" % PORT, "localhost:%d" % PORT, "[::1]:%d" % PORT,
+}
+_ALLOWED_ORIGINS = {
+    "http://127.0.0.1:%d" % PORT, "http://localhost:%d" % PORT,
+    "http://[::1]:%d" % PORT,
+}
+_RUNTIME_U = urlparse(RUNTIME_URL)
+_RUNTIME_HOSTS = {"127.0.0.1", "localhost", "::1", _RUNTIME_U.hostname}
+_RUNTIME_PORT = _RUNTIME_U.port or 17900
+
 DEFAULT_PROJECT_ROOT = os.path.join(
     HOME, ".hyprcandy", "GJS", "hyprcandydock")
 COLORS_CSS = os.path.join(HOME, ".config", "gtk-4.0", "colors.css")
@@ -109,7 +133,8 @@ BRIDGE_SHIM = """<script>
     try {
       fetch('/bridge', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json',
+                   'X-HC-Bridge': (window.__HC_BRIDGE_TOKEN || '') },
         body: String(raw)
       }).then(function (r) {
         if (!r.ok) { fail(); return; }
@@ -127,7 +152,8 @@ BRIDGE_SHIM = """<script>
   // only a cache; Chromium does not flush it on a hard kill).
   fetch('/bridge', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json',
+               'X-HC-Bridge': (window.__HC_BRIDGE_TOKEN || '') },
     body: JSON.stringify({ action: 'bootstrap' })
   }).then(function (r) { return r.json(); })
     .then(function (o) {
@@ -184,6 +210,14 @@ def _secret_args(payload):
 # ── Bridge action handlers (return the object to send back) ────────────────
 def handle_runtime_request(id_, payload):
     url = payload.get("url") or (RUNTIME_URL + "/health")
+    # SSRF/exfil guard: this proxy must only ever reach the local Python
+    # runtime. Pin the target to a loopback host on the runtime port so a
+    # crafted url can't be used to POST app data to an arbitrary host.
+    tgt = urlparse(url)
+    if tgt.scheme not in ("http", "https") or tgt.hostname not in _RUNTIME_HOSTS \
+            or (tgt.port not in (None, _RUNTIME_PORT)):
+        return {"id": id_, "type": "response",
+                "error": "runtime_request blocked: non-loopback target"}
     method = (payload.get("method") or "POST").upper()
     body = None if method == "GET" else json.dumps(
         payload.get("payload") or {}).encode("utf-8")
@@ -671,6 +705,33 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cross-Origin-Embedder-Policy", "require-corp")
         self.send_header("Cross-Origin-Resource-Policy", "same-origin")
 
+    def _host_origin_ok(self):
+        # Host must name this loopback server (a DNS-rebinding page sends its
+        # own hostname and fails); Origin/Referer, when present, must be the
+        # loopback origin. Shared by the /bridge gate and the raw-file media
+        # route, both of which bind loopback and must reject cross-origin.
+        host = (self.headers.get("Host") or "").split("/")[0].strip().lower()
+        if host not in _ALLOWED_HOSTS:
+            return False
+        origin = (self.headers.get("Origin") or "").rstrip("/").lower()
+        if origin and origin not in _ALLOWED_ORIGINS:
+            return False
+        referer = (self.headers.get("Referer") or "").lower()
+        if not origin and referer and not any(
+                referer.startswith(o) for o in _ALLOWED_ORIGINS):
+            return False
+        return True
+
+    def _bridge_authorized(self):
+        # Privileged /bridge dispatch additionally requires the per-session
+        # token injected into the SPA; a foreign local process can forge
+        # Host/Origin headers but cannot read that token, and a rebinding
+        # page is already rejected by the Host check above.
+        if not self._host_origin_ok():
+            return False
+        return self.headers.get("X-HC-Bridge") == BRIDGE_TOKEN
+
+
     def _respond(self, code, ctype, data, extra=None, head_only=False):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
@@ -689,15 +750,19 @@ class Handler(BaseHTTPRequestHandler):
     def _serve_index(self, fp, head_only):
         # Read the SPA shell and splice the bridge shim in before the first
         # <script> so it is installed at document-start, ahead of the bundle.
+        # The per-session token global is emitted immediately BEFORE the shim
+        # so the shim's own fetches (and the bootstrap pull) can present it.
         try:
             with open(fp, "rb") as f:
                 html = f.read().decode("utf-8", "replace")
+            inject = ("<script>window.__HC_BRIDGE_TOKEN='%s';</script>"
+                      % BRIDGE_TOKEN) + BRIDGE_SHIM
             if "<head" in html:
                 idx = html.lower().index("<head")
                 close = html.find(">", idx)
-                html = html[:close + 1] + BRIDGE_SHIM + html[close + 1:]
+                html = html[:close + 1] + inject + html[close + 1:]
             else:
-                html = BRIDGE_SHIM + html
+                html = inject + html
             data = html.encode("utf-8")
             self._respond(200, "text/html; charset=utf-8", data,
                           extra={"Cache-Control": "no-cache"}, head_only=head_only)
@@ -739,6 +804,14 @@ class Handler(BaseHTTPRequestHandler):
             self._respond(500, "text/plain", b"server error", head_only=head_only)
 
     def _media(self, path, head_only):
+        # This route streams an arbitrary absolute path (local media
+        # previews). Reject any request that is not clearly aimed at this
+        # loopback origin so a rebinding page can't exfiltrate files; a
+        # same-user local process could read the disk directly anyway.
+        if not self._host_origin_ok():
+            self.close_connection = True
+            self._respond(403, "text/plain", b"forbidden", head_only=head_only)
+            return
         target = unquote(path[len("/_media_file/"):])
         if not target.startswith("/"):
             target = "/" + target
@@ -758,7 +831,9 @@ class Handler(BaseHTTPRequestHandler):
             self._respond(404, "text/plain", b"not found", head_only=head_only)
             return
         fp = os.path.normpath(os.path.join(DIST, *rel.split("/")))
-        if not fp.startswith(DIST) or not os.path.isfile(fp):
+        # Boundary-safe containment: a sibling dir that merely shares the
+        # DIST name prefix (e.g. "dist-evil") must NOT pass the check.
+        if not (fp == DIST or fp.startswith(DIST + os.sep)) or not os.path.isfile(fp):
             idx = os.path.join(DIST, "index.html")
             base = os.path.basename(rel)
             if "." not in base and os.path.isfile(idx):
@@ -786,6 +861,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path.split("?", 1)[0] != "/bridge":
             self._respond(404, "text/plain", b"not found")
+            return
+        if not self._bridge_authorized():
+            # Do not read/dispatch the body. Close the keep-alive connection
+            # so the unread request payload can't desync the next request.
+            self.close_connection = True
+            self._respond(403, "application/json", json.dumps(
+                {"type": "response", "error": "bridge access denied"}).encode())
             return
         try:
             length = int(self.headers.get("Content-Length") or 0)

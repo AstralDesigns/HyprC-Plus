@@ -73,6 +73,7 @@ singleton HCCLauncherState 1.0 HCCLauncherState.qml
 singleton ClipboardState 1.0 ClipboardState.qml
 singleton GroupsState 1.0 GroupsState.qml
 singleton WebBookmarksState 1.0 WebBookmarksState.qml
+singleton TuiLaunch 1.0 TuiLaunch.qml
 singleton TrashState 1.0 TrashState.qml
 CCSegmented 1.0 CCSegmented.qml
 WebSearchPrefs 1.0 WebSearchPrefs.qml

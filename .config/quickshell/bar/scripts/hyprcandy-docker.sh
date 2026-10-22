@@ -92,8 +92,14 @@ EOF
 ensure_settings_file() {
     mkdir -p "$SCRIPT_DIR/searxng-settings"
     local settings_file="$SCRIPT_DIR/searxng-settings/settings.yml"
+    # Per-install random SearXNG secret. It used to be a committed constant,
+    # which let anyone reproduce the instance's CSRF/signing key straight from
+    # the public repo. The file lives under the user's home and is bind-mounted
+    # into the container (which reads it as root), so owner-only perms are safe.
+    local secret
+    secret="$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
     if [ ! -f "$settings_file" ]; then
-        cat > "$settings_file" << 'EOF'
+        cat > "$settings_file" << EOF
 use_default_settings: true
 
 general:
@@ -103,7 +109,7 @@ general:
 server:
   port: 8080
   bind_address: "0.0.0.0"
-  secret_key: "hyprcandy-permanent-local-secret-key-3f98a21b44c8"
+  secret_key: "$secret"
   limiter: false
   image_proxy: true
 
@@ -113,9 +119,12 @@ search:
     - html
     - json
 EOF
+    elif grep -q "hyprcandy-permanent-local-secret-key" "$settings_file"; then
+        # Rotate any install still carrying the old shipped default.
+        sed -i "s/hyprcandy-permanent-local-secret-key-3f98a21b44c8/$secret/" "$settings_file"
     fi
-    chmod 755 "$SCRIPT_DIR/searxng-settings" 2>/dev/null || true
-    chmod 644 "$settings_file" 2>/dev/null || true
+    chmod 700 "$SCRIPT_DIR/searxng-settings" 2>/dev/null || true
+    chmod 600 "$settings_file" 2>/dev/null || true
 }
 
 case "$ACTION" in
@@ -153,12 +162,12 @@ case "$ACTION" in
             docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
         fi
 
-        # Launch fresh SearXNG container
+        # Launch fresh SearXNG container. The secret comes from the
+        # per-install settings.yml (bind-mounted below); no committed constant.
         docker run -d \
             --name "$CONTAINER_NAME" \
             -p 127.0.0.1:8080:8080 \
             -v "$SCRIPT_DIR/searxng-settings:/etc/searxng:rw" \
-            -e SEARXNG_SECRET_KEY=hyprcandy-permanent-local-secret-key-3f98a21b44c8 \
             --restart unless-stopped \
             searxng/searxng:latest >/dev/null 2>&1 || true
 

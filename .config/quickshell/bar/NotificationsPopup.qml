@@ -234,6 +234,19 @@ Item {
                                 Text { visible:notif.appName!=="" && notif.summary!==""; text:notif.appName
                                     color:Theme.cOnSurfVar; font.pixelSize:9; opacity:0.75 }
                             }
+                            // Source-URL chip — opens the notification's site
+                            // link in the default browser (xdg-open). Only
+                            // rendered when notifUrl() resolves http(s).
+                            Rectangle {
+                                visible: !notif.isPrompt && NotificationsState.notifUrl(notif) !== ""
+                                width:22;height:22;radius:6
+                                color: toastLinkH.containsMouse ? Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.25) : "transparent"
+                                Behavior on color { ColorAnimation{duration:80} }
+                                Text { anchors.centerIn:parent; text:"󰑋"; font.pixelSize:11; font.family:Config.fontFamily
+                                    color: toastLinkH.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar }
+                                MouseArea { id:toastLinkH; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
+                                    onClicked: NotificationsState.openUrl(notif) }
+                            }
                             Rectangle { width:22;height:22;radius:6
                                 color:dH.containsMouse ? Qt.rgba(Theme.cSurfHi.r,Theme.cSurfHi.g,Theme.cSurfHi.b,0.9) : "transparent"
                                 Behavior on color { ColorAnimation{duration:80} }
@@ -681,6 +694,15 @@ Item {
                                     }
                                     Text { text: { const d = new Date(notif.timestamp), now = new Date(); const dm = Math.floor((now - d) / 60000); if (dm < 1) return "now"; if (dm < 60) return dm + "m"; const dh = Math.floor(dm / 60); if (dh < 24) return dh + "h"; return d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) }
                                         color: Theme.cOnSurfVar; font.pixelSize: 9; opacity: 0.65; Layout.alignment: Qt.AlignVCenter }
+                                    // Source-URL chip — history parity with the toast
+                                    Rectangle { visible: NotificationsState.notifUrl(notif) !== ""
+                                        width:18;height:18;radius:5; Layout.alignment: Qt.AlignVCenter
+                                        color: hcLinkH.containsMouse ? Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.25) : "transparent"
+                                        Behavior on color { ColorAnimation { duration: 80 } }
+                                        Text { anchors.centerIn: parent; text: "󰑋"; font.pixelSize: 9; font.family: Config.fontFamily
+                                            color: hcLinkH.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar; opacity: 0.8 }
+                                        MouseArea { id:hcLinkH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                            onClicked: NotificationsState.openUrl(notif) } }
                                     Text { visible: (notif.body || "") !== "" || ((notif.actions || []).length > 0)
                                         text: _exp ? "󰅃" : "󰅀"; font.pixelSize: 10; font.family: Config.fontFamily; color: Theme.cOnSurfVar; opacity: 0.8; Layout.alignment: Qt.AlignVCenter
                                         MouseArea { anchors.fill: parent; anchors.margins: -4; cursorShape: Qt.PointingHandCursor; onClicked: _exp = !_exp } }
