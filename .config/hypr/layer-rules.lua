@@ -302,3 +302,19 @@ hl.layer_rule({
     },
     ignore_alpha = 0.01,
 })
+hl.layer_rule({
+    name = "layer-rule-39",
+    match = {
+        namespace = "hyprcandy-trash-dialog",
+    },
+    blur = true,
+    xray = true,
+    no_anim = true,
+})
+hl.layer_rule({
+    name = "layer-rule-40",
+    match = {
+        namespace = "hyprcandy-trash-dialog",
+    },
+    ignore_alpha = 0.01,
+})
