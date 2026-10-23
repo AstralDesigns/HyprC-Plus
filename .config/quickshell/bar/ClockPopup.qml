@@ -82,7 +82,7 @@ Item {
 
                 Text {
                     text: root._greeting
-                    color: Theme.cOnSurf
+                    color: Theme.cSurfaceTint
                     font.family: Config.labelFont
                     font.pixelSize: 13
                     font.weight: Font.Medium
@@ -111,7 +111,7 @@ Item {
                     }
                     Text {
                         text: Qt.formatDateTime(root._now, "mm")
-                        color:Theme.cInversePrimary
+                        color:Theme.cPrimaryContainer
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
