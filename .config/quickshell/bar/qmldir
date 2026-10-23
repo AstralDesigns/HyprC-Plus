@@ -26,6 +26,7 @@ singleton WeatherPopupState 1.0 WeatherPopupState.qml
 singleton SystemMonitorPopupState 1.0 SystemMonitorPopupState.qml
 singleton DisplayState 1.0 DisplayState.qml
 singleton DistroState 1.0 DistroState.qml
+DistroIconView 1.0 DistroIconView.qml
 Bar 1.0 Bar.qml
 CalendarPopup 1.0 CalendarPopup.qml
 ClockPopup 1.0 ClockPopup.qml
@@ -73,10 +74,12 @@ singleton HCCLauncherState 1.0 HCCLauncherState.qml
 singleton ClipboardState 1.0 ClipboardState.qml
 singleton GroupsState 1.0 GroupsState.qml
 singleton WebBookmarksState 1.0 WebBookmarksState.qml
+singleton PackagesIndex 1.0 PackagesIndex.qml
 singleton TuiLaunch 1.0 TuiLaunch.qml
 singleton TrashState 1.0 TrashState.qml
 CCSegmented 1.0 CCSegmented.qml
 WebSearchPrefs 1.0 WebSearchPrefs.qml
+PackagesTab 1.0 PackagesTab.qml
 DockWindow 1.0 DockWindow.qml
 LauncherWindow 1.0 LauncherWindow.qml
 TrashDialog 1.0 TrashDialog.qml

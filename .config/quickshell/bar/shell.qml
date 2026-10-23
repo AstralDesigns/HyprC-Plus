@@ -100,6 +100,12 @@ ShellRoot {
     // so the watcher below never sees a false "first change" on startup.
     Component.onCompleted: {
         if (Config._settings) Config._settings.sync()
+        // Warm the persisted installed-packages index so the launcher Packages
+        // tab has instant first availability (loads the cache, then refreshes).
+        PackagesIndex.ensureStartupScan()
+        // Resolve distro identity + brand logo once at boot so the ControlCenter
+        // bar button, dock start badge and System tab render without a flash.
+        DistroState.refresh()
     }
 
     // ── Cava hot-reload via /tmp/qs-cava-size ─────────────────────────────
@@ -401,5 +407,30 @@ ShellRoot {
         // No tab arg -> toggle (hyprviz.lua SUPER+A); with a tab -> open it.
         function openLauncher(tab: string) { if (!LicenseState.activated) return; tab ? HCCLauncherState.open(tab) : HCCLauncherState.toggle() }
         function closeLauncher()       { HCCLauncherState.close() }
+
+        // ── Launcher sub-tab toggles (hyprviz.lua keybinds) ────────────────
+        // Open a specific tab; pressing again while that tab is already shown
+        // closes the launcher (toggle feel for picker-style binds).
+        function launcherTab(tab: string) {
+            if (!LicenseState.activated) return
+            if (HCCLauncherState.visible && HCCLauncherState.activeTab === tab)
+                HCCLauncherState.close()
+            else
+                HCCLauncherState.open(tab)
+        }
+        // Icons tab with an Emojis/Glyphs sub-mode (mode: emoji|glyphs vs nerd).
+        function launcherIcons(mode: string) {
+            if (!LicenseState.activated) return
+            const want = (mode === "nerd" || mode === "glyph" || mode === "glyphs") ? "nerd" : "emoji"
+            if (HCCLauncherState.visible && HCCLauncherState.activeTab === "emoji"
+                    && HCCLauncherState.iconMode === want)
+                HCCLauncherState.close()
+            else
+                HCCLauncherState.openIcons(mode)
+        }
+
+        // Desktop icon layer visibility — flips the same Config.desktopVisible
+        // the CC Hyprland tab "Show Icons" pill binds, so the two stay in sync.
+        function toggleDesktopIcons() { Config.desktopVisible = !Config.desktopVisible }
     }
 }

@@ -14,6 +14,9 @@ Item {
     implicitHeight: Config.moduleHeight
 
     property string _glyph: Config.ccGlyph
+    readonly property bool _distro:    Config.ccIconMode === "distro"
+    readonly property bool _custom:    Config.ccIconMode === "custom"
+    readonly property bool _glyphMode: !root._distro && !root._custom
 
     // Live state file
     FileView {
@@ -68,15 +71,65 @@ Item {
         z: 1
     }
 
+    // ── Icon: Glyph | Distro | Custom (Bar:Icons → Control Center) ───────
+    // glyph  → the ccGlyph text (live-overridable via candy-start-icon.txt)
+    // distro → detected distro brand image, else its Nerd Font glyph
+    // custom → a user image chosen from ~/Pictures/Icons
+    // ccGlyphOpacity fades all three (color alpha for the glyph, element
+    // opacity for images).
     Text {
         id: ccIcon
         anchors.centerIn: parent
+        visible: root._glyphMode
         text: root._glyph
         color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, Config.ccGlyphOpacity)
         font.family: Config.fontFamily
         font.pixelSize: Config.glyphSize + 2
         z: 2
         Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+    }
+
+    DistroIconView {
+        anchors.centerIn: parent
+        visible: root._distro
+        opacity: Config.ccGlyphOpacity
+        imagePath: DistroState.imagePath
+        glyph: DistroState.glyph
+        pixelSize: Config.glyphSize + 2
+        color: Theme.cOnSecondary
+        z: 2
+    }
+
+    Item {
+        anchors.centerIn: parent
+        visible: root._custom
+        opacity: Config.ccGlyphOpacity
+        // Match DistroIconView's image sizing exactly (pixelSize * 1.15) so the
+        // custom logo scales 1:1 with the Glyph Size slider like the other modes.
+        readonly property real _d: Math.round((Config.glyphSize + 2) * 1.15)
+        width: _d
+        height: _d
+        z: 2
+        Image {
+            anchors.fill: parent
+            visible: Config.ccCustomIconPath.length > 0 && status === Image.Ready
+            source: Config.ccCustomIconPath.length > 0 ? "file://" + Config.ccCustomIconPath : ""
+            sourceSize.width: parent._d * 2
+            sourceSize.height: parent._d * 2
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
+            asynchronous: true
+        }
+        // Placeholder when no custom image is chosen yet.
+        Text {
+            anchors.centerIn: parent
+            visible: !(Config.ccCustomIconPath.length > 0)
+            text: ""
+            font.family: Config.fontFamily
+            font.pixelSize: Config.glyphSize + 2
+            color: Theme.cOnSecondary
+        }
     }
 
     opacity: ma.containsMouse ? 0.7 : 1.0

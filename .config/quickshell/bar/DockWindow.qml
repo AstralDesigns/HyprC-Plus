@@ -297,10 +297,12 @@ PanelWindow {
         }
     }
 
-    // ── Start-button glyph (bar distro module parity) ────────────────────
-    // Mirrors modules/ControlCenter.qml: default Config.ccGlyph, overridden by
-    // ~/.config/hyprcandy/candy-start-icon.txt when present so the dock start
-    // button always shows the same distro glyph as the bar.
+    // ── Start-button mirrors the bar ControlCenter module ────────────────
+    // Same icon and same Config.ccIconMode as modules/ControlCenter.qml:
+    // 'distro' → detected distro logo/glyph, 'custom' → the chosen
+    // ~/Pictures/Icons image, else ('glyph') the ccGlyph (kept live via
+    // candy-start-icon.txt). Start/trash glyph sizes are multipliers of
+    // dockIconSize.
     property string _startGlyph: Config.ccGlyph !== "" ? Config.ccGlyph : "\u{F15FC}"
     FileView {
         path: Config.home + "/.config/hyprcandy/candy-start-icon.txt"
@@ -311,6 +313,8 @@ PanelWindow {
             if (g.length > 0) dock._startGlyph = g
         }
     }
+    readonly property real _startGlyphSize: Math.round(Config.dockIconSize * Config.dockStartIconScale)
+    readonly property real _trashGlyphSize: Math.round(Config.dockIconSize * Config.dockTrashIconScale)
 
     // ── Background ─────────────────────────────────────────────────────────
     //  glass    → Theme.blurBackground fill (compositor blur via the
@@ -389,9 +393,10 @@ PanelWindow {
 
             DockBadge {
                 id: startBadgeH
-                glyphSize: Config.dockStartIconSize
+                glyphSize: dock._startGlyphSize
                 kind: "start"
-                glyph: dock._startGlyph
+                glyph: Config.ccIconMode === "custom" ? "" : (Config.ccIconMode === "distro" ? DistroState.glyph : dock._startGlyph)
+                imageSource: Config.ccIconMode === "custom" ? Config.ccCustomIconPath : (Config.ccIconMode === "distro" ? DistroState.imagePath : "")
                 onClicked: dock._startClicked()
                 onRightClicked: dock._openMenu("start", null, startBadgeH)
             }
@@ -409,7 +414,7 @@ PanelWindow {
             }
             DockBadge {
                 id: trashBadgeH
-                glyphSize: Config.dockTrashIconSize
+                glyphSize: dock._trashGlyphSize
                 kind: "trash"
                 glyph: TrashState.glyph
                 tipText: TrashState.count === 0 ? "Trash (empty)"
@@ -428,9 +433,10 @@ PanelWindow {
 
             DockBadge {
                 id: startBadgeV
-                glyphSize: Config.dockStartIconSize
+                glyphSize: dock._startGlyphSize
                 kind: "start"
-                glyph: dock._startGlyph
+                glyph: Config.ccIconMode === "custom" ? "" : (Config.ccIconMode === "distro" ? DistroState.glyph : dock._startGlyph)
+                imageSource: Config.ccIconMode === "custom" ? Config.ccCustomIconPath : (Config.ccIconMode === "distro" ? DistroState.imagePath : "")
                 onClicked: dock._startClicked()
                 onRightClicked: dock._openMenu("start", null, startBadgeV)
             }
@@ -449,7 +455,7 @@ PanelWindow {
             }
             DockBadge {
                 id: trashBadgeV
-                glyphSize: Config.dockTrashIconSize
+                glyphSize: dock._trashGlyphSize
                 kind: "trash"
                 glyph: TrashState.glyph
                 tipText: TrashState.count === 0 ? "Trash (empty)"
@@ -1637,6 +1643,7 @@ PanelWindow {
         required property string kind
         required property string glyph
         property string tipText: ""
+        property string imageSource: ""   // non-empty → render brand image instead of glyph
         property real glyphSize: -1   // <=0 -> auto (iconD*0.62)
         readonly property bool hovered: hover.hovered
         signal clicked
@@ -1672,6 +1679,24 @@ PanelWindow {
             color: Theme.cOnSecondary
             font.family: Theme.fontFamily
             font.pixelSize: badge.glyphSize > 0 ? Math.round(badge.glyphSize) : Math.round(badge.iconD * 0.62)
+            visible: !badgeImg.visible
+        }
+
+        // Brand logo (dock start badge) — wins over the glyph when present.
+        Image {
+            id: badgeImg
+            anchors.centerIn: parent
+            readonly property real eff: badge.glyphSize > 0 ? Math.round(badge.glyphSize) : Math.round(badge.iconD * 0.62)
+            width: Math.round(eff * 1.15)
+            height: width
+            visible: badge.imageSource.length > 0 && status === Image.Ready
+            source: badge.imageSource.length > 0 ? "file://" + badge.imageSource : ""
+            sourceSize.width: width * 2
+            sourceSize.height: height * 2
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+            mipmap: true
+            onStatusChanged: if (status === Image.Error) badge.imageSource = ""
         }
         HoverHandler { id: hover; onHoveredChanged: dock._setTip(badge, hovered) }
         MouseArea {

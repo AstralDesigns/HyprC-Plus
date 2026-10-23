@@ -74,6 +74,52 @@ Item {
                 }
             }
 
+            // ── Mounted-disk drives (listed before pinned apps) ───────────
+            // Enumerates real mount points directly under /mnt (findmnt only
+            // lists actual mounts, so empty placeholder dirs are skipped) and
+            // renders a harddisk glyph for each; clicking opens the file manager
+            // at that mount. /proc + mount tables are pseudo-fs so inotify can't
+            // watch them — a light poll keeps USB drives fresh without a reload.
+            property var _disks: []        // [{ name, path }]
+
+            function _applyDiskList(text) {
+                const out = []
+                const lines = text.split("\n")
+                for (let i = 0; i < lines.length; i++) {
+                    const p = lines[i].trim()
+                    if (!p) continue
+                    const base = p.split("/").filter(function (s) { return s !== "" }).pop()
+                    out.push({ name: base || p, path: p })
+                }
+                win._disks = out
+            }
+
+            Process {
+                id: diskScanProc
+                running: false
+                property string _buf: ""
+                command: ["bash", "-c",
+                    "findmnt -rno TARGET | grep -E '^/mnt/[^/]+$' | sort -u"]
+                stdout: SplitParser {
+                    splitMarker: "\n"
+                    onRead: function(line) { diskScanProc._buf += line + "\n" }
+                }
+                onRunningChanged: if (running) _buf = ""
+                onExited: win._applyDiskList(_buf)
+            }
+
+            Timer {
+                id: diskScanTimer
+                interval: 10000
+                repeat: true
+                running: Config.desktopVisible
+                triggeredOnStart: true
+                onTriggered: {
+                    diskScanProc.running = false
+                    diskScanProc.running = true
+                }
+            }
+
             // ── Drag state ────────────────────────────────────────────────
             // Track by class string rather than index so the opacity binding
             // stays correct across the brief period between _isDragging being
@@ -164,6 +210,73 @@ Item {
                 // TopToBottom flow: items fill column top→bottom, wrap right.
                 flow:    Flow.TopToBottom
                 spacing: 4
+
+                // ── Mounted-disk drives (rendered before the pinned apps) ──
+                Repeater {
+                    model: win._disks
+                    delegate: Item {
+                        id: diskItem
+                        required property var modelData
+                        readonly property string _name: modelData.name
+                        readonly property string _path: modelData.path
+
+                        width:  Config.desktopIconSize + 25
+                        height: Config.desktopIconSize + Config.desktopLabelSize + 16
+
+                        // nf-md-harddisk glyph (PUA — keep the \u{} escape)
+                        Text {
+                            id: diskIcon
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.top: parent.top
+                            width:  Config.desktopIconSize
+                            height: Config.desktopIconSize
+                            horizontalAlignment: Text.AlignHCenter
+                            verticalAlignment:   Text.AlignVCenter
+                            text:    "\u{F02CA}"
+                            font.family: Config.fontFamily
+                            font.pixelSize: Config.desktopIconSize * 0.9
+                            color:   Theme.cInversePrimary
+                        }
+
+                        Rectangle {
+                            id: diskLabelBg
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.top: diskIcon.bottom
+                            anchors.topMargin: 4
+                            width:  Math.min(diskLabel.implicitWidth + 10, parent.width)
+                            height: diskLabel.implicitHeight + 6
+                            radius: Config.desktopLabelRadius
+                            color:  Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                            Theme.cInversePrimary.b, 0.50)
+                            border.width: 1
+                            border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                                                  Config.barBorderColor.b, Config.barBorderAlpha)
+                            Text {
+                                id: diskLabel
+                                anchors.centerIn: parent
+                                width:            parent.width - 10
+                                text:             diskItem._name
+                                font.pixelSize:   Config.desktopLabelSize
+                                font.weight:      Font.Bold
+                                color:            Theme.cOnSurf
+                                elide:            Text.ElideRight
+                                maximumLineCount: 1
+                                horizontalAlignment: Text.AlignHCenter
+                            }
+                        }
+
+                        scale: diskMouse.containsMouse ? 1.07 : 1.0
+                        Behavior on scale { NumberAnimation { duration: 100 } }
+
+                        MouseArea {
+                            id: diskMouse
+                            anchors.fill:    parent
+                            hoverEnabled:    true
+                            cursorShape:     Qt.PointingHandCursor
+                            onClicked:       win._openPath(diskItem._path)
+                        }
+                    }
+                }
 
                 Repeater {
                     id: iconRepeater
@@ -371,7 +484,9 @@ Item {
 
                                 const cellW = Config.desktopIconSize + 16
                                 const cellH = Config.desktopIconSize + Config.desktopLabelSize + 22 + 16
-                                const total = DesktopPinnedState.apps.length
+                                const total  = DesktopPinnedState.apps.length
+                                const dCount = win._disks.length      // prepended disk cells
+                                const full   = total + dCount
 
                                 // How many items fit in one column?
                                 const colCap = Math.max(1, Math.floor(
@@ -381,11 +496,15 @@ Item {
                                 // Which column and row is the pointer in?
                                 const col = Math.max(0, Math.floor(gpt.x / cellW))
                                 const row = Math.max(0, Math.floor(gpt.y / cellH))
-                                const hitIdx = Math.min(col * colCap + row, total - 1)
+                                // Slot in the FULL grid (disks occupy the first dCount
+                                // cells), shifted into apps-space so reorder indices
+                                // are unaffected by the prepended disk entries.
+                                const fullIdx = Math.min(col * colCap + row, full - 1)
 
                                 // Is pointer in the top half or bottom half of that cell?
                                 const cellLocalY = gpt.y - row * cellH
-                                const dropAfter  = (cellLocalY >= cellH / 2) ? hitIdx : hitIdx - 1
+                                const dropAfterFull = (cellLocalY >= cellH / 2) ? fullIdx : fullIdx - 1
+                                const dropAfter = dropAfterFull - dCount
 
                                 win._dropAfterIdx = Math.max(-1, Math.min(dropAfter, total - 1))
                             }
@@ -717,6 +836,30 @@ Item {
                 _launchProc.running = false
                 win._pendingCmd = clean + " &"
                 _launchTimer.restart()
+            }
+
+            // Open a directory (a mounted disk) in a GUI file manager. We must NOT
+            // use xdg-open/gio here — on this setup the inode/directory default is
+            // a terminal (kitty-open.desktop), which is what xdg-open launched.
+            // Resolve a real FM binary instead (nautilus first, then common others),
+            // falling back to xdg-open only if none is installed. Path is passed as
+            // a positional arg ($1) so no shell-quoting of the mount point is needed.
+            function _openPath(path) {
+                if (!path || path === "") return
+                diskOpenProc._path = path
+                diskOpenProc.running = false
+                diskOpenProc.running = true
+            }
+
+            Process {
+                id: diskOpenProc
+                property string _path: ""
+                running: false
+                command: _path ? ["bash", "-c",
+                    "fm=''; for c in nautilus nemo thunar dolphin pcmanfm caja; do " +
+                    "command -v \"$c\" >/dev/null 2>&1 && fm=\"$c\" && break; done; " +
+                    "[ -z \"$fm\" ] && fm=xdg-open; \"$fm\" \"$1\" >/dev/null 2>&1 &",
+                    "--", _path] : ["bash", "-c", "true"]
             }
 
             function _launchOnGpu(exec, envObj) {

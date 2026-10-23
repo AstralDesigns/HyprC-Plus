@@ -33,13 +33,14 @@ Item {
                     return WlrKeyboardFocus.OnDemand
             return WlrKeyboardFocus.None
         }
-        readonly property bool  _barAtBottom: Config.barPosition === "bottom"
-        readonly property real  _panelMargin: Config.outerMarginSide * 2
+        readonly property bool _barAtBottom: Config.barPosition === "bottom"
+        readonly property real _barGap:    (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop)    : Config.outerMarginTop)    + Config.barHeight + 6
+        readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 6
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true }
         margins {
-            top:    _barAtBottom ? 10 : (Config.barHeight + Config.outerMarginTop + 10)
-            bottom: _barAtBottom ? (Config.barHeight + Config.outerMarginBottom + 10) : 10
-            left:   10 // changed from '_panelMargin' because toasts don't need margin tracking but keep pos tracking
+            top:    _barAtBottom ? 10 : _barGap
+            bottom: _barAtBottom ? _barGapBot : 10
+            left:   Config.barMode === "shell" ? (Config.shellArmThickness + 6) : 6
         }
         implicitWidth:  364
         implicitHeight: toastCol.implicitHeight + 4

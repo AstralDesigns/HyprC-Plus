@@ -27,6 +27,7 @@ QtObject {
     property string text: ""
     property Item target: null
     property real offsetX: 0        // optional horizontal nudge set by show()'s dx arg
+    property int radius: 7          // popup corner radius; callers may override (CC color pickers use 10)
 
     readonly property int _showDelay: 450   // delay before a cold first show
     readonly property int _hideGrace: 140   // grace before closing after leave
@@ -41,11 +42,12 @@ QtObject {
         onTriggered: root.visible = false
     }
 
-    function show(t, item, dx) {
+    function show(t, item, dx, r) {
         root._grace.stop()          // a neighbour re-entered — don't close
         root.text = t
         root.target = item
         root.offsetX = (dx === undefined ? 0 : dx)   // reset for callers that pass none
+        root.radius = (r === undefined ? 7 : r)       // bar default 7; CC color pickers pass 10
         if (root.visible) {
             root._pending.stop()    // already up: swap in place, no delay
         } else {

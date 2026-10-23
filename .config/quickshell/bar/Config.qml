@@ -157,6 +157,12 @@ QtObject {
         v = _settings.value("trayItemPadH");   trayItemPadH   = v
         v = _settings.value("trayItemSpacing"); trayItemSpacing = v
         v = _settings.value("ccGlyph"); ccGlyph = v
+        v = _settings.value("ccUseDistroIcon"); ccUseDistroIcon = _toBool(v)
+        v = _settings.value("ccIconMode"); ccIconMode = (v === undefined || v === null) ? "" : v
+        v = _settings.value("ccCustomIconPath"); ccCustomIconPath = (v === undefined || v === null) ? "" : v
+        // Migrate the old boolean toggle into the 3-way mode when no mode saved yet.
+        if (ccIconMode !== "glyph" && ccIconMode !== "distro" && ccIconMode !== "custom")
+            ccIconMode = ccUseDistroIcon ? "distro" : "glyph"
         v = _settings.value("ccGlyphColorA"); ccGlyphOpacity = Math.min(1, Math.max(0, parseFloat(v)))
         v = _settings.value("wsCount"); wsCount = Math.min(10, Math.max(1, parseInt(v)))
         v = _settings.value("barMonitors")
@@ -281,6 +287,9 @@ QtObject {
         v = _settings.value("dockIconSize");       dockIconSize       = parseInt(v)
         v = _settings.value("dockStartIconSize");  dockStartIconSize  = parseInt(v)
         v = _settings.value("dockTrashIconSize");  dockTrashIconSize  = parseInt(v)
+        // New multiplier keys — default when an older conf predates them.
+        v = _settings.value("dockStartIconScale"); dockStartIconScale = (v === undefined || v === null || v === "") ? 0.85 : Math.min(1.5, Math.max(0.5, parseFloat(v)))
+        v = _settings.value("dockTrashIconScale"); dockTrashIconScale = (v === undefined || v === null || v === "") ? 0.70 : Math.min(1.5, Math.max(0.5, parseFloat(v)))
         v = _settings.value("dockButtonSpacing");  dockButtonSpacing  = parseInt(v)
         v = _settings.value("dockInnerPadding");   dockInnerPadding   = parseInt(v)
         v = _settings.value("dockPadding");        dockPadding        = parseInt(v)
@@ -413,6 +422,9 @@ QtObject {
         _settings.setValue("trayItemPadH",    trayItemPadH)
         _settings.setValue("trayItemSpacing", trayItemSpacing)
         _settings.setValue("ccGlyph", ccGlyph)
+        _settings.setValue("ccUseDistroIcon", ccUseDistroIcon)
+        _settings.setValue("ccIconMode", ccIconMode)
+        _settings.setValue("ccCustomIconPath", ccCustomIconPath)
         _settings.setValue("ccGlyphColorA", ccGlyphOpacity)
         _settings.setValue("wsCount", wsCount)
         _settings.setValue("barMonitors", JSON.stringify(barMonitors))
@@ -532,6 +544,8 @@ QtObject {
         _settings.setValue("dockIconSize",        dockIconSize)
         _settings.setValue("dockStartIconSize",   dockStartIconSize)
         _settings.setValue("dockTrashIconSize",   dockTrashIconSize)
+        _settings.setValue("dockStartIconScale",  dockStartIconScale)
+        _settings.setValue("dockTrashIconScale",  dockTrashIconScale)
         _settings.setValue("dockButtonSpacing",   dockButtonSpacing)
         _settings.setValue("dockInnerPadding",    dockInnerPadding)
         _settings.setValue("dockPadding",         dockPadding)
@@ -850,6 +864,9 @@ QtObject {
 
     // ── Control-center / startmenu glyphs ────────────────────────────────
     property string ccGlyph     // nf-linux-hyprland
+    property bool   ccUseDistroIcon   // legacy (superseded by ccIconMode); kept for migration
+    property string ccIconMode        // "glyph" | "distro" | "custom" — CC button + dock start icon source
+    property string ccCustomIconPath  // absolute path to a user image (custom mode)
     property string powerGlyph:    ""     // nf-fa-chevron_circle_down
     property bool   ccTransparentBg: true
 
@@ -1333,8 +1350,11 @@ QtObject {
     property int    dockAutoHideDelay       // seconds
     property int    dockMargin       // px — screen-edge gap
     property int    dockIconSize      // px — app icon size
-    property int    dockStartIconSize      // px - start badge glyph
-    property int    dockTrashIconSize      // px - trash badge glyph
+    property int    dockStartIconSize      // px - start badge glyph (legacy, unused)
+    property int    dockTrashIconSize      // px - trash badge glyph (legacy, unused)
+    // Start/trash badge glyph size as a multiplier of dockIconSize (0.5–1.5).
+    property real   dockStartIconScale     // × dockIconSize
+    property real   dockTrashIconScale     // × dockIconSize
     property int    dockButtonSpacing       // px — gap between dock buttons
     property int    dockInnerPadding      // px — padding inside dock rect
     property int    dockPadding       // px — legacy extra padding

@@ -204,6 +204,7 @@ ShellRoot {
     // ── Clock ────────────────────────────────────────────────────────────────
     property string clockHour:     Qt.formatTime(new Date(),"hh")
     property string clockMin:      Qt.formatTime(new Date(),"mm")
+    property int    clockSec:      new Date().getSeconds()
     property string clockDate:     Qt.formatDate(new Date(),"dddd, d MMMM")
     property string clockDayName:  Qt.formatDate(new Date(),"dddd")
     property string clockDateNum:  Qt.formatDate(new Date(),"d")
@@ -216,6 +217,8 @@ ShellRoot {
         root.clockDateNum   = Qt.formatDate(new Date(),"d")
         root.clockMonthName = Qt.formatDate(new Date(),"MMMM")
     }}
+    // Seconds tick drives the clock coverflow indicator (front slot = current second).
+    Timer { interval:1000; repeat:true; running:true; onTriggered: root.clockSec = new Date().getSeconds() }
 
     // ── Weather ───────────────────────────────────────────────────────────────
     // Logic mirrors WeatherPopupState exactly:
@@ -451,8 +454,14 @@ ShellRoot {
         root._updateWeatherDisplay()
     }
 
-    // Kick the pipeline on startup and every 300 s (matches Config.weatherInterval)
-    Component.onCompleted: wxUnitProc.running = true
+    // Kick the pipeline on startup and every 300 s (matches Config.weatherInterval).
+    // Also read the on-disk cache immediately so the weather card is populated from
+    // the last-known reading on frame 0 (while the transition overlay is still up),
+    // before the live open-meteo fetch lands and refreshes it.
+    Component.onCompleted: {
+        wxCacheProc.running = true
+        wxUnitProc.running  = true
+    }
     Timer { interval: 300000; repeat: true; running: true; onTriggered: if (!wxUnitProc.running) wxUnitProc.running = true }
 
     // ── System monitor ────────────────────────────────────────────────────────
@@ -1092,11 +1101,65 @@ ShellRoot {
                                                 font.italic: true; font.weight: Font.Bold
                                                 lineHeight: 0.88
                                             }
-                                            Text {
+                                            // ── Seconds coverflow: the current second sits centred in
+                                            //    front; previous / next fan out, scaled down and dimmed,
+                                            //    behind it — sliding left one slot each tick (mirrors the
+                                            //    wallpaper lightbox coverflow, in the C059 clock face).
+                                            Item {
+                                                id: secStage
                                                 Layout.alignment: Qt.AlignHCenter
-                                                text: "󰫢  󰫢"; color: root.cPrimary
-                                                font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
-                                                topPadding: 6; bottomPadding: 6
+                                                Layout.fillWidth: true
+                                                Layout.preferredHeight: 48
+                                                clip: true
+
+                                                readonly property int  sec:  root.clockSec
+                                                readonly property real slot: 38
+
+                                                // Suppress the flow animation for the first moment the lock
+                                                // surface maps. The coverflow is built while candylock boots
+                                                // under the transition overlay, so on reveal `sec` has already
+                                                // advanced and the delegates would otherwise sweep through every
+                                                // skipped second at once (the "catch-up" pacing). Snapping until
+                                                // primed lands the first frame on the true current second; ticks
+                                                // after that animate normally.
+                                                property bool _primed: false
+                                                Timer {
+                                                    id: secPrimeTimer
+                                                    interval: 350
+                                                    onTriggered: secStage._primed = true
+                                                }
+                                                onVisibleChanged: if (visible) secPrimeTimer.restart()
+                                                Component.onCompleted: if (visible) secPrimeTimer.restart()
+
+                                                Repeater {
+                                                    model: 60
+                                                    delegate: Text {
+                                                        required property int modelData
+                                                        // Signed, circular distance from the current second.
+                                                        readonly property int role: {
+                                                            let r = modelData - secStage.sec
+                                                            if (r >  30) r -= 60
+                                                            if (r < -30) r += 60
+                                                            return r
+                                                        }
+                                                        visible: Math.abs(role) <= 2
+                                                        text: modelData < 10 ? "0" + modelData : "" + modelData
+                                                        font.family: "C059"
+                                                        font.pixelSize: 30
+                                                        font.italic: true
+                                                        font.weight: Font.Bold
+                                                        color: root.cPrimary
+                                                        // Front slot centred on the stage; neighbours fan out either side.
+                                                        x: secStage.width / 2 - width / 2 + role * secStage.slot
+                                                        y: secStage.height / 2 - height / 2
+                                                        scale:   role === 0 ? 1.0 : (Math.abs(role) === 1 ? 0.58 : 0.40)
+                                                        opacity: role === 0 ? 1.0 : (Math.abs(role) === 1 ? 0.42 : 0.14)
+                                                        z: role === 0 ? 10 : 5 - Math.abs(role)
+                                                        Behavior on x       { enabled: secStage._primed; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                                                        Behavior on scale   { enabled: secStage._primed; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                                                        Behavior on opacity { enabled: secStage._primed; NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
+                                                    }
+                                                }
                                             }
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter

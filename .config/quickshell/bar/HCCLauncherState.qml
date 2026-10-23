@@ -33,6 +33,9 @@ QtObject {
     // Tab currently shown; updated synchronously on open, refined once the
     // tab-select file has been read (async).
     property string activeTab: "launcher"
+    // Icons-tab sub-mode (emoji | nerd), centralised so an external IPC request
+    // can pick Emojis vs Glyphs. LauncherWindow binds its view to this.
+    property string iconMode: "emoji"
 
     readonly property var tabs: ["launcher", "clipboard", "emoji", "websearch", "agent"]
 
@@ -54,6 +57,14 @@ QtObject {
         opened()
         // Async: if a tab-select file exists it wins, then gets unlinked.
         _tabFileView.reload()
+    }
+
+    // Open the Icons tab on a specific sub-mode (emoji/glyph* → Emojis,
+    // nerd/glyph* → Glyphs). The launcher's view binds iconMode here, so the
+    // segmented control and external requests stay in sync.
+    function openIcons(mode: string) {
+        iconMode = (mode === "nerd" || mode === "glyph" || mode === "glyphs") ? "nerd" : "emoji"
+        open("emoji")
     }
 
     function close() {

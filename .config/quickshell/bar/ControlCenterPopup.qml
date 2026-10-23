@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+import QtQuick.Effects
 import QtCore
 import Quickshell
 import Quickshell.Wayland
@@ -22,11 +23,12 @@ import "scripts/cavapaint.js" as CP
 //  Slider style matches startmenu SliderBg exactly:
 //    trough = 14 px tall, innerH = 8 px, gradient fill (inversePrimary→onPrimary), dot-glyph thumb.
 //
-//  Wallpaper picker:
-//    • Clicking the user icon circle opens a wallpaper-picker-like overlay
-//      rendered ABOVE the control center (higher layer order).
-//    • Right-clicking a wallpaper thumbnail shows a small tray-style popover
-//      with "Set as user icon" option (converts via imagemagick).
+//  User-icon gallery (wpPickerOverlay):
+//    • Clicking the user icon circle opens a folder-browsing overlay rendered
+//      ABOVE the control center (higher layer order).
+//    • Clicking an image opens the avatar crop overlay to set it as the user
+//      icon; right-clicking opens a coverflow lightbox preview (ported from the
+//      wallpaper panel's local-folder lightbox) with ← / → cycle + Enter apply.
 //
 //  Layer: Top layer, explicit width/height so the surface only wraps the popup
 //         (no full-screen stretch → blur only around the panel, not full-width).
@@ -1897,11 +1899,10 @@ PanelWindow {
                                                                 border.color: Config.barBorderVar === modelData.var
                                                                     ? Theme.cPrimary
                                                                     : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                ToolTip.visible: _bbMatHov.containsMouse
-                                                                ToolTip.text: modelData.var
-                                                                ToolTip.delay: 400
                                                                 MouseArea {
                                                                     id: _bbMatHov
+                                                                    onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                    onExited: BarTipState.hide(parent)
                                                                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                     hoverEnabled: true
                                                                     onClicked: {
@@ -1933,11 +1934,10 @@ PanelWindow {
                                                                 border.color: Config.barBorderWallustVar === modelData.var
                                                                     ? Theme.cPrimary
                                                                     : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                ToolTip.visible: _bbWalHov.containsMouse
-                                                                ToolTip.text: modelData.var
-                                                                ToolTip.delay: 400
                                                                 MouseArea {
                                                                     id: _bbWalHov
+                                                                    onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                    onExited: BarTipState.hide(parent)
                                                                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                     hoverEnabled: true
                                                                     onClicked: {
@@ -2015,11 +2015,10 @@ PanelWindow {
                                                                 border.color: Config.islandBorderVar === modelData.var
                                                                     ? Theme.cPrimary
                                                                     : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                ToolTip.visible: _ibMatHov.containsMouse
-                                                                ToolTip.text: modelData.var
-                                                                ToolTip.delay: 400
                                                                 MouseArea {
                                                                     id: _ibMatHov
+                                                                    onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                    onExited: BarTipState.hide(parent)
                                                                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                     hoverEnabled: true
                                                                     onClicked: {
@@ -2051,11 +2050,10 @@ PanelWindow {
                                                                 border.color: Config.islandBorderWallustVar === modelData.var
                                                                     ? Theme.cPrimary
                                                                     : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                ToolTip.visible: _ibWalHov.containsMouse
-                                                                ToolTip.text: modelData.var
-                                                                ToolTip.delay: 400
                                                                 MouseArea {
                                                                     id: _ibWalHov
+                                                                    onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                    onExited: BarTipState.hide(parent)
                                                                     anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                     hoverEnabled: true
                                                                     onClicked: {
@@ -2121,8 +2119,53 @@ PanelWindow {
                                         CCSlider { label:"Separator Opacity";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.wsSeparatorOpacity;  onMoved:function(v){Config.wsSeparatorOpacity=v} }
 
                                         CCSection { text: "Control Center" }
+                                        // Icon source mode: Glyph | Distro | Custom (mirrored by the dock start button)
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Icon Mode"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 13
+                                                Layout.preferredWidth: 100
+                                            }
+                                            // Three-button mode selector (matches the Cava color-mode pill)
+                                            Rectangle {
+                                                Layout.preferredWidth: 216; height: 28; radius: 9
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                                Row {
+                                                    anchors.fill: parent; anchors.margins: 2; spacing: 2
+                                                    Repeater {
+                                                        model: ["glyph", "distro", "custom"]
+                                                        delegate: Rectangle {
+                                                            required property string modelData
+                                                            property bool _sel: Config.ccIconMode === modelData
+                                                            width: (parent.width - 6) / 3; height: parent.height; radius: 7
+                                                            color: _sel ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                                                                                  Theme.cSurfaceTint.b, 0.8) : "transparent"
+                                                            border.width: _sel ? 1 : 0
+                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                            Text {
+                                                                anchors.centerIn: parent
+                                                                text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                                color: _sel ? Theme.cOnSecondary : Theme.cPrimary
+                                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                                font.weight: _sel ? 600 : 400
+                                                            }
+                                                            MouseArea {
+                                                                anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                                onClicked: { Config.ccIconMode = modelData }
+                                                            }
+                                                            Behavior on color { ColorAnimation { duration: 120 } }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
                                         CCIconEntry {
                                             label:"CC Glyph"
+                                            visible: Config.ccIconMode === "glyph"
                                             value:Config.ccGlyph
                                             onApplied:function(v){
                                                 Config.ccGlyph=v
@@ -2133,6 +2176,54 @@ PanelWindow {
                                             }
                                         }
                                         CCSlider { label:"CC Glyph Opacity"; from:0;to:1;stepSize:0.05;decimals:2; value:Config.ccGlyphOpacity; onMoved:function(v){Config.ccGlyphOpacity=v} }
+                                        RowLayout {
+                                            visible: Config.ccIconMode === "custom"
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Icon Image"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 13
+                                                Layout.preferredWidth: 100
+                                            }
+                                            // Gallery trigger — one active segment of the CCSegmented pill
+                                            Rectangle {
+                                                width: 104; height: 28; radius: 9
+                                                color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.55)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                                Rectangle {
+                                                    anchors { fill: parent; margins: 2 }
+                                                    radius: 7
+                                                    color: ccPickMa.containsMouse
+                                                           ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.95)
+                                                           : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.8)
+                                                    border.width: 1
+                                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                                    RowLayout {
+                                                        anchors.centerIn: parent; spacing: 6
+                                                        Text {
+                                                            text: "\u{F0976}"
+                                                            color: Theme.cOnSecondary
+                                                            font.family: Config.fontFamily; font.pixelSize: 13
+                                                        }
+                                                        Text {
+                                                            text: "Icons"
+                                                            color: Theme.cOnSecondary
+                                                            font.family: Config.labelFont; font.pixelSize: 12
+                                                            font.weight: Font.DemiBold
+                                                        }
+                                                    }
+                                                }
+                                                MouseArea {
+                                                    id: ccPickMa
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    cursorShape: Qt.PointingHandCursor
+                                                    onClicked: ccIconGalleryOverlay.open()
+                                                }
+                                            }
+                                        }
                                         Process { id:_ccGlyphWrite; running:false }
 
                                         CCSection { text: "Battery" }
@@ -2446,11 +2537,10 @@ PanelWindow {
                                                                     border.color: Config.cavaStartVar === modelData.var
                                                                         ? Theme.cPrimary
                                                                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                    ToolTip.visible: _csMatHover.containsMouse
-                                                                    ToolTip.text: modelData.var
-                                                                    ToolTip.delay: 400
                                                                     MouseArea {
                                                                         id: _csMatHover
+                                                                        onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                        onExited: BarTipState.hide(parent)
                                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                         hoverEnabled: true
                                                                         onClicked: { Config.cavaStartVar = modelData.var }
@@ -2483,11 +2573,10 @@ PanelWindow {
                                                                     border.color: Config.cavaStartPywalVar === modelData.var
                                                                         ? Theme.cPrimary
                                                                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                    ToolTip.visible: _csPywalHover.containsMouse
-                                                                    ToolTip.text: modelData.var
-                                                                    ToolTip.delay: 400
                                                                     MouseArea {
                                                                         id: _csPywalHover
+                                                                        onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                        onExited: BarTipState.hide(parent)
                                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                         hoverEnabled: true
                                                                         onClicked: { Config.cavaStartPywalVar = modelData.var }
@@ -2520,11 +2609,10 @@ PanelWindow {
                                                                     border.color: Config.cavaStartWallustVar === modelData.var
                                                                         ? Theme.cPrimary
                                                                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                    ToolTip.visible: _csWallustHover.containsMouse
-                                                                    ToolTip.text: modelData.var
-                                                                    ToolTip.delay: 400
                                                                     MouseArea {
                                                                         id: _csWallustHover
+                                                                        onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                        onExited: BarTipState.hide(parent)
                                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                         hoverEnabled: true
                                                                         onClicked: { Config.cavaStartWallustVar = modelData.var }
@@ -2618,11 +2706,10 @@ PanelWindow {
                                                                     border.color: Config.cavaEndVar === modelData.var
                                                                         ? Theme.cPrimary
                                                                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                    ToolTip.visible: _ceMatHover.containsMouse
-                                                                    ToolTip.text: modelData.var
-                                                                    ToolTip.delay: 400
                                                                     MouseArea {
                                                                         id: _ceMatHover
+                                                                        onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                        onExited: BarTipState.hide(parent)
                                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                         hoverEnabled: true
                                                                         onClicked: {
@@ -2658,11 +2745,10 @@ PanelWindow {
                                                                     border.color: Config.cavaEndPywalVar === modelData.var
                                                                         ? Theme.cPrimary
                                                                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                    ToolTip.visible: _cePywalHover.containsMouse
-                                                                    ToolTip.text: modelData.var
-                                                                    ToolTip.delay: 400
                                                                     MouseArea {
                                                                         id: _cePywalHover
+                                                                        onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                        onExited: BarTipState.hide(parent)
                                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                         hoverEnabled: true
                                                                         onClicked: {
@@ -2698,11 +2784,10 @@ PanelWindow {
                                                                     border.color: Config.cavaEndWallustVar === modelData.var
                                                                         ? Theme.cPrimary
                                                                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                                    ToolTip.visible: _ceWallustHover.containsMouse
-                                                                    ToolTip.text: modelData.var
-                                                                    ToolTip.delay: 400
                                                                     MouseArea {
                                                                         id: _ceWallustHover
+                                                                        onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                                        onExited: BarTipState.hide(parent)
                                                                         anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                                         hoverEnabled: true
                                                                         onClicked: {
@@ -2961,8 +3046,8 @@ PanelWindow {
 
                                         CCSection { text: "Shape" }
                                         CCSlider { label:"Icon Size"; from:18;to:60;stepSize:1; value:Config.dockIconSize; onMoved:function(v){Config.dockIconSize=v} }
-                                        CCSlider { label:"Start Icon"; from:8;to:40;stepSize:2; value:Config.dockStartIconSize; onMoved:function(v){Config.dockStartIconSize=v} }
-                                        CCSlider { label:"Trash Icon"; from:8;to:40;stepSize:2; value:Config.dockTrashIconSize; onMoved:function(v){Config.dockTrashIconSize=v} }
+                                        CCSlider { label:"Start Icon ×"; from:0.5;to:1.5;stepSize:0.05;decimals:2; value:Config.dockStartIconScale; onMoved:function(v){Config.dockStartIconScale=v} }
+                                        CCSlider { label:"Trash Icon ×"; from:0.5;to:1.5;stepSize:0.05;decimals:2; value:Config.dockTrashIconScale; onMoved:function(v){Config.dockTrashIconScale=v} }
                                         CCSlider { label:"Spacing"; from:0;to:30;stepSize:1; value:Config.dockButtonSpacing; onMoved:function(v){Config.dockButtonSpacing=v} }
                                         CCSlider { label:"Padding"; from:8;to:20;stepSize:1; value:Config.dockInnerPadding; onMoved:function(v){Config.dockInnerPadding=v} }
 
@@ -3350,11 +3435,10 @@ PanelWindow {
                                                         border.color: ccWin._activeBorderVar === modelData.var
                                                             ? Theme.cPrimary
                                                             : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                        ToolTip.visible: _matAHover.containsMouse
-                                                        ToolTip.text: modelData.var
-                                                        ToolTip.delay: 400
                                                         MouseArea {
                                                             id: _matAHover
+                                                            onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                            onExited: BarTipState.hide(parent)
                                                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                             hoverEnabled: true
                                                             onClicked: {
@@ -3398,11 +3482,10 @@ PanelWindow {
                                                         border.color: ccWin._activeBorderPywalVar === modelData.var
                                                             ? Theme.cPrimary
                                                             : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                        ToolTip.visible: _pywalAHover.containsMouse
-                                                        ToolTip.text: modelData.var
-                                                        ToolTip.delay: 400
                                                         MouseArea {
                                                             id: _pywalAHover
+                                                            onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                            onExited: BarTipState.hide(parent)
                                                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                             hoverEnabled: true
                                                             onClicked: {
@@ -3515,11 +3598,10 @@ PanelWindow {
                                                         border.color: ccWin._inactiveBorderVar === modelData.var
                                                             ? Theme.cPrimary
                                                             : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                        ToolTip.visible: _matIHover.containsMouse
-                                                        ToolTip.text: modelData.var
-                                                        ToolTip.delay: 400
                                                         MouseArea {
                                                             id: _matIHover
+                                                            onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                            onExited: BarTipState.hide(parent)
                                                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                             hoverEnabled: true
                                                             onClicked: {
@@ -3563,11 +3645,10 @@ PanelWindow {
                                                         border.color: ccWin._inactiveBorderPywalVar === modelData.var
                                                             ? Theme.cPrimary
                                                             : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
-                                                        ToolTip.visible: _pywalIHover.containsMouse
-                                                        ToolTip.text: modelData.var
-                                                        ToolTip.delay: 400
                                                         MouseArea {
                                                             id: _pywalIHover
+                                                            onEntered: BarTipState.show(modelData.var, parent, 0, 10)
+                                                            onExited: BarTipState.hide(parent)
                                                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                                             hoverEnabled: true
                                                             onClicked: {
@@ -5876,7 +5957,13 @@ PanelWindow {
                                     }
                                 }
                                 Component.onCompleted: {
-                                    if (ccTabSettings.activeTab === 9) sysInfoProc.running = true
+                                    // Pre-load on CC launch instead of waiting for the
+                                    // user to switch to the System tab. The CC is
+                                    // Loader-gated on ControlCenterState.visible, so this
+                                    // fires (and refreshes uptime/RAM/etc.) every open.
+                                    // Guarded by the same license gate the other CC
+                                    // readers honour in ControlCenterState.onVisibleChanged.
+                                    if (LicenseState.activated) sysInfoProc.running = true
                                 }
                             }
 
@@ -5897,54 +5984,20 @@ PanelWindow {
                                     anchors.rightMargin: 18
                                     spacing: 18
 
-                                    // Distro icon: PNG/SVG image when found, Nerd Font glyph fallback
+                                    // Distro icon: real brand image when the distro
+                                    // ships one, else the Nerd Font glyph. Uses the
+                                    // same DistroState + DistroIconView as the CC bar
+                                    // button and the dock start badge.
                                     Item {
                                         Layout.alignment: Qt.AlignVCenter
                                         implicitWidth: 44
                                         implicitHeight: 44
 
-                                        Image {
-                                            id: distroImg
+                                        DistroIconView {
                                             anchors.fill: parent
-                                            // Only set source when we have a path — empty source avoids
-                                            // QML's broken-image ghost placeholder entirely.
-                                            source: sysInfoRoot._distroIconPath.length > 0
-                                                    ? "file://" + sysInfoRoot._distroIconPath
-                                                    : ""
-                                            visible: source.length > 0 && status === Image.Ready
-                                            fillMode: Image.PreserveAspectFit
-                                            smooth: true
-                                            mipmap: true
-                                            // Clear path on load failure so fallback glyph takes over
-                                            onStatusChanged: {
-                                                if (status === Image.Error)
-                                                    sysInfoRoot._distroIconPath = ""
-                                            }
-                                        }
-
-                                        // Fallback Nerd Font glyph — shown whenever no image loaded
-                                        Text {
-                                            anchors.centerIn: parent
-                                            visible: !distroImg.visible
-                                            text: {
-                                                const id = (sysInfoRoot.info.OSID || "").toLowerCase()
-                                                const m = {
-                                                    "arch": "", "cachyos": "",
-                                                    "archcraft": "", "endeavouros": "",
-                                                    "manjaro": "", "garuda": "",
-                                                    "ubuntu": "", "debian": "",
-                                                    "fedora": "", "linuxmint": "",
-                                                    "opensuse": "", "opensuse-tumbleweed": "",
-                                                    "gentoo": "", "void": "",
-                                                    "nixos": "", "pop": "",
-                                                    "alpine": "", "centos": "",
-                                                    "rhel": "", "kali": "",
-                                                    "raspbian": "", "artix": "",
-                                                }
-                                                return m[id] || ""
-                                            }
-                                            font.family: Config.fontFamily
-                                            font.pixelSize: 44
+                                            imagePath: DistroState.imagePath
+                                            glyph: DistroState.glyph
+                                            pixelSize: 44
                                             color: Theme.cWc6
                                         }
                                     }
@@ -6151,15 +6204,64 @@ PanelWindow {
             visible = true
             if (wpSettings.wallpaperDir) {
                 _wpSidebarPath = _parentOf(wpSettings.wallpaperDir)
-                _wpCurrentDir  = wpSettings.wallpaperDir
-                _wpDoScan()
+                // The CC-launch preload (Component.onCompleted) already scanned
+                // this dir; only re-scan when the dir changed or nothing is warm
+                // yet, so opening reuses the preloaded listing instead of discarding it.
+                if (_wpCurrentDir !== wpSettings.wallpaperDir || _wallpapers.length === 0) {
+                    _wpCurrentDir  = wpSettings.wallpaperDir
+                    _wpDoScan()
+                }
             } else {
                 _wpSidebarPath = Quickshell.env("HOME") + "/Pictures"
                 _wpCurrentDir  = ""
             }
             if (_wpSidebarOpen) _wpScanSidebarDirs(_wpSidebarPath)
         }
-        function close() { visible = false }
+        function close() { closeLightbox(); visible = false }
+
+        // Pre-warm on CC launch. The CC is Loader-gated on ControlCenterState
+        // .visible, so this fires every open. Scan the persisted icon folder and
+        // kick the thumbnail pipeline so tiles are ready before the user opens
+        // the gallery (mirrors open()'s dir resolution without making it visible).
+        Component.onCompleted: {
+            if (LicenseState.activated && wpSettings.wallpaperDir) {
+                _wpSidebarPath = _parentOf(wpSettings.wallpaperDir)
+                _wpCurrentDir  = wpSettings.wallpaperDir
+                _wpDoScan()
+            }
+        }
+
+        // ── Lightbox preview (right-click a tile; local-folder coverflow) ─────
+        // Architecture ported from quickshell/wallpaper/shell.qml's local-folder
+        // lightbox: dim scrim + role-based coverflow (prev / focus / next slide
+        // and scale), ← / → / ↑ / ↓ cycle, Esc dismiss, Enter or the button sets
+        // the focused image as the user icon (via the crop overlay).
+        property string _lbPath: ""
+        property int    _lbIdx:  -1
+        function openLightbox(index) {
+            if (index < 0 || index >= _filtered.length) return
+            _lbIdx      = index
+            _lbPath     = _filtered[index]
+            _focusedIdx = index
+        }
+        function closeLightbox() { _lbPath = ""; _lbIdx = -1 }
+        function cycleLightbox(delta) {
+            const n = _filtered.length
+            if (_lbPath === "" || n === 0) return
+            let i = _lbIdx
+            if (i < 0) i = _filtered.indexOf(_lbPath)
+            i = (((i + delta) % n) + n) % n   // circular wrap last <-> first
+            _lbIdx      = i
+            _lbPath     = _filtered[i]
+            _focusedIdx = i
+        }
+        function lbApply() {
+            if (_lbPath === "") return
+            const p = _lbPath
+            closeLightbox()
+            avatarCropOverlay.openWith(p)
+            close()
+        }
 
         function _parentOf(p) {
             if (!p) return Quickshell.env("HOME")
@@ -6364,6 +6466,28 @@ PanelWindow {
                             text: wpPickerOverlay._wpSidebarPath.split('/').pop() || "/"
                             color: Theme.cOnSurf; font.pixelSize: 12
                             font.family: Config.labelFont; elide: Text.ElideRight
+                        }
+
+                        // Minimal Primary-color 'x' close button (matches the wallpaper
+                        // explorer sidebar): transparent circle → cPrimary 0.2 on hover.
+                        Rectangle {
+                            width: 24; height: 24; radius: 12
+                            color: wpSbCloseHov.containsMouse
+                                ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                : "transparent"
+                            Behavior on color { ColorAnimation { duration: 120 } }
+                            Text {
+                                anchors.centerIn: parent
+                                text: "\u{F0156}"
+                                color: Theme.cPrimary
+                                font.pixelSize: 14; font.family: Config.fontFamily
+                            }
+                            MouseArea {
+                                id: wpSbCloseHov
+                                anchors.fill: parent; hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: wpPickerOverlay._wpSidebarOpen = false
+                            }
                         }
                     }
                 }
@@ -6591,7 +6715,7 @@ PanelWindow {
                 // Hint when no folder selected
                 Text {
                     visible: wpPickerOverlay._wpCurrentDir === ""
-                    text: "Open  Folder  to choose an image directory, then click any image to set it as your user icon."
+                    text: "Open  Folder  to choose an image directory. Click an image to set it as your user icon, or right-click to preview."
                     color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
                     font.family: Config.labelFont; font.pixelSize: 12
                     wrapMode: Text.Wrap; Layout.fillWidth: true
@@ -6649,6 +6773,7 @@ PanelWindow {
                                 z: wpThumbItem._isFocused ? 10 : 0
 
                                 Rectangle {
+                                    id: wpThumbCard
                                     anchors.fill: parent; radius: 10
                                     color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
                                    			Theme.cOnSecondary.b, 0.50)
@@ -6684,31 +6809,47 @@ PanelWindow {
                                             font.pixelSize: 22; font.family: Config.fontFamily
                                         }
                                     }
-                                    // Filename on hover - clipped to thumbnail bounds
+                                }
+
+                                // Filename bar — sibling of the card wrapped in a clip Item
+                                // (wallpaper-panel technique): the inner Rectangle is taller
+                                // than the strip by the radius and bottom-anchored, so its top
+                                // rounded corners are masked and only the bottom corners (radius
+                                // 10, matching the card) show.
+                                Item {
+                                    anchors { left: wpThumbCard.left; right: wpThumbCard.right; bottom: wpThumbCard.bottom }
+                                    height: wpItemHov.containsMouse ? 22 : 0
+                                    clip: true
+                                    z: 2
+                                    Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                                     Rectangle {
-                                        anchors { bottom: parent.bottom; left: parent.left; right: parent.right }
-                                        height: wpItemHov.containsMouse ? 22 : 0
-                                        color: Qt.rgba(0, 0, 0, 0.55)
-                                        radius: 0
-                                        clip: true
-                                        Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                        anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                                        height: (wpItemHov.containsMouse ? 22 : 0) + 10
+                                        radius: 10
+                                        color: Qt.rgba(0, 0, 0, 0.6)
                                         Text {
-                                            anchors { fill: parent; leftMargin: 6; rightMargin: 6 }
+                                            anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 8; rightMargin: 8 }
+                                            height: 22
                                             text: wpThumbItem.modelData.split('/').pop()
                                             color: "#ffffff"; font.pixelSize: 10
                                             elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter
-                                            width: parent.width - 12
                                         }
                                     }
                                 }
                                 MouseArea {
                                     id: wpItemHov; anchors.fill: parent; hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: {
-                                        // Open the avatar crop overlay instead of applying directly,
-                                        // so the user can pan/position the image before committing.
-                                        avatarCropOverlay.openWith(wpThumbItem.modelData)
-                                        wpPickerOverlay.close()
+                                    onClicked: function(mouse) {
+                                        if (mouse.button === Qt.RightButton) {
+                                            // Preview full image in the coverflow lightbox.
+                                            wpPickerOverlay.openLightbox(wpThumbItem.index)
+                                        } else {
+                                            // Open the avatar crop overlay instead of applying
+                                            // directly, so the user can pan/position the image.
+                                            avatarCropOverlay.openWith(wpThumbItem.modelData)
+                                            wpPickerOverlay.close()
+                                        }
                                     }
                                 }
                             }
@@ -6746,10 +6887,951 @@ PanelWindow {
             }
         }
 
+        // ── Lightbox preview (right-click a tile) ─────────────────────────────
+        // Local-folder coverflow ported from quickshell/wallpaper/shell.qml: a
+        // scrim dims the picker, a role-based stage slides + scales the nearby
+        // images between prev / focus / next, and the focused image sizes the box
+        // from its own decoded sourceSize (no grow-into-place). Rounded corners
+        // use a MultiEffect mask since QtQuick clip ignores radius.
+        Rectangle {
+            id: wpLightbox
+            anchors.fill: parent
+            visible: wpPickerOverlay._lbPath !== ""
+            color: Qt.rgba(0, 0, 0, 0.74)
+            radius: 20
+            z: 999
+
+            focus: visible
+            onVisibleChanged: if (visible) wpLightbox.forceActiveFocus()
+                              else wpSearchInput.forceActiveFocus()
+            Keys.onLeftPressed:   function(e) { wpPickerOverlay.cycleLightbox(-1); e.accepted = true }
+            Keys.onRightPressed:  function(e) { wpPickerOverlay.cycleLightbox(+1); e.accepted = true }
+            Keys.onUpPressed:     function(e) { wpPickerOverlay.cycleLightbox(-1); e.accepted = true }
+            Keys.onDownPressed:   function(e) { wpPickerOverlay.cycleLightbox(+1); e.accepted = true }
+            Keys.onEscapePressed: function(e) { wpPickerOverlay.closeLightbox(); e.accepted = true }
+            Keys.onReturnPressed: function(e) { wpPickerOverlay.lbApply(); e.accepted = true }
+
+            // Scrim: click-away dismisses. hoverEnabled:false lets the grid tiles
+            // beneath keep receiving hover.
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: false
+                onClicked: wpPickerOverlay.closeLightbox()
+            }
+
+            Column {
+                id: wpLbCol
+                anchors.centerIn: parent
+                spacing: 12
+
+                property real availW: wpLightbox.width  - 120
+                property real availH: wpLightbox.height - 180
+                property real iw: wpLbStage.focusCell && wpLbStage.focusCell.srcW > 0 ? wpLbStage.focusCell.srcW : 16
+                property real ih: wpLbStage.focusCell && wpLbStage.focusCell.srcH > 0 ? wpLbStage.focusCell.srcH : 16
+                property real fit:   Math.min(availW / iw, availH / ih, 1)
+                property real boxW:  Math.max(220, Math.min(availW, iw * fit))
+                property real boxH:  Math.max(160, Math.min(availH, ih * fit))
+                property real stageW: wpLightbox.width - 40
+
+                Item {
+                    id: wpLbStage
+                    width:  wpLbCol.stageW
+                    height: wpLbCol.boxH
+                    clip: true
+                    Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+
+                    readonly property real nbW: Math.max(0, (wpLbStage.width - wpLbCol.boxW) / 2 + 60)
+                    readonly property int focusIdx: {
+                        const i = wpPickerOverlay._filtered.indexOf(wpPickerOverlay._lbPath)
+                        return i >= 0 ? i : 0
+                    }
+                    property Item focusCell: null
+
+                    Repeater {
+                        model: wpPickerOverlay._lbPath !== "" ? wpPickerOverlay._filtered : []
+                        delegate: Item {
+                            id: wpCarCell
+                            required property int    index
+                            required property string modelData
+
+                            // Role relative to the focused image, wrapped so the
+                            // coverflow cycles circularly (last sits left of first).
+                            readonly property int role: {
+                                const n = wpPickerOverlay._filtered.length
+                                let r = index - wpLbStage.focusIdx
+                                if (n > 2) {
+                                    if (r >  n / 2) r -= n
+                                    if (r < -n / 2) r += n
+                                }
+                                return r
+                            }
+                            readonly property bool near: Math.abs(role) <= 2
+                            readonly property real srcW: wpCarImg.sourceSize.width
+                            readonly property real srcH: wpCarImg.sourceSize.height
+                            onRoleChanged: if (role === 0) wpLbStage.focusCell = wpCarCell
+                            Component.onCompleted: if (role === 0) wpLbStage.focusCell = wpCarCell
+
+                            x: role === 0 ? (wpLbStage.width - wpLbCol.boxW) / 2
+                               : role === -1 ? 0
+                               : role === 1 ? wpLbStage.width - wpLbStage.nbW
+                               : role < -1 ? -wpLbStage.nbW
+                               : wpLbStage.width
+                            width: role === 0 ? wpLbCol.boxW : wpLbStage.nbW
+                            y: (wpLbStage.height - height) / 2
+                            height: role === 0 ? wpLbCol.boxH : wpLbCol.boxH * 0.8
+                            z: role === 0 ? 10 : 1
+                            visible: near
+
+                            Behavior on x      { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                            Behavior on width  { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+                            Behavior on height { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+
+                            Image {
+                                id: wpCarImg
+                                anchors.fill: parent
+                                source: wpCarCell.near ? "file://" + wpCarCell.modelData : ""
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                                cache: true
+                                smooth: true
+                                layer.enabled: wpCarCell.near
+                                layer.effect: MultiEffect {
+                                    maskEnabled: true
+                                    maskSource: wpCarMask
+                                    maskThresholdMin: 0.5
+                                    maskSpreadAtMin: 1.0
+                                }
+                            }
+                            Item {
+                                id: wpCarMask
+                                anchors.fill: parent
+                                opacity: 0
+                                layer.enabled: true
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 18
+                                    color: "white"
+                                }
+                            }
+                        }
+                    }
+
+                    // Click the focused image to dismiss too.
+                    MouseArea {
+                        anchors.centerIn: parent
+                        width: wpLbCol.boxW
+                        height: wpLbCol.boxH
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: wpPickerOverlay.closeLightbox()
+                    }
+                }
+
+                RowLayout {
+                    width: wpLbStage.width
+                    spacing: 10
+                    Text {
+                        Layout.fillWidth: true
+                        text: wpPickerOverlay._lbPath.split("/").pop()
+                        color: "#ffffff"
+                        font.pixelSize: 13
+                        font.family: Config.labelFont
+                        elide: Text.ElideRight
+                    }
+                    Rectangle {
+                        Layout.preferredWidth: wpLbApplyText.implicitWidth + 28
+                        Layout.preferredHeight: 32
+                        radius: 16
+                        color: wpLbApplyArea.containsMouse
+                            ? Qt.lighter(Theme.cPrimary, 1.12) : Theme.cPrimary
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                        Text {
+                            id: wpLbApplyText
+                            anchors.centerIn: parent
+                            text: "Set as icon"
+                            color: Theme.cOnPrimary
+                            font.pixelSize: 12
+                            font.family: Config.labelFont
+                        }
+                        MouseArea {
+                            id: wpLbApplyArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: wpPickerOverlay.lbApply()
+                        }
+                    }
+                }
+            }
+        }
+
         // FocusScope for keyboard navigation and search management
         FocusScope {
             visible: wpPickerOverlay.visible
             Keys.onEscapePressed: wpPickerOverlay.close()
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  CC / Dock custom-icon gallery
+    //  Grid of images from ~/Pictures/Icons. Picking one sets
+    //  Config.ccCustomIconPath (and the custom mode) which the bar CC module
+    //  and the dock start button both render. Opens from Bar:Icons → Control
+    //  Center → Icon Mode = Custom.
+    // ═══════════════════════════════════════════════════════════════════════
+    Rectangle {
+        id: ccIconGalleryOverlay
+        anchors.fill: panel
+        z: 12
+        visible: false
+        radius: 20
+        clip: true
+        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                       Theme.cOnSecondary.b, 0.97)
+        border.width: 1
+        border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.40)
+        scale: visible ? 1.0 : 0.94
+        transformOrigin: Item.Top
+        opacity: visible ? 1.0 : 0.0
+        Behavior on scale   { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 140 } }
+
+        readonly property string dir: Quickshell.env("HOME") + "/Pictures/Icons"
+        property var  images:   []
+        property bool scanning: false
+        property string searchText: ""
+        // Per-tab search so switching Folder ⇄ Iconify never carries the query over.
+        property string folderSearch: ""
+        property string iconSearch:   ""
+        readonly property var filtered: {
+            const q = searchText.trim().toLowerCase()
+            return q ? images.filter(function(p) { return p.split('/').pop().toLowerCase().includes(q) })
+                     : images
+        }
+
+        // ── Tab state: local folder vs. remote Iconify search ────────────────
+        property string activeTab: "folder"   // "folder" | "iconify"
+
+        // ── Iconify state ─────────────────────────────────────────────────────
+        // Free, keyless API (https://api.iconify.design). Search returns a list
+        // of "prefix:name" ids; each id renders as an SVG via iconUrl().
+        property var  iconResults: []
+        property bool iconLoading: false
+        property string iconError: ""
+
+        // Convert a Theme colour to a lowercase 6-digit hex (no '#') for the
+        // Iconify ?color= param, so downloaded/saved SVGs bake in cOnSecondary.
+        function _hex(c) {
+            const h = function(n) { return ("0" + Math.round(n * 255).toString(16)).slice(-2) }
+            return h(c.r) + h(c.g) + h(c.b)
+        }
+        function iconUrl(id, size) {
+            if (!id) return ""
+            const i = id.indexOf(":")
+            const prefix = id.slice(0, i), name = id.slice(i + 1)
+            let url = "https://api.iconify.design/" + prefix + "/" + name
+                    + ".svg?color=%23" + _hex(Theme.cOnSecondary)
+            if (size) url += "&width=" + size
+            return url
+        }
+
+        // ── Batched Iconify fetch queue ───────────────────────────────────────
+        // The public API is Cloudflare rate-limited, and fetching every result
+        // as its own /{prefix}/{name}.svg request fires ~96 parallel calls that
+        // get throttled past the first handful. Instead we group results by
+        // icon-set prefix and pull each set in ONE bulk JSON call
+        // (/{prefix}.json?icons=a,b,c), then assemble the SVGs locally — turning
+        // ~96 requests into a handful. A small worker pool + watchdog keeps a
+        // hung/failed batch from stalling the rest.
+        property var iconSources: []        // per-index data-URI ("" = pending)
+        property var  _icQueue: []          // pending batch tasks {prefix, items, attempt}
+        property var  _icInflight: []       // in-flight {id, task, gen, attempt, t0, done}
+        property int  _icActive: 0          // in-flight request count
+        property int  _icGen: 0             // generation; ignores stale callbacks
+        property int  _icReqSeq: 0          // monotonic request id
+        readonly property int _icMax: 3     // max parallel batch requests
+        readonly property int _icChunk: 50  // max icons per bulk request
+
+        function _setIconSource(i, uri) {
+            const arr = ccIconGalleryOverlay.iconSources.slice(0)
+            while (arr.length <= i) arr.push("")
+            arr[i] = uri
+            ccIconGalleryOverlay.iconSources = arr
+        }
+        function _startIconQueue() {
+            const g = ccIconGalleryOverlay
+            g._icGen++                       // invalidate any in-flight from the last search
+            g.iconSources = []
+            g._icInflight = []               // reset tracker + counter together so stale
+            g._icActive = 0                  // completions become harmless no-ops
+            // group result indices by icon-set prefix
+            const byPrefix = {}
+            for (let i = 0; i < g.iconResults.length; i++) {
+                const id = g.iconResults[i]
+                const c = id.indexOf(":")
+                const prefix = id.slice(0, c), name = id.slice(c + 1)
+                if (!byPrefix[prefix]) byPrefix[prefix] = []
+                byPrefix[prefix].push({ name: name, i: i })
+            }
+            const q = []
+            const keys = Object.keys(byPrefix)
+            for (let p = 0; p < keys.length; p++) {
+                const items = byPrefix[keys[p]]
+                for (let s = 0; s < items.length; s += g._icChunk)
+                    q.push({ prefix: keys[p], items: items.slice(s, s + g._icChunk), attempt: 0 })
+            }
+            g._icQueue = q
+            g._pumpIcons()
+        }
+        function _pumpIcons() {
+            const g = ccIconGalleryOverlay
+            while (g._icActive < g._icMax && g._icQueue.length > 0) {
+                const task = g._icQueue.shift()
+                g._loadBatch(task, g._icGen, task.attempt)
+            }
+        }
+        function _loadBatch(task, gen, attempt) {
+            const g = ccIconGalleryOverlay
+            const id = ++g._icReqSeq
+            g._icInflight.push({ id: id, task: task, gen: gen, attempt: attempt, t0: Date.now(), done: false })
+            g._icActive++
+            let names = ""
+            for (let m = 0; m < task.items.length; m++)
+                names += (m ? "," : "") + task.items[m].name
+            const xhr = new XMLHttpRequest()
+            xhr.open("GET", "https://api.iconify.design/" + task.prefix
+                     + ".json?icons=" + encodeURIComponent(names))
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === XMLHttpRequest.DONE)
+                    g._finishIconReq(id, xhr)
+            }
+            try { xhr.send() } catch (e) { g._finishIconReq(id, null) }
+        }
+        // Single completion path: frees the worker slot exactly once and always
+        // re-pumps, so a thrown error or a watchdog timeout can never leave the
+        // queue wedged with fewer than _icMax usable slots.
+        function _finishIconReq(id, xhr) {
+            const g = ccIconGalleryOverlay
+            const arr = g._icInflight
+            let idx = -1
+            for (let k = 0; k < arr.length; k++) { if (arr[k].id === id) { idx = k; break } }
+            if (idx < 0 || arr[idx].done) return
+            const rec = arr[idx]
+            rec.done = true
+            arr.splice(idx, 1)
+            g._icActive--
+            let loaded = false
+            if (xhr && xhr.status === 200 && xhr.responseText) {
+                try {
+                    const data = JSON.parse(xhr.responseText)
+                    const defs = data.icons || {}
+                    const aliases = data.aliases || {}
+                    const baseW = data.width || 16, baseH = data.height || 16
+                    const hex = g._hex(Theme.cOnSecondary)
+                    const items = rec.task.items
+                    for (let m = 0; m < items.length; m++) {
+                        let d = defs[items[m].name]
+                        if (!d && aliases[items[m].name])
+                            d = defs[aliases[items[m].name].parent]
+                        if (!d || !d.body) continue
+                        const w = d.width || baseW, h = d.height || baseH
+                        const svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"96\" height=\"96\" "
+                                + "viewBox=\"0 0 " + w + " " + h + "\" style=\"color:#" + hex + "\">"
+                                + d.body + "</svg>"
+                        g._setIconSource(items[m].i,
+                                "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg))
+                        loaded = true
+                    }
+                } catch (e) { loaded = false }
+            }
+            // Retry a fully-failed batch (throttle/hang), not a partial one.
+            if (!loaded && rec.gen === g._icGen && rec.attempt < 5)
+                g._icQueue.push({ prefix: rec.task.prefix, items: rec.task.items, attempt: rec.attempt + 1 })
+            g._pumpIcons()
+        }
+
+        // Watchdog: Quickshell's XMLHttpRequest has no timeout/abort, so a
+        // request that never reaches DONE would otherwise pin a worker slot
+        // forever and stall every tile behind it. Force-fail anything older
+        // than 9s so its slot frees up and it can be retried.
+        Timer {
+            id: ccIconWatchdog
+            interval: 1500
+            repeat: true
+            running: ccIconGalleryOverlay._icActive > 0
+            onTriggered: {
+                const g = ccIconGalleryOverlay
+                const now = Date.now()
+                const arr = g._icInflight
+                for (let k = arr.length - 1; k >= 0; k--) {
+                    const rec = arr[k]
+                    if (rec && !rec.done && rec.t0 && (now - rec.t0) > 9000)
+                        g._finishIconReq(rec.id, null)
+                }
+            }
+        }
+
+        function fetchIcons(q) {
+            const query = (q !== undefined ? q : searchText).trim()
+            if (!query) { iconResults = []; iconSources = []; _icQueue = []; iconError = ""; iconLoading = false; return }
+            iconLoading = true
+            iconError = ""
+            const url = "https://api.iconify.design/search?query="
+                    + encodeURIComponent(query) + "&limit=96"
+            if (typeof XMLHttpRequest === "undefined") {
+                iconLoading = false
+                iconError = "Network requests unavailable."
+                return
+            }
+            const xhr = new XMLHttpRequest()
+            xhr.open("GET", url)
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState !== XMLHttpRequest.DONE) return
+                ccIconGalleryOverlay.iconLoading = false
+                if (xhr.status === 200) {
+                    try {
+                        const json = JSON.parse(xhr.responseText)
+                        ccIconGalleryOverlay.iconResults = json.icons || []
+                        ccIconGalleryOverlay._startIconQueue()
+                        if (ccIconGalleryOverlay.iconResults.length === 0)
+                            ccIconGalleryOverlay.iconError = "No icons found for \u201C" + query + "\u201D."
+                    } catch (e) {
+                        ccIconGalleryOverlay.iconError = "Failed to parse Iconify results."
+                    }
+                } else {
+                    ccIconGalleryOverlay.iconError = "Iconify request failed (" + xhr.status + ")."
+                }
+            }
+            xhr.send()
+        }
+
+        // Debounced search while typing in the Iconify tab.
+        Timer {
+            id: ccIconDebounce
+            interval: 350
+            repeat: false
+            onTriggered: ccIconGalleryOverlay.fetchIcons()
+        }
+        onSearchTextChanged: {
+            if (activeTab === "iconify") ccIconDebounce.restart()
+        }
+
+        // ── Download an Iconify SVG into ~/Pictures/Icons and apply it ────────
+        property string iconDownloading: ""   // id currently being fetched
+        function downloadAndApply(id) {
+            if (!id) return
+            const fname = id.replace(":", "-") + ".svg"
+            ccIconDownloadProc._url  = iconUrl(id, 256)
+            ccIconDownloadProc._dest = dir + "/" + fname
+            ccIconDownloadProc._id   = id
+            iconDownloading = id
+            ccIconDownloadProc.running = true
+        }
+        Process {
+            id: ccIconDownloadProc
+            property string _url: ""
+            property string _dest: ""
+            property string _id: ""
+            command: _url && _dest
+                ? ["bash", "-c", "mkdir -p \"$2\"; curl -fsSL --max-time 20 \"$1\" -o \"$3\"",
+                   "--", _url, ccIconGalleryOverlay.dir, _dest]
+                : ["bash", "-c", "exit 1"]
+            onExited: function(code) {
+                if (code === 0) {
+                    Config.ccCustomIconPath = _dest
+                    Config.ccIconMode = "custom"
+                    ccIconGalleryOverlay.closeLightbox()
+                    ccIconGalleryOverlay._scan()   // surface the new file in the Folder tab
+                } else {
+                    ccIconGalleryOverlay.iconError = "Download failed."
+                }
+                ccIconGalleryOverlay.iconDownloading = ""
+            }
+        }
+
+        // ── Lightbox preview (right-click a tile; mirrors wallpaper/shell.qml) ─
+        property string lbKind: ""    // "" | "folder" | "iconify"
+        property int    lbIndex: -1
+        readonly property bool lbOpen: lbKind !== ""
+        readonly property var  lbList: lbKind === "iconify" ? iconResults : filtered
+        readonly property string lbRef: (lbOpen && lbIndex >= 0 && lbIndex < lbList.length)
+                                        ? lbList[lbIndex] : ""
+        readonly property string lbName: lbKind === "iconify"
+                                         ? lbRef : (lbRef ? lbRef.split('/').pop() : "")
+        readonly property string lbSource: !lbOpen ? ""
+                                 : (lbKind === "iconify" ? iconUrl(lbRef, 256)
+                                                         : "file://" + lbRef)
+
+        function openLightbox(kind, index) { lbKind = kind; lbIndex = index }
+        function closeLightbox() { lbKind = ""; lbIndex = -1 }
+        function cycleLightbox(delta) {
+            const n = lbList.length
+            if (!lbOpen || n === 0) return
+            lbIndex = (lbIndex + delta + n) % n
+        }
+        function lbApply() {
+            if (!lbOpen) return
+            if (lbKind === "iconify") downloadAndApply(lbRef)
+            else { Config.ccCustomIconPath = lbRef; Config.ccIconMode = "custom"; closeLightbox() }
+        }
+
+        // Block clicks/wheel from leaking to the CC panel behind.
+        MouseArea {
+            anchors.fill: parent
+            enabled: ccIconGalleryOverlay.visible
+            acceptedButtons: Qt.AllButtons
+            onWheel: function(e) { e.accepted = true }
+        }
+
+        function open()  { searchText = ""; folderSearch = ""; iconSearch = ""; activeTab = "folder"; closeLightbox(); visible = true; if (images.length === 0) _scan() }
+        function close() { closeLightbox(); visible = false }
+
+        // Pre-scan the local icon folder on CC launch (the CC is Loader-gated on
+        // ControlCenterState.visible, so this fires every open) so the Folder tab
+        // is populated before the gallery is shown. Iconify stays on-demand since
+        // it needs a search query.
+        Component.onCompleted: { if (LicenseState.activated) _scan() }
+
+        function _scan() {
+            images = []
+            scanning = true
+            if (ccIconScanProc.running) ccIconScanProc.running = false
+            Qt.callLater(function() { ccIconScanProc.running = true })
+        }
+
+        Process {
+            id: ccIconScanProc
+            property var _buf: []
+            command: ["bash", "-c",
+                "find \"$1\" -maxdepth 1 -type f " +
+                "\\( -iname '*.png' -o -iname '*.svg' -o -iname '*.jpg' " +
+                "-o -iname '*.jpeg' -o -iname '*.webp' -o -iname '*.gif' " +
+                "-o -iname '*.bmp' \\) -print 2>/dev/null | sort",
+                "--", ccIconGalleryOverlay.dir]
+            stdout: SplitParser {
+                splitMarker: "\n"
+                onRead: function(l) { const t = l.trim(); if (t) ccIconScanProc._buf.push(t) }
+            }
+            onRunningChanged: if (running) _buf = []
+            onExited: {
+                ccIconGalleryOverlay.images = _buf.slice()
+                ccIconGalleryOverlay.scanning = false
+            }
+        }
+
+        ColumnLayout {
+            anchors { fill: parent; margins: 16 }
+            spacing: 12
+
+            RowLayout {
+                Layout.fillWidth: true; spacing: 8
+                // Folder | Iconify source toggle (styled like the CC mode pills)
+                Rectangle {
+                    Layout.preferredWidth: 150; Layout.preferredHeight: 30
+                    Layout.alignment: Qt.AlignVCenter
+                    radius: 15
+                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                   Theme.cInversePrimary.b, 0.12)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                    Row {
+                        id: ccGalTabRow
+                        anchors { fill: parent; margins: 2 }
+                        spacing: 2
+                        Repeater {
+                            model: ["folder", "iconify"]
+                            delegate: Rectangle {
+                                required property string modelData
+                                readonly property bool sel: ccIconGalleryOverlay.activeTab === modelData
+                                width: (ccGalTabRow.width - 2) / 2
+                                height: ccGalTabRow.height
+                                radius: 13
+                                color: sel ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                                                     Theme.cSurfaceTint.b, 0.85)
+                                           : (tabMa.containsMouse
+                                              ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                              : "transparent")
+                                Behavior on color { ColorAnimation { duration: 120 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: modelData === "folder" ? "Folder" : "Iconify"
+                                    color: sel ? Theme.cOnSecondary : Theme.cOnSurfVar
+                                    font.family: Config.labelFont; font.pixelSize: 12
+                                    font.weight: sel ? Font.DemiBold : Font.Normal
+                                }
+                                MouseArea {
+                                    id: tabMa
+                                    anchors.fill: parent; hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        const g = ccIconGalleryOverlay
+                                        // stash the query under the tab we're leaving,
+                                        // then restore the entering tab's own query
+                                        if (g.activeTab === "folder") g.folderSearch = g.searchText
+                                        else g.iconSearch = g.searchText
+                                        g.activeTab = modelData
+                                        g.searchText = (modelData === "folder") ? g.folderSearch : g.iconSearch
+                                        ccGalSearch.forceActiveFocus()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Search bar (styled like the wallpaper picker)
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 30; radius: 20
+                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                   Theme.cInversePrimary.b, 0.12)
+                    border.width: 1
+                    border.color: ccGalSearch.activeFocus
+                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.55)
+                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                    Behavior on border.color { ColorAnimation { duration: 150 } }
+                    RowLayout {
+                        anchors { fill: parent; leftMargin: 10; rightMargin: 8 }
+                        spacing: 6
+                        Text {
+                            text: "\u{F0349}"
+                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.5)
+                            font.pixelSize: 13; font.family: Config.fontFamily
+                        }
+                        TextInput {
+                            id: ccGalSearch
+                            Layout.fillWidth: true
+                            color: Theme.cPrimary
+                            font.family: Config.labelFont
+                            font.pixelSize: 12
+                            verticalAlignment: TextInput.AlignVCenter
+                            clip: true
+                            selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                            text: ccIconGalleryOverlay.searchText
+                            onTextChanged: ccIconGalleryOverlay.searchText = text
+                            Keys.onEscapePressed: {
+                                if (ccIconGalleryOverlay.searchText !== "") {
+                                    ccIconGalleryOverlay.searchText = ""
+                                    ccGalSearch.deselect()
+                                } else {
+                                    ccIconGalleryOverlay.close()
+                                }
+                            }
+                            focus: true
+                        }
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: ccGalSearch.forceActiveFocus()
+                    }
+                }
+                // Close button (themed like the wallpaper picker)
+                Rectangle {
+                    width: 26; height: 26; radius: 13
+                    color: ccGalCloseMa.containsMouse
+                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.07)
+                    Text {
+                        anchors.centerIn: parent; text: "\u{F0159}"
+                        font.family: Config.fontFamily; font.pixelSize: 14
+                        color: Theme.cPrimary
+                    }
+                    MouseArea {
+                        id: ccGalCloseMa; anchors.fill: parent; hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: ccIconGalleryOverlay.close()
+                    }
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                }
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.topMargin: 24
+                readonly property bool folderTab: ccIconGalleryOverlay.activeTab === "folder"
+                readonly property bool fEmpty: ccIconGalleryOverlay.filtered.length === 0
+                                               && !ccIconGalleryOverlay.scanning
+                readonly property bool iEmpty: ccIconGalleryOverlay.activeTab === "iconify"
+                                               && ccIconGalleryOverlay.iconResults.length === 0
+                visible: folderTab ? fEmpty : iEmpty
+                text: {
+                    if (folderTab)
+                        return ccIconGalleryOverlay.images.length === 0
+                             ? "No images found.\nAdd PNG / SVG / JPG files to ~/Pictures/Icons."
+                             : "No icons match your search."
+                    if (ccIconGalleryOverlay.iconLoading) return "Searching Iconify\u2026"
+                    if (ccIconGalleryOverlay.iconError)   return ccIconGalleryOverlay.iconError
+                    if (ccIconGalleryOverlay.searchText.trim() === "")
+                        return "Search 200k+ open-source icons.\nType a keyword \u00B7 right-click to preview."
+                    return "No icons found."
+                }
+                horizontalAlignment: Text.AlignHCenter
+                color: Theme.cOnSurfVar
+                font.family: Config.fontFamily
+                font.pixelSize: 13
+            }
+
+            Flickable {
+                visible: ccIconGalleryOverlay.activeTab === "folder"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentHeight: ccGalGrid.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                clip: true
+
+                Grid {
+                    id: ccGalGrid
+                    width: parent.width
+                    columns: Math.max(2, Math.floor((width + 12) / (92 + 12)))
+                    spacing: 12
+
+                    Repeater {
+                        model: ccIconGalleryOverlay.filtered
+                        delegate: Item {
+                            id: ccGalCell
+                            required property string modelData
+                            required property int index
+                            readonly property bool selected: Config.ccCustomIconPath === modelData
+                            width: 92; height: 92
+
+                            // Card (rounded; clips the image to the radius)
+                            Rectangle {
+                                id: ccGalCard
+                                anchors.fill: parent
+                                radius: 12
+                                clip: true
+                                color: galCellMa.containsMouse
+                                       ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.5)
+                                       : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
+                                border.width: ccGalCell.selected ? 2 : 1
+                                border.color: ccGalCell.selected ? Theme.cPrimary
+                                        : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+
+                                Image {
+                                    anchors { fill: parent; margins: 10 }
+                                    source: "file://" + ccGalCell.modelData
+                                    sourceSize.width: 144
+                                    sourceSize.height: 144
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                    mipmap: true
+                                    asynchronous: true
+                                }
+                            }
+
+                            // Filename bar — sibling of the card wrapped in a clip Item: the
+                            // inner Rectangle is taller than the strip by the radius and
+                            // bottom-anchored, so only its bottom rounded corners (radius 12,
+                            // matching the card) show.
+                            Item {
+                                anchors { left: ccGalCard.left; right: ccGalCard.right; bottom: ccGalCard.bottom }
+                                height: galCellMa.containsMouse ? 26 : 0
+                                clip: true
+                                z: 2
+                                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                Rectangle {
+                                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                                    height: (galCellMa.containsMouse ? 26 : 0) + 12
+                                    radius: 12
+                                    color: Qt.rgba(0, 0, 0, 0.6)
+                                    Text {
+                                        anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 5; rightMargin: 5 }
+                                        height: 26
+                                        text: ccGalCell.modelData.split('/').pop()
+                                        color: "#ffffff"; font.pixelSize: 11
+                                        elide: Text.ElideNone; verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: galCellMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: function(mouse) {
+                                    if (mouse.button === Qt.RightButton) {
+                                        ccIconGalleryOverlay.openLightbox("folder", ccGalCell.index)
+                                    } else {
+                                        Config.ccCustomIconPath = ccGalCell.modelData
+                                        Config.ccIconMode = "custom"
+                                        ccIconGalleryOverlay.close()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── Iconify results grid ──────────────────────────────────────
+            Flickable {
+                visible: ccIconGalleryOverlay.activeTab === "iconify"
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                contentHeight: ccIconGrid.implicitHeight
+                boundsBehavior: Flickable.StopAtBounds
+                clip: true
+
+                Grid {
+                    id: ccIconGrid
+                    width: parent.width
+                    columns: Math.max(2, Math.floor((width + 12) / (92 + 12)))
+                    spacing: 12
+
+                    Repeater {
+                        model: ccIconGalleryOverlay.iconResults
+                        delegate: Item {
+                            id: ccIconCell
+                            required property string modelData
+                            required property int index
+                            readonly property bool busy: ccIconGalleryOverlay.iconDownloading === modelData
+                            width: 92; height: 92
+
+                            // Card uses cSurfaceTint — the exact background the bar CC
+                            // island paints behind a cOnSecondary glyph — so the tinted
+                            // icon previews with the same contrast it has on the bar.
+                            Rectangle {
+                                id: ccIconCard
+                                anchors.fill: parent
+                                radius: 12
+                                clip: true
+                                color: Theme.cSurfaceTint
+                                border.width: (iconCellMa.containsMouse || ccIconCell.busy) ? 2 : 1
+                                border.color: (iconCellMa.containsMouse || ccIconCell.busy)
+                                        ? Theme.cPrimary
+                                        : Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
+                                Behavior on border.color { ColorAnimation { duration: 120 } }
+
+                                Image {
+                                    anchors { fill: parent; margins: 24 }
+                                    source: ccIconGalleryOverlay.iconSources[ccIconCell.index]
+                                    sourceSize.width: 96
+                                    sourceSize.height: 96
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                    asynchronous: true
+                                    cache: true
+                                }
+
+                                // Busy overlay while the SVG downloads to ~/Pictures/Icons
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 12
+                                    color: Qt.rgba(0, 0, 0, 0.35)
+                                    visible: ccIconCell.busy
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "\u2026"
+                                        color: "#ffffff"; font.pixelSize: 22; font.bold: true
+                                    }
+                                }
+                            }
+
+                            // Name bar (clip-wrapper technique)
+                            Item {
+                                anchors { left: ccIconCard.left; right: ccIconCard.right; bottom: ccIconCard.bottom }
+                                height: iconCellMa.containsMouse ? 26 : 0
+                                clip: true
+                                z: 2
+                                Behavior on height { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+                                Rectangle {
+                                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                                    height: (iconCellMa.containsMouse ? 26 : 0) + 12
+                                    radius: 12
+                                    color: Qt.rgba(0, 0, 0, 0.6)
+                                    Text {
+                                        anchors { left: parent.left; right: parent.right; bottom: parent.bottom; leftMargin: 5; rightMargin: 5 }
+                                        height: 26
+                                        text: ccIconCell.modelData
+                                        color: "#ffffff"; font.pixelSize: 11
+                                        elide: Text.ElideNone; verticalAlignment: Text.AlignVCenter
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                id: iconCellMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: function(mouse) {
+                                    if (mouse.button === Qt.RightButton)
+                                        ccIconGalleryOverlay.openLightbox("iconify", ccIconCell.index)
+                                    else
+                                        ccIconGalleryOverlay.downloadAndApply(ccIconCell.modelData)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // ── Lightbox preview (right-click a tile; mirrors wallpaper/shell.qml) ─
+        Rectangle {
+            id: ccIconLightbox
+            anchors.fill: parent
+            visible: ccIconGalleryOverlay.lbOpen
+            z: 30
+            radius: 20
+            color: Qt.rgba(0, 0, 0, 0.74)
+
+            focus: visible
+            onVisibleChanged: if (visible) ccIconLightbox.forceActiveFocus()
+                              else ccGalSearch.forceActiveFocus()
+            Keys.onLeftPressed:   function(e) { ccIconGalleryOverlay.cycleLightbox(-1); e.accepted = true }
+            Keys.onRightPressed:  function(e) { ccIconGalleryOverlay.cycleLightbox(+1); e.accepted = true }
+            Keys.onUpPressed:     function(e) { ccIconGalleryOverlay.cycleLightbox(-1); e.accepted = true }
+            Keys.onDownPressed:   function(e) { ccIconGalleryOverlay.cycleLightbox(+1); e.accepted = true }
+            Keys.onEscapePressed: function(e) { ccIconGalleryOverlay.closeLightbox(); e.accepted = true }
+            Keys.onReturnPressed: function(e) { ccIconGalleryOverlay.lbApply(); e.accepted = true }
+            Keys.onEnterPressed:  function(e) { ccIconGalleryOverlay.lbApply(); e.accepted = true }
+
+            // Scrim click-away dismisses (hoverEnabled false so it never eats cell hover)
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: false
+                onClicked: ccIconGalleryOverlay.closeLightbox()
+            }
+
+            Column {
+                anchors.centerIn: parent
+                spacing: 16
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 240; height: 240; radius: 18
+                    color: Theme.cSurfaceTint
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.4)
+                    Image {
+                        anchors { fill: parent; margins: 48 }
+                        source: ccIconGalleryOverlay.lbSource
+                        sourceSize.width: 320
+                        sourceSize.height: 320
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                        asynchronous: true
+                    }
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 320
+                    text: ccIconGalleryOverlay.lbName
+                    color: "#ffffff"; font.family: Config.fontFamily; font.pixelSize: 14
+                    elide: Text.ElideMiddle
+                    horizontalAlignment: Text.AlignHCenter
+                }
+                Text {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: (ccIconGalleryOverlay.lbKind === "iconify" ? "Enter to download & apply"
+                                                                      : "Enter to apply")
+                          + "  \u00B7  \u2190 \u2192 cycle  \u00B7  Esc close"
+                    color: Qt.rgba(1, 1, 1, 0.55)
+                    font.family: Config.fontFamily; font.pixelSize: 11
+                }
+            }
         }
     }
 

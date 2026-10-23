@@ -106,7 +106,7 @@ Item {
             property var _dlg: ({ open: false })    // group-name dialog
 
             // ── Icons tab state (glyphData.json) ────────────────────
-            property string iconMode: "emoji"       // emoji | nerd
+            property string iconMode: HCCLauncherState.iconMode   // emoji | nerd
             property int emojiGroup: 0
             property int nerdCat: 0
             property bool glyphReady: false
@@ -2478,7 +2478,7 @@ Item {
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
                                         if (win.iconMode === modelData.k) return
-                                        win.iconMode = modelData.k
+                                        HCCLauncherState.iconMode = modelData.k
                                         win.query = ""; searchInput.text = ""
                                     }
                                 }
@@ -2726,7 +2726,8 @@ Item {
                             id: appsGroupsSeg
                             anchors.verticalCenter: parent.verticalCenter
                             options: [{ key: "apps", label: "Apps" },
-                                      { key: "groups", label: "Groups" }]
+                                      { key: "groups", label: "Groups" },
+                                      { key: "packages", label: "Packages" }]
                             current: win.subTab
                             onPicked: key => { win.subTab = key; win.focusIdx = -1 }
                         }
@@ -3171,6 +3172,13 @@ Item {
                                 color: Theme.cOnSurf
                                 opacity: 0.55
                             }
+                        }
+
+                        // ── Packages page ─────────────────────────────────
+                        PackagesTab {
+                            anchors.fill: parent
+                            visible: win.tab === "launcher" && win.subTab === "packages"
+                            query: win.query
                         }
 
                         // ── Clipboard page ────────────────────────────────
@@ -4696,7 +4704,8 @@ Item {
                                       ? " Search glyph\u2026" : " Search emoji\u2026"
                 case "websearch": return " Search the web\u2026"
                 case "agent":     return " Ask the agent\u2026"
-                default:          return " Search applications\u2026"
+                default:          return win.tab === "launcher" && win.subTab === "packages"
+                                        ? " Search packages\u2026" : " Search applications\u2026"
                 }
             }
 

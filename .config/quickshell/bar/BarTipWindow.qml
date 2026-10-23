@@ -47,7 +47,7 @@ PopupWindow {
 
     Rectangle {
         id: box
-        radius: 7
+        radius: BarTipState.radius
         color: Theme.cOnSecondary
         border.color: Theme.cInversePrimary
         border.width: 1
