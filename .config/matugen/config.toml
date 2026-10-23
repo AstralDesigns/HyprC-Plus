@@ -6,10 +6,10 @@ input_path = '~/.config/matugen/templates/kitty-colors.conf'
 output_path = '~/.config/kitty/colors.conf'
 post_hook = 'pkill -SIGUSR1 kitty'
 
-[templates.hyprland]
-input_path = '~/.config/matugen/templates/hyprland-colors.conf'
-output_path = '~/.config/hypr/colors.conf'
-post_hook = 'hyprctl reload'
+#[templates.hyprland]
+#input_path = '~/.config/matugen/templates/hyprland-colors.conf'
+#output_path = '~/.config/hypr/colors.conf'
+#post_hook = 'hyprctl reload'
 
 [templates.hyprland_lua]
 input_path = '~/.config/matugen/templates/hyprland-colors.lua'
@@ -53,14 +53,6 @@ output_path = '~/.cache/quickshell/overview/Appearance.colors.qml'
 [templates.wallpaper]
 input_path = '~/.config/matugen/templates/Appearance.colors.qml'
 output_path = '~/.cache/quickshell/wallpaper/MatugenColors.qml'
-
-[templates.rofi]
-input_path = '~/.config/matugen/templates/rofi-colors.rasi'
-output_path = '~/.config/rofi/colors.rasi'
-
-[templates.rofiborder]
-input_path = '~/.config/matugen/templates/rofi.rasi'
-output_path = '~/.config/rofi/rofi.rasi'
 
 [templates.cava]
 input_path = '~/.config/matugen/templates/config'

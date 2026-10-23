@@ -6350,6 +6350,26 @@ PanelWindow {
             }
         }
 
+        // ── Delete a local image, then rescan the folder ──────────────────────
+        // Mirrors wallpaper/shell.qml: the hover badge calls this, rm runs, and
+        // on success we drop the lightbox if it was previewing this file and
+        // rescan so the grid rebuilds from disk.
+        function deleteImage(path) {
+            if (!path) return
+            wpDeleteProc._path = path
+            if (wpDeleteProc.running) wpDeleteProc.running = false
+            Qt.callLater(function() { wpDeleteProc.running = true })
+        }
+        Process {
+            id: wpDeleteProc
+            property string _path: ""
+            command: ["bash", "-c", "rm -f -- \"$1\"", "--", _path]
+            onExited: function() {
+                if (wpPickerOverlay._lbPath === _path) wpPickerOverlay.closeLightbox()
+                wpPickerOverlay._wpDoScan()
+            }
+        }
+
         // ── Sidebar directory listing ─────────────────────────────────────────
         function _wpScanSidebarDirs(path) {
             wpSidebarProc._path = path
@@ -6836,6 +6856,38 @@ PanelWindow {
                                         }
                                     }
                                 }
+                                // Delete badge — top-left of the tile (opposite the
+                                // filename bar), shown on hover/focus so idle tiles
+                                // stay clean. 20×20 / radius 10, cSecondary bg that
+                                // brightens on hover, cOnSecondary trash glyph. z:20 +
+                                // its own MouseArea keep it above the tile's click-to-
+                                // crop layer; clicking deletes the file and rescans.
+                                Rectangle {
+                                    anchors {
+                                        top:    wpThumbCard.top
+                                        left:   wpThumbCard.left
+                                        topMargin:   6
+                                        leftMargin:  6
+                                    }
+                                    width: 20; height: 20; radius: 10
+                                    color: wpDelArea.containsMouse
+                                        ? Qt.lighter(Theme.cSecondary, 1.18) : Theme.cSecondary
+                                    visible: wpItemHov.containsMouse || wpThumbItem._isFocused || wpDelArea.containsMouse
+                                    z: 20
+                                    Text {
+                                        anchors.centerIn: parent; text: "\u{F0A7A}"
+                                        color: Theme.cOnSecondary
+                                        font.pixelSize: 11; font.family: "Symbols Nerd Font Mono"
+                                    }
+                                    MouseArea {
+                                        id: wpDelArea
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: wpPickerOverlay.deleteImage(wpThumbItem.modelData)
+                                    }
+                                }
+
                                 MouseArea {
                                     id: wpItemHov; anchors.fill: parent; hoverEnabled: true
                                     acceptedButtons: Qt.LeftButton | Qt.RightButton
@@ -7418,6 +7470,31 @@ PanelWindow {
             }
         }
 
+        // ── Delete a local icon, then rescan the folder ───────────────────────
+        // Mirrors wallpaper/shell.qml: the hover badge calls this, rm runs, and on
+        // success we drop the lightbox if it was previewing this file, reset to the
+        // glyph mode if it was the active CC icon, and rescan ~/Pictures/Icons.
+        function deleteImage(path) {
+            if (!path) return
+            ccIconDeleteProc._path = path
+            if (ccIconDeleteProc.running) ccIconDeleteProc.running = false
+            Qt.callLater(function() { ccIconDeleteProc.running = true })
+        }
+        Process {
+            id: ccIconDeleteProc
+            property string _path: ""
+            command: ["bash", "-c", "rm -f -- \"$1\"", "--", _path]
+            onExited: function() {
+                if (ccIconGalleryOverlay.lbKind === "folder" && ccIconGalleryOverlay.lbRef === _path)
+                    ccIconGalleryOverlay.closeLightbox()
+                if (Config.ccCustomIconPath === _path) {
+                    Config.ccCustomIconPath = ""
+                    Config.ccIconMode = "glyph"
+                }
+                ccIconGalleryOverlay._scan()
+            }
+        }
+
         ColumnLayout {
             anchors { fill: parent; margins: 16 }
             spacing: 12
@@ -7639,6 +7716,37 @@ PanelWindow {
                                         color: "#ffffff"; font.pixelSize: 11
                                         elide: Text.ElideNone; verticalAlignment: Text.AlignVCenter
                                     }
+                                }
+                            }
+
+                            // Delete badge — top-left of the tile, shown on hover so
+                            // idle tiles stay clean. 20×20 / radius 10, cSecondary bg
+                            // that brightens on hover, cOnSecondary trash glyph. z:20 +
+                            // its own MouseArea keep it above the tile's click-to-apply
+                            // layer; clicking removes the file and rescans the Folder tab.
+                            Rectangle {
+                                anchors {
+                                    top:    ccGalCard.top
+                                    left:   ccGalCard.left
+                                    topMargin:   4
+                                    leftMargin:  4
+                                }
+                                width: 20; height: 20; radius: 10
+                                color: ccGalDelArea.containsMouse
+                                    ? Qt.lighter(Theme.cSecondary, 1.18) : Theme.cSecondary
+                                visible: galCellMa.containsMouse || ccGalDelArea.containsMouse
+                                z: 20
+                                Text {
+                                    anchors.centerIn: parent; text: "\u{F0A7A}"
+                                    color: Theme.cOnSecondary
+                                    font.pixelSize: 11; font.family: "Symbols Nerd Font Mono"
+                                }
+                                MouseArea {
+                                    id: ccGalDelArea
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: ccIconGalleryOverlay.deleteImage(ccGalCell.modelData)
                                 }
                             }
 

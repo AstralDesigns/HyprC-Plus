@@ -39,4 +39,3 @@ trap cleanup EXIT INT TERM
 
 # Start (blocks until unlocked)
 qs -c candylock
-

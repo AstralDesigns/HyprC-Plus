@@ -1,13 +1,6 @@
 #!/bin/bash
 #set +e
 
-# Update ROFI background 
-ROFI_RASI="$HOME/.config/rofi/colors.rasi"
-
-if command -v sed >/dev/null; then
-    sed -i "2s/, 1)/, 0.3)/" "$ROFI_RASI"
-fi
-
 # Update local background.png
 if command -v magick >/dev/null && [ -f "$HOME/.config/background" ]; then
     magick "$HOME/.config/background[0]" "$HOME/.config/background.png"
@@ -65,17 +58,18 @@ if [[ -f "$WAYPAPER_CONFIG" && -f "$SDDM_CONF" ]]; then
         echo "⚠️  colors.css not found at $COLORS_CSS"
     fi
 
-    # ── AccentColor from primary_container in colors.css ───────────────────
+    # ── AccentColor from surface_tint in colors.css ───────────────────
     if [[ -f "$COLORS_CSS" ]]; then
-        FULL_HEX=$(grep -E '@define-color\s+primary_container\s+#' "$COLORS_CSS" \
+        FULL_HEX=$(grep -E '@define-color\s+surface_tint\s+#' "$COLORS_CSS" \
             | head -n1 \
             | grep -oP '(?<=#)[0-9a-fA-F]{6}')
 
         if [[ -n "$FULL_HEX" ]]; then
             sudo sed -i "s|^AccentColor=.*|AccentColor=\"#$FULL_HEX\"|" "$SDDM_CONF"
-            #echo "🎨 SDDM AccentColor updated → #$FULL_HEX (from primary_container)"
+            #echo "🎨 SDDM AccentColor updated → #$FULL_HEX (from surface_tint)"
+            pkill -f magick
         else
-            echo "⚠️  Could not parse primary_container from $COLORS_CSS"
+            echo "⚠️  Could not parse surface_tint from $COLORS_CSS"
         fi
     else
         echo "⚠️  colors.css not found at $COLORS_CSS"
