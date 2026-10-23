@@ -92,7 +92,7 @@ Item {
                     spacing: 2
                     Text {
                         text: Qt.formatDateTime(root._now, "HH")
-                        color: Theme.cWc6
+                        color: Theme.cWc14
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
@@ -111,7 +111,7 @@ Item {
                     }
                     Text {
                         text: Qt.formatDateTime(root._now, "mm")
-                        color:Theme.cPrimaryContainer
+                        color:Theme.cWc10
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
