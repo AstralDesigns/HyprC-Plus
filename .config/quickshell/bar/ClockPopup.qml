@@ -101,7 +101,7 @@ Item {
                     }
                     Text {
                         text: ":"
-                        color: Theme.cPrimary
+                        color: Theme.cSurfaceTint
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
