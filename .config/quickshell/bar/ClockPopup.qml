@@ -92,7 +92,7 @@ Item {
                     spacing: 2
                     Text {
                         text: Qt.formatDateTime(root._now, "HH")
-                        color: Theme.cOnSurf
+                        color: Theme.cWc6
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
@@ -111,7 +111,7 @@ Item {
                     }
                     Text {
                         text: Qt.formatDateTime(root._now, "mm")
-                        color:Theme.cOnSurf
+                        color:Theme.cInversePrimary
                         font.family: "C059"
                         font.italic: true
                         font.weight: Font.Bold
@@ -439,7 +439,7 @@ Item {
                 ctx.arc(minX, minY, 8, 0, 2 * Math.PI)
                 ctx.fill()
 
-                ctx.fillStyle = Theme.cWc2.toString()
+                ctx.fillStyle = Theme.cOnSurf.toString()
                 ctx.fillText(minText, tx, ty)
             }
         }
