@@ -8,8 +8,8 @@ QtObject {
     id: root
     property bool visible: false
     property bool widgetVisible: false
-    property int widgetX: Quickshell.screens[0] ? Math.round((Quickshell.screens[0].width - 244) / 2) : 674
-    property int widgetY: Quickshell.screens[0] ? (Quickshell.screens[0].height - 380) / 2 : 350
+    property int widgetX: Quickshell.screens[0] ? Math.round((Quickshell.screens[0].width - 222) / 2) : 674
+    property int widgetY: Quickshell.screens[0] ? (Quickshell.screens[0].height - 300) / 2 : 350
 
     function toggle() { root.visible = !root.visible }
     function open()   { root.visible = true  }
