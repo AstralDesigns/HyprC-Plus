@@ -243,7 +243,7 @@ Item {
                             text:    "\u{F02CA}"
                             font.family: Config.fontFamily
                             font.pixelSize: Config.desktopIconSize * 0.9
-                            color:   Theme.cInversePrimary
+                            color:   Theme.cWc9
                         }
 
                         Rectangle {
