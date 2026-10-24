@@ -75,6 +75,23 @@ Item {
             property string tab: HCCLauncherState.activeTab
             readonly property bool immersiveTab: tab === "websearch" || tab === "agent"
             property string subTab: "apps"          // launcher tab
+            // Per-sub-tab search text (apps/groups/packages) so a term typed in
+            // one sub-tab never filters another; the field is swapped on switch.
+            property var _subTabQuery: ({})
+            property string _prevSubTab: "apps"
+            // Packages keeps its own persistent term. The shared field (and thus
+            // PackagesTab.query) must not churn through other sub-tabs' terms on
+            // switch — that churn cleared the cached results and re-ran (and raced)
+            // the remote search on return.
+            property string pkgQuery: ""
+            onSubTabChanged: {
+                if (_prevSubTab === "packages") pkgQuery = query
+                else _subTabQuery[_prevSubTab] = query
+                query = (subTab === "packages") ? pkgQuery
+                                                : (_subTabQuery[subTab] ?? "")
+                searchInput.text = query
+                _prevSubTab = subTab
+            }
             property string query: ""
             readonly property string q: query.toLowerCase().trim()
 
@@ -114,6 +131,7 @@ Item {
             property var emojiGroups: []
             property var nerdCats: []
             property string copiedChar: ""
+            property bool   clipCopied: false     // clipboard-restore "Copied" flash
             property string hoveredIconName: ""   // in-card hover readout
 
             // ── Web-Search tab state (SearXNG list mode) ───────────
@@ -1540,6 +1558,18 @@ Item {
                 copiedTimer.restart()
             }
 
+            Timer {
+                id: clipCopiedTimer
+                interval: 1800
+                repeat: false
+                onTriggered: win.clipCopied = false
+            }
+            // Flash the "Copied clipboard item" pill after a restore (click or Enter).
+            function noteClipCopied() {
+                win.clipCopied = true
+                clipCopiedTimer.restart()
+            }
+
             // ── Web-Search tab: SearXNG JSON (curl) + docker lifecycle ────
             readonly property string searxBase: "http://127.0.0.1:8080"
             // True only while the active websearch tab is showing the SearXNG
@@ -2187,6 +2217,8 @@ Item {
                 HCCLauncherState.setTab(id)
                 win.query = ""
                 searchInput.text = ""
+                win._subTabQuery = {}   // leaving the tab drops sub-tab search memory
+                win.pkgQuery = ""
                 win.focusIdx = -1
                 win._hideMenu()
                 win._addToOpen = false
@@ -2514,7 +2546,12 @@ Item {
                             cursorVisible: searchInput.activeFocus
                             font.pixelSize: 13
                             clip: true
-                            onTextChanged: { win.query = text; win.focusIdx = -1; win._addToOpen = false }
+                            onTextChanged: {
+                                win.query = text
+                                if (win.tab === "launcher" && win.subTab === "packages")
+                                    win.pkgQuery = text
+                                win.focusIdx = -1; win._addToOpen = false
+                            }
 
                             Text {
                                 anchors.fill: parent
@@ -3178,7 +3215,7 @@ Item {
                         PackagesTab {
                             anchors.fill: parent
                             visible: win.tab === "launcher" && win.subTab === "packages"
-                            query: win.query
+                            query: win.pkgQuery
                         }
 
                         // ── Clipboard page ────────────────────────────────
@@ -3226,6 +3263,7 @@ Item {
                                         // Restore keeps the launcher open (agentic-workflow
                                         // parity with app launches); hide is manual, like other tabs.
                                         ClipboardState.restore(modelData.raw)
+                                        win.noteClipCopied()
                                     }
                                 }
                             }
@@ -3238,6 +3276,27 @@ Item {
                                 font.pixelSize: 12
                                 color: Theme.cOnSurf
                                 opacity: 0.55
+                            }
+                        }
+
+                        // Copied-feedback pill — mirrors the emoji/glyph copy bar;
+                        // shown briefly after a clipboard entry is restored.
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.bottomMargin: 12
+                            visible: win.tab === "clipboard" && win.clipCopied
+                            width: clipCopiedLbl.implicitWidth + 28
+                            height: clipCopiedLbl.implicitHeight + 10
+                            radius: 8
+                            color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                           Theme.cInversePrimary.b, 0.85)
+                            Text {
+                                id: clipCopiedLbl
+                                anchors.centerIn: parent
+                                text: "Copied clipboard item"
+                                font.pixelSize: 12
+                                color: Theme.cPrimary
                             }
                         }
 
@@ -4755,7 +4814,7 @@ Item {
                 } else if (win.tab === "clipboard") {
                     const list = win.clipFiltered
                     // Enter keeps the launcher open — same manual-hide policy as click.
-                    if (list.length > 0) ClipboardState.restore(list[0].raw)
+                    if (list.length > 0) { ClipboardState.restore(list[0].raw); win.noteClipCopied() }
                 }
             }
 

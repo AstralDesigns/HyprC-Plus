@@ -14,6 +14,7 @@
 set -u
 exec python3 - "$@" <<'PY'
 import sys, json, shutil, re, subprocess
+import threading
 
 mode  = sys.argv[1] if len(sys.argv) > 1 else "installed"
 query = sys.argv[2] if len(sys.argv) > 2 else ""
@@ -33,21 +34,36 @@ def run(cmd, timeout=25):
         return ""
 
 
-# ── installed sets (used both for the `installed` view and to tag searches) ──
+# ── installed sets ───────────────────────────────────────────────────────────
+# The browsable `installed` view is explicit-only (pacman -Qe): the packages
+# you directly asked for, not their pulled-in dependencies. A separate, broader
+# name set (pacman -Qq) is used ONLY to flag search rows as installed, so a
+# dependency-installed package (e.g. faugus-launcher via a meta-package) reads
+# truthfully instead of "available".
 def native_installed():
-    recs, names = [], set()
+    recs = []
     if not HAVE_PACMAN:
-        return recs, names
+        return recs
     # pacman -Qe -> "name version  description"
     for line in run(["pacman", "-Qe"]).splitlines():
         m = re.match(r"^(\S+)\s+(\S+)\s*(.*)$", line)
         if not m:
             continue
         name, ver, desc = m.group(1), m.group(2), m.group(3).strip()
-        names.add(name)
         recs.append({"name": name, "version": ver, "source": "native",
                      "description": desc, "repo": "", "installed": True, "icon": ""})
-    return recs, names
+    return recs
+
+
+def all_installed_names():
+    names = set()
+    if not HAVE_PACMAN:
+        return names
+    for line in run(["pacman", "-Qq"]).splitlines():
+        n = line.strip()
+        if n:
+            names.add(n)
+    return names
 
 
 def flatpak_installed():
@@ -128,31 +144,38 @@ def search_flatpak(q, fp_ids):
 
 
 def main():
-    n_inst, n_names = native_installed()
     f_inst, f_ids = flatpak_installed()
 
     if mode == "installed":
-        # pacman -Qe already lists installed AUR packages (same local DB).
-        out = (n_inst + f_inst)[:INSTALLED_LIMIT]
-    else:
-        nat, aur = search_pkgs(query, n_names)
-        nat = nat[:PER_SOURCE]
-        aur = aur[:PER_SOURCE]
-        fp = search_flatpak(query, f_ids)[:PER_SOURCE]
-        rank = {"native": 0, "aur": 1, "flatpak": 2}
-        merged, seen = [], set()
-        for r in sorted(nat + aur + fp,
-                        key=lambda r: (not r["installed"],
-                                       rank.get(r["source"], 9),
-                                       r["name"].lower())):
-            key = (r["source"], r["name"])
-            if key in seen:
-                continue
-            seen.add(key)
-            merged.append(r)
-        out = merged
+        # Explicit view: pacman -Qe already lists installed AUR packages too
+        # (they live in the same local DB). Single JSON array (PackagesIndex).
+        out = (native_installed() + f_inst)[:INSTALLED_LIMIT]
+        sys.stdout.write(json.dumps(out))
+        return
 
-    sys.stdout.write(json.dumps(out))
+    # Search: stream one NDJSON line per backend as it completes, so the fast
+    # native/AUR hits (paru/yay, ~3s) render before the slow Flathub query (~8s)
+    # lands. Each line is a JSON array of records; the reader merges, de-dupes
+    # and sorts them. Backends run concurrently so total is max(both), not sum.
+    inst_names = all_installed_names()
+    write_lock = threading.Lock()
+
+    def emit(recs):
+        with write_lock:
+            sys.stdout.write(json.dumps(recs) + "\n")
+            sys.stdout.flush()
+
+    def pkgs_task():
+        nat, aur = search_pkgs(query, inst_names)
+        emit(nat[:PER_SOURCE] + aur[:PER_SOURCE])
+
+    def fp_task():
+        emit(search_flatpak(query, f_ids)[:PER_SOURCE])
+
+    t1 = threading.Thread(target=pkgs_task)
+    t2 = threading.Thread(target=fp_task)
+    t1.start(); t2.start()
+    t1.join(); t2.join()
 
 
 main()

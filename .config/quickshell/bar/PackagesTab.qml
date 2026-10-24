@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
 
@@ -22,6 +23,14 @@ Item {
     id: tabRoot
 
     property string query: ""
+
+    // The query the cached `remote` results correspond to. Used to skip re-running
+    // (and killing) the remote search when the tab is re-shown with an unchanged
+    // query — that re-run is what lost results across sub-tab switches.
+    property string _lastRunQuery: ""
+    // Latest query requested while a stream is still running; started on exit
+    // (we never kill mid-stream — that raced and corrupted the NDJSON).
+    property string _pendingQ: ""
 
     property var selected: []        // array of selected package records
     property bool busy: false        // a transaction terminal is open
@@ -122,18 +131,36 @@ Item {
 
     // Remote search is only needed for a non-empty query; the installed view is
     // served straight from the persisted index (no subprocess).
-    function refresh() {
+    function refresh(force) {
         const q = query.trim()
         if (q === "") {
             remote = []
             remoteLoading = false
+            error = ""
+            _lastRunQuery = ""
+            _pendingQ = ""
+            queryProc._acc = []
             queryProc.running = false
             return
         }
+        // Re-entering the tab with the same query reuses cached results instead of
+        // re-issuing the subprocess (which raced with its own restart and surfaced
+        // a spurious failure). `force` re-runs after an install/uninstall tx.
+        if (!force && q === _lastRunQuery) return
+        // A run is already streaming: don't kill it. Stash the latest query and
+        // start it when the current one exits (serialized, race-free).
+        if (queryProc.running) { _pendingQ = q; return }
+        startSearch(q)
+    }
+
+    // Begin a fresh stream for `q`. Clears any prior results/accumulator.
+    function startSearch(q) {
         error = ""
         remoteLoading = true
+        remote = []
+        queryProc._acc = []
+        _lastRunQuery = q
         queryProc._q = q
-        queryProc.running = false
         queryProc.running = true
     }
 
@@ -169,19 +196,50 @@ Item {
     Process {
         id: queryProc
         property string _q: ""
+        property var _acc: []          // accumulated records for the current stream
         command: ["bash", Config.barDir + "/scripts/pkg-query.sh", "search", _q]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                queryProc.running = false
-                tabRoot.remoteLoading = false
-                try {
-                    const d = JSON.parse(text)
-                    tabRoot.remote = Array.isArray(d) ? d : []
-                    tabRoot.error = ""
-                } catch (e) {
-                    tabRoot.remote = []
-                    tabRoot.error = "Package search failed"
+        // NDJSON: the script streams one JSON array per backend as it finishes.
+        // Append each to _acc and republish `remote` so native/AUR render before
+        // Flathub lands. `packages` de-dupes + sorts the accumulated set.
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(line) {
+                const s = line.trim()
+                if (s === "") return
+                let d
+                try { d = JSON.parse(s) } catch (e) { return }
+                if (!Array.isArray(d)) return
+                // Capture scroll BEFORE republishing: a full model reassign makes
+                // ListView reset to originY=0, snapping the user to the top when a
+                // later source (Flathub) lands.
+                const prevY = list.contentY
+                queryProc._acc = queryProc._acc.concat(d)
+                tabRoot.remote = queryProc._acc
+                tabRoot.error = ""
+                // Re-apply the offset once the view has re-laid out (streaming
+                // appends grow the list downward, so the saved offset stays valid;
+                // clamp in case the new content is shorter than the viewport).
+                if (prevY > 0) {
+                    Qt.callLater(function() {
+                        list.contentY = Math.max(0,
+                            Math.min(prevY, list.contentHeight - list.height))
+                    })
                 }
+            }
+        }
+        onExited: function(exitCode) {
+            running = false
+            tabRoot.remoteLoading = false
+            // Genuine failure = no records AND non-zero exit, and only while a
+            // non-empty query is still the active one (a cleared/empty query that
+            // killed the run must not surface an error).
+            if (tabRoot.query.trim() !== "" && queryProc._acc.length === 0 && exitCode !== 0)
+                tabRoot.error = "Package search failed"
+            // Start the latest query typed while this run was in flight.
+            if (tabRoot._pendingQ !== "") {
+                const pq = tabRoot._pendingQ
+                tabRoot._pendingQ = ""
+                if (pq !== queryProc._q) tabRoot.startSearch(pq)
             }
         }
     }
@@ -197,7 +255,7 @@ Item {
             running = false
             tabRoot.busy = false
             PackagesIndex.rescan()   // refresh + persist the installed index
-            tabRoot.refresh()        // refresh any active remote search
+            tabRoot.refresh(true)    // re-run the active remote search after a tx
         }
     }
 
@@ -338,6 +396,18 @@ Item {
             spacing: 2
             boundsBehavior: Flickable.StopAtBounds
             model: tabRoot.packages
+
+            // Minimal material-you scrollbar: 3px, translucent primary, overlay,
+            // only when the list actually overflows (AsNeeded).
+            ScrollBar.vertical: ScrollBar {
+                policy: ScrollBar.AsNeeded
+                contentItem: Rectangle {
+                    implicitWidth: 3
+                    radius: 2
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                }
+                background: Rectangle { color: "transparent" }
+            }
 
             delegate: Rectangle {
                 id: row
