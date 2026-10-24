@@ -223,6 +223,14 @@ Item {
                         width:  Config.desktopIconSize + 25
                         height: Config.desktopIconSize + Config.desktopLabelSize + 16
 
+                        Rectangle {
+                            anchors.centerIn: diskIcon
+                            width:  diskIcon.width * 0.6
+                            height: diskIcon.height * 0.85
+                            radius: 10
+                            color:  Theme.cScrim; opacity: 0.1 
+                        }
+
                         // nf-md-harddisk glyph (PUA — keep the \u{} escape)
                         Text {
                             id: diskIcon
@@ -235,7 +243,7 @@ Item {
                             text:    "\u{F02CA}"
                             font.family: Config.fontFamily
                             font.pixelSize: Config.desktopIconSize * 0.9
-                            color:   Theme.cWc2
+                            color:   Theme.cInversePrimary
                         }
 
                         Rectangle {

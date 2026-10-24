@@ -4666,6 +4666,12 @@ PanelWindow {
                         property string editDesc:   ""
                         // Search / filter
                         property string kbFilter:   ""
+                        // Explicit descriptions for binds the line-parser can't read —
+                        // e.g. a multi-line `hl.bind("KEYS", function() ... end,
+                        // { description = "..." })`, whose description lives on a
+                        // different line than the `hl.bind("KEYS"` header. Keyed by the
+                        // exact bind string; only applied when the parsed desc is empty.
+                        property var kbDescOverrides: ({ "ALT + G": "Toggle game-mode" })
                         // Sub-tab index (mirrored to/from ccTabSettings)
                         property int kbSubIdx: ccTabSettings.activeKbSubTab
 
@@ -4679,7 +4685,11 @@ PanelWindow {
                             const keys = keysM[1]
                             // Description
                             const descM = line.match(/description\s*=\s*"([^"]*)"/)
-                            const desc  = descM ? descM[1] : ""
+                            let desc  = descM ? descM[1] : ""
+                            // Fall back to an explicit override for binds whose
+                            // description the single-line parser can't capture.
+                            if (desc === "" && kbTabRoot.kbDescOverrides[keys] !== undefined)
+                                desc = kbTabRoot.kbDescOverrides[keys]
                             // Command — try exec_cmd first, then whole second arg
                             let cmd = ""
                             const execM = line.match(/hl\.dsp\.exec_cmd\s*\(\s*"((?:[^"\\]|\\.)*)"\s*\)/)

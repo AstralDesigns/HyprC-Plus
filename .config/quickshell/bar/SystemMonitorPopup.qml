@@ -68,6 +68,12 @@ Item {
         const m = Math.floor((sec % 3600) / 60)
         return d > 0 ? d+"d "+h+"h "+m+"m" : h > 0 ? h+"h "+m+"m" : m+"m"
     }
+    // Clamp a device name to `n` chars, appending an ellipsis when truncated
+    // so shortened GPU/NPU names read clearly instead of cutting off mid-word.
+    function _trunc(s, n) {
+        if (!s) return ""
+        return s.length > n ? s.slice(0, n) + "\u2026" : s
+    }
 
     // ── Poller ────────────────────────────────────────────────────────────
     // Notes on separator choice:
@@ -286,7 +292,12 @@ Item {
         onTriggered: if (!sysProc.running) sysProc.running = true
     }
 
-    // ── Arc gauge ─────────────────────────────────────────────────────────
+    // ── Arc gauge (popup) — data inside the ring, colored icon in the title ───
+    // The ring interior carries the readout: the primary value large, plus a
+    // secondary measure (RAM/Swap usage, GPU temp, battery state) on a small line
+    // beneath it when present. The colored glyph moves out of the dial into the
+    // title row (icon + label) that sits right under the ring, which frees the
+    // larger popup ring to show bigger data text.
     component ArcGauge: Item {
         id: ag
         property real   value:    0
@@ -297,7 +308,7 @@ Item {
         property color  arcColor: Theme.cPrimary
 
         implicitWidth:  88
-        implicitHeight: 112
+        implicitHeight: 96
 
         Behavior on value { NumberAnimation { duration: 800; easing.type: Easing.OutCubic } }
 
@@ -308,13 +319,13 @@ Item {
 
             property real   _v:  ag.value
             property color  _ac: ag.arcColor
-            property string _gl: ag.glyph
             property string _vt: ag.valStr
+            property string _sb: ag.sub
 
             on_VChanged:  requestPaint()
             on_AcChanged: requestPaint()
-            on_GlChanged: requestPaint()
             on_VtChanged: requestPaint()
+            on_SbChanged: requestPaint()
             Component.onCompleted: requestPaint()
 
             onPaint: {
@@ -325,43 +336,142 @@ Item {
                 const onS = Theme.cOnSecondary
                 ctx.lineWidth = lw; ctx.lineCap = "round"
                 ctx.beginPath(); ctx.arc(cx, cy, r, S, E)
+                ctx.strokeStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.35).toString()
+                ctx.stroke()
+                if (_v > 0.005) {
+                    ctx.beginPath(); ctx.arc(cx, cy, r, S, S + _v*(E-S))
+                    ctx.strokeStyle = _ac.toString(); ctx.stroke()
+                }
+                // Data centered inside the ring — value large, optional sub small.
+                ctx.textAlign = "center"
+                if (_sb) {
+                    ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.94).toString()
+                    ctx.font = "bold 15px '" + Config.labelFont + "'"
+                    ctx.textBaseline = "bottom"
+                    ctx.fillText(_vt, cx, cy + 1)
+                    ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.94).toString()
+                    ctx.font = "11px '" + Config.labelFont + "'"
+                    ctx.textBaseline = "top"
+                    ctx.fillText(_sb, cx, cy + 2)
+                } else {
+                    ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.94).toString()
+                    ctx.font = "bold 15px '" + Config.labelFont + "'"
+                    ctx.textBaseline = "middle"
+                    ctx.fillText(_vt, cx, cy)
+                }
+            }
+        }
+
+        // Title row — colored glyph (at text height) just before the label,
+        // sitting close under the ring's bottom edge.
+        Row {
+            anchors.top: arcC.bottom; anchors.topMargin: 1
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 4
+            Text {
+                text: ag.glyph; color: Theme.cOnSecondary
+                font.pixelSize: 13; font.family: Config.fontFamily
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                text: ag.label.trim(); color: Theme.cOnSecondary
+                font.pixelSize: 12; font.family: Config.labelFont
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+    }
+
+
+    // ── Compact gauge (widget) — small ring, value inside, icon+label below ───
+    // Minimal grid cell: a small arc ring with the value centered inside it, then
+    // the metric's glyph (at text height, just before the label) and label on the
+    // next line, with an optional dim sub line. All text/value is cOnSecondary —
+    // only the arc stroke keeps the per-gauge matugen/wallust color. Cells are
+    // laid out 2-per-row with the same pair + odd-remainder logic as the popup.
+    component CompactGauge: Item {
+        id: cg
+        property real   value:    0
+        property string glyph:    ""
+        property string label:    ""
+        property string valStr:   "--"
+        property string sub:      ""
+        property color  arcColor: Theme.cPrimary
+        property int    ringSize: 52
+
+        implicitWidth:  88
+        implicitHeight: ringSize + 32
+
+        Behavior on value { NumberAnimation { duration: 800; easing.type: Easing.OutCubic } }
+
+        // Small arc ring with the value centered inside (cOnSecondary).
+        Canvas {
+            id: cgRing
+            anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter
+            width: cg.ringSize; height: cg.ringSize
+
+            property real   _v: cg.value
+            property color  _ac: cg.arcColor
+            property string _vt: cg.valStr
+            on_VChanged:  requestPaint()
+            on_AcChanged: requestPaint()
+            on_VtChanged: requestPaint()
+            Component.onCompleted: requestPaint()
+
+            onPaint: {
+                const ctx = getContext("2d")
+                ctx.clearRect(0, 0, width, height)
+                const cx = width/2, cy = height/2, lw = 5, r = cx - lw
+                const S = 0.75*Math.PI, E = 2.25*Math.PI
+                ctx.lineWidth = lw; ctx.lineCap = "round"
+                ctx.beginPath(); ctx.arc(cx, cy, r, S, E)
                 ctx.strokeStyle = Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35).toString()
                 ctx.stroke()
                 if (_v > 0.005) {
                     ctx.beginPath(); ctx.arc(cx, cy, r, S, S + _v*(E-S))
                     ctx.strokeStyle = _ac.toString(); ctx.stroke()
                 }
-                ctx.fillStyle = Qt.rgba(_ac.r, _ac.g, _ac.b, 0.90).toString()
-                ctx.font = "16px 'Symbols Nerd Font Mono'"
-                ctx.textAlign = "center"; ctx.textBaseline = "alphabetic"
-                ctx.fillText(_gl, cx, cy + 2)
-                ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.88).toString()
-                ctx.font = "bold 9px monospace"
-                ctx.textBaseline = "top"
-                ctx.fillText(_vt, cx, cy + 6)
+                ctx.fillStyle = Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.92).toString()
+                ctx.font = "bold " + Math.round(width*0.24) + "px '" + Config.labelFont + "'"
+                ctx.textAlign = "center"; ctx.textBaseline = "middle"
+                ctx.fillText(_vt, cx, cy)
             }
         }
 
-        Text {
-            anchors.top: arcC.bottom; anchors.topMargin: 2
+        // Icon (at text height, just before the label) + label, then optional sub.
+        Column {
+            anchors.top: cgRing.bottom; anchors.topMargin: 3
             anchors.horizontalCenter: parent.horizontalCenter
-            text: ag.sub; color: Theme.cOnSecondary
-            font.pixelSize: 11; font.family: Config.labelFont
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideRight; width: parent.width
-        }
-        Text {
-            anchors.bottom: parent.bottom; anchors.horizontalCenter: parent.horizontalCenter
-            text: ag.label; color: Theme.cOnSecondary
-            font.pixelSize: 12; font.family: Config.labelFont
-            horizontalAlignment: Text.AlignHCenter
+            spacing: 0
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 3
+                Text {
+                    text: cg.glyph; color: Theme.cOnSecondary
+                    font.pixelSize: 11; font.family: Config.fontFamily
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    text: cg.label.trim(); color: Theme.cOnSecondary
+                    font.pixelSize: 11; font.family: Config.labelFont
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+            Text {
+                visible: cg.sub !== ""
+                text: cg.sub
+                color: Theme.cOnSecondary
+                font.pixelSize: 10; font.family: Config.labelFont
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
         }
     }
+
 
     // ── Dials Card (used in popup panel and widget) ───────────────────────
     component GaugesCard: Rectangle {
         id: cardRoot
         required property var root
+        property bool compact: false
 
         radius: 16
         color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
@@ -416,9 +526,9 @@ Item {
                 list.push({
                     value: (npu.pct || 0) / 100,
                     glyph: "󰧑",
-                    label: "NPU",
+                    label: "NPU" + (npu.name ? " " + cardRoot.root._trunc(npu.name, 8) : ""),
                     valStr: (npu.pct || 0) + "%",
-                    sub: (npu.name || "NPU").slice(0, 8),
+                    sub: "",
                     arcColor: Theme.cWc1
                 })
             }
@@ -428,9 +538,9 @@ Item {
                 list.push({
                     value: (gpu.pct || 0) / 100,
                     glyph: gpu.isIgpu ? "󱤓" : "󰢮",
-                    label: gpu.isIgpu ? "iGPU" : "dGPU",
+                    label: (gpu.isIgpu ? "iGPU" : "dGPU") + (gpu.name ? " " + cardRoot.root._trunc(gpu.name, 8) : ""),
                     valStr: (gpu.pct || 0) + "%",
-                    sub: (gpu.temp > 0 ? gpu.temp + "°  " : "") + (gpu.name || "GPU").slice(0, 8),
+                    sub: gpu.temp > 0 ? gpu.temp + "°" : "",
                     arcColor: Theme.cWc3
                 })
             }
@@ -441,7 +551,7 @@ Item {
                 list.push({
                     value: bPct / 100,
                     glyph: bPct > 80 ? "󰁹" : bPct > 60 ? "󰂀" : bPct > 40 ? "󰁾" : bPct > 20 ? "󰁼" : "󰁺",
-                    label: bSta === "Full" ? "Battery " : bSta === "Charging" ? "Battery 󱐋" : "Battery",
+                    label: "Battery",
                     valStr: bPct + "%",
                     sub: bSta,
                     arcColor: bPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1) : bSta === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1) : Theme.cWc6
@@ -456,7 +566,9 @@ Item {
 
         implicitWidth: 88 * 2 + 12 + 24
         // Row stack + spacing + 24px internal padding (12 top + 12 bottom) + 28px footer
-        implicitHeight: _rowCount * 112 + Math.max(0, _rowCount - 1) * 10 + 24 + 28
+        implicitHeight: compact
+            ? (_rowCount * 84 + Math.max(0, _rowCount - 1) * 10 + 24 + 28)
+            : (_rowCount * 96 + Math.max(0, _rowCount - 1) * 10 + 24 + 28)
 
         ColumnLayout {
             id: dialsCol
@@ -468,11 +580,11 @@ Item {
                 bottomMargin: 12
             }
             width: 88 * 2 + 12
-            spacing: 10
+            spacing: compact ? 6 : 10
 
-            // 2-column paired rows
+            // 2-column paired rows (popup only)
             Repeater {
-                model: cardRoot._pairCount
+                model: cardRoot.compact ? 0 : cardRoot._pairCount
                 delegate: RowLayout {
                     Layout.alignment: Qt.AlignHCenter
                     spacing: 12
@@ -501,14 +613,64 @@ Item {
                 }
             }
 
-            // Odd remainder: single dial at the bottom, centered
+            // Odd remainder: single dial at the bottom, centered (popup only)
             Item {
-                visible: cardRoot._hasOddRemainder
+                visible: cardRoot._hasOddRemainder && !cardRoot.compact
                 Layout.alignment: Qt.AlignHCenter
                 implicitWidth: 88
-                implicitHeight: 112
+                implicitHeight: 96
 
                 ArcGauge {
+                    anchors.centerIn: parent
+                    readonly property var d: cardRoot._hasOddRemainder ? cardRoot._dials[cardRoot._dials.length - 1] : null
+                    value:    d ? d.value : 0
+                    glyph:    d ? d.glyph : ""
+                    label:    d ? d.label : ""
+                    valStr:   d ? d.valStr : "--"
+                    sub:      d ? d.sub : ""
+                    arcColor: d ? d.arcColor : Theme.cPrimary
+                }
+            }
+
+            // Compact 2-column paired rows (widget only) — same pairing as popup
+            Repeater {
+                model: cardRoot.compact ? cardRoot._pairCount : 0
+                delegate: RowLayout {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 12
+
+                    required property int index
+
+                    CompactGauge {
+                        readonly property var d: cardRoot._dials[index * 2]
+                        value:    d ? d.value : 0
+                        glyph:    d ? d.glyph : ""
+                        label:    d ? d.label : ""
+                        valStr:   d ? d.valStr : "--"
+                        sub:      d ? d.sub : ""
+                        arcColor: d ? d.arcColor : Theme.cPrimary
+                    }
+
+                    CompactGauge {
+                        readonly property var d: cardRoot._dials[index * 2 + 1]
+                        value:    d ? d.value : 0
+                        glyph:    d ? d.glyph : ""
+                        label:    d ? d.label : ""
+                        valStr:   d ? d.valStr : "--"
+                        sub:      d ? d.sub : ""
+                        arcColor: d ? d.arcColor : Theme.cPrimary
+                    }
+                }
+            }
+
+            // Compact odd remainder: single cell centered at the bottom (widget only)
+            Item {
+                visible: cardRoot.compact && cardRoot._hasOddRemainder
+                Layout.alignment: Qt.AlignHCenter
+                implicitWidth: 88
+                implicitHeight: 84
+
+                CompactGauge {
                     anchors.centerIn: parent
                     readonly property var d: cardRoot._hasOddRemainder ? cardRoot._dials[cardRoot._dials.length - 1] : null
                     value:    d ? d.value : 0
@@ -688,6 +850,7 @@ Item {
             GaugesCard {
                 id: widgetDials
                 root: scope
+                compact: true
                 anchors.centerIn: parent
             }
         }
