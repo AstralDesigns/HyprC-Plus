@@ -1297,7 +1297,7 @@ PanelWindow {
                             { icon: "󰔎", label: "Themes",    idx: 2 },
                             { icon: "󰍹", label: "Display",   idx: 3 },
                             { icon: "󰮫", label: "Menus",     idx: 4 },
-                            { icon: "󰍂", label: "SDDM",      idx: 5 },
+                            { icon: "󰍂", label: "Login",     idx: 5 },
                             { icon: "󰌌", label: "Keybinds",  idx: 7 },
                             { icon: "󰗘", label: "Animations", idx: 8 },
                             { icon: "󰍛", label: "System",     idx: 9 }
@@ -4400,7 +4400,7 @@ PanelWindow {
                             Layout.fillWidth: true
                             Layout.margins: 14
                             spacing: 6
-                            CCSection { text: " 󰍂 SDDM" }
+                            CCSection { text: " 󰍂 Greeter" }
 
                             CCEntryRow {
                                 label: "Header"
