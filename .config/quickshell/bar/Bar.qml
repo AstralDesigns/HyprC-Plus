@@ -546,7 +546,12 @@ PanelWindow {
                     return barBg._shellHorizontal ? (bar._isBottom ? (barBg.parent.height - barBg.height) : 0) : 0
                 })
                 shellCenter.y = Qt.binding(function() {
-                    return bar._isTop ? 0 : (shellCenter.parent.height - shellCenter.height)
+                    // Must mirror the declarative binding at shellCenter (arm-hug
+                    // geometry): offset off the active edge by Shell Pad so the
+                    // island stays flush with the arm's inner border in top and
+                    // bottom positions after a mode round-trip.
+                    return bar._isTop ? Config.shellArmThickness
+                                      : (shellCenter.parent.height - shellCenter.height - Config.shellArmThickness)
                 })
             }
             updateBarVisibility()
