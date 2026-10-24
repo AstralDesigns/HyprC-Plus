@@ -34,7 +34,8 @@ QtObject {
         _wipeProc.running = true
     }
 
-    // Restore one history entry to the clipboard (then close the launcher).
+    // Restore one history entry to the clipboard. The launcher stays
+    // open; hiding it is a manual action like on the other tabs.
     function restore(rawLine) {
         _decodeProc._line = rawLine
         _decodeProc.running = true

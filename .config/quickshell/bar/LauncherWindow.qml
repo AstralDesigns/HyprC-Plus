@@ -3223,8 +3223,9 @@ Item {
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
                                     onClicked: {
+                                        // Restore keeps the launcher open (agentic-workflow
+                                        // parity with app launches); hide is manual, like other tabs.
                                         ClipboardState.restore(modelData.raw)
-                                        HCCLauncherState.close()
                                     }
                                 }
                             }
@@ -4753,10 +4754,8 @@ Item {
                     if (rec) { win.launchApp(rec) }
                 } else if (win.tab === "clipboard") {
                     const list = win.clipFiltered
-                    if (list.length > 0) {
-                        ClipboardState.restore(list[0].raw)
-                        HCCLauncherState.close()
-                    }
+                    // Enter keeps the launcher open — same manual-hide policy as click.
+                    if (list.length > 0) ClipboardState.restore(list[0].raw)
                 }
             }
 
