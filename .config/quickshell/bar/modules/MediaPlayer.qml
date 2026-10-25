@@ -103,8 +103,12 @@ Item {
                 	MouseArea {
                     	    id: discMa; anchors.fill: parent; hoverEnabled: true
                     	    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    	    onEntered: if (Config.tipMedia) BarTipState.show("Left-click: Player\nRight-click: Widget", parent)
-                    	    onExited: BarTipState.hide(parent)
+                    	    // Anchor to the non-rotating activeMedia, NOT discContainer:
+                    	    // the disc spins via RotationAnimator and mapFromItem honours
+                    	    // an item's rotation, so anchoring to it made the tooltip
+                    	    // orbit (appear above/below/side depending on the angle).
+                    	    onEntered: if (Config.tipMedia) BarTipState.show("Left-click: Player\nRight-click: Widget", activeMedia)
+                    	    onExited: BarTipState.hide(activeMedia)
                     	    cursorShape: Qt.PointingHandCursor
                     	    onClicked: function(ev) {
                     	        if (ev.button === Qt.RightButton) {
