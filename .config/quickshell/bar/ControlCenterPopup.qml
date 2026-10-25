@@ -52,6 +52,9 @@ PanelWindow {
     // ── Scripts directory
     readonly property string scriptDir: Quickshell.env("HOME") + "/.config/quickshell/bar/scripts"
 
+    // X-Ray live state — preloaded on CC open so the Hyprland-tab pill matches reality.
+    property bool _xrayOn: false
+
     // ── Login-shell switcher: floating-installer kitty (mirrors UpdatesPopup) ──
     // CC lives in a Loader gated on ControlCenterState.visible, so hiding it
     // DESTROYS this component and Quickshell's Process destructor would kill
@@ -320,6 +323,7 @@ PanelWindow {
                 _layoutReader.running = true
                 _hyprStateReader.running = true
                 _kbLayoutReader.running  = true
+                _xrayStatusReader.running = true
                 ccWin._maybereVerify()
             }
         }
@@ -338,9 +342,21 @@ PanelWindow {
         _hyprStateReader.running   = true
         _kbLayoutReader.running    = true
         _winBgAlphaReader.running  = true
+        _xrayStatusReader.running  = true
         // Seed from persisted value immediately; reader overrides only on first-ever launch
         if (ccAppearanceSettings.winBgAlpha > 0)
             ccWin._winBgAlpha = ccAppearanceSettings.winBgAlpha
+    }
+
+    // X-Ray status reader (top-level so it runs on every CC open regardless of tab).
+    Process {
+        id: _xrayStatusReader
+        command: [scriptDir + "/hyprland-xray.sh", "status"]
+        running: false
+        stdout: SplitParser {
+            splitMarker: "\n"
+            onRead: function(l) { const t = l.trim(); if (t === "on" || t === "off") ccWin._xrayOn = (t === "on") }
+        }
     }
 
     // Read hyprland config values
@@ -3197,23 +3213,17 @@ PanelWindow {
 
                             // ── X-Ray toggle ──────────────────────────────────────
                             CCToggle {
-                                id: xrayToggle; label: "X-Ray"; value: false
-                                Component.onCompleted: _xrayStatus.running = true
+                                id: xrayToggle; label: "X-Ray"; value: ccWin._xrayOn
                                 onToggled: function(v) {
                                     _xrayToggleProc.command = [scriptDir + "/hyprland-xray.sh", "toggle"]
                                     _xrayToggleProc.running = true
                                 }
                             }
                             Process {
-                                id: _xrayStatus
-                                command: [scriptDir + "/hyprland-xray.sh", "status"]
+                                id: _xrayToggleProc
                                 running: false
-                                stdout: SplitParser {
-                                    splitMarker: "\n"
-                                    onRead: function(l) { xrayToggle.value = l.trim() === "on" }
-                                }
+                                onExited: { _xrayStatusReader.running = true }
                             }
-                            Process { id: _xrayToggleProc; running: false }
                             
                             CCSection { text: "Opacity & Blur" }
 
@@ -8616,8 +8626,10 @@ PanelWindow {
 
     // ── Toggle ───────────────────────────────────────────────────────────
     component CCToggle: RowLayout {
+        id: _tog
         property alias label: _tl.text
         property bool  value: false
+        property bool  _animate: false   // only slide/fade on user click, not async preload
         signal toggled(bool v)
 
         Layout.fillWidth: true; spacing: 8
@@ -8649,15 +8661,15 @@ PanelWindow {
                 color: value ? Theme.cPrimary : Theme.cPrimary
                 anchors.verticalCenter: parent.verticalCenter
                 x: value ? parent.width - width - 3 : 3
-                Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on x { enabled: _tog._animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                Behavior on color { enabled: _tog._animate; ColorAnimation { duration: 150 } }
             }
 
             MouseArea {
                 anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                onClicked: { value = !value; toggled(value) }
+                onClicked: { _tog._animate = true; value = !value; toggled(value) }
             }
-            Behavior on color { ColorAnimation { duration: 150 } }
+            Behavior on color { enabled: _tog._animate; ColorAnimation { duration: 150 } }
         }
     }
 

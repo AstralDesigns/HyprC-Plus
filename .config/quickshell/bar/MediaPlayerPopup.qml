@@ -22,6 +22,8 @@ Item {
     id: scope
 
     readonly property bool _active: MediaPlayerPopupState.visible || MediaPlayerPopupState.widgetVisible
+    // Cava is popup-only (widget omits the visualizer), so gate it on the popup.
+    readonly property bool _cavaWanted: scope._anyPlaying && MediaPlayerPopupState.visible
 
     property var  mediaPlayers:       []
     property int  activePlayerIndex:  0
@@ -358,33 +360,30 @@ Item {
         onExited: cavaRestartTimer.restart()
     }
     Timer { id: cavaRestartTimer; interval: 2000; repeat: false
-        onTriggered: if (scope._anyPlaying && !cavaProc.running) cavaProc.running = true }
+        onTriggered: if (scope._cavaWanted && !cavaProc.running) cavaProc.running = true }
 
     Connections {
         target: scope
-        function on_AnyPlayingChanged() {
-            if (scope._anyPlaying) {
-                if (!cavaProc.running) cavaProc.running = true
-            } else {
-                cavaProc.running = false
-                scope._cavaRaw = ""
-            }
-        }
         function on_PlayingChanged() {
             if (scope._playing && !posProc.running) posProc.running = true
         }
-        // Central lifecycle for popup + widget shared processes — either
-        // surface being open keeps playerctl/volume/cava running; both
-        // closing tears everything down.
+        // Shared popup+widget processes: playerctl + volume.
         function on_ActiveChanged() {
             if (scope._active) {
                 if (!pctlProc.running)    pctlProc.running    = true
                 if (!volReadProc.running) volReadProc.running = true
-                if (scope._anyPlaying && !cavaProc.running) cavaProc.running = true
             } else {
                 pctlProc.running    = false
-                cavaProc.running    = false
                 volReadProc.running = false
+            }
+        }
+        // Cava runs only while the popup is open and something is playing.
+        function on_CavaWantedChanged() {
+            if (scope._cavaWanted) {
+                if (!cavaProc.running) cavaProc.running = true
+            } else {
+                cavaProc.running = false
+                scope._cavaRaw = ""
             }
         }
     }
@@ -565,9 +564,11 @@ Item {
         property bool popupMode: false
 
         id: mediaCard
-        implicitWidth:  450
+        // Widget hugs content (popup keeps the disc column + equalizer).
+        implicitWidth:  popupMode ? 450 : (80 + controlsRow.implicitWidth)
         implicitHeight: Math.max(mediaCardRow.implicitHeight
-                                 + (popupMode ? eqColumn.height + 12 : 28), 198)
+                                 + (popupMode ? eqColumn.height + 12 : 31),
+                                 popupMode ? 198 : 0)
         width:  implicitWidth
         height: implicitHeight
 
@@ -741,7 +742,11 @@ Item {
 
             // ── Left Column: Title, Artist, Seek Bar, Volume, Controls ──
             ColumnLayout {
-                Layout.fillWidth: true
+                id: leftCol
+                // Widget caps to the controls-row width; popup stretches.
+                Layout.fillWidth: mediaCard.popupMode
+                Layout.maximumWidth: mediaCard.popupMode ? 16777215
+                                                          : controlsRow.implicitWidth
                 spacing: 6
 
                 // Title
@@ -931,6 +936,7 @@ Item {
 
                 // ── Playback Controls ─────────────────────────────────
                 RowLayout {
+                    id: controlsRow
                     spacing: 6
 
                     Repeater {
@@ -986,8 +992,9 @@ Item {
                 }
             }
 
-            // ── Right Column: Radial Cava + Spinning Album Disc ─────
+            // ── Right Column: Radial Cava + Spinning Album Disc (popup only) ─
             Item {
+                visible: mediaCard.popupMode
                 width: 170; height: 170
                 Layout.alignment: Qt.AlignVCenter
 

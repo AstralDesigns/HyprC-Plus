@@ -16,6 +16,7 @@ singleton NetworkPopupState 1.0 NetworkPopupState.qml
 singleton VolumePopupState 1.0 VolumePopupState.qml
 singleton SmallLauncherState 1.0 SmallLauncherState.qml
 singleton CalendarPopupState 1.0 CalendarPopupState.qml
+singleton EventsState 1.0 EventsState.qml
 singleton ClockPopupState 1.0 ClockPopupState.qml
 singleton MediaPlayerPopupState 1.0 MediaPlayerPopupState.qml
 singleton TrayMenuState 1.0 TrayMenuState.qml

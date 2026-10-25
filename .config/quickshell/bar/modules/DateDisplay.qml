@@ -4,8 +4,7 @@ import Quickshell.Io
 import ".."
 
 // Date-only module — sits right of the ControlCenter button in center island.
-// Left-click  → toggle CalendarPopup (inline calendar)
-// Right-click → launch gnome-calendar
+// Left-click → toggle CalendarPopup (calendar + events/holidays)
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
@@ -39,24 +38,14 @@ Item {
     opacity: ma.containsMouse ? 0.7 : 1.0
     Behavior on opacity { NumberAnimation { duration: 80 } }
 
-    // gnome-calendar for right-click
-    Process { id: calProc; command: ["gnome-calendar"]; running: false }
-
     MouseArea {
         id: ma
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
-        onEntered: if (Config.tipDate) BarTipState.show("Left-click: Calendar\nRight-click: Configure", parent)
+        onEntered: if (Config.tipDate) BarTipState.show("Left-click: Calendar", parent)
         onExited: BarTipState.hide(parent)
-        onClicked: function(mouse) {
-            if (mouse.button === Qt.RightButton) {
-                if (!calProc.running) calProc.running = true
-            } else {
-                CalendarPopupState.toggle()
-            }
-        }
+        onClicked: CalendarPopupState.toggle()
     }
 
     // Update at midnight

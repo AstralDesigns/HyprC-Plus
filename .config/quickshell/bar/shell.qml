@@ -103,6 +103,9 @@ ShellRoot {
         // Warm the persisted installed-packages index so the launcher Packages
         // tab has instant first availability (loads the cache, then refreshes).
         PackagesIndex.ensureStartupScan()
+        // Instantiate the events store so its reminder timer runs for the bar's
+        // lifetime (fires notify-send even while the Events popup is closed).
+        EventsState.init()
         // Resolve distro identity + brand logo once at boot so the ControlCenter
         // bar button, dock start badge and System tab render without a flash.
         DistroState.refresh()
