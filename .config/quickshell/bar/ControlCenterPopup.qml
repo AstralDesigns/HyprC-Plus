@@ -1469,7 +1469,7 @@ PanelWindow {
                                 Layout.rightMargin: -14
                                 spacing: 4
                                 Repeater {
-                                    model: ["General","Borders","Icons","Workspaces","Cava","Background","Visibility","Dock"]
+                                    model: ["General","Borders","Icons","Workspaces","Cava","Background","Dock","Visibility"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -2834,15 +2834,15 @@ PanelWindow {
 
                                 // ── Background ─────────────────────────────
                                 CCScrollPane {
-                                ColumnLayout {
+                                    ColumnLayout {
                                         width: parent.width; spacing: 5
 
                                         CCSection { text: "Island Pill Style" }
                                         Text {
                                             Layout.fillWidth: true
                                             text: "Background fill style → glass vs gradient tint"
-                                	    color: Theme.cOnSurf
-            				    opacity: 0.65
+                                    	    color: Theme.cOnSurf
+            				                opacity: 0.65
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             wrapMode: Text.Wrap
                                         }
@@ -2860,8 +2860,8 @@ PanelWindow {
                                         Text {
                                             Layout.fillWidth: true
                                             text: "Background fill style for the bar strip in 'bar' and 'shell' modes (shell paints the frame + center island), the 'tri' islands, and the dock."
-                                	    color: Theme.cOnSurf
-            				    opacity: 0.65
+                                    	    color: Theme.cOnSurf
+            				                opacity: 0.65
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             wrapMode: Text.Wrap
                                         }
@@ -2881,8 +2881,8 @@ PanelWindow {
                                         Text {
                                             Layout.fillWidth: true
                                             text: "0.05 = lowest transparency maintaining blur  •  1 = fully opaque"
-                                	    color: Theme.cOnSurf
-            				    opacity: 0.65
+                                    	    color: Theme.cOnSurf
+            				                opacity: 0.65
                                             font.family: Config.labelFont; font.pixelSize: 11
                                             wrapMode: Text.Wrap
                                         }
@@ -2898,7 +2898,45 @@ PanelWindow {
                                         CCSlider { label:"Distro";        from:0.05;to:1;stepSize:0.05;decimals:2; value:Config.distroBgOpacity;       onMoved:function(v){Config.distroBgOpacity=v} }
 
                                         Item { height: 10 }
+                                    }
                                 }
+
+                                // ── Dock ──────────────────────────────────
+                                ColumnLayout {
+                                    width: parent.width; spacing: 5
+
+                                    CCSection { text: "Screen Margin" }
+                                    CCSlider { label:"Edge Gap"; from:0;to:40;stepSize:1; value:Config.dockMargin; onMoved:function(v){Config.dockMargin=v} }
+
+                                    CCSection { text: "Position" }
+                                    RowLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 6
+                                        Repeater {
+                                            model: ["bottom", "left", "top", "right"]
+                                            delegate: CCPillBtn {
+                                                required property var modelData
+                                                text: (DockState.position === modelData ? "● " : "○ ") +
+                                                      modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                                                onClicked: DockState.setPosition(modelData)
+                                            }
+                                        }
+                                    }
+
+                                    CCSection { text: "Shape" }
+                                    CCSlider { label:"Icon Size"; from:18;to:60;stepSize:1; value:Config.dockIconSize; onMoved:function(v){Config.dockIconSize=v} }
+                                    CCSlider { label:"Start Icon ×"; from:0.5;to:1.5;stepSize:0.05;decimals:2; value:Config.dockStartIconScale; onMoved:function(v){Config.dockStartIconScale=v} }
+                                    CCSlider { label:"Trash Icon ×"; from:0.5;to:1.5;stepSize:0.05;decimals:2; value:Config.dockTrashIconScale; onMoved:function(v){Config.dockTrashIconScale=v} }
+                                    CCSlider { label:"Spacing"; from:0;to:30;stepSize:1; value:Config.dockButtonSpacing; onMoved:function(v){Config.dockButtonSpacing=v} }
+                                    CCSlider { label:"Padding"; from:8;to:20;stepSize:1; value:Config.dockInnerPadding; onMoved:function(v){Config.dockInnerPadding=v} }
+
+                                    CCSection { text: "Corner Radius" }
+                                    CCSlider { label:"Top-Left"; from:0;to:60;stepSize:1; value:Config.dockTopLeftRadius; onMoved:function(v){Config.dockTopLeftRadius=v} }
+                                    CCSlider { label:"Top-Right"; from:0;to:60;stepSize:1; value:Config.dockTopRightRadius; onMoved:function(v){Config.dockTopRightRadius=v} }
+                                    CCSlider { label:"Bottom-Left"; from:0;to:60;stepSize:1; value:Config.dockBottomLeftRadius; onMoved:function(v){Config.dockBottomLeftRadius=v} }
+                                    CCSlider { label:"Bottom-Right"; from:0;to:60;stepSize:1; value:Config.dockBottomRightRadius; onMoved:function(v){Config.dockBottomRightRadius=v} }
+
+                                    Item { height: 10 }
                                 }
 
                                 // ── Visibility ─────────────────────────────
@@ -2998,6 +3036,17 @@ PanelWindow {
                                             }
                                         }
 
+                                        CCSection { text: "Dock Auto-Hide" }
+                                        CCToggle { label:"Auto-Hide Dock"; value:Config.dockAutoHide; onToggled:function(v){Config.dockAutoHide=v} }
+                                        CCSlider {
+                                            label:"Delay (s)"
+                                            from:1;to:60;stepSize:1
+                                            value:Config.dockAutoHideDelay
+                                            opacity: Config.dockAutoHide ? 1.0 : 0.4
+                                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                                            onMoved:function(v){Config.dockAutoHideDelay=v}
+                                        }
+
                                         Item { height: 6 }
                                         CCSection { text: "Show / Hide Modules" }
                                         CCToggle { label:"Clock";          value:Config.showClock;          onToggled:function(v){Config.showClock=v} }
@@ -3021,57 +3070,6 @@ PanelWindow {
                                         CCToggle { label:"Wallpaper Btn";  value:Config.showWallpaper;      onToggled:function(v){Config.showWallpaper=v} }
                                         CCToggle { label:"System Tray";    value:Config.showTray;           onToggled:function(v){Config.showTray=v} }
                                         //CCToggle { label:"Distro Icon";    value:Config.showDistro;         onToggled:function(v){Config.showDistro=v} }
-
-                                        Item { height: 10 }
-                                    }
-                                }
-
-                                // ── Dock ──────────────────────────────────
-                                CCScrollPane {
-                                    ColumnLayout {
-                                        width: parent.width; spacing: 5
-
-                                        CCSection { text: "Screen Margin" }
-                                        CCSlider { label:"Edge Gap"; from:0;to:40;stepSize:1; value:Config.dockMargin; onMoved:function(v){Config.dockMargin=v} }
-
-                                        CCSection { text: "Dock Auto-Hide" }
-                                        CCToggle { label:"Auto-Hide Dock"; value:Config.dockAutoHide; onToggled:function(v){Config.dockAutoHide=v} }
-                                        CCSlider {
-                                            label:"Delay (s)"
-                                            from:1;to:60;stepSize:1
-                                            value:Config.dockAutoHideDelay
-                                            opacity: Config.dockAutoHide ? 1.0 : 0.4
-                                            Behavior on opacity { NumberAnimation { duration: 120 } }
-                                            onMoved:function(v){Config.dockAutoHideDelay=v}
-                                        }
-
-                                        CCSection { text: "Position" }
-                                        RowLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 6
-                                            Repeater {
-                                                model: ["bottom", "left", "top", "right"]
-                                                delegate: CCPillBtn {
-                                                    required property var modelData
-                                                    text: (DockState.position === modelData ? "● " : "○ ") +
-                                                          modelData.charAt(0).toUpperCase() + modelData.slice(1)
-                                                    onClicked: DockState.setPosition(modelData)
-                                                }
-                                            }
-                                        }
-
-                                        CCSection { text: "Shape" }
-                                        CCSlider { label:"Icon Size"; from:18;to:60;stepSize:1; value:Config.dockIconSize; onMoved:function(v){Config.dockIconSize=v} }
-                                        CCSlider { label:"Start Icon ×"; from:0.5;to:1.5;stepSize:0.05;decimals:2; value:Config.dockStartIconScale; onMoved:function(v){Config.dockStartIconScale=v} }
-                                        CCSlider { label:"Trash Icon ×"; from:0.5;to:1.5;stepSize:0.05;decimals:2; value:Config.dockTrashIconScale; onMoved:function(v){Config.dockTrashIconScale=v} }
-                                        CCSlider { label:"Spacing"; from:0;to:30;stepSize:1; value:Config.dockButtonSpacing; onMoved:function(v){Config.dockButtonSpacing=v} }
-                                        CCSlider { label:"Padding"; from:8;to:20;stepSize:1; value:Config.dockInnerPadding; onMoved:function(v){Config.dockInnerPadding=v} }
-
-                                        CCSection { text: "Corner Radius" }
-                                        CCSlider { label:"Top-Left"; from:0;to:60;stepSize:1; value:Config.dockTopLeftRadius; onMoved:function(v){Config.dockTopLeftRadius=v} }
-                                        CCSlider { label:"Top-Right"; from:0;to:60;stepSize:1; value:Config.dockTopRightRadius; onMoved:function(v){Config.dockTopRightRadius=v} }
-                                        CCSlider { label:"Bottom-Left"; from:0;to:60;stepSize:1; value:Config.dockBottomLeftRadius; onMoved:function(v){Config.dockBottomLeftRadius=v} }
-                                        CCSlider { label:"Bottom-Right"; from:0;to:60;stepSize:1; value:Config.dockBottomRightRadius; onMoved:function(v){Config.dockBottomRightRadius=v} }
 
                                         Item { height: 10 }
                                     }

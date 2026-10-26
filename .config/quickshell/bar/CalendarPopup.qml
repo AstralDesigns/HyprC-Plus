@@ -484,8 +484,8 @@ PanelWindow {
                                         visible: _isHoliday || _hasEvent
                                         anchors { horizontalCenter: parent.horizontalCenter
                                                   top: dayNum.bottom; topMargin: 2 }
-                                        Rectangle { width: 5; height: 5; radius: 3; visible: _isHoliday; color: Theme.cTertiary }
-                                        Rectangle { width: 5; height: 5; radius: 3; visible: _hasEvent; color: Theme.cPrimary }
+                                        Rectangle { width: 5; height: 5; radius: 99; visible: _isHoliday; color: Theme.cPrimaryContainer }
+                                        Rectangle { width: 5; height: 5; radius: 99; visible: _hasEvent; color: Theme.cSourceColor }
                                     }
 
                                     MouseArea {
