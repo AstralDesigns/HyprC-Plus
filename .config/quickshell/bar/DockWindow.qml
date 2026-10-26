@@ -1662,6 +1662,10 @@ PanelWindow {
 
         Rectangle {
             anchors.fill: parent
+            // Inset by the badge border: children paint on top of the parent
+            // Rectangle's own border ring, so a full-bleed gradient would
+            // cover (hide) it. Margin keeps the gradient inside the border.
+            anchors.margins: badge.border.width
             radius: parent.radius
             visible: Config.islandBgStyle === "gradient"
             gradient: Gradient {
