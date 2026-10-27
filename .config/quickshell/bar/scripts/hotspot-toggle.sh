@@ -126,10 +126,11 @@ do_on() {
         fi
         sleep 0.3
     done
-    ip link set "$AP" up
-    ip addr flush dev "$AP"
-    ip addr add 10.42.0.1/24 dev "$AP"
-
+    # Do NOT bring the iface up or assign an address here. On some ath10k parts
+    # (QCA6174), pre-setting IFF_UP makes hostapd's OWN bring-up fail with
+    # "Could not set interface flags (UP): Name not unique" and abort. hostapd must
+    # own the bring-up; we give the iface its gateway address only after it's up
+    # (below). Proven: leaving it DOWN and running hostapd reaches ENABLED/beacons.
     cat >"$HSCONF" <<EOF
 ctrl_interface=/var/run/hostapd
 interface=$AP
@@ -151,6 +152,18 @@ EOF
         rm -f "$NMEXCL" "$HSCONF"; kill -HUP "$(pidof NetworkManager)" 2>/dev/null || true
         exit 1; }
 
+    # hostapd owns the bring-up: it has now set the AP iface UP and is beaconing.
+    # Wait briefly for carrier, then give the iface its gateway address so the
+    # firewall + dnsmasq below have something to bind to.
+    hc=0
+    while ! ip -br link show "$AP" 2>/dev/null | grep -q 'LOWER_UP'; do
+        hc=$((hc+1)); [ "$hc" -ge 25 ] && break    # up to ~5s
+        sleep 0.2
+    done
+    ip link set "$AP" up
+    ip addr flush dev "$AP"
+    ip addr add 10.42.0.1/24 dev "$AP"
+
     sysctl -qw net.ipv4.ip_forward=1
     iptables -t nat   -C POSTROUTING -o "$upl" -j MASQUERADE 2>/dev/null || \
         iptables -t nat -A POSTROUTING -o "$upl" -j MASQUERADE
@@ -161,7 +174,7 @@ EOF
     # A default-deny INPUT (e.g. active UFW) otherwise drops the clients'
     # DHCPDISCOVER to 10.42.0.1:67, so they complete WPA but never get an IP and
     # loop in "connecting". Accept host-terminated traffic from the AP subnet
-    # (only associated stations can send on ap0). Inserted ahead of UFW's chains.
+    # (only associated stations can send on the AP iface). Inserted ahead of UFW's chains.
     iptables -C INPUT -i "$AP" -j ACCEPT 2>/dev/null || \
         iptables -I INPUT 1 -i "$AP" -j ACCEPT
 
