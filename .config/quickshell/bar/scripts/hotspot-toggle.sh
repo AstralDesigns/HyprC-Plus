@@ -30,7 +30,7 @@ hotspot_status() {
 }
 
 do_on() {
-    local upl ssid phych hsfreq hwmodeset pw psk ssid_raw phyinfo phyname hsctry
+    local upl ssid phych hsfreq hwmodeset pw psk ssid_raw phyinfo phyname hsctry hsdrv
     upl=$(nmcli -t -f DEVICE,STATE dev | awk -F: '$2=="connected" && $1!="lo"{print $1;exit}')
     [ -z "$upl" ] && { echo "no connected interface to share" >&2; exit 1; }
 
@@ -43,6 +43,17 @@ do_on() {
     [ -z "$phyname" ] && phyname=phy0
     # mirror the client band: <4900 MHz → 2.4 GHz (g), else 5 GHz (a)
     [ "${hsfreq:-0}" -lt 4900 ] && hwmodeset=g || hwmodeset=a
+    # Some drivers expose no AP interface mode at all — notably the proprietary
+    # Broadcom 'wl' (e.g. BCM4313: supported modes are only IBSS + managed).
+    # There hostapd can never start, so fail fast with a clear reason instead of
+    # creating ap0, silently bailing, and leaving the button not lighting up.
+    if ! iw phy "$phyname" info 2>/dev/null \
+          | awk '/Supported interface modes:/{f=1;next} f&&/Band/{f=0} f' \
+          | grep -qE '^[[:space:]]*\*[[:space:]]*AP[[:space:]]*$'; then
+        hsdrv=$(basename "$(readlink -f "/sys/class/net/$upl/device/driver" 2>/dev/null)" 2>/dev/null)
+        echo "This Wi-Fi card (driver: ${hsdrv:-unknown}) has no AP/hotspot mode — it can only be a client. To tether on Wi-Fi use a USB adapter (Intel/Atheros/MediaTek) or the open b43/brcmsmac driver." >&2
+        exit 1
+    fi
     # regulatory country so hostapd/firmware TX beacons+EAPOL on the 5 GHz
     # channel without falling back to a passive/scan state (a common cause of
     # clients looping in the WPA2 handshake on iwlwifi).
