@@ -432,7 +432,14 @@ PanelWindow {
                     // Hotspot toggle — shares the active uplink via a virtual AP
                     // (hotspot-toggle.sh) without dropping this device's own link.
                     Rectangle {
+                        id: hsBtn
                         width: 24; height: 24; radius: 6
+                        // Live tip text; shared OnSecondary/Primary tooltip surface.
+                        readonly property string tipText: StartMenuState.hotspotBusy
+                            ? "Hotspot — switching…"
+                            : (StartMenuState.hotspotOn
+                                ? "Hotspot ON — click to turn off"
+                                : "Hotspot OFF — click to turn on")
                         color: hsH.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65) : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
                         border.width: 1
                         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, StartMenuState.hotspotOn ? 0.9 : 0.55)
@@ -447,7 +454,15 @@ PanelWindow {
                         MouseArea { id: hsH; anchors.fill: parent; hoverEnabled: true
                             cursorShape: StartMenuState.hotspotBusy ? Qt.ArrowCursor : Qt.PointingHandCursor
                             enabled: !StartMenuState.hotspotBusy
+                            onEntered: BarTipState.show(hsBtn.tipText, hsBtn, 0, 10)
+                            onExited: BarTipState.hide(hsBtn)
                             onClicked: StartMenuState.toggleHotspot() }
+                        // Keep the tip current if the state flips while hovered
+                        // (e.g. right after a click, before the pointer moves).
+                        Connections { target: StartMenuState
+                            function onHotspotOnChanged() { if (hsH.containsMouse) BarTipState.refresh(hsBtn.tipText, hsBtn) }
+                            function onHotspotBusyChanged() { if (hsH.containsMouse) BarTipState.refresh(hsBtn.tipText, hsBtn) }
+                        }
                     }
                     // Rescan button — triggers nmcli dev wifi rescan then refreshes list.
                     // Only visible while the Wi-Fi section is expanded.

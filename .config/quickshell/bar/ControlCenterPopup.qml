@@ -6254,6 +6254,11 @@ PanelWindow {
                                         property bool dirty: false
                                         property bool saved: false
                                         property bool reveal: false
+                                        // WPA2 keys must be 8-63 chars. An empty key is legal
+                                        // (the toggle script falls back to its default), so only
+                                        // flag a non-empty value that is out of range.
+                                        readonly property bool keyBad: hsPassTI.text.length > 0
+                                            && (hsPassTI.text.length < 8 || hsPassTI.text.length > 63)
 
                                         function save() {
                                             hsWriteProc.command = ["bash", "-c",
@@ -6400,22 +6405,26 @@ PanelWindow {
                                             Layout.fillWidth: true; spacing: 10
                                             Rectangle {
                                                 Layout.preferredWidth: hsSaveLbl.implicitWidth + 24; height: 30; radius: 8
-                                                color: hsTab.dirty
+                                                color: hsTab.dirty && !hsTab.keyBad
                                                     ? (hsSaveMa.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.9) : Theme.cPrimary)
                                                     : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
                                                 Behavior on color { ColorAnimation { duration: 120 } }
                                                 Text { id: hsSaveLbl; anchors.centerIn: parent
                                                     text: "Save"
-                                                    color: hsTab.dirty ? Theme.cOnSecondary : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.5)
+                                                    color: hsTab.dirty && !hsTab.keyBad ? Theme.cOnSecondary : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.5)
                                                     font.family: Config.labelFont; font.pixelSize: 12; font.weight: Font.DemiBold }
                                                 MouseArea { id: hsSaveMa; anchors.fill: parent; hoverEnabled: true
-                                                    enabled: hsTab.dirty; cursorShape: hsTab.dirty ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                                    enabled: hsTab.dirty && !hsTab.keyBad; cursorShape: hsTab.dirty && !hsTab.keyBad ? Qt.PointingHandCursor : Qt.ArrowCursor
                                                     onClicked: hsTab.save() }
                                             }
                                             Text {
                                                 Layout.fillWidth: true
-                                                text: hsTab.saved ? "Saved — applies on next hotspot start" : ""
-                                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                                text: hsTab.keyBad
+                                                      ? "Key must be 8–63 characters"
+                                                      : (hsTab.saved ? "Saved — applies on next hotspot start" : "")
+                                                color: hsTab.keyBad
+                                                      ? Theme.cErr
+                                                      : Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
                                                 font.family: Config.labelFont; font.pixelSize: 11
                                             }
                                         }

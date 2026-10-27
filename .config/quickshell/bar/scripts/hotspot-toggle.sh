@@ -54,6 +54,14 @@ do_on() {
     ssid="${SSID_OVR:-${ssid_raw}-HS}"
     ssid="${ssid:0:32}"
     pw="${PASSWORD_OVR:-hyprcandy123}"
+    # WPA2 pre-shared keys must be 8-63 ASCII chars (or 64 raw hex). A shorter
+    # key makes wpa_passphrase emit no psk and hostapd then aborts with an empty
+    # PSK — the AP never broadcasts, so clients see nothing. Fail fast & clearly
+    # before touching the system.
+    if [ "${#pw}" -lt 8 ] || [ "${#pw}" -gt 63 ]; then
+        echo "hotspot password must be 8-63 characters (got ${#pw}); set PASSWORD_OVR in ~/.config/hyprcandy/hotspot.conf or use Control Center ▸ System ▸ Hotspot" >&2
+        exit 1
+    fi
     # wpa_passphrase emits a network={} block with a "#psk=" comment line and a
     # real "psk=<hex>" line; take only the hex (robust to spaces in the phrase).
     psk=$(wpa_passphrase "$ssid" "$pw" | sed -n 's/^[[:space:]]*psk=\(.*\)/\1/p' | head -1)
@@ -76,7 +84,6 @@ ssid=$ssid
 hw_mode=$hwmodeset
 channel=$phych
 country_code=$hsctry
-noscan=1
 ieee80211n=1
 ht_capab=
 wpa=2
@@ -85,7 +92,10 @@ rsn_pairwise=CCMP
 wpa_psk=$psk
 EOF
     hostapd -B -P /run/hyprcandy-hostapd.pid "$HSCONF" || {
-        echo "hostapd failed to start" >&2; exit 1; }
+        echo "hostapd failed to start (see $HSCONF)" >&2
+        ip link set "$AP" down 2>/dev/null; iw dev "$AP" del 2>/dev/null
+        rm -f "$NMEXCL" "$HSCONF"; kill -HUP "$(pidof NetworkManager)" 2>/dev/null || true
+        exit 1; }
 
     sysctl -qw net.ipv4.ip_forward=1
     iptables -t nat   -C POSTROUTING -o "$upl" -j MASQUERADE 2>/dev/null || \
