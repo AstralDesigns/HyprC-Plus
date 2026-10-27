@@ -31,7 +31,7 @@ hotspot_status() {
 
 do_on() {
     local upl ssid phych hsfreq hwmodeset pw psk ssid_raw phyinfo phyname hsctry
-    upl=$(nmcli -t -f DEVICE,STATE dev | awk -F: '$2=="connected" && $1!="lo"{print;exit}')
+    upl=$(nmcli -t -f DEVICE,STATE dev | awk -F: '$2=="connected" && $1!="lo"{print $1;exit}')
     [ -z "$upl" ] && { echo "no connected interface to share" >&2; exit 1; }
 
     phyinfo=$(iw dev "$upl" info)
@@ -104,6 +104,12 @@ EOF
         iptables -I FORWARD 1 -i "$AP" -o "$upl" -j ACCEPT
     iptables -C FORWARD -o "$AP" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || \
         iptables -I FORWARD 1 -o "$AP" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+    # A default-deny INPUT (e.g. active UFW) otherwise drops the clients'
+    # DHCPDISCOVER to 10.42.0.1:67, so they complete WPA but never get an IP and
+    # loop in "connecting". Accept host-terminated traffic from the AP subnet
+    # (only associated stations can send on ap0). Inserted ahead of UFW's chains.
+    iptables -C INPUT -i "$AP" -j ACCEPT 2>/dev/null || \
+        iptables -I INPUT 1 -i "$AP" -j ACCEPT
 
     pkill -f "dnsmasq -i $AP" 2>/dev/null
     # DHCP-only (--port=0: systemd-resolved already owns :53); advertise the AP
@@ -128,6 +134,7 @@ do_off() {
         iptables -D FORWARD -i "$AP" -o "$upl" -j ACCEPT 2>/dev/null
         iptables -D FORWARD -o "$AP" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null
     }
+    iptables -D INPUT -i "$AP" -j ACCEPT 2>/dev/null
     ip link set "$AP" down 2>/dev/null
     iw dev "$AP" del 2>/dev/null
     rm -f "$STATE" /run/hyprcandy-hostapd.pid /run/hyprcandy-hotspot.pid "$HSCONF"
