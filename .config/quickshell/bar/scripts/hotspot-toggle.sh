@@ -82,7 +82,27 @@ do_on() {
     kill -HUP "$(pidof NetworkManager)" 2>/dev/null || true
     sleep 1
 
-    iw dev "$AP" info >/dev/null 2>&1 || iw phy "$phyname" interface add "$AP" type __ap
+    # Reclaim a clean slate on EVERY start. A leftover ap0 — orphaned from a
+    # crashed run (a live hostapd keeps the iface, so a plain "iw del" can't
+    # remove it) or an older version — otherwise collides
+    # ("RTNETLINK: Name not unique on network") or eats the radio's AP slot.
+    # Kill our daemons first, then drop the iface and any stale ap0 rules, so
+    # turning the hotspot on is always self-healing. (This deliberately takes
+    # over ap0 — HyprCandy is the system-level hotspot.)
+    for pf in /run/hyprcandy-hostapd.pid /run/hyprcandy-hotspot.pid; do
+        [ -f "$pf" ] && kill "$(cat "$pf")" 2>/dev/null || true
+    done
+    pkill -f "hostapd .*$HSCONF" 2>/dev/null || true   # orphaned AP whose pidfile is gone
+    pkill -f "dnsmasq -i $AP" 2>/dev/null || true
+    if iw dev "$AP" info >/dev/null 2>&1; then
+        ip link set "$AP" down 2>/dev/null || true
+        iw dev "$AP" del 2>/dev/null || true
+    fi
+    iptables -D INPUT   -i "$AP" -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -i "$AP" -o "$upl" -j ACCEPT 2>/dev/null || true
+    iptables -D FORWARD -o "$AP" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+    rm -f /run/hyprcandy-hostapd.pid /run/hyprcandy-hotspot.pid
+    iw phy "$phyname" interface add "$AP" type __ap
     ip link set "$AP" up
     ip addr flush dev "$AP"
     ip addr add 10.42.0.1/24 dev "$AP"
