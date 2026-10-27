@@ -403,6 +403,28 @@ Item {
         if (sm.hotspotOn && !hotspotCountProc.running) hotspotCountProc.running = true
     }
 
+    // Seamless band switch: a single-radio card cannot keep the AP up while the
+    // STA hops to a new network (especially 2.4↔5G). When the user connects a new
+    // network while the hotspot is ON, we lower the AP first, connect, then raise
+    // the AP again on the new band (see netConnProc.onExited + hotspotResumeTimer).
+    property bool hotspotAutoResume: false
+    Process { id: hotspotOffForSwitchProc
+        command: [sm._scriptDir + "/hotspot-toggle.sh", "off"]
+        running: false
+        onExited: { sm.hotspotOn = false; sm.hotspotClients = 0
+            // AP is down; now safe to move the STA.
+            if (!netConnProc.running) netConnProc.running = true }
+    }
+    Process { id: hotspotResumeProc
+        command: [sm._scriptDir + "/hotspot-toggle.sh", "on"]
+        running: false
+        onExited: { if (!hotspotStatusProc.running) hotspotStatusProc.running = true }
+    }
+    // Short settle delay so NM finishes associating on the new channel before
+    // the AP is rebuilt (do_on mirrors the STA's new band/channel).
+    Timer { id: hotspotResumeTimer; interval: 1500; repeat: false
+        onTriggered: { if (!hotspotResumeProc.running) hotspotResumeProc.running = true } }
+
     property var _netBuf: []
     property var _savedNets: []
     property bool _forgetPending: false
@@ -497,6 +519,14 @@ Item {
             } else {
                 if (!netStatusProc.running) netStatusProc.running = true
             }
+            // Band switch triggered by this connect: rebuild the AP now the STA has
+            // (re)settled — on success OR failure, so the user is never left without
+            // the hotspot they had before the attempt.
+            if (sm.hotspotAutoResume) {
+                sm.hotspotAutoResume = false
+                sm.hotspotBusy = true
+                hotspotResumeTimer.restart()
+            }
         }
     }
     Timer { id: netConnFeedbackTimer; interval: 2500; repeat: false
@@ -514,9 +544,18 @@ Item {
     }
     function connectNetwork(ssid, password){
         const esc=ssid.replace(/'/g,"'\\''")
-        if(password) netConnProc._cmd="nmcli device wifi connect '"+esc+"' password '"+password.replace(/'/g,"'\\''")+"'"
-        else netConnProc._cmd="nmcli connection up '"+esc+"' 2>/dev/null || nmcli device wifi connect '"+esc+"'"
+        netConnProc._cmd = password
+            ? "nmcli device wifi connect '"+esc+"' password '"+password.replace(/'/g,"'\\''")+"'"
+            : "nmcli connection up '"+esc+"' 2>/dev/null || nmcli device wifi connect '"+esc+"'"
         sm.netConnecting_=true; sm.netConnectTarget=ssid; netConnProc._lastSSID=ssid
+        if (sm.hotspotOn) {
+            // Drop the AP now; netConnProc is started by hotspotOffForSwitchProc
+            // and the AP is auto-raised again once the connect attempt finishes.
+            sm.hotspotAutoResume = true
+            sm.hotspotBusy = true
+            if (!hotspotOffForSwitchProc.running) hotspotOffForSwitchProc.running = true
+            return
+        }
         if(!netConnProc.running) netConnProc.running=true
     }
 
