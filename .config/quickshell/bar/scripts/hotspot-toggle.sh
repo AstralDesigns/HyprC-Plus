@@ -99,15 +99,33 @@ do_on() {
     done
     pkill -f "hostapd .*$HSCONF" 2>/dev/null || true   # orphaned AP whose pidfile is gone
     pkill -f "dnsmasq -i $AP" 2>/dev/null || true
+    # Delete any existing iface and WAIT for the kernel/firmware to finish the
+    # teardown. On ath10k (QCA6174) wdev destruction is asynchronous and slow, so
+    # a rapid del->add races and returns EEXIST ("RTNETLINK: Name not unique")
+    # even though we just deleted it. Poll until it's gone, then retry the create.
     if iw dev "$AP" info >/dev/null 2>&1; then
         ip link set "$AP" down 2>/dev/null || true
         iw dev "$AP" del 2>/dev/null || true
     fi
+    hc=0
+    while iw dev "$AP" info >/dev/null 2>&1; do
+        hc=$((hc+1)); [ "$hc" -ge 30 ] && break    # up to ~6s for slow firmware
+        sleep 0.2
+    done
     iptables -D INPUT   -i "$AP" -j ACCEPT 2>/dev/null || true
     iptables -D FORWARD -i "$AP" -o "$upl" -j ACCEPT 2>/dev/null || true
     iptables -D FORWARD -o "$AP" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
     rm -f /run/hyprcandy-hostapd.pid /run/hyprcandy-hotspot.pid
-    iw phy "$phyname" interface add "$AP" type __ap
+    hc=0
+    until iw phy "$phyname" interface add "$AP" type __ap 2>/dev/null; do
+        hc=$((hc+1))
+        if [ "$hc" -ge 20 ]; then
+            echo "could not create $AP (firmware still busy?) — try toggling again" >&2
+            iw dev "$AP" del 2>/dev/null || true
+            exit 1
+        fi
+        sleep 0.3
+    done
     ip link set "$AP" up
     ip addr flush dev "$AP"
     ip addr add 10.42.0.1/24 dev "$AP"
