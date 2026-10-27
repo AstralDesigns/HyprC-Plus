@@ -158,7 +158,17 @@ case "${1:-status}" in
         [ "$(id -u)" = 0 ] || exec sudo -n "$0" toggle
         if [ -f "$STATE" ] && iw dev "$AP" info >/dev/null 2>&1; then do_off; else do_on; fi
         ;;
+    count)
+        # Number of associated stations on the AP. iw station dump needs root,
+        # so self-elevate like the mutation paths (covered by the sudo entry).
+        [ "$(id -u)" = 0 ] || exec sudo -n "$0" count
+        if [ -f "$STATE" ] && iw dev "$AP" info >/dev/null 2>&1; then
+            iw dev "$AP" station dump 2>/dev/null | grep -c '^Station'
+        else
+            echo 0
+        fi
+        ;;
     *)
-        echo "usage: $0 {status|on|off|toggle}" >&2; exit 2
+        echo "usage: $0 {status|on|off|toggle|count}" >&2; exit 2
         ;;
 esac

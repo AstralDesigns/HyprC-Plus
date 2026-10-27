@@ -438,7 +438,9 @@ PanelWindow {
                         readonly property string tipText: StartMenuState.hotspotBusy
                             ? "Hotspot — switching…"
                             : (StartMenuState.hotspotOn
-                                ? "Hotspot ON — click to turn off"
+                                ? ("Hotspot ON — " + StartMenuState.hotspotClients
+                                     + (StartMenuState.hotspotClients === 1 ? " device" : " devices")
+                                     + " · click to turn off")
                                 : "Hotspot OFF — click to turn on")
                         color: hsH.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65) : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
                         border.width: 1
@@ -454,7 +456,7 @@ PanelWindow {
                         MouseArea { id: hsH; anchors.fill: parent; hoverEnabled: true
                             cursorShape: StartMenuState.hotspotBusy ? Qt.ArrowCursor : Qt.PointingHandCursor
                             enabled: !StartMenuState.hotspotBusy
-                            onEntered: BarTipState.show(hsBtn.tipText, hsBtn, 0, 10)
+                            onEntered: { StartMenuState.pollHotspotClients(); BarTipState.show(hsBtn.tipText, hsBtn, 0, 10) }
                             onExited: BarTipState.hide(hsBtn)
                             onClicked: StartMenuState.toggleHotspot() }
                         // Keep the tip current if the state flips while hovered
@@ -462,6 +464,7 @@ PanelWindow {
                         Connections { target: StartMenuState
                             function onHotspotOnChanged() { if (hsH.containsMouse) BarTipState.refresh(hsBtn.tipText, hsBtn) }
                             function onHotspotBusyChanged() { if (hsH.containsMouse) BarTipState.refresh(hsBtn.tipText, hsBtn) }
+                            function onHotspotClientsChanged() { if (hsH.containsMouse) BarTipState.refresh(hsBtn.tipText, hsBtn) }
                         }
                     }
                     // Rescan button — triggers nmcli dev wifi rescan then refreshes list.

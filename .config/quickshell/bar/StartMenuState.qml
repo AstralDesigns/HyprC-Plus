@@ -368,13 +368,24 @@ Item {
     // via a NOPASSWD sudoers entry installed by the HyprCandy installer.
     property bool hotspotOn: false
     property bool hotspotBusy: false
+    property int hotspotClients: 0     // associated stations on the AP (tooltip)
     Process { id: hotspotStatusProc
         command: [sm._scriptDir + "/hotspot-toggle.sh", "status"]
         running: false
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
-            const t = l.trim(); if (t === "on" || t === "off") sm.hotspotOn = (t === "on")
+            const t = l.trim()
+            if (t === "on" || t === "off") { sm.hotspotOn = (t === "on"); if (t === "off") sm.hotspotClients = 0 }
         }}
-        onExited: sm.hotspotBusy = false
+        onExited: { sm.hotspotBusy = false
+            // Refresh the station count only while the AP is actually up.
+            if (sm.hotspotOn && !hotspotCountProc.running) hotspotCountProc.running = true }
+    }
+    Process { id: hotspotCountProc
+        command: [sm._scriptDir + "/hotspot-toggle.sh", "count"]
+        running: false
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
+            const n = parseInt(l.trim(), 10); if (!isNaN(n)) sm.hotspotClients = n
+        }}
     }
     Process { id: hotspotToggleProc
         command: [sm._scriptDir + "/hotspot-toggle.sh", "toggle"]
@@ -385,6 +396,11 @@ Item {
         if (sm.hotspotBusy) return
         sm.hotspotBusy = true
         hotspotToggleProc.running = true
+    }
+    // Re-query the station count (used when the hotspot tooltip is hovered so
+    // the number is fresh, not just the value from the last menu open).
+    function pollHotspotClients() {
+        if (sm.hotspotOn && !hotspotCountProc.running) hotspotCountProc.running = true
     }
 
     property var _netBuf: []
