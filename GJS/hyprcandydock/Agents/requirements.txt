@@ -1,6 +1,6 @@
 fastapi
 pydantic
 motor
-pymongo[srv]
+pymongo
 httpx
 python-multipart
