@@ -40,6 +40,7 @@ Item {
         if (!btStatusProc.running) btStatusProc.running = true
         if (!nightLightStatusProc.running) nightLightStatusProc.running = true
         if (!netRateProc.running) netRateProc.running = true
+        if (!sm.hotspotBusy && !hotspotStatusProc.running) hotspotStatusProc.running = true
     }
 
     // ── Network scan state ──────────────────────────────────────────────
@@ -360,6 +361,30 @@ Item {
             ? "nmcli radio wifi off"
             : "nmcli radio wifi on"
         if(!netRadioSetProc.running) netRadioSetProc.running=true
+    }
+
+    // ── Hotspot toggle (virtual-AP tethering via hotspot-toggle.sh) ──────
+    // Status reads are unprivileged; on/off self-elevate inside the script
+    // via a NOPASSWD sudoers entry installed by the HyprCandy installer.
+    property bool hotspotOn: false
+    property bool hotspotBusy: false
+    Process { id: hotspotStatusProc
+        command: [sm._scriptDir + "/hotspot-toggle.sh", "status"]
+        running: false
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
+            const t = l.trim(); if (t === "on" || t === "off") sm.hotspotOn = (t === "on")
+        }}
+        onExited: sm.hotspotBusy = false
+    }
+    Process { id: hotspotToggleProc
+        command: [sm._scriptDir + "/hotspot-toggle.sh", "toggle"]
+        running: false
+        onExited: { if(!hotspotStatusProc.running) hotspotStatusProc.running = true }
+    }
+    function toggleHotspot() {
+        if (sm.hotspotBusy) return
+        sm.hotspotBusy = true
+        hotspotToggleProc.running = true
     }
 
     property var _netBuf: []

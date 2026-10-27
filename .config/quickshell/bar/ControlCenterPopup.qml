@@ -877,6 +877,7 @@ PanelWindow {
         property int activeTab: 1  // Default to Hyprland tab (index 1)
         property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
         property int activeKbSubTab:  0  // Remembered Keybinds sub-tab (0 = View, 1 = Edit)
+        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot)
     }
     Settings {
         id: ccLocSettings
@@ -5820,11 +5821,71 @@ PanelWindow {
                     }
 
                     // ── TAB 9: System ────────────────────────────────────────
-                    CCScrollPane {
+                    Item {
+                        clip: true
                         ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.margins: 14
-                            spacing: 10
+                            anchors.fill: parent
+                            anchors.margins: 14
+                            spacing: 6
+
+                            // System sub-tab header row (mirrors the Bar sub-tabs)
+                            Row {
+                                Layout.fillWidth: true
+                                spacing: 4
+                                Repeater {
+                                    model: ["Info", "Hotspot"]
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        required property int index
+                                        property int _subIdx: sysSubStack.currentIndex
+                                        height: 30
+                                        implicitWidth: _sysTabLbl.implicitWidth + 18
+                                        radius: 9
+                                        color: _subIdx === index
+                                            ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                                                      Theme.cSurfaceTint.b, 0.8)
+                                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                      Theme.cOnSecondary.b, 0.3)
+                                        border.width: _subIdx === index ? 1 : 0
+                                        border.color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                      Theme.cInversePrimary.b, 0.42)
+                                        Text {
+                                            id: _sysTabLbl; anchors.centerIn: parent
+                                            text: modelData
+                                            color: (_subIdx === index ? Theme.cOnSecondary : Theme.cPrimary)
+                                            font.family: Config.labelFont; font.pixelSize: 12
+                                            font.weight: _subIdx === index ? 600 : 400
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                            onClicked: {
+                                                sysSubStack.currentIndex = index
+                                                ccTabSettings.activeSysSubTab = index
+                                            }
+                                        }
+                                        Behavior on color { ColorAnimation { duration: 120 } }
+                                    }
+                                }
+                            }
+
+                            // Separator
+                            Rectangle {
+                                Layout.fillWidth: true; height: 1
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                            }
+
+                            // System sub-tab content
+                            StackLayout {
+                                id: sysSubStack
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                currentIndex: ccTabSettings.activeSysSubTab
+
+                                // ── Info sub-tab ─────────────────────────────
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        width: parent.width
+                                        spacing: 10
 
                             CCSection { text: " 󰍛 System" }
 
@@ -6176,7 +6237,193 @@ PanelWindow {
                                 SysChip { glyph: "󰟀"; label: "Host";     value: sysInfoRoot.info.HOST || "—" }
                             }
 
-                            Item { height: 4 }
+                                        Item { height: 4 }
+                                    }
+                                }
+
+                                // ── Hotspot sub-tab ──────────────────────────
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        id: hsTab
+                                        width: parent.width
+                                        spacing: 12
+
+                                        property string ssid: ""
+                                        property string pass: ""
+                                        property bool loaded: false
+                                        property bool dirty: false
+                                        property bool saved: false
+                                        property bool reveal: false
+
+                                        function save() {
+                                            hsWriteProc.command = ["bash", "-c",
+                                                "umask 022; mkdir -p \"$HOME/.config/hyprcandy\"; " +
+                                                "{ printf '# HyprCandy hotspot credentials. Edit here or Control Center \u25b8 System \u25b8 Hotspot.\\n'; " +
+                                                "printf 'SSID_OVR=%q\\n' \"$0\"; printf 'PASSWORD_OVR=%q\\n' \"$1\"; } " +
+                                                "> \"$HOME/.config/hyprcandy/hotspot.conf\"",
+                                                hsSsidTI.text.trim(), hsPassTI.text]
+                                            hsWriteProc.running = true
+                                        }
+
+                                        // Read the existing config (first time the sub-tab opens).
+                                        // Source it exactly like hotspot-toggle.sh does, so the
+                                        // editor shows the literal values the AP will use (handles
+                                        // the %q escaping the Save writes).
+                                        Process {
+                                            id: hsReadProc
+                                            running: false
+                                            command: ["bash", "-c",
+                                                "SSID_OVR=\"\" PASSWORD_OVR=\"\"; " +
+                                                ". \"$HOME/.config/hyprcandy/hotspot.conf\" 2>/dev/null; " +
+                                                "printf 'SSID\\t%s\\nPASS\\t%s\\n' \"$SSID_OVR\" \"$PASSWORD_OVR\""]
+                                            stdout: SplitParser {
+                                                splitMarker: "\n"
+                                                onRead: function (line) {
+                                                    if (line.startsWith("SSID\t"))      hsTab.ssid = line.slice(5)
+                                                    else if (line.startsWith("PASS\t")) hsTab.pass = line.slice(5)
+                                                }
+                                            }
+                                            onExited: {
+                                                hsSsidTI.text = hsTab.ssid
+                                                hsPassTI.text = hsTab.pass
+                                                hsTab.loaded = true
+                                                hsTab.dirty  = false
+                                            }
+                                        }
+                                        Process {
+                                            id: hsWriteProc
+                                            running: false
+                                            onExited: { hsTab.saved = true; hsTab.dirty = false; hsTab.loaded = true }
+                                        }
+                                        Connections {
+                                            target: sysSubStack
+                                            function onCurrentIndexChanged() {
+                                                if (sysSubStack.currentIndex === 1 && !hsTab.loaded && !hsReadProc.running)
+                                                    hsReadProc.running = true
+                                            }
+                                        }
+
+                                        CCSection { text: "  Hotspot" }
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Set the network name and password this machine broadcasts when the hotspot is on. " +
+                                                  "Changes apply the next time the hotspot is turned on. Leave the name blank to " +
+                                                  "auto-name it from your current network."
+                                            wrapMode: Text.WordWrap
+                                            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.7)
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                        }
+
+                                        // Name field
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Name"; color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 46 }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: hsSsidTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: hsSsidTI
+                                                    anchors { fill: parent; margins: 8 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: { hsTab.dirty = true; hsTab.saved = false }
+                                                }
+                                                Text {
+                                                    visible: hsSsidTI.text.length === 0 && !hsSsidTI.activeFocus
+                                                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    text: "Auto (<network>-HS)"; color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.4)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+
+                                        // Key field + reveal toggle
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Key"; color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 46 }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: hsPassTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: hsPassTI
+                                                    anchors { left: parent.left; right: hsReveal.left; top: parent.top; bottom: parent.bottom }
+                                                    anchors.leftMargin: 8; anchors.rightMargin: 30
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                                                    echoMode: hsTab.reveal ? TextInput.Normal : TextInput.Password
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: { hsTab.dirty = true; hsTab.saved = false }
+                                                }
+                                                Rectangle {
+                                                    id: hsReveal
+                                                    anchors { right: parent.right; rightMargin: 4; verticalCenter: parent.verticalCenter }
+                                                    width: 22; height: 22; radius: 5
+                                                    color: hsRevealMa.containsMouse
+                                                        ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.6) : "transparent"
+                                                    Text {
+                                                        anchors.centerIn: parent
+                                                        text: hsTab.reveal ? "\u{F06E}" : "\u{F070}"
+                                                        font.family: Config.fontFamily; font.pixelSize: 12
+                                                        color: Theme.cPrimary
+                                                    }
+                                                    MouseArea { id: hsRevealMa; anchors.fill: parent; hoverEnabled: true
+                                                        cursorShape: Qt.PointingHandCursor
+                                                        onClicked: hsTab.reveal = !hsTab.reveal }
+                                                }
+                                                Text {
+                                                    visible: hsPassTI.text.length === 0 && !hsPassTI.activeFocus
+                                                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    text: "hyprcandy123 (default)"; color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.4)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+
+                                        // Save row
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 10
+                                            Rectangle {
+                                                Layout.preferredWidth: hsSaveLbl.implicitWidth + 24; height: 30; radius: 8
+                                                color: hsTab.dirty
+                                                    ? (hsSaveMa.containsMouse ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.9) : Theme.cPrimary)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                Behavior on color { ColorAnimation { duration: 120 } }
+                                                Text { id: hsSaveLbl; anchors.centerIn: parent
+                                                    text: "Save"
+                                                    color: hsTab.dirty ? Theme.cOnSecondary : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.5)
+                                                    font.family: Config.labelFont; font.pixelSize: 12; font.weight: Font.DemiBold }
+                                                MouseArea { id: hsSaveMa; anchors.fill: parent; hoverEnabled: true
+                                                    enabled: hsTab.dirty; cursorShape: hsTab.dirty ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                                    onClicked: hsTab.save() }
+                                            }
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: hsTab.saved ? "Saved — applies on next hotspot start" : ""
+                                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                                font.family: Config.labelFont; font.pixelSize: 11
+                                            }
+                                        }
+
+                                        Item { height: 4 }
+                                    }
+                                }
+                            }
                         }
                     }
                 }

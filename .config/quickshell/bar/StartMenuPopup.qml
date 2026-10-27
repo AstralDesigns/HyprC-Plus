@@ -429,6 +429,26 @@ PanelWindow {
                         color: Theme.cOnSurf; font.pixelSize: 11; opacity: 0.75
                         elide: Text.ElideRight
                     }
+                    // Hotspot toggle — shares the active uplink via a virtual AP
+                    // (hotspot-toggle.sh) without dropping this device's own link.
+                    Rectangle {
+                        width: 24; height: 24; radius: 6
+                        color: hsH.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65) : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                        border.width: 1
+                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, StartMenuState.hotspotOn ? 0.9 : 0.55)
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Behavior on border.color { ColorAnimation { duration: 150 } }
+                        Text {
+                            anchors.centerIn: parent; text: "\u{F1EB}"; font.pixelSize: 13; font.family: Config.fontFamily
+                            color: StartMenuState.hotspotOn ? Theme.cPrimary : Theme.cSurfaceTint
+                            opacity: StartMenuState.hotspotBusy ? 0.4 : 1.0
+                            Behavior on color { ColorAnimation { duration: 120 } }
+                        }
+                        MouseArea { id: hsH; anchors.fill: parent; hoverEnabled: true
+                            cursorShape: StartMenuState.hotspotBusy ? Qt.ArrowCursor : Qt.PointingHandCursor
+                            enabled: !StartMenuState.hotspotBusy
+                            onClicked: StartMenuState.toggleHotspot() }
+                    }
                     // Rescan button — triggers nmcli dev wifi rescan then refreshes list.
                     // Only visible while the Wi-Fi section is expanded.
                     Rectangle {
