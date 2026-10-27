@@ -1,6 +1,6 @@
 #!/bin/bash
 # HyprCandy Wi-Fi hotspot — keeps the client Wi-Fi connection up and opens a
-# virtual AP (ap0) on the SAME control channel (single-radio constraint),
+# virtual AP (hc-hotspot) on the SAME control channel (single-radio constraint),
 # NAT'd through the active uplink. hostapd does the WPA2 state machine,
 # dnsmasq the DHCP. Status reads are unprivileged; on/off self-elevate via
 # `sudo` (a NOPASSWD sudoers entry for this script is installed by the
@@ -8,7 +8,12 @@
 # ~/.config/hyprcandy/hotspot.conf:  SSID_OVR / PASSWORD_OVR
 set -uo pipefail
 
-AP="ap0"
+# Private, HyprCandy-only interface name. We deliberately do NOT use the
+# conventional "ap0": NetworkManager auto-creates/reclaims ap0 for its own
+# hotspot connection on reload, which races our script and yields
+# "RTNETLINK: Name not unique on network" (observed on an ath10k/QCA6174 box
+# even with stale-iface cleanup present). A unique name collides with nothing.
+AP="hc-hotspot"
 STATE="/run/hyprcandy-hotspot.state"    # "<upstream> <ssid>" while active
 NMEXCL="/etc/NetworkManager/conf.d/99-hyprcandy-hotspot.conf"
 HSCONF="/tmp/hyprcandy-hostapd.conf"    # fixed path; the on/off branch runs as root
@@ -82,13 +87,13 @@ do_on() {
     kill -HUP "$(pidof NetworkManager)" 2>/dev/null || true
     sleep 1
 
-    # Reclaim a clean slate on EVERY start. A leftover ap0 — orphaned from a
-    # crashed run (a live hostapd keeps the iface, so a plain "iw del" can't
-    # remove it) or an older version — otherwise collides
+    # Reclaim a clean slate on EVERY start. A leftover hc-hotspot — orphaned
+    # from a crashed run (a live hostapd keeps the iface, so a plain "iw del"
+    # can't remove it) or an older version — otherwise collides
     # ("RTNETLINK: Name not unique on network") or eats the radio's AP slot.
-    # Kill our daemons first, then drop the iface and any stale ap0 rules, so
-    # turning the hotspot on is always self-healing. (This deliberately takes
-    # over ap0 — HyprCandy is the system-level hotspot.)
+    # Kill our daemons first, then drop the iface and any stale rules, so
+    # turning the hotspot on is always self-healing. (Uses our private
+    # hc-hotspot name, so we never touch a foreign/NM-owned ap0.)
     for pf in /run/hyprcandy-hostapd.pid /run/hyprcandy-hotspot.pid; do
         [ -f "$pf" ] && kill "$(cat "$pf")" 2>/dev/null || true
     done
