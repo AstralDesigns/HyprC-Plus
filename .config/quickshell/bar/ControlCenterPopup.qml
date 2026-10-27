@@ -5887,8 +5887,6 @@ PanelWindow {
                                         width: parent.width
                                         spacing: 10
 
-                            CCSection { text: " 󰍛 System" }
-
                             // ── Fetch system info once when this tab becomes active ──
                             Item {
                                 id: sysInfoRoot
@@ -6307,9 +6305,7 @@ PanelWindow {
                                                     hsReadProc.running = true
                                             }
                                         }
-
-                                        CCSection { text: "  Hotspot" }
-
+                                        
                                         Text {
                                             Layout.fillWidth: true
                                             text: "Set the network name and password this machine broadcasts when the hotspot is on. " +
