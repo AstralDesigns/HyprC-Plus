@@ -546,10 +546,10 @@ PanelWindow {
                         }
                         Rectangle {
                             visible: !calWin._formOpen
-                            implicitWidth: addTxt.implicitWidth + 14; implicitHeight: 22; radius: 11
-                            color: Theme.cPrimary
-                            Text { id: addTxt; anchors.centerIn: parent; text: "+ Add"
-                                color: Theme.cOnPrimary; font.family: Config.labelFont; font.pixelSize: 11 }
+                            implicitWidth: addTxt.implicitWidth + 14; implicitHeight: 22; radius: 99
+                            color: Theme.cOnSecondary
+                            Text { id: addTxt; anchors.centerIn: parent; text: "+Add"
+                                color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 11 }
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
                                 onClicked: calWin.openNew() }
                         }
