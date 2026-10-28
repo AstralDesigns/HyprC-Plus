@@ -1313,13 +1313,13 @@ PanelWindow {
                     // ── Nav buttons ───────────────────────────────────────
                     Repeater {
                         model: [
-                            { icon: "", label: "Hyprland",  idx: 1 },
-                            { icon: "󰇜", label: "Bar",       idx: 0 },
-                            { icon: "󰔎", label: "Themes",    idx: 2 },
-                            { icon: "󰍹", label: "Display",   idx: 3 },
-                            { icon: "󰮫", label: "Menus",     idx: 4 },
-                            { icon: "󰍂", label: "Login",     idx: 5 },
-                            { icon: "󰌌", label: "Keybinds",  idx: 7 },
+                            { icon: "", label: "Hyprland",   idx: 1 },
+                            { icon: "󰇜", label: "Bar",        idx: 0 },
+                            { icon: "󰔎", label: "Themes",     idx: 2 },
+                            { icon: "󰍹", label: "Display",    idx: 3 },
+                            { icon: "󰮫", label: "Menus",      idx: 4 },
+                            { icon: "󰍂", label: "Greeter",    idx: 5 },
+                            { icon: "󰌌", label: "Keybinds",   idx: 7 },
                             { icon: "󰗘", label: "Animations", idx: 8 },
                             { icon: "󰍛", label: "System",     idx: 9 }
                         ]
@@ -3090,8 +3090,6 @@ PanelWindow {
                             Layout.margins: 14
                             spacing: 6
 
-                            CCSection { text: "  Hyprland" }
-
                             // ── Desktop icon layer ────────────────────────────────
                             CCSection { text: "Desktop" }
                             CCToggle { label:"Show Icons";  value:Config.desktopVisible;   onToggled:function(v){ Config.desktopVisible=v } }
@@ -3693,10 +3691,9 @@ PanelWindow {
                             Layout.fillWidth: true
                             Layout.margins: 14
                             spacing: 6
-                            CCSection { text: " 󰔎 Matugen Themes" }
 
                             // ── Color Generation toggle ────────────────────────────
-                            CCSection { text: "Color Generation" }
+                            CCSection { text: "󰔎 Color Generation" }
                             RowLayout {
                                 Layout.fillWidth: true; spacing: 8
 
@@ -4241,10 +4238,9 @@ PanelWindow {
                             Layout.fillWidth: true
                             Layout.margins: 14
                             spacing: 6
-                            CCSection { text: " 󰮫 Menus" }
 
                             // ── Application Launcher ──────────────────────────────
-                            CCSection { text: "Application Launcher" }
+                            CCSection { text: "󰮫 Application Launcher" }
 
                             // Search bar width fraction (0.2–1.0) shown as a slider
                             // Sliders bind directly to Config.launcher* — the qs launcher
@@ -4351,7 +4347,6 @@ PanelWindow {
                             Layout.fillWidth: true
                             Layout.margins: 14
                             spacing: 6
-                            CCSection { text: " 󰍂 Greeter" }
 
                             CCEntryRow {
                                 label: "Header"
