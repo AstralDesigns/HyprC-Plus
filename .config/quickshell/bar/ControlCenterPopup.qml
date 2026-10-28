@@ -1200,15 +1200,12 @@ PanelWindow {
                     spacing: 5
 
                     // ── User info card ─────────────────────────────────────
+                    // Transparent container (no panel bg / scrim border): the avatar
+                    // floats free at the top, followed by the clickable username chip.
                     Rectangle {
                         Layout.fillWidth: true
                         height: 125
-                        radius: 16
-                        color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                               Theme.cSurfaceTint.b, 0.8)
-                        border.width: 2
-                        border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g,
-                                              Theme.cScrim.b, 0.85)
+                        color: "transparent"
 
                         ColumnLayout {
                             anchors.centerIn: parent
@@ -1266,15 +1263,49 @@ PanelWindow {
                                 }
                             }
 
-                            Text {
-                                id: userNameText
+                            // Username chip — OnSecondary @0.3 pill (→0.5 on hover),
+                            // cWc5 user glyph + SurfaceTint text. Click opens the User tab.
+                            Rectangle {
+                                id: userNameChip
                                 Layout.alignment: Qt.AlignHCenter
-                                text: "—"
-                                color: Theme.cOnSecondary
-                                font.family: Config.styleFont
-                                font.pixelSize: 16
-                                font.weight: Font.Bold
-                                font.italic: true
+                                radius: 99
+                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                               Theme.cOnSecondary.b,
+                                               chipHover.containsMouse ? 0.5 : 0.3)
+                                implicitWidth:  chipRow.implicitWidth + 26
+                                implicitHeight: chipRow.implicitHeight + 12
+                                Behavior on color { ColorAnimation { duration: 150 } }
+
+                                RowLayout {
+                                    id: chipRow
+                                    anchors.centerIn: parent
+                                    spacing: 7
+                                    Text {
+                                        text: "\uf2bd"          // nf-fa-user_circle
+                                        font.family: Config.fontFamily
+                                        font.pixelSize: 15
+                                        color: Theme.cWc5
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                    Text {
+                                        id: userNameText
+                                        text: "—"
+                                        color: Theme.cSurfaceTint
+                                        font.family: Config.styleFont
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                        font.italic: true
+                                        Layout.alignment: Qt.AlignVCenter
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: chipHover
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: { userTab._returnTo = mainStack.currentIndex; mainStack.currentIndex = 10 }   // open User tab
+                                }
                             }
                         }
                     }
@@ -6339,6 +6370,354 @@ PanelWindow {
                                         Item { height: 4 }
                                     }
                                 }
+                            }
+                        }
+                    }
+                    // ── TAB 10: User ───────────────────────────────────────
+                    // Reached only via the sidebar username chip. Manages *other*
+                    // accounts through scripts/user-manager.py, which the CC runs
+                    // via a narrow NOPASSWD sudoers rule on the script itself, so
+                    // no password prompt (and no focus-stealing polkit dialog that
+                    // would tear down this Loader-gated CC). The current user is
+                    // always protected from deletion.
+                    Item {
+                        id: userTab
+                        property var    users: []
+                        property bool   showAdd: false
+                        property string status: ""
+                        property bool   statusOk: true
+                        property int    _returnTo: 1
+                        property string pendingDelete: ""
+                        property string passFor: ""
+                        property string addType: "standard"
+
+                        function refresh() { if (!userListProc.running) userListProc.running = true }
+                        function note(msg, ok) { userTab.status = msg; userTab.statusOk = ok }
+
+                        // GNOME/Calamares-style: one "Account name" field drives
+                        // both the GECOS display name and a derived login name.
+                        function deriveUser(display) {
+                            var u = display.toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9_-]/g, "")
+                            if (!u) u = "user"
+                            if (!/^[a-z_]/.test(u)) u = "u" + u
+                            return u
+                        }
+
+                        // Mutations run the helper through a narrow NOPASSWD sudoers
+                        // rule on the script itself (see install.sh), so no password
+                        // field is needed here. The *new* user's password is passed
+                        // via HC_PASS (env_keep'd across sudo), never in argv.
+                        function doAdd(name, full, type, pass) {
+                            userMutateProc.command = ["sudo", "-n", scriptDir + "/user-manager.py", "add", name, full, type]
+                            userMutateProc.environment = pass ? { "HC_PASS": pass } : ({})
+                            userMutateProc._kind = "add:" + name
+                            userMutateProc.running = true
+                        }
+                        function doSetpass(name, pass) {
+                            userMutateProc.command = ["sudo", "-n", scriptDir + "/user-manager.py", "setpass", name]
+                            userMutateProc.environment = { "HC_PASS": pass }
+                            userMutateProc._kind = "setpass:" + name
+                            userTab.passFor = ""
+                            userMutateProc.running = true
+                        }
+                        function doDelete(name, rmhome) {
+                            userMutateProc.command = ["sudo", "-n", scriptDir + "/user-manager.py", "delete", name, rmhome ? "true" : "false"]
+                            userMutateProc.environment = ({})
+                            userMutateProc._kind = "delete:" + name
+                            userTab.pendingDelete = ""
+                            userMutateProc.running = true
+                        }
+
+                        // Refresh whenever the tab is entered.
+                        Connections {
+                            target: mainStack
+                            function onCurrentIndexChanged() {
+                                if (mainStack.currentIndex === 10) {
+                                    userTab.pendingDelete = ""
+                                    userTab.passFor = ""
+                                    userTab.refresh()
+                                }
+                            }
+                        }
+
+                        // ── list reader (NDJSON, one user per line) ──
+                        Process {
+                            id: userListProc
+                            command: ["python3", scriptDir + "/user-manager.py", "list"]
+                            running: false
+                            property var _rows: []
+                            stdout: SplitParser {
+                                splitMarker: "\n"
+                                onRead: function (l) {
+                                    if (!l.trim()) return
+                                    try { userListProc._rows.push(JSON.parse(l)) } catch (e) {}
+                                }
+                            }
+                            onExited: { userTab.users = userListProc._rows; userListProc._rows = [] }
+                        }
+
+                        // ── mutation runner (add / setpass / delete) ──
+                        Process {
+                            id: userMutateProc
+                            property string _kind: ""
+                            property var _out: []
+                            running: false
+                            command: ["true"]
+                            stdout: SplitParser {
+                                splitMarker: "\n"
+                                onRead: function (l) { if (l.trim()) userMutateProc._out.push(l.trim()) }
+                            }
+                            onExited: {
+                                var res = {}
+                                for (var i = 0; i < userMutateProc._out.length; i++) {
+                                    try { res = JSON.parse(userMutateProc._out[i]); break } catch (e) {}
+                                }
+                                userMutateProc._out = []
+                                var who = userMutateProc._kind.split(":")[1] || ""
+                                if (res.ok) {
+                                    if (userMutateProc._kind.indexOf("add") === 0)
+                                        userTab.note("Created '" + (res.created || who) + "'" + (res.password_set ? " with password." : " (no password set)."), true)
+                                    else if (userMutateProc._kind.indexOf("setpass") === 0)
+                                        userTab.note("Password updated for '" + who + "'.", true)
+                                    else if (userMutateProc._kind.indexOf("delete") === 0)
+                                        userTab.note("Deleted '" + who + "'.", true)
+                                    userTab.showAdd = false
+                                    userTab.refresh()
+                                } else {
+                                    userTab.note(res.error || "Operation failed.", false)
+                                }
+                            }
+                        }
+
+                        CCScrollPane {
+                            anchors.fill: parent
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                Layout.margins: 14
+                                spacing: 8
+
+                                // ── Header: back + title + add ──
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 8
+                                    Rectangle {
+                                        width: 30; height: 30; radius: 8
+                                        color: backMa.containsMouse
+                                            ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.6)
+                                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.3)
+                                        Behavior on color { ColorAnimation { duration: 120 } }
+                                        Text {
+                                            anchors.centerIn: parent
+                                            text: "\uf060"   // nf-fa-arrow_left
+                                            font.family: Config.fontFamily; font.pixelSize: 14
+                                            color: Theme.cOnSurf
+                                        }
+                                        MouseArea {
+                                            id: backMa
+                                            anchors.fill: parent; hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: mainStack.currentIndex = userTab._returnTo
+                                        }
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: "  Users"
+                                        color: Theme.cOnSurf
+                                        font.family: Config.labelFont; font.pixelSize: 17; font.weight: Font.Bold
+                                        verticalAlignment: Text.AlignVCenter
+                                    }
+                                    CCPillBtn {
+                                        text: "  \uf067  Add user"   // nf-fa-plus
+                                        onClicked: { userTab.showAdd = !userTab.showAdd; userTab.status = ""; if (userTab.showAdd) { addAdminToggle.value = false; userTab.addType = "standard" } }
+                                    }
+                                }
+
+                                // ── status line ──
+                                Text {
+                                    visible: userTab.status !== ""
+                                    Layout.fillWidth: true
+                                    text: userTab.status
+                                    wrapMode: Text.WordWrap
+                                    color: userTab.statusOk ? Theme.cPrimary : "#e7766f"
+                                    font.family: Config.labelFont; font.pixelSize: 12
+                                }
+
+                                // ── Add-user form ──
+                                Rectangle {
+                                    visible: userTab.showAdd
+                                    Layout.fillWidth: true
+                                    radius: 12
+                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.18)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                    height: addForm.implicitHeight + 24
+
+                                    ColumnLayout {
+                                        id: addForm
+                                        anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12 }
+                                        spacing: 8
+                                        Text { text: "New account"; color: Theme.cOnSurf; opacity: 0.85
+                                            font.family: Config.labelFont; font.pixelSize: 13; font.weight: Font.Bold }
+
+                                        RowLayout { Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Account name"; Layout.preferredWidth: 80; color: Theme.cOnSurf; opacity: 0.8; font.family: Config.labelFont; font.pixelSize: 12 }
+                                            Rectangle { Layout.fillWidth: true; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                TextInput { id: addNameTI; anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: loginHint.text = text.trim() ? "login: " + userTab.deriveUser(text.trim()) : "" } } }
+                                        Text { id: loginHint; Layout.leftMargin: 88; text: ""; color: Theme.cOnSurf; opacity: 0.5
+                                            font.family: Config.labelFont; font.pixelSize: 10; font.italic: true }
+                                        RowLayout { Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Password"; Layout.preferredWidth: 80; color: Theme.cOnSurf; opacity: 0.8; font.family: Config.labelFont; font.pixelSize: 12 }
+                                            Rectangle { Layout.fillWidth: true; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                TextInput { id: addPassTI; anchors { fill: parent; margins: 6 }
+                                                    echoMode: TextInput.Password
+                                                    color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true } } }
+                                        RowLayout { Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Confirm"; Layout.preferredWidth: 80; color: Theme.cOnSurf; opacity: 0.8; font.family: Config.labelFont; font.pixelSize: 12 }
+                                            Rectangle { Layout.fillWidth: true; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                TextInput { id: addPass2TI; anchors { fill: parent; margins: 6 }
+                                                    echoMode: TextInput.Password
+                                                    color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true } } }
+
+                                        CCToggle {
+                                            id: addAdminToggle
+                                            label: "Set as admin?"
+                                            value: false
+                                            onToggled: function (v) { userTab.addType = v ? "admin" : "standard" }
+                                        }
+
+                                        RowLayout {
+                                            Layout.topMargin: 2; spacing: 8
+                                            Item { Layout.fillWidth: true }
+                                            CCPillBtn { text: "Cancel"; onClicked: { userTab.showAdd = false; userTab.status = "" } }
+                                            CCPillBtn {
+                                                text: "Create"; active: true
+                                                onClicked: {
+                                                    var acct = addNameTI.text.trim()
+                                                    if (!acct) { userTab.note("Enter an account name.", false); return }
+                                                    if (addPassTI.text !== addPass2TI.text) { userTab.note("Passwords do not match.", false); return }
+                                                    var uname = userTab.deriveUser(acct)
+                                                    userTab.doAdd(uname, acct, userTab.addType, addPassTI.text)
+                                                    userTab.note("Creating '" + uname + "'…", true)
+                                                    addNameTI.text = ""; addPassTI.text = ""; addPass2TI.text = ""; loginHint.text = ""
+                                                    addAdminToggle.value = false; userTab.addType = "standard"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ── user rows ──
+                                Repeater {
+                                    model: userTab.users
+                                    delegate: Rectangle {
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        radius: 12
+                                        color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.15)
+                                        border.width: 1
+                                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.12)
+                                        height: ucol.implicitHeight + 20
+
+                                        ColumnLayout {
+                                            id: ucol
+                                            anchors { left: parent.left; right: parent.right; top: parent.top; margins: 10 }
+                                            spacing: 8
+
+                                            RowLayout {
+                                                Layout.fillWidth: true; spacing: 10
+                                                Rectangle {
+                                                    width: 40; height: 40; radius: 20; clip: true
+                                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.3)
+                                                    Text { anchors.centerIn: parent; text: "\uf2bd"
+                                                        font.family: Config.fontFamily; font.pixelSize: 18; color: Theme.cWc5 }
+                                                    Image { anchors.fill: parent
+                                                        source: (modelData.icon && modelData.icon !== "") ? "file://" + modelData.icon : ""
+                                                        fillMode: Image.PreserveAspectCrop; smooth: true; visible: status === Image.Ready }
+                                                }
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true; spacing: 1
+                                                    RowLayout { spacing: 6
+                                                        Text { text: modelData.name; color: Theme.cOnSurf
+                                                            font.family: Config.labelFont; font.pixelSize: 14; font.weight: Font.Bold }
+                                                        Rectangle { visible: modelData.current; radius: 6
+                                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                                            height: 16; width: lblYou.implicitWidth + 10
+                                                            Text { id: lblYou; anchors.centerIn: parent; text: "you"
+                                                                color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 10 } }
+                                                    }
+                                                    Text { text: (modelData.real && modelData.real !== "" ? modelData.real + "  ·  " : "") + modelData.type
+                                                        color: Theme.cOnSurf; opacity: 0.6
+                                                        font.family: Config.labelFont; font.pixelSize: 11 }
+                                                }
+                                                CCPillBtn { text: "  \uf084  Password"   // allowed on the current user too (changing your own password does not end your session)
+                                                    onClicked: { userTab.passFor = (userTab.passFor === modelData.name) ? "" : modelData.name; userTab.pendingDelete = "" } }
+                                                CCPillBtn { visible: !modelData.current; text: "  \uf1f8  Delete"
+                                                    onClicked: { userTab.pendingDelete = (userTab.pendingDelete === modelData.name) ? "" : modelData.name; userTab.passFor = "" } }
+                                            }
+
+                                            // password sub-row
+                                            RowLayout {
+                                                visible: userTab.passFor === modelData.name
+                                                Layout.fillWidth: true; spacing: 8
+                                                Rectangle { Layout.fillWidth: true; height: 28; radius: 7
+                                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                    border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                    TextInput { id: passSetTI; anchors { fill: parent; margins: 6 }
+                                                        echoMode: TextInput.Password
+                                                        color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
+                                                        verticalAlignment: TextInput.AlignVCenter; clip: true } }
+                                                CCPillBtn { text: "Save"; active: true
+                                                    onClicked: { if (passSetTI.text.length < 1) { userTab.note("Enter a password first.", false); return }
+                                                        userTab.doSetpass(modelData.name, passSetTI.text); userTab.note("Setting password for '" + modelData.name + "'…", true)
+                                                        passSetTI.text = "" } }
+                                                CCPillBtn { text: "Cancel"; onClicked: userTab.passFor = "" }
+                                            }
+
+                                            // delete confirm sub-row
+                                            RowLayout {
+                                                visible: userTab.pendingDelete === modelData.name
+                                                Layout.fillWidth: true; spacing: 8
+                                                Text { Layout.fillWidth: true; text: "Delete '" + modelData.name + "'?"
+                                                    wrapMode: Text.WordWrap; color: "#e7766f"
+                                                    font.family: Config.labelFont; font.pixelSize: 12 }
+                                                CCPillBtn { text: "Delete"; onClicked: userTab.doDelete(modelData.name, false) }
+                                                CCPillBtn { text: "Delete + home"; onClicked: userTab.doDelete(modelData.name, true) }
+                                                CCPillBtn { text: "Cancel"; onClicked: userTab.pendingDelete = "" }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    visible: userTab.users.length === 0
+                                    Layout.fillWidth: true
+                                    text: "Loading accounts…"
+                                    color: Theme.cOnSurf; opacity: 0.5
+                                    font.family: Config.labelFont; font.pixelSize: 12
+                                }
+
+                                // Loaded, but only the signed-in account exists.
+                                Text {
+                                    visible: userTab.users.length > 0 && !userTab.users.some(function (u) { return !u.current })
+                                    Layout.fillWidth: true
+                                    text: "No additional accounts yet — tap \"Add user\" to create one. You can also change your own password from your row above."
+                                    wrapMode: Text.WordWrap
+                                    color: Theme.cOnSurf; opacity: 0.55
+                                    font.family: Config.labelFont; font.pixelSize: 12
+                                }
+
+                                Item { height: 10 }
                             }
                         }
                     }
