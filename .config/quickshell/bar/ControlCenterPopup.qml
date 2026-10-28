@@ -83,10 +83,6 @@ PanelWindow {
     property string _dockAhDelay:   Config.dockAutoHideDelay.toString()
     property int    _dockMarginVal: Config.dockMargin
 
-    // ── Rofi current values ───────────────────────────────────────────────
-    property string _rofiBorderVal:  "2"
-    property string _rofiRadiusVal:  "1.0"
-
     // ── SDDM current values ───────────────────────────────────────────────
     property string _sddmHeaderVal:  "󰫣󰫣󰫣"
     property string _sddmFormVal:    "center"
@@ -304,7 +300,7 @@ PanelWindow {
 
     // Resolve a "$varname" string → the matching Theme color
     // Used by the cava color pickers to apply matugen vars to Config properties
-    // Load dock + rofi + launcher + sddm + hyprland values when CC opens
+    // Load launcher + sddm + hyprland values when CC opens
     Connections {
         target: ControlCenterState
         function onVisibleChanged() {
@@ -316,7 +312,6 @@ PanelWindow {
                     ccTabSettings.activeTab = 6
                     return
                 }
-                _rofiValReader.running = true
                 _sddmValReader.running = true
                 _weatherLocReader.running = true
                 _hyprlandValReader.running = true
@@ -336,7 +331,6 @@ PanelWindow {
         // Dock values are Config-driven outright now (qs dock) — no conf readers.
         _hyprlandValReader.running = true
         _layoutReader.running      = true
-        _rofiValReader.running     = true
         _sddmValReader.running     = true
         _weatherLocReader.running  = true
         _hyprStateReader.running   = true
@@ -650,25 +644,6 @@ PanelWindow {
         }
     }
 
-    Process {
-        id: _rofiValReader
-        command: ["bash", "-c",
-            "f=\"$HOME/.config/hyprcandy/settings/rofi-border.rasi\"; " +
-            "[ -f \"$f\" ] && grep -oP 'border-width: \\K[0-9]+' \"$f\" | head -1 || echo ''; " +
-            "f=\"$HOME/.config/hyprcandy/settings/rofi-border-radius.rasi\"; " +
-            "[ -f \"$f\" ] && grep -oP 'border-radius: \\K[0-9.]+' \"$f\" | head -1 || echo ''"]
-        running: false
-        property var _lines: []
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: function(l) { _rofiValReader._lines.push(l.trim()) }
-        }
-        onExited: {
-            const ls = _lines; _lines = []
-            _rofiBorderVal = (ls[0] !== undefined && ls[0]) ? ls[0] : "2"
-            _rofiRadiusVal = (ls[1] !== undefined && ls[1]) ? ls[1] : "1.0"
-        }
-    }
     // Launcher slider values now live in Config.launcher* (persisted via
     // Settings) — the qs launcher reads them reactively, so no external
     // reader/writer for GJS launcherConfig.js is needed anymore.
@@ -1044,7 +1019,6 @@ PanelWindow {
                             ccLicenseSettings.lastVerified  = now
                             // Key already persisted in _verifyLicense() before the curl call.
                             LicenseState.activate()
-                            _rofiValReader.running = true
                             _sddmValReader.running = true
                             _weatherLocReader.running = true
                             _hyprlandValReader.running = true
@@ -1070,7 +1044,6 @@ PanelWindow {
         }       // StdioCollector
     }           // Process
 
-    // ── Gumroad licence deactivation process ─────────────────────────────────
     Process {
         id: _licDeactivateProc
         running: false
@@ -4232,6 +4205,7 @@ PanelWindow {
 
                     // ── TAB 4: Menus ─────────────────────────────────────────
                     CCScrollPane {
+                        scrollable: false
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.margins: 14
@@ -4290,42 +4264,6 @@ PanelWindow {
                                 }
                             }
 
-                            CCSection { text: "Window Size — Horizontal Dock App Launcher" }
-                            CCSlider {
-                                label: "Width"
-                                from: 320; to: 2000; stepSize: 5
-                                value: Config.launcherFrameWidth
-                                onMoved: function(v) {
-                                    Config.launcherFrameWidth = Math.round(v)
-                                }
-                            }
-                            CCSlider {
-                                label: "Height"
-                                from: 300; to: 2000; stepSize: 5
-                                value: Config.launcherFrameHeight
-                                onMoved: function(v) {
-                                    Config.launcherFrameHeight = Math.round(v)
-                                }
-                            }
-
-                            CCSection { text: "Window Size — Vertical Dock App Launcher" }
-                            CCSlider {
-                                label: "Width"
-                                from: 240; to: 2000; stepSize: 5
-                                value: Config.launcherFrameWidthVert
-                                onMoved: function(v) {
-                                    Config.launcherFrameWidthVert = Math.round(v)
-                                }
-                            }
-                            CCSlider {
-                                label: "Height"
-                                from: 300; to: 2000; stepSize: 5
-                                value: Config.launcherFrameHeightVert
-                                onMoved: function(v) {
-                                    Config.launcherFrameHeightVert = Math.round(v)
-                                }
-                            }
-
                             CCSection { text: "Borders" }
                             CCSlider {
                                 label: "Outer Radius"
@@ -4371,33 +4309,6 @@ PanelWindow {
                                     Config.launcherInnerPadding = Math.round(v)
                                 }
                             }
-
-                            // ── Rofi (other menus — drun replaced by App Launcher) ──
-                            CCSection { text: "Rofi (Other Menus)" }
-
-                            CCSlider {
-                                label: "Border"
-                                from: 0; to: 10; stepSize: 1
-                                value: parseInt(_rofiBorderVal) || 0
-                                onMoved: function(v) {
-                                    _rofiBorderVal = v.toString()
-                                    _rofiBorder.command = [scriptDir + "/rofi-border.sh", v.toString()]
-                                    _rofiBorder.running = true
-                                }
-                            }
-                            Process { id: _rofiBorder; running: false }
-
-                            CCSlider {
-                                label: "Radius"
-                                from: 0; to: 5; stepSize: 0.1; decimals: 1
-                                value: parseFloat(_rofiRadiusVal) || 0
-                                onMoved: function(v) {
-                                    _rofiRadiusVal = v.toFixed(1)
-                                    _rofiRadius.command = [scriptDir + "/rofi-radius.sh", v.toFixed(1)]
-                                    _rofiRadius.running = true
-                                }
-                            }
-                            Process { id: _rofiRadius; running: false }
 
                             Item { height: 10 }
                         }
@@ -8586,15 +8497,20 @@ PanelWindow {
 
     // ── Scrollable pane — invisible scrollbar ────────────────────────────
     component CCScrollPane: Flickable {
+        // scrollable=false turns this into a plain clipped container (no drag,
+        // no scrollbar, no bottom scroll-buffer) for tabs whose content already
+        // fits the pane — keeps the shared edge-to-edge padding without scrolling.
+        property bool scrollable: true
         Layout.fillWidth: true
         Layout.fillHeight: true
         contentWidth: width
-        contentHeight: _scrollContent.implicitHeight + 20
+        contentHeight: _scrollContent.implicitHeight + (scrollable ? 20 : 0)
+        interactive: scrollable
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         // Invisible scrollbar so it doesn't block slider values
         ScrollBar.vertical: ScrollBar {
-            policy: ScrollBar.AsNeeded
+            policy: scrollable ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
             contentItem: Rectangle {
                 implicitWidth: 0
                 color: "transparent"

@@ -22,18 +22,32 @@ QtObject {
         Qt.application.organizationDomain = "hyprcandy.local"
         // Load persisted values after properties are initialized
         _loadSettings()
+        // Baseline the change-detector so the periodic save doesn't rewrite the
+        // just-loaded state (and never writes identical bytes back).
+        _lastSig = _persistSig()
         _lastBarPosition = barPosition
         _cornerSwapReady = true
     }
 
+    // Persist on graceful quit / hot-reload teardown, closing the <5s window
+    // between a change and the next periodic flush.
+    Component.onDestruction: _saveSettings()
+
     // ── Settings persistence helper ────────────────────────────────────────
     property Settings _settings: Settings { category: "qs-bar-config-v1" }
-    // Auto-save every 5 seconds
+    // Signature of the last state flushed to disk (see _persistSig).
+    property string _lastSig: ""
+    // Change-guarded auto-save: every 5s flush ONLY if a persisted value differs
+    // from the last write, so idle sessions never touch the disk. The timer is
+    // the crash safety net; save-on-quit above handles clean exits.
     property Timer _saveTimer: Timer {
         interval: 5000
         repeat: true
         running: true
-        onTriggered: _saveSettings()
+        onTriggered: {
+            var sig = cfg._persistSig()
+            if (sig !== cfg._lastSig) { cfg._lastSig = sig; cfg._saveSettings() }
+        }
     }
 
     // ── Media equalizer (EasyEffects) persistence ────────────────────────
@@ -321,255 +335,272 @@ QtObject {
         v = _settings.value("clockWorldCities");   try { clockWorldCities = JSON.parse(v) } catch(e) {}
     }
 
-    function _saveSettings() {
-        _settings.setValue("barMode", barMode)
-        _settings.setValue("barPosition", barPosition)
-        _settings.setValue("barPad", barPad)
-        _settings.setValue("moduleHeight", moduleHeight)
-        _settings.setValue("outerMarginTop", outerMarginTop)
-        _settings.setValue("outerMarginBottom", outerMarginBottom)
-        _settings.setValue("outerMarginSide", outerMarginSide)
-        _settings.setValue("triModuleSideMargin", triModuleSideMargin)
-        _settings.setValue("barEdgePaddingLeft",  barEdgePaddingLeft)
-        _settings.setValue("barEdgePaddingRight", barEdgePaddingRight)
-        _settings.setValue("barTopLeftRadius",     barTopLeftRadius)
-        _settings.setValue("barTopRightRadius",    barTopRightRadius)
-        _settings.setValue("barBottomLeftRadius",  barBottomLeftRadius)
-        _settings.setValue("barBottomRightRadius", barBottomRightRadius)
-        _settings.setValue("triLeftTopRightRadius",    triLeftTopRightRadius)
-        _settings.setValue("triLeftBottomRightRadius", triLeftBottomRightRadius)
-        _settings.setValue("triLeftTopLeftRadius",    barTopLeftRadius)
-        _settings.setValue("triLeftBottomLeftRadius", barBottomLeftRadius)
-        _settings.setValue("triCenterTopLeftRadius",     triCenterTopLeftRadius)
-        _settings.setValue("triCenterTopRightRadius",    triCenterTopRightRadius)
-        _settings.setValue("triCenterBottomLeftRadius",  triCenterBottomLeftRadius)
-        _settings.setValue("triCenterBottomRightRadius", triCenterBottomRightRadius)
-        _settings.setValue("triRightTopLeftRadius",     triRightTopLeftRadius)
-        _settings.setValue("triRightBottomLeftRadius",  triRightBottomLeftRadius)
-        _settings.setValue("triRightTopRightRadius",    barTopRightRadius)
-        _settings.setValue("triRightBottomRightRadius", barBottomRightRadius)
-        _settings.setValue("shellArmThickness",         shellArmThickness)
-        _settings.setValue("shellInnerRadius",          shellInnerRadius)
-        _settings.setValue("shellCenterJunctionRadius", shellCenterJunctionRadius)
-        _settings.setValue("shellModuleSideMargin",     shellModuleSideMargin)
-        _settings.setValue("shellModuleAutoHide",       shellModuleAutoHide)
-        _settings.setValue("shellModuleAutoHideDelay",  shellModuleAutoHideDelay)
-        _settings.setValue("islandRadius", islandRadius)
-        _settings.setValue("islandBorder", islandBorder)
-        _settings.setValue("islandBorderAlpha", islandBorderAlpha)
-        _settings.setValue("borderWs", borderWs)
-        _settings.setValue("borderClockDate", borderClockDate)
-        _settings.setValue("borderWeatherBat", borderWeatherBat)
-        _settings.setValue("borderLeftGroup", borderLeftGroup)
-        _settings.setValue("borderRightGroup", borderRightGroup)
-        _settings.setValue("borderStartMenu", borderStartMenu)
-        _settings.setValue("borderMedia", borderMedia)
-        _settings.setValue("borderCava", borderCava)
-        _settings.setValue("borderDistro", borderDistro)
-        _settings.setValue("borderStartTrash", borderStartTrash)
-        _settings.setValue("tipPowerProfiles", tipPowerProfiles)
-        _settings.setValue("tipOverview", tipOverview)
-        _settings.setValue("tipPower", tipPower)
-        _settings.setValue("tipSystemTray", tipSystemTray)
-        _settings.setValue("tipNotifications", tipNotifications)
-        _settings.setValue("tipMedia", tipMedia)
-        _settings.setValue("tipWeather", tipWeather)
-        _settings.setValue("tipBattery", tipBattery)
-        _settings.setValue("tipClock", tipClock)
-        _settings.setValue("tipDate", tipDate)
-        _settings.setValue("tipWallpaper", tipWallpaper)
-        _settings.setValue("tipUpdates", tipUpdates)
-        _settings.setValue("tipControlCenter", tipControlCenter)
-        _settings.setValue("tipIdleInhibitor", tipIdleInhibitor)
-        _settings.setValue("islandBorderVar", islandBorderVar)
-        _settings.setValue("islandBorderMode", islandBorderMode)
-        _settings.setValue("islandBorderWallustVar", islandBorderWallustVar)
-        _settings.setValue("islandBorderGradient", islandBorderGradient)
-        _settings.setValue("islandBorderSecondVar", islandBorderSecondVar)
-        _settings.setValue("islandBorderSecondMode", islandBorderSecondMode)
-        _settings.setValue("islandBorderSecondWallustVar", islandBorderSecondWallustVar)
-        _settings.setValue("islandBorderAngle", islandBorderAngle)
-        _settings.setValue("barBorderWidth", barBorderWidth)
-        _settings.setValue("barBorderAlpha", barBorderAlpha)
-        _settings.setValue("barBorderVar", barBorderVar)
-        _settings.setValue("barBorderMode", barBorderMode)
-        _settings.setValue("barBorderWallustVar", barBorderWallustVar)
-        _settings.setValue("barBorderGradient", barBorderGradient)
-        _settings.setValue("barBorderSecondVar", barBorderSecondVar)
-        _settings.setValue("barBorderSecondMode", barBorderSecondMode)
-        _settings.setValue("barBorderSecondWallustVar", barBorderSecondWallustVar)
-        _settings.setValue("barBorderAngle", barBorderAngle)
-        _settings.setValue("islandBgStyle",  islandBgStyle)
-        _settings.setValue("barRectBgStyle", barRectBgStyle)
-        _settings.setValue("moduleBgOpacity", moduleBgOpacity)
-        _settings.setValue("islandBgOpacityIsland", islandBgOpacityIsland)
-        _settings.setValue("islandSpacing", islandSpacing)
-        _settings.setValue("modPadH", modPadH)
-        _settings.setValue("modPadV", modPadV)
-        _settings.setValue("groupedSpacing", groupedSpacing)
-        _settings.setValue("glyphSize", glyphSize)
-        _settings.setValue("infoGlyphSize", infoGlyphSize)
-        _settings.setValue("mediaGlyphSize", mediaGlyphSize)
-        _settings.setValue("weatherIconSize", weatherIconSize)
-        _settings.setValue("infoFontSize",   infoFontSize)
-        _settings.setValue("labelFontSize",  labelFontSize)
-        _settings.setValue("mediaCtlSize", mediaCtlSize)
-        _settings.setValue("mediaThumbSize", mediaThumbSize)
-        _settings.setValue("batteryRadialVisible", batteryRadialVisible)
-        _settings.setValue("batteryRadialSize", batteryRadialSize)
-        _settings.setValue("batteryRadialWidth", batteryRadialWidth)
-        _settings.setValue("trayIconSz", trayIconSz)
-        _settings.setValue("trayItemPadH",    trayItemPadH)
-        _settings.setValue("trayItemSpacing", trayItemSpacing)
-        _settings.setValue("ccGlyph", ccGlyph)
-        _settings.setValue("ccUseDistroIcon", ccUseDistroIcon)
-        _settings.setValue("ccIconMode", ccIconMode)
-        _settings.setValue("ccCustomIconPath", ccCustomIconPath)
-        _settings.setValue("ccGlyphColorA", ccGlyphOpacity)
-        _settings.setValue("wsCount", wsCount)
-        _settings.setValue("barMonitors", JSON.stringify(barMonitors))
-        _settings.setValue("wsIconMode", wsIconMode)
-        _settings.setValue("wsGlyphSize", wsGlyphSize)
-        _settings.setValue("wsSpacing", wsSpacing)
-        _settings.setValue("wsMarginLeft", wsMarginLeft)
-        _settings.setValue("wsMarginRight", wsMarginRight)
-        _settings.setValue("wsPadLeft", wsPadLeft)
-        _settings.setValue("wsPadRight", wsPadRight)
-        _settings.setValue("wsPadTop", wsPadTop)
-        _settings.setValue("wsPadBottom", wsPadBottom)
-        _settings.setValue("wsSeparators", wsSeparators)
-        _settings.setValue("wsSeparatorSize", wsSeparatorSize)
-        _settings.setValue("wsSeparatorPadLeft", wsSeparatorPadLeft)
-        _settings.setValue("wsSeparatorPadRight", wsSeparatorPadRight)
-        _settings.setValue("wsSeparatorGlyph", wsSeparatorGlyph)
-        _settings.setValue("wsDotActive", wsDotActive)
-        _settings.setValue("wsDotPersistent", wsDotPersistent)
-        _settings.setValue("wsDotEmpty", wsDotEmpty)
-        _settings.setValue("wsIcons", JSON.stringify(wsIcons))
-        _settings.setValue("wsActiveOpacity",     wsActiveOpacity)
-        _settings.setValue("wsPersistentOpacity", wsPersistentOpacity)
-        _settings.setValue("wsEmptyOpacity",      wsEmptyOpacity)
-        _settings.setValue("wsSeparatorOpacity",  wsSeparatorOpacity)
-        _settings.setValue("mediaInfoFontSize", mediaInfoFontSize)
-        _settings.setValue("mediaPadLeft", mediaPadLeft)
-        _settings.setValue("mediaPadRight", mediaPadRight)
-        _settings.setValue("mediaPadTop", mediaPadTop)
-        _settings.setValue("mediaPadBottom", mediaPadBottom)
-        _settings.setValue("cavaWidth", cavaWidth)
-        _settings.setValue("cavaBarSpacing", cavaBarSpacing)
-        _settings.setValue("cavaStyle", cavaStyle)
-        _settings.setValue("cavaWaveThickness", cavaWaveThickness)
-        _settings.setValue("cavaWaveSmooth", cavaWaveSmooth)
-        _settings.setValue("cavaTransparentWhenInactive", cavaTransparentWhenInactive)
-        _settings.setValue("eqGains", JSON.stringify(eqGains))
-        _settings.setValue("eqPreset", eqPreset)
-        _settings.setValue("eqExpanded", eqExpanded)
-        _settings.setValue("cavaActiveOpacity", cavaActiveOpacity)
-        _settings.setValue("cavaInactiveOpacity", cavaInactiveOpacity)
-        _settings.setValue("cavaAutoHide", cavaAutoHide)
-        _settings.setValue("cavaGradientEnabled", cavaGradientEnabled)
-        _settings.setValue("cavaGradientSplit",   cavaGradientSplit)
-        _settings.setValue("cavaStartMode",        cavaStartMode)
-        _settings.setValue("cavaEndMode",          cavaEndMode)
-        _settings.setValue("cavaStartVar",         cavaStartVar)
-        _settings.setValue("cavaEndVar",           cavaEndVar)
-        _settings.setValue("cavaStartPywalVar",    cavaStartPywalVar)
-        _settings.setValue("cavaEndPywalVar",      cavaEndPywalVar)
-        _settings.setValue("cavaStartWallustVar",  cavaStartWallustVar)
-        _settings.setValue("cavaEndWallustVar",    cavaEndWallustVar)
-        _settings.setValue("cavaStartCustomColor", _cavaStartCustomColor)
-        _settings.setValue("cavaEndCustomColor",   _cavaEndCustomColor)
-        _settings.setValue("cavaGlyphCustomColor", _cavaGlyphCustomColor)
-        _settings.setValue("wsBgOpacity", wsBgOpacity)
-        _settings.setValue("groupedBgOpacity", groupedBgOpacity)
-        _settings.setValue("ungroupedBgOpacity", ungroupedBgOpacity)
-        _settings.setValue("clockDateBgOpacity",  clockDateBgOpacity)
-        _settings.setValue("weatherBatBgOpacity", weatherBatBgOpacity)
-        _settings.setValue("leftGroupBgOpacity",  leftGroupBgOpacity)
-        _settings.setValue("rightGroupBgOpacity", rightGroupBgOpacity)
-        _settings.setValue("trayBgOpacity", trayBgOpacity)
-        _settings.setValue("startMenuBgOpacity", startMenuBgOpacity)
-        _settings.setValue("mediaBgOpacity", mediaBgOpacity)
-        _settings.setValue("cavaBgOpacity", cavaBgOpacity)
-        _settings.setValue("distroBgOpacity", distroBgOpacity)
-        _settings.setValue("activeWindowBgOpacity", activeWindowBgOpacity)
-        _settings.setValue("activeWindowMinWidth", activeWindowMinWidth)
-        _settings.setValue("showClock", showClock)
-        _settings.setValue("showDate", showDate)
-        _settings.setValue("showWorkspaces", showWorkspaces)
-        _settings.setValue("showCava", showCava)
-        _settings.setValue("showWeather", showWeather)
-        _settings.setValue("showBattery", showBattery)
-        _settings.setValue("showMediaPlayer", showMediaPlayer)
-        _settings.setValue("showIdleInhibitor", showIdleInhibitor)
+    // ── Persisted key/value pairs (single source of truth for save + dirty-check) ──
+    // Order/keys mirror _loadSettings(). Aliases (a config key sourced from a
+    // differently-named property) and JSON-encoded lists are intentional.
+    function _persistPairs() {
+        return [
+            ["barMode", barMode],
+            ["barPosition", barPosition],
+            ["barPad", barPad],
+            ["moduleHeight", moduleHeight],
+            ["outerMarginTop", outerMarginTop],
+            ["outerMarginBottom", outerMarginBottom],
+            ["outerMarginSide", outerMarginSide],
+            ["triModuleSideMargin", triModuleSideMargin],
+            ["barEdgePaddingLeft", barEdgePaddingLeft],
+            ["barEdgePaddingRight", barEdgePaddingRight],
+            ["barTopLeftRadius", barTopLeftRadius],
+            ["barTopRightRadius", barTopRightRadius],
+            ["barBottomLeftRadius", barBottomLeftRadius],
+            ["barBottomRightRadius", barBottomRightRadius],
+            ["triLeftTopRightRadius", triLeftTopRightRadius],
+            ["triLeftBottomRightRadius", triLeftBottomRightRadius],
+            ["triLeftTopLeftRadius", barTopLeftRadius],
+            ["triLeftBottomLeftRadius", barBottomLeftRadius],
+            ["triCenterTopLeftRadius", triCenterTopLeftRadius],
+            ["triCenterTopRightRadius", triCenterTopRightRadius],
+            ["triCenterBottomLeftRadius", triCenterBottomLeftRadius],
+            ["triCenterBottomRightRadius", triCenterBottomRightRadius],
+            ["triRightTopLeftRadius", triRightTopLeftRadius],
+            ["triRightBottomLeftRadius", triRightBottomLeftRadius],
+            ["triRightTopRightRadius", barTopRightRadius],
+            ["triRightBottomRightRadius", barBottomRightRadius],
+            ["shellArmThickness", shellArmThickness],
+            ["shellInnerRadius", shellInnerRadius],
+            ["shellCenterJunctionRadius", shellCenterJunctionRadius],
+            ["shellModuleSideMargin", shellModuleSideMargin],
+            ["shellModuleAutoHide", shellModuleAutoHide],
+            ["shellModuleAutoHideDelay", shellModuleAutoHideDelay],
+            ["islandRadius", islandRadius],
+            ["islandBorder", islandBorder],
+            ["islandBorderAlpha", islandBorderAlpha],
+            ["borderWs", borderWs],
+            ["borderClockDate", borderClockDate],
+            ["borderWeatherBat", borderWeatherBat],
+            ["borderLeftGroup", borderLeftGroup],
+            ["borderRightGroup", borderRightGroup],
+            ["borderStartMenu", borderStartMenu],
+            ["borderMedia", borderMedia],
+            ["borderCava", borderCava],
+            ["borderDistro", borderDistro],
+            ["borderStartTrash", borderStartTrash],
+            ["tipPowerProfiles", tipPowerProfiles],
+            ["tipOverview", tipOverview],
+            ["tipPower", tipPower],
+            ["tipSystemTray", tipSystemTray],
+            ["tipNotifications", tipNotifications],
+            ["tipMedia", tipMedia],
+            ["tipWeather", tipWeather],
+            ["tipBattery", tipBattery],
+            ["tipClock", tipClock],
+            ["tipDate", tipDate],
+            ["tipWallpaper", tipWallpaper],
+            ["tipUpdates", tipUpdates],
+            ["tipControlCenter", tipControlCenter],
+            ["tipIdleInhibitor", tipIdleInhibitor],
+            ["islandBorderVar", islandBorderVar],
+            ["islandBorderMode", islandBorderMode],
+            ["islandBorderWallustVar", islandBorderWallustVar],
+            ["islandBorderGradient", islandBorderGradient],
+            ["islandBorderSecondVar", islandBorderSecondVar],
+            ["islandBorderSecondMode", islandBorderSecondMode],
+            ["islandBorderSecondWallustVar", islandBorderSecondWallustVar],
+            ["islandBorderAngle", islandBorderAngle],
+            ["barBorderWidth", barBorderWidth],
+            ["barBorderAlpha", barBorderAlpha],
+            ["barBorderVar", barBorderVar],
+            ["barBorderMode", barBorderMode],
+            ["barBorderWallustVar", barBorderWallustVar],
+            ["barBorderGradient", barBorderGradient],
+            ["barBorderSecondVar", barBorderSecondVar],
+            ["barBorderSecondMode", barBorderSecondMode],
+            ["barBorderSecondWallustVar", barBorderSecondWallustVar],
+            ["barBorderAngle", barBorderAngle],
+            ["islandBgStyle", islandBgStyle],
+            ["barRectBgStyle", barRectBgStyle],
+            ["moduleBgOpacity", moduleBgOpacity],
+            ["islandBgOpacityIsland", islandBgOpacityIsland],
+            ["islandSpacing", islandSpacing],
+            ["modPadH", modPadH],
+            ["modPadV", modPadV],
+            ["groupedSpacing", groupedSpacing],
+            ["glyphSize", glyphSize],
+            ["infoGlyphSize", infoGlyphSize],
+            ["mediaGlyphSize", mediaGlyphSize],
+            ["weatherIconSize", weatherIconSize],
+            ["infoFontSize", infoFontSize],
+            ["labelFontSize", labelFontSize],
+            ["mediaCtlSize", mediaCtlSize],
+            ["mediaThumbSize", mediaThumbSize],
+            ["batteryRadialVisible", batteryRadialVisible],
+            ["batteryRadialSize", batteryRadialSize],
+            ["batteryRadialWidth", batteryRadialWidth],
+            ["trayIconSz", trayIconSz],
+            ["trayItemPadH", trayItemPadH],
+            ["trayItemSpacing", trayItemSpacing],
+            ["ccGlyph", ccGlyph],
+            ["ccUseDistroIcon", ccUseDistroIcon],
+            ["ccIconMode", ccIconMode],
+            ["ccCustomIconPath", ccCustomIconPath],
+            ["ccGlyphColorA", ccGlyphOpacity],
+            ["wsCount", wsCount],
+            ["barMonitors", JSON.stringify(barMonitors)],
+            ["wsIconMode", wsIconMode],
+            ["wsGlyphSize", wsGlyphSize],
+            ["wsSpacing", wsSpacing],
+            ["wsMarginLeft", wsMarginLeft],
+            ["wsMarginRight", wsMarginRight],
+            ["wsPadLeft", wsPadLeft],
+            ["wsPadRight", wsPadRight],
+            ["wsPadTop", wsPadTop],
+            ["wsPadBottom", wsPadBottom],
+            ["wsSeparators", wsSeparators],
+            ["wsSeparatorSize", wsSeparatorSize],
+            ["wsSeparatorPadLeft", wsSeparatorPadLeft],
+            ["wsSeparatorPadRight", wsSeparatorPadRight],
+            ["wsSeparatorGlyph", wsSeparatorGlyph],
+            ["wsDotActive", wsDotActive],
+            ["wsDotPersistent", wsDotPersistent],
+            ["wsDotEmpty", wsDotEmpty],
+            ["wsIcons", JSON.stringify(wsIcons)],
+            ["wsActiveOpacity", wsActiveOpacity],
+            ["wsPersistentOpacity", wsPersistentOpacity],
+            ["wsEmptyOpacity", wsEmptyOpacity],
+            ["wsSeparatorOpacity", wsSeparatorOpacity],
+            ["mediaInfoFontSize", mediaInfoFontSize],
+            ["mediaPadLeft", mediaPadLeft],
+            ["mediaPadRight", mediaPadRight],
+            ["mediaPadTop", mediaPadTop],
+            ["mediaPadBottom", mediaPadBottom],
+            ["cavaWidth", cavaWidth],
+            ["cavaBarSpacing", cavaBarSpacing],
+            ["cavaStyle", cavaStyle],
+            ["cavaWaveThickness", cavaWaveThickness],
+            ["cavaWaveSmooth", cavaWaveSmooth],
+            ["cavaTransparentWhenInactive", cavaTransparentWhenInactive],
+            ["eqGains", JSON.stringify(eqGains)],
+            ["eqPreset", eqPreset],
+            ["eqExpanded", eqExpanded],
+            ["cavaActiveOpacity", cavaActiveOpacity],
+            ["cavaInactiveOpacity", cavaInactiveOpacity],
+            ["cavaAutoHide", cavaAutoHide],
+            ["cavaGradientEnabled", cavaGradientEnabled],
+            ["cavaGradientSplit", cavaGradientSplit],
+            ["cavaStartMode", cavaStartMode],
+            ["cavaEndMode", cavaEndMode],
+            ["cavaStartVar", cavaStartVar],
+            ["cavaEndVar", cavaEndVar],
+            ["cavaStartPywalVar", cavaStartPywalVar],
+            ["cavaEndPywalVar", cavaEndPywalVar],
+            ["cavaStartWallustVar", cavaStartWallustVar],
+            ["cavaEndWallustVar", cavaEndWallustVar],
+            ["cavaStartCustomColor", _cavaStartCustomColor],
+            ["cavaEndCustomColor", _cavaEndCustomColor],
+            ["cavaGlyphCustomColor", _cavaGlyphCustomColor],
+            ["wsBgOpacity", wsBgOpacity],
+            ["groupedBgOpacity", groupedBgOpacity],
+            ["ungroupedBgOpacity", ungroupedBgOpacity],
+            ["clockDateBgOpacity", clockDateBgOpacity],
+            ["weatherBatBgOpacity", weatherBatBgOpacity],
+            ["leftGroupBgOpacity", leftGroupBgOpacity],
+            ["rightGroupBgOpacity", rightGroupBgOpacity],
+            ["trayBgOpacity", trayBgOpacity],
+            ["startMenuBgOpacity", startMenuBgOpacity],
+            ["mediaBgOpacity", mediaBgOpacity],
+            ["cavaBgOpacity", cavaBgOpacity],
+            ["distroBgOpacity", distroBgOpacity],
+            ["activeWindowBgOpacity", activeWindowBgOpacity],
+            ["activeWindowMinWidth", activeWindowMinWidth],
+            ["showClock", showClock],
+            ["showDate", showDate],
+            ["showWorkspaces", showWorkspaces],
+            ["showCava", showCava],
+            ["showWeather", showWeather],
+            ["showBattery", showBattery],
+            ["showMediaPlayer", showMediaPlayer],
+            ["showIdleInhibitor", showIdleInhibitor],
+            ["showUpdates", showUpdates],
+            ["showPowerProfiles", showPowerProfiles],
+            ["showOverview", showOverview],
+            ["showNotifications", showNotifications],
+            ["showWallpaper", showWallpaper],
+            ["showTray", showTray],
+            ["showBluetooth", showBluetooth],
+            // ["showWindow", showWindow],  // intentionally not persisted
+            ["showDistro", showDistro],
+            ["launcherSearchWidth", launcherSearchWidth],
+            ["launcherIconSize", launcherIconSize],
+            ["launcherTextFontSize", launcherTextFontSize],
+            ["launcherFixedTileWidth", launcherFixedTileWidth],
+            ["launcherFixedTileHeight", launcherFixedTileHeight],
+            ["launcherFrameWidth", launcherFrameWidth],
+            ["launcherFrameHeight", launcherFrameHeight],
+            ["launcherFrameWidthVert", launcherFrameWidthVert],
+            ["launcherFrameHeightVert", launcherFrameHeightVert],
+            ["launcherBorderRadius", launcherBorderRadius],
+            ["launcherBorderWidth", launcherBorderWidth],
+            ["launcherSearchRadius", launcherSearchRadius],
+            ["launcherListRadius", launcherListRadius],
+            ["launcherInnerBorderWidth", launcherInnerBorderWidth],
+            ["launcherInnerPadding", launcherInnerPadding],
+            ["barAutoHide", barAutoHide],
+            ["barAutoHideDelay", barAutoHideDelay],
+            ["triLeftAutoHide", triLeftAutoHide],
+            ["triLeftAutoHideDelay", triLeftAutoHideDelay],
+            ["triCenterAutoHide", triCenterAutoHide],
+            ["triCenterAutoHideDelay", triCenterAutoHideDelay],
+            ["triRightAutoHide", triRightAutoHide],
+            ["triRightAutoHideDelay", triRightAutoHideDelay],
+            ["dockAutoHide", dockAutoHide],
+            ["dockAutoHideDelay", dockAutoHideDelay],
+            ["dockMargin", dockMargin],
+            ["dockIconSize", dockIconSize],
+            ["dockStartIconSize", dockStartIconSize],
+            ["dockTrashIconSize", dockTrashIconSize],
+            ["dockStartIconScale", dockStartIconScale],
+            ["dockTrashIconScale", dockTrashIconScale],
+            ["dockButtonSpacing", dockButtonSpacing],
+            ["dockInnerPadding", dockInnerPadding],
+            ["dockPadding", dockPadding],
+            ["dockRadius", dockRadius],
+            ["dockTopLeftRadius", dockTopLeftRadius],
+            ["dockTopRightRadius", dockTopRightRadius],
+            ["dockBottomLeftRadius", dockBottomLeftRadius],
+            ["dockBottomRightRadius", dockBottomRightRadius],
+            ["dockBorderWidth", dockBorderWidth],
+            ["dockBorderAlpha", dockBorderAlpha],
+            ["dockBorderColorVar", dockBorderColorVar],
+            ["dockBackgroundStyle", dockBackgroundStyle],
+            ["dockPosition", dockPosition],
+            ["dockStartIcon", dockStartIcon],
+            ["dockLayer", dockLayer],
+            ["dockReserveSpace", dockReserveSpace],
+            ["dockVisible", dockVisible],
+            ["desktopIconSize", desktopIconSize],
+            ["desktopLabelSize", desktopLabelSize],
+            ["desktopLabelRadius", desktopLabelRadius],
+            ["desktopVisible", desktopVisible],
+            ["clockTextSize", clockTextSize],
+            ["clockIconSize", clockIconSize],
+            ["clockWorldCities", JSON.stringify(clockWorldCities)],
+        ]
+    }
 
-        _settings.setValue("showUpdates", showUpdates)
-        _settings.setValue("showPowerProfiles", showPowerProfiles)
-        _settings.setValue("showOverview", showOverview)
-        _settings.setValue("showNotifications", showNotifications)
-        _settings.setValue("showWallpaper", showWallpaper)
-        _settings.setValue("showTray", showTray)
-        _settings.setValue("showBluetooth", showBluetooth)
-        //_settings.setValue("showWindow", showWindow)
-        _settings.setValue("showDistro", showDistro)
-        // ── Launcher (GJS app-launcher) ───────────────────────────────────
-        _settings.setValue("launcherSearchWidth",     launcherSearchWidth)
-        _settings.setValue("launcherIconSize",        launcherIconSize)
-        _settings.setValue("launcherTextFontSize",    launcherTextFontSize)
-        _settings.setValue("launcherFixedTileWidth",  launcherFixedTileWidth)
-        _settings.setValue("launcherFixedTileHeight", launcherFixedTileHeight)
-        _settings.setValue("launcherFrameWidth",      launcherFrameWidth)
-        _settings.setValue("launcherFrameHeight",     launcherFrameHeight)
-        _settings.setValue("launcherFrameWidthVert",  launcherFrameWidthVert)
-        _settings.setValue("launcherFrameHeightVert", launcherFrameHeightVert)
-        _settings.setValue("launcherBorderRadius",    launcherBorderRadius)
-        _settings.setValue("launcherBorderWidth",     launcherBorderWidth)
-        _settings.setValue("launcherSearchRadius",    launcherSearchRadius)
-        _settings.setValue("launcherListRadius",      launcherListRadius)
-        _settings.setValue("launcherInnerBorderWidth",launcherInnerBorderWidth)
-        _settings.setValue("launcherInnerPadding",    launcherInnerPadding)
-        // Bar autohide + dock runtime state
-        _settings.setValue("barAutoHide",      barAutoHide)
-        _settings.setValue("barAutoHideDelay", barAutoHideDelay)
-        _settings.setValue("triLeftAutoHide",        triLeftAutoHide)
-        _settings.setValue("triLeftAutoHideDelay",   triLeftAutoHideDelay)
-        _settings.setValue("triCenterAutoHide",      triCenterAutoHide)
-        _settings.setValue("triCenterAutoHideDelay", triCenterAutoHideDelay)
-        _settings.setValue("triRightAutoHide",       triRightAutoHide)
-        _settings.setValue("triRightAutoHideDelay",  triRightAutoHideDelay)
-        _settings.setValue("dockAutoHide",     dockAutoHide)
-        _settings.setValue("dockAutoHideDelay",dockAutoHideDelay)
-        _settings.setValue("dockMargin",       dockMargin)
-        // ── Dock appearance (qs-native dock) ──
-        _settings.setValue("dockIconSize",        dockIconSize)
-        _settings.setValue("dockStartIconSize",   dockStartIconSize)
-        _settings.setValue("dockTrashIconSize",   dockTrashIconSize)
-        _settings.setValue("dockStartIconScale",  dockStartIconScale)
-        _settings.setValue("dockTrashIconScale",  dockTrashIconScale)
-        _settings.setValue("dockButtonSpacing",   dockButtonSpacing)
-        _settings.setValue("dockInnerPadding",    dockInnerPadding)
-        _settings.setValue("dockPadding",         dockPadding)
-        _settings.setValue("dockRadius",          dockRadius)
-        _settings.setValue("dockTopLeftRadius",   dockTopLeftRadius)
-        _settings.setValue("dockTopRightRadius",  dockTopRightRadius)
-        _settings.setValue("dockBottomLeftRadius",dockBottomLeftRadius)
-        _settings.setValue("dockBottomRightRadius",dockBottomRightRadius)
-        _settings.setValue("dockBorderWidth",     dockBorderWidth)
-        _settings.setValue("dockBorderAlpha",     dockBorderAlpha)
-        _settings.setValue("dockBorderColorVar",  dockBorderColorVar)
-        _settings.setValue("dockBackgroundStyle", dockBackgroundStyle)
-        _settings.setValue("dockPosition",        dockPosition)
-        _settings.setValue("dockStartIcon",       dockStartIcon)
-        _settings.setValue("dockLayer",           dockLayer)
-        _settings.setValue("dockReserveSpace",    dockReserveSpace)
-        _settings.setValue("dockVisible",         dockVisible)
-        _settings.setValue("desktopIconSize",    desktopIconSize)
-        _settings.setValue("desktopLabelSize",   desktopLabelSize)
-        _settings.setValue("desktopLabelRadius", desktopLabelRadius)
-        _settings.setValue("desktopVisible",     desktopVisible)
-        _settings.setValue("clockTextSize",      clockTextSize)
-        _settings.setValue("clockIconSize",      clockIconSize)
-        _settings.setValue("clockWorldCities",   JSON.stringify(clockWorldCities))
+    // Serialize all persisted values into the QSettings backend.
+    function _saveSettings() {
+        var p = _persistPairs()
+        for (var i = 0; i < p.length; i++) _settings.setValue(p[i][0], p[i][1])
+    }
+
+    // Change-detector: signature of current persisted state. The periodic save
+    // only touches disk when this changes (no idle re-writes of identical bytes).
+    // String-coercion is used (not JSON.stringify) so QML color values fold to a
+    // stable "#hex" and list values (already JSON-encoded above) compare by value.
+    function _persistSig() {
+        var p = _persistPairs(), s = ""
+        for (var i = 0; i < p.length; i++) s += p[i][0] + "\u0000" + p[i][1] + "\u0001"
+        return s
     }
 
     // ═══════════════════════════════════════════════════════════════════════

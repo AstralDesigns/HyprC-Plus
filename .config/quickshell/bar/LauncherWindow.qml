@@ -64,6 +64,34 @@ Item {
             readonly property real cardH: isVert ? Config.launcherFrameHeightVert
                                                  : Config.launcherFrameHeight
 
+            // ── Drag-resize (kept in sync with Control Center ▸ Menus  Window Size) ──
+            // The card is anchored to the dock edge and centred on the other axis,
+            // so a grabbed edge must track the cursor 2:1 on the centred axis and
+            // 1:1 on the anchored axis. Ranges mirror the CC sliders exactly.
+            readonly property real minCardW: isVert ? 240 : 320
+            readonly property real maxCardW: 2000
+            readonly property real minCardH: 300
+            readonly property real maxCardH: 2000
+            readonly property real wGrowFactor: isVert ? 1 : 2
+            readonly property real hGrowFactor: isVert ? 2 : 1
+            readonly property real curW: isVert ? Config.launcherFrameWidthVert
+                                                : Config.launcherFrameWidth
+            readonly property real curH: isVert ? Config.launcherFrameHeightVert
+                                                : Config.launcherFrameHeight
+            function setW(v) { v = Math.max(minCardW, Math.min(maxCardW, Math.round(v / 5) * 5))
+                if (isVert) Config.launcherFrameWidthVert = v; else Config.launcherFrameWidth = v }
+            function setH(v) { v = Math.max(minCardH, Math.min(maxCardH, Math.round(v / 5) * 5))
+                if (isVert) Config.launcherFrameHeightVert = v; else Config.launcherFrameHeight = v }
+            // Free (resizable) edges = everything except the dock-anchored side.
+            readonly property bool dockTop:    DockState.position === "top"
+            readonly property bool dockBottom: DockState.position === "bottom"
+            readonly property bool dockLeft:   DockState.position === "left"
+            readonly property bool dockRight:  DockState.position === "right"
+            readonly property bool wFreeLeft:   !isVert || dockRight
+            readonly property bool wFreeRight:  !isVert || dockLeft
+            readonly property bool hFreeTop:     isVert || dockBottom
+            readonly property bool hFreeBottom:  isVert || dockTop
+
             // ── Shared style shorthands ───────────────────────────────────
             readonly property color wColor2: Qt.color(Theme.wallustColors?.color2
                                                       ?? Theme.cSecondary)
@@ -2394,8 +2422,109 @@ Item {
 
             // ── Backdrop: click outside the card dismisses ────────────────
             MouseArea {
+                id: backdrop
                 anchors.fill: parent
                 onClicked: win.dismiss()
+            }
+
+            // ── Edge resize grips (children of win, above the card, unclipped) ──
+            // Coordinates are mapped to the stable full-screen `backdrop` so the
+            // drag doesn't feed back as the card (and thus the grip) moves.
+            MouseArea {
+                id: gripRight
+                z: 1000
+                enabled: win.wFreeRight
+                visible: enabled
+                hoverEnabled: true
+                width: 12; height: card.height
+                x: card.x + card.width - width / 2
+                y: card.y
+                cursorShape: Qt.SizeHorCursor
+                property real _px; property real _pw
+                onPressed: { _px = mapToItem(backdrop, mouse.x, 0).x; _pw = win.curW }
+                onPositionChanged: function (mouse) {
+                    if (!pressed) return
+                    var p = mapToItem(backdrop, mouse.x, 0).x
+                    win.setW(_pw + win.wGrowFactor * (p - _px))
+                }
+                Rectangle {
+                    anchors.centerIn: parent; width: 4; height: 30; radius: 2
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b,
+                                   gripRight.containsMouse ? 0.9 : 0.35)
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                }
+            }
+            MouseArea {
+                id: gripLeft
+                z: 1000
+                enabled: win.wFreeLeft
+                visible: enabled
+                hoverEnabled: true
+                width: 12; height: card.height
+                x: card.x - width / 2
+                y: card.y
+                cursorShape: Qt.SizeHorCursor
+                property real _px; property real _pw
+                onPressed: { _px = mapToItem(backdrop, mouse.x, 0).x; _pw = win.curW }
+                onPositionChanged: function (mouse) {
+                    if (!pressed) return
+                    var p = mapToItem(backdrop, mouse.x, 0).x
+                    win.setW(_pw + win.wGrowFactor * (_px - p))
+                }
+                Rectangle {
+                    anchors.centerIn: parent; width: 4; height: 30; radius: 2
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b,
+                                   gripLeft.containsMouse ? 0.9 : 0.35)
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                }
+            }
+            MouseArea {
+                id: gripTop
+                z: 1000
+                enabled: win.hFreeTop
+                visible: enabled
+                hoverEnabled: true
+                width: card.width; height: 12
+                x: card.x
+                y: card.y - height / 2
+                cursorShape: Qt.SizeVerCursor
+                property real _py; property real _ph
+                onPressed: { _py = mapToItem(backdrop, 0, mouse.y).y; _ph = win.curH }
+                onPositionChanged: function (mouse) {
+                    if (!pressed) return
+                    var p = mapToItem(backdrop, 0, mouse.y).y
+                    win.setH(_ph + win.hGrowFactor * (_py - p))
+                }
+                Rectangle {
+                    anchors.centerIn: parent; width: 30; height: 4; radius: 2
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b,
+                                   gripTop.containsMouse ? 0.9 : 0.35)
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                }
+            }
+            MouseArea {
+                id: gripBottom
+                z: 1000
+                enabled: win.hFreeBottom
+                visible: enabled
+                hoverEnabled: true
+                width: card.width; height: 12
+                x: card.x
+                y: card.y + card.height - height / 2
+                cursorShape: Qt.SizeVerCursor
+                property real _py; property real _ph
+                onPressed: { _py = mapToItem(backdrop, 0, mouse.y).y; _ph = win.curH }
+                onPositionChanged: function (mouse) {
+                    if (!pressed) return
+                    var p = mapToItem(backdrop, 0, mouse.y).y
+                    win.setH(_ph + win.hGrowFactor * (p - _py))
+                }
+                Rectangle {
+                    anchors.centerIn: parent; width: 30; height: 4; radius: 2
+                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b,
+                                   gripBottom.containsMouse ? 0.9 : 0.35)
+                    Behavior on color { ColorAnimation { duration: 120 } }
+                }
             }
 
             // ══════════════════════════════════════════════════════════════
