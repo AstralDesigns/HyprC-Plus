@@ -1304,7 +1304,7 @@ PanelWindow {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: { userTab._returnTo = mainStack.currentIndex; mainStack.currentIndex = 10 }   // open User tab
+                                    onClicked: { if (mainStack.currentIndex !== 10) userTab._returnTo = mainStack.currentIndex; mainStack.currentIndex = 10 }   // open User tab (don't clobber _returnTo on multi-click)
                                 }
                             }
                         }
