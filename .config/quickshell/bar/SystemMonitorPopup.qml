@@ -74,6 +74,19 @@ Item {
         if (!s) return ""
         return s.length > n ? s.slice(0, n) + "\u2026" : s
     }
+    // Short vendor label for a GPU dial's arc-gap text (preferred over the raw
+    // driver name). Derived from the driver/type field so it stays stable even
+    // when the lspci product name is empty.
+    function _vendor(g) {
+        const t = (g && g.type ? g.type : "").toLowerCase()
+        if (t === "nvidia" || t === "nouveau") return "NVIDIA"
+        if (t === "amdgpu" || t === "radeon")  return "AMD"
+        if (t === "i915"   || t === "xe")       return "Intel"
+        if (t === "vc4"    || t === "v3d")      return "Broadcom"
+        if (t === "panfury" || t === "lima")    return "Arm"
+        // Unknown driver: fall back to a truncated product name, else the driver.
+        return g && g.name ? _trunc(g.name, 8) : _trunc(t, 8)
+    }
 
     // ── Poller ────────────────────────────────────────────────────────────
     // Notes on separator choice:
@@ -281,6 +294,9 @@ Item {
         // independent workload (NVIDIA Optimus pattern). For AMD/Intel combos,
         // show both so the user can see integrated workload separately.
         // Policy: always show dGPUs; show iGPUs always too (both are useful).
+        // Order the accelerator dials so any iGPU precedes the dGPU(s); the NPU
+        // dial(s) are inserted ahead of all GPUs in GaugesCard._dials.
+        gpus.sort((a, b) => (b.isIgpu ? 1 : 0) - (a.isIgpu ? 1 : 0))
         _gpus = gpus
         // Mark data as ready — unlocks the popup enter-animation
         _hasData = true
@@ -292,46 +308,134 @@ Item {
         onTriggered: if (!sysProc.running) sysProc.running = true
     }
 
-    // ── Arc gauge (popup) — data inside the ring, colored icon in the title ───
-    // The ring interior carries the readout: the primary value large, plus a
-    // secondary measure (RAM/Swap usage, GPU temp, battery state) on a small line
-    // beneath it when present. The colored glyph moves out of the dial into the
-    // title row (icon + label) that sits right under the ring, which frees the
-    // larger popup ring to show bigger data text.
+    // ── Unified dial list ───────────────────────────────────────────────────
+    // Single source of truth shared by the popup GaugesCard and the widget's
+    // per-dial cards. Order: NPU first, then iGPU before dGPU(s); battery last.
+    readonly property var _dials: {
+        let list = []
+        // 1. CPU
+        list.push({
+            value: scope._cpu,
+            glyph: "󰻠",
+            label: "CPU",
+            valStr: Math.round(scope._cpu * 100) + "%",
+            sub: "",
+            arcColor: Theme.cWc5
+        })
+        // 2. RAM
+        list.push({
+            value: scope._ram,
+            glyph: "󰍛",
+            label: "RAM",
+            valStr: Math.round(scope._ram * 100) + "%",
+            sub: scope._fmtBytes(scope._ramUsed),
+            arcColor: Theme.cWc5
+        })
+        // 3. Temp
+        list.push({
+            value: scope._tempOk ? Math.min(scope._temp / 100, 1) : 0,
+            glyph: "󰔏",
+            label: "Temp",
+            valStr: scope._tempOk ? Math.round(scope._temp) + "°" : "N/A",
+            sub: "",
+            arcColor: scope._tempOk && scope._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cWc4
+        })
+        // 4. Swap (if swapOk)
+        if (scope._swapOk) {
+            list.push({
+                value: scope._swap,
+                glyph: "",
+                label: "Swap",
+                valStr: Math.round(scope._swap * 100) + "%",
+                sub: scope._fmtBytes(scope._swapUsed),
+                arcColor: Theme.cWc4
+            })
+        }
+        // 5. NPU (from SystemMonitorPopupState.npus)
+        for (let i = 0; i < SystemMonitorPopupState.npus.length; i++) {
+            const npu = SystemMonitorPopupState.npus[i]
+            list.push({
+                value: (npu.pct || 0) / 100,
+                glyph: "󰧑",
+                label: "NPU" + (npu.name ? " " + scope._trunc(npu.name, 8) : ""),
+                valStr: (npu.pct || 0) + "%",
+                sub: "",
+                arcColor: Theme.cWc1
+            })
+        }
+        // 6. GPUs — all detected GPUs shown (iGPU precedes dGPU via _parse sort)
+        for (let i = 0; i < scope._gpus.length; i++) {
+            const gpu = scope._gpus[i]
+            list.push({
+                value: (gpu.pct || 0) / 100,
+                glyph: gpu.isIgpu ? "󱤓" : "󰢮",
+                gapText: scope._vendor(gpu),
+                label: (gpu.isIgpu ? "iGPU" : "dGPU") + (gpu.name ? " " + scope._trunc(gpu.name, 8) : ""),
+                valStr: (gpu.pct || 0) + "%",
+                sub: gpu.temp > 0 ? gpu.temp + "°" : "",
+                arcColor: Theme.cWc3
+            })
+        }
+        // 7. Battery — laptops only; hidden on desktops
+        if (scope._hasBat) {
+            const bPct = scope._batPct
+            const bSta = scope._batStatus
+            list.push({
+                value: bPct / 100,
+                glyph: bPct > 80 ? "󰁹" : bPct > 60 ? "󰂀" : bPct > 40 ? "󰁾" : bPct > 20 ? "󰁼" : "󰁺",
+                label: "Battery",
+                valStr: bPct + "%",
+                sub: bSta === "Charging" ? "󰂄" : "󰂌",
+                subGlyph: true,
+                arcColor: bPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1) : bSta === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1) : Theme.cWc6
+            })
+        }
+        return list
+    }
+
+    // ── Arc gauge (popup) — value+sub inside the ring, icon in the bottom gap ─
+    // The 270° ring leaves an open gap at the bottom centre; the metric's colored
+    // glyph now sits in that gap instead of a separate title row (the "CPU"/"RAM"
+    // … labels are gone). GPU dials put a short vendor name (Intel/AMD/NVIDIA) in
+    // the gap via `gapText` instead of the glyph. The ring interior carries the
+    // primary value large with an optional small secondary line beneath it.
     component ArcGauge: Item {
         id: ag
         property real   value:    0
         property string glyph:    ""
-        property string label:    ""
+        property string gapText:  ""     // when non-empty, replaces the gap glyph
         property string valStr:   "--"
         property string sub:      ""
+        property bool   subGlyph: false  // sub is a Nerd-Font icon (battery charge) → bigger + icon font
         property color  arcColor: Theme.cPrimary
 
         implicitWidth:  88
-        implicitHeight: 96
+        implicitHeight: 84
 
         Behavior on value { NumberAnimation { duration: 800; easing.type: Easing.OutCubic } }
 
         Canvas {
             id: arcC
             anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter
-            width: 78; height: 78
+            width: 82; height: 82
 
             property real   _v:  ag.value
             property color  _ac: ag.arcColor
             property string _vt: ag.valStr
             property string _sb: ag.sub
+            property bool   _sg: ag.subGlyph
 
             on_VChanged:  requestPaint()
             on_AcChanged: requestPaint()
             on_VtChanged: requestPaint()
             on_SbChanged: requestPaint()
+            on_SgChanged: requestPaint()
             Component.onCompleted: requestPaint()
 
             onPaint: {
                 const ctx = getContext("2d")
                 ctx.clearRect(0, 0, width, height)
-                const cx = width/2, cy = height/2, r = 31, lw = 6
+                const cx = width/2, cy = height/2, r = 33, lw = 6
                 const S = 0.75*Math.PI, E = 2.25*Math.PI
                 const onS = Theme.cOnSecondary
                 ctx.lineWidth = lw; ctx.lineCap = "round"
@@ -342,68 +446,77 @@ Item {
                     ctx.beginPath(); ctx.arc(cx, cy, r, S, S + _v*(E-S))
                     ctx.strokeStyle = _ac.toString(); ctx.stroke()
                 }
-                // Data centered inside the ring — value large, optional sub small.
+                // Data centered in the ring, nudged up to leave the bottom gap
+                // clear for the icon/vendor text. Sub line is 2px smaller than
+                // before to keep the ring interior tidy.
                 ctx.textAlign = "center"
+                ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.94).toString()
                 if (_sb) {
-                    ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.94).toString()
                     ctx.font = "bold 15px '" + Config.labelFont + "'"
                     ctx.textBaseline = "bottom"
-                    ctx.fillText(_vt, cx, cy + 1)
-                    ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.94).toString()
-                    ctx.font = "11px '" + Config.labelFont + "'"
-                    ctx.textBaseline = "top"
-                    ctx.fillText(_sb, cx, cy + 2)
+                    ctx.fillText(_vt, cx, cy - 2)
+                    if (_sg) {
+                        // Battery charge/discharge glyph: drawn with the icon
+                        // font. Shifted ~1px left to cancel the glyph's extra
+                        // left side-bearing (advance-width centering sits right).
+                        ctx.font = "12px '" + Config.fontFamily + "'"
+                        ctx.textBaseline = "top"
+                        ctx.fillText(_sb, cx - 1, cy + 1)
+                    } else {
+                        ctx.font = "10px '" + Config.labelFont + "'"
+                        ctx.textBaseline = "top"
+                        ctx.fillText(_sb, cx, cy)
+                    }
                 } else {
-                    ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.94).toString()
                     ctx.font = "bold 15px '" + Config.labelFont + "'"
                     ctx.textBaseline = "middle"
-                    ctx.fillText(_vt, cx, cy)
+                    ctx.fillText(_vt, cx, cy - 5)
                 }
             }
         }
 
-        // Title row — colored glyph (at text height) just before the label,
-        // sitting close under the ring's bottom edge.
-        Row {
-            anchors.top: arcC.bottom; anchors.topMargin: 1
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 4
-            Text {
-                text: ag.glyph; color: Theme.cOnSecondary
-                font.pixelSize: 13; font.family: Config.fontFamily
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Text {
-                text: ag.label.trim(); color: Theme.cOnSecondary
-                font.pixelSize: 12; font.family: Config.labelFont
-                anchors.verticalCenter: parent.verticalCenter
-            }
+        // Bottom-gap content: the metric glyph (most dials) or a short vendor
+        // name (GPU dials). Positioned in the open 90° gap at the ring's base.
+        Text {
+            visible: ag.gapText === "" && ag.glyph !== ""
+            text: ag.glyph; color: Theme.cOnSecondary
+            font.pixelSize: 15; font.family: Config.fontFamily
+            anchors.horizontalCenter: arcC.horizontalCenter
+            anchors.bottom: arcC.bottom; anchors.bottomMargin: 8
+        }
+        Text {
+            visible: ag.gapText !== ""
+            text: ag.gapText; color: Theme.cOnSecondary
+            font.pixelSize: 9; font.family: Config.labelFont
+            anchors.horizontalCenter: arcC.horizontalCenter
+            anchors.bottom: arcC.bottom; anchors.bottomMargin: 8
         }
     }
 
 
-    // ── Compact gauge (widget) — small ring, value inside, icon+label below ───
-    // Minimal grid cell: a small arc ring with the value centered inside it, then
-    // the metric's glyph (at text height, just before the label) and label on the
-    // next line, with an optional dim sub line. All text/value is cOnSecondary —
-    // only the arc stroke keeps the per-gauge matugen/wallust color. Cells are
-    // laid out 2-per-row with the same pair + odd-remainder logic as the popup.
+
+    // ── Compact gauge (widget) — value+sub inside the ring, glyph in the gap ──
+    // Minimal grid cell mirroring the popup layout but smaller: the ring carries
+    // the value (large) with an optional sub line beneath it, and the metric's
+    // glyph sits in the open bottom gap. No labels, and (unlike the popup GPUs)
+    // the widget always shows the glyph rather than a vendor name.
     component CompactGauge: Item {
         id: cg
         property real   value:    0
         property string glyph:    ""
-        property string label:    ""
+        property string gapText:  ""     // widget ignores this — always shows the glyph
         property string valStr:   "--"
         property string sub:      ""
+        property bool   subGlyph: false  // sub is a Nerd-Font icon (battery charge) → bigger + icon font
         property color  arcColor: Theme.cPrimary
-        property int    ringSize: 52
+        property int    ringSize: 68
 
         implicitWidth:  88
-        implicitHeight: ringSize + 32
+        implicitHeight: ringSize + 6
 
         Behavior on value { NumberAnimation { duration: 800; easing.type: Easing.OutCubic } }
 
-        // Small arc ring with the value centered inside (cOnSecondary).
+        // Small arc ring: value (+ optional sub) centered inside.
         Canvas {
             id: cgRing
             anchors.top: parent.top; anchors.horizontalCenter: parent.horizontalCenter
@@ -412,9 +525,13 @@ Item {
             property real   _v: cg.value
             property color  _ac: cg.arcColor
             property string _vt: cg.valStr
+            property string _sb: cg.sub
+            property bool   _sg: cg.subGlyph
             on_VChanged:  requestPaint()
             on_AcChanged: requestPaint()
             on_VtChanged: requestPaint()
+            on_SbChanged: requestPaint()
+            on_SgChanged: requestPaint()
             Component.onCompleted: requestPaint()
 
             onPaint: {
@@ -422,50 +539,119 @@ Item {
                 ctx.clearRect(0, 0, width, height)
                 const cx = width/2, cy = height/2, lw = 5, r = cx - lw
                 const S = 0.75*Math.PI, E = 2.25*Math.PI
+                const onS = Theme.cOnSecondary
                 ctx.lineWidth = lw; ctx.lineCap = "round"
                 ctx.beginPath(); ctx.arc(cx, cy, r, S, E)
-                ctx.strokeStyle = Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35).toString()
+                ctx.strokeStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.35).toString()
                 ctx.stroke()
                 if (_v > 0.005) {
                     ctx.beginPath(); ctx.arc(cx, cy, r, S, S + _v*(E-S))
                     ctx.strokeStyle = _ac.toString(); ctx.stroke()
                 }
-                ctx.fillStyle = Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.92).toString()
-                ctx.font = "bold " + Math.round(width*0.24) + "px '" + Config.labelFont + "'"
-                ctx.textAlign = "center"; ctx.textBaseline = "middle"
-                ctx.fillText(_vt, cx, cy)
+                // Value + optional sub inside the ring, nudged up for the gap glyph.
+                ctx.fillStyle = Qt.rgba(onS.r, onS.g, onS.b, 0.92).toString()
+                ctx.textAlign = "center"
+                const vpx = Math.round(width*0.24)
+                if (_sb) {
+                    ctx.font = "bold " + vpx + "px '" + Config.labelFont + "'"
+                    ctx.textBaseline = "bottom"
+                    ctx.fillText(_vt, cx, cy)
+                    if (_sg) {
+                        // Battery charge/discharge glyph: icon font, shifted ~1px
+                        // left to cancel the glyph's extra left side-bearing.
+                        ctx.font = Math.round(width*0.19) + "px '" + Config.fontFamily + "'"
+                        ctx.textBaseline = "top"
+                        ctx.fillText(_sb, cx - 1, cy + 1)
+                    } else {
+                        ctx.font = Math.round(width*0.15) + "px '" + Config.labelFont + "'"
+                        ctx.textBaseline = "top"
+                        ctx.fillText(_sb, cx, cy + 1)
+                    }
+                } else {
+                    ctx.font = "bold " + vpx + "px '" + Config.labelFont + "'"
+                    ctx.textBaseline = "middle"
+                    ctx.fillText(_vt, cx, cy - 3)
+                }
             }
         }
 
-        // Icon (at text height, just before the label) + label, then optional sub.
-        Column {
-            anchors.top: cgRing.bottom; anchors.topMargin: 3
-            anchors.horizontalCenter: parent.horizontalCenter
-            spacing: 0
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 3
-                Text {
-                    text: cg.glyph; color: Theme.cOnSecondary
-                    font.pixelSize: 11; font.family: Config.fontFamily
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Text {
-                    text: cg.label.trim(); color: Theme.cOnSecondary
-                    font.pixelSize: 11; font.family: Config.labelFont
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-            }
-            Text {
-                visible: cg.sub !== ""
-                text: cg.sub
-                color: Theme.cOnSecondary
-                font.pixelSize: 10; font.family: Config.labelFont
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
+        // Metric glyph in the ring's bottom gap (no label / vendor text).
+        Text {
+            visible: cg.glyph !== ""
+            text: cg.glyph; color: Theme.cOnSecondary
+            font.pixelSize: 13; font.family: Config.fontFamily
+            anchors.horizontalCenter: cgRing.horizontalCenter
+            anchors.bottom: cgRing.bottom; anchors.bottomMargin: 5
         }
     }
 
+
+
+    // ── Widget per-dial mini card ──────────────────────────────────────────
+    // Each dial gets its own bordered tile so the widget reads as a cluster of
+    // small cards instead of one slab. All tiles live inside the single
+    // PinnedWidgetWindow body, so one drag anywhere still moves the whole grid.
+    component WidgetDialCard: Rectangle {
+        id: wdc
+        required property var root
+        required property var dial
+        implicitWidth: 100
+        implicitHeight: 82
+        radius: 16
+        color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                       Theme.cSurfaceTint.b, 0.65)
+        border.width: 1
+        border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+
+        CompactGauge {
+            anchors.centerIn: parent
+            value:    wdc.dial ? wdc.dial.value : 0
+            glyph:    wdc.dial ? wdc.dial.glyph : ""
+            gapText:  (wdc.dial && wdc.dial.gapText) ? wdc.dial.gapText : ""
+            subGlyph: (wdc.dial && wdc.dial.subGlyph) === true
+            valStr:   wdc.dial ? wdc.dial.valStr : "--"
+            sub:      wdc.dial ? wdc.dial.sub : ""
+            arcColor: wdc.dial ? wdc.dial.arcColor : Theme.cPrimary
+        }
+    }
+
+    // ── Widget Load / Uptime footer card (separate from the dials) ─────────
+    component WidgetFooterCard: Rectangle {
+        id: wfc
+        required property var root
+        implicitHeight: 30
+        radius: 16
+        color: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
+                       Theme.cSurfaceTint.b, 0.65)
+        border.width: 1
+        border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
+
+        RowLayout {
+            anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
+            spacing: 5
+            Text {
+                text: "󰒋"; color: Theme.cOnSecondary
+                font.pixelSize: 11; font.family: Config.fontFamily
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                text: "Load: " + wfc.root._load; color: Theme.cOnPrimary
+                font.pixelSize: 10; font.family: Config.labelFont
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Item { Layout.fillWidth: true; Layout.preferredWidth: 1 }
+            Text {
+                text: "󰅐"; color: Theme.cOnSecondary
+                font.pixelSize: 11; font.family: Config.fontFamily
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Text {
+                text: "Up: " + wfc.root._uptime; color: Theme.cOnPrimary
+                font.pixelSize: 10; font.family: Config.labelFont
+                anchors.verticalCenter: parent.verticalCenter
+            }
+        }
+    }
 
     // ── Dials Card (used in popup panel and widget) ───────────────────────
     component GaugesCard: Rectangle {
@@ -479,86 +665,9 @@ Item {
         border.width: 1
         border.color: Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.85)
 
-        // Unified list of all active dials
-        readonly property var _dials: {
-            let list = []
-            // 1. CPU
-            list.push({
-                value: cardRoot.root._cpu,
-                glyph: "󰻠",
-                label: "CPU",
-                valStr: Math.round(cardRoot.root._cpu * 100) + "%",
-                sub: "",
-                arcColor: Theme.cWc5
-            })
-            // 2. RAM
-            list.push({
-                value: cardRoot.root._ram,
-                glyph: "󰍛",
-                label: "RAM",
-                valStr: Math.round(cardRoot.root._ram * 100) + "%",
-                sub: cardRoot.root._fmtBytes(cardRoot.root._ramUsed),
-                arcColor: Theme.cWc5
-            })
-            // 3. Temp
-            list.push({
-                value: cardRoot.root._tempOk ? Math.min(cardRoot.root._temp / 100, 1) : 0,
-                glyph: "󰔏",
-                label: "Temp",
-                valStr: cardRoot.root._tempOk ? Math.round(cardRoot.root._temp) + "°" : "N/A",
-                sub: "",
-                arcColor: cardRoot.root._tempOk && cardRoot.root._temp > 80 ? Qt.rgba(1.0, 0.4, 0.2, 1) : Theme.cWc4
-            })
-            // 4. Swap (if swapOk)
-            if (cardRoot.root._swapOk) {
-                list.push({
-                    value: cardRoot.root._swap,
-                    glyph: "󰾴",
-                    label: "Swap",
-                    valStr: Math.round(cardRoot.root._swap * 100) + "%",
-                    sub: cardRoot.root._fmtBytes(cardRoot.root._swapUsed),
-                    arcColor: Theme.cWc4
-                })
-            }
-            // 5. NPU (from SystemMonitorPopupState.npus)
-            for (let i = 0; i < SystemMonitorPopupState.npus.length; i++) {
-                const npu = SystemMonitorPopupState.npus[i]
-                list.push({
-                    value: (npu.pct || 0) / 100,
-                    glyph: "󰧑",
-                    label: "NPU" + (npu.name ? " " + cardRoot.root._trunc(npu.name, 8) : ""),
-                    valStr: (npu.pct || 0) + "%",
-                    sub: "",
-                    arcColor: Theme.cWc1
-                })
-            }
-            // 6. GPUs — all detected GPUs shown (iGPU and dGPU both visible)
-            for (let i = 0; i < cardRoot.root._gpus.length; i++) {
-                const gpu = cardRoot.root._gpus[i]
-                list.push({
-                    value: (gpu.pct || 0) / 100,
-                    glyph: gpu.isIgpu ? "󱤓" : "󰢮",
-                    label: (gpu.isIgpu ? "iGPU" : "dGPU") + (gpu.name ? " " + cardRoot.root._trunc(gpu.name, 8) : ""),
-                    valStr: (gpu.pct || 0) + "%",
-                    sub: gpu.temp > 0 ? gpu.temp + "°" : "",
-                    arcColor: Theme.cWc3
-                })
-            }
-            // 7. Battery — laptops only; hidden on desktops
-            if (cardRoot.root._hasBat) {
-                const bPct = cardRoot.root._batPct
-                const bSta = cardRoot.root._batStatus
-                list.push({
-                    value: bPct / 100,
-                    glyph: bPct > 80 ? "󰁹" : bPct > 60 ? "󰂀" : bPct > 40 ? "󰁾" : bPct > 20 ? "󰁼" : "󰁺",
-                    label: "Battery",
-                    valStr: bPct + "%",
-                    sub: bSta === "Charging" ? "󰂄" : "󰂌",
-                    arcColor: bPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1) : bSta === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1) : Theme.cWc6
-                })
-            }
-            return list
-        }
+        // Unified dial list lives on `scope._dials` so the popup and the
+        // widget's per-dial cards read from a single source.
+        readonly property var _dials: cardRoot.root._dials
 
         readonly property int _pairCount: Math.floor(_dials.length / 2)
         readonly property bool _hasOddRemainder: _dials.length % 2 === 1
@@ -567,8 +676,8 @@ Item {
         implicitWidth: 88 * 2 + 12 + 24
         // Row stack + spacing + 24px internal padding (12 top + 12 bottom) + 28px footer
         implicitHeight: compact
-            ? (_rowCount * 84 + Math.max(0, _rowCount - 1) * 10 + 24 + 28)
-            : (_rowCount * 96 + Math.max(0, _rowCount - 1) * 10 + 24 + 28)
+            ? (_rowCount * 66 + Math.max(0, _rowCount - 1) * 10 + 24 + 28)
+            : (_rowCount * 84 + Math.max(0, _rowCount - 1) * 10 + 24 + 28)
 
         ColumnLayout {
             id: dialsCol
@@ -595,7 +704,8 @@ Item {
                         readonly property var d: cardRoot._dials[index * 2]
                         value:    d ? d.value : 0
                         glyph:    d ? d.glyph : ""
-                        label:    d ? d.label : ""
+                        gapText:  (d && d.gapText) ? d.gapText : ""
+                        subGlyph: (d && d.subGlyph) === true
                         valStr:   d ? d.valStr : "--"
                         sub:      d ? d.sub : ""
                         arcColor: d ? d.arcColor : Theme.cPrimary
@@ -605,7 +715,8 @@ Item {
                         readonly property var d: cardRoot._dials[index * 2 + 1]
                         value:    d ? d.value : 0
                         glyph:    d ? d.glyph : ""
-                        label:    d ? d.label : ""
+                        gapText:  (d && d.gapText) ? d.gapText : ""
+                        subGlyph: (d && d.subGlyph) === true
                         valStr:   d ? d.valStr : "--"
                         sub:      d ? d.sub : ""
                         arcColor: d ? d.arcColor : Theme.cPrimary
@@ -618,14 +729,15 @@ Item {
                 visible: cardRoot._hasOddRemainder && !cardRoot.compact
                 Layout.alignment: Qt.AlignHCenter
                 implicitWidth: 88
-                implicitHeight: 96
+                implicitHeight: 84
 
                 ArcGauge {
                     anchors.centerIn: parent
                     readonly property var d: cardRoot._hasOddRemainder ? cardRoot._dials[cardRoot._dials.length - 1] : null
                     value:    d ? d.value : 0
                     glyph:    d ? d.glyph : ""
-                    label:    d ? d.label : ""
+                    gapText:  (d && d.gapText) ? d.gapText : ""
+                    subGlyph: (d && d.subGlyph) === true
                     valStr:   d ? d.valStr : "--"
                     sub:      d ? d.sub : ""
                     arcColor: d ? d.arcColor : Theme.cPrimary
@@ -645,7 +757,8 @@ Item {
                         readonly property var d: cardRoot._dials[index * 2]
                         value:    d ? d.value : 0
                         glyph:    d ? d.glyph : ""
-                        label:    d ? d.label : ""
+                        gapText:  (d && d.gapText) ? d.gapText : ""
+                        subGlyph: (d && d.subGlyph) === true
                         valStr:   d ? d.valStr : "--"
                         sub:      d ? d.sub : ""
                         arcColor: d ? d.arcColor : Theme.cPrimary
@@ -655,7 +768,8 @@ Item {
                         readonly property var d: cardRoot._dials[index * 2 + 1]
                         value:    d ? d.value : 0
                         glyph:    d ? d.glyph : ""
-                        label:    d ? d.label : ""
+                        gapText:  (d && d.gapText) ? d.gapText : ""
+                        subGlyph: (d && d.subGlyph) === true
                         valStr:   d ? d.valStr : "--"
                         sub:      d ? d.sub : ""
                         arcColor: d ? d.arcColor : Theme.cPrimary
@@ -668,14 +782,15 @@ Item {
                 visible: cardRoot.compact && cardRoot._hasOddRemainder
                 Layout.alignment: Qt.AlignHCenter
                 implicitWidth: 88
-                implicitHeight: 84
+                implicitHeight: 66
 
                 CompactGauge {
                     anchors.centerIn: parent
                     readonly property var d: cardRoot._hasOddRemainder ? cardRoot._dials[cardRoot._dials.length - 1] : null
                     value:    d ? d.value : 0
                     glyph:    d ? d.glyph : ""
-                    label:    d ? d.label : ""
+                    gapText:  (d && d.gapText) ? d.gapText : ""
+                    subGlyph: (d && d.subGlyph) === true
                     valStr:   d ? d.valStr : "--"
                     sub:      d ? d.sub : ""
                     arcColor: d ? d.arcColor : Theme.cPrimary
@@ -841,20 +956,49 @@ Item {
             SystemMonitorPopupState.widgetY = Math.round(y)
         }
 
-        Rectangle {
-            implicitWidth: widgetDials.implicitWidth + 20
-            implicitHeight: widgetDials.implicitHeight + 20
-            radius: 24
-            color: Theme.blurBackground
-            border.width: Config.barBorderWidth
-            border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
-                                  Config.barBorderColor.b, Config.barBorderAlpha)
+        // Split-card widget: a 2-column grid of per-dial tiles plus a separate
+        // full-width Load/Uptime tile. No unifying slab — each tile draws its
+        // own border. The whole cluster sits in one PinnedWidgetWindow body, so
+        // a single drag anywhere moves everything together.
+        Item {
+            id: widgetBody
+            width: widgetCol.implicitWidth
+            height: widgetCol.implicitHeight
 
-            GaugesCard {
-                id: widgetDials
-                root: scope
-                compact: true
-                anchors.centerIn: parent
+            ColumnLayout {
+                id: widgetCol
+                anchors.left: parent.left
+                anchors.top: parent.top
+                spacing: 8
+
+                GridLayout {
+                    columns: 2
+                    columnSpacing: 8
+                    rowSpacing: 8
+
+                    Repeater {
+                        // Stable int model — delegates persist across the 2s poll
+                        // instead of being recreated each cycle (which re-ran the
+                        // 0→value enter animation and made the tiles "pulse").
+                        model: scope._dials.length
+                        delegate: WidgetDialCard {
+                            required property int index
+                            root: scope
+                            dial: scope._dials[index]
+                            // Lone tile on an odd final row spans both columns and
+                            // centers, mirroring the popup's odd-remainder handling.
+                            readonly property bool _lastOdd: scope._dials.length % 2 === 1
+                                                             && index === scope._dials.length - 1
+                            Layout.columnSpan: _lastOdd ? 2 : 1
+                            Layout.alignment: _lastOdd ? Qt.AlignHCenter : Qt.AlignLeft
+                        }
+                    }
+                }
+
+                WidgetFooterCard {
+                    root: scope
+                    Layout.fillWidth: true
+                }
             }
         }
     }
