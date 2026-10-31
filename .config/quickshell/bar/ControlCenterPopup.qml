@@ -3163,10 +3163,13 @@ PanelWindow {
                                         onClicked: {
                                             ccWin._currentLayout = modelData.key
                                             _layoutProc.command = ["bash", "-c",
-                                                // Persist to hyprviz.lua so the layout survives reload
+                                                // Persist to hyprviz.lua so the layout survives reload.
+                                                // Anchor on ^<ws>layout so ONLY the general-layout key
+                                                // is rewritten; without the anchor the pattern also
+                                                // matches the tail of input.kb_layout and clobbers it.
                                                 "f=\"$HOME/.config/hypr/hyprviz.lua\";" +
                                                 "[ -f \"$f\" ] && sed -i" +
-                                                "  's/\\(layout[[:space:]]*=[[:space:]]*\\)\"[^\"]*\"/\\1\"" + modelData.key + "\"/' \"$f\";" +
+                                                "  's/^\\([[:space:]]*layout[[:space:]]*=[[:space:]]*\\)\"[^\"]*\"/\\1\"" + modelData.key + "\"/' \"$f\";" +
                                                 // Apply immediately at runtime and reload so the
                                                 // persisted value in hyprviz.lua takes effect
                                                 "hyprctl keyword general:layout \"" + modelData.key + "\" 2>/dev/null;" +

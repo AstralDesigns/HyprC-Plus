@@ -38,7 +38,7 @@ pkgname=hyprcandy-qs
 pkgver=0.3.2
 pkgrel=1
 epoch=1
-pkgdesc="Quickshell rebuilt with the argc=1 QtWebEngine fix for the HyprCandy+ launcher"
+pkgdesc="Quickshell rebuilt with the argc=1 QtWebEngine fix + pinned OpenGL scene graph for the HyprCandy+ launcher"
 arch=('x86_64')
 url="https://github.com/quickshell-mirror/quickshell"
 license=('custom')
@@ -87,6 +87,49 @@ prepare() {
         exit 1
     }
     echo "hyprcandy-qs: patched $f argc 0->1 (QtWebEngine base::CommandLine fix)"
+
+    # Pin the Qt Quick scene graph to the OpenGL RHI. QtWebEngine (Chromium) only
+    # renders when the scene graph is on OpenGL; if Qt selects the Vulkan backend
+    # (incomplete on Ivy-Bridge-class GPUs) or the software backend, embedded
+    # WebEngine content fails to paint. Setting it here, before QGuiApplication is
+    # constructed, makes the choice binding and immune to a stray QSG_RHI_BACKEND.
+    # Guarded so a future quickshell that relocates the anchor FAILS THE BUILD
+    # LOUDLY instead of silently shipping an unpinned binary.
+    # NOTE: a previous revision also forced an 8-bit alpha plane (QSurfaceFormat
+    # setAlphaBufferSize) to fight the opaque-black transparent windows. That was a
+    # misdiagnosis: the black was a Hyprland 0.57 compositor regression (dmabuf
+    # layer surfaces losing alpha at composite time), fixed by holding Hyprland at
+    # 0.56.2, and is NOT a client-side surface-format problem. Alpha patch removed.
+    if ! grep -q 'hyprcandy-qs: pin the OpenGL scene graph' "$f"; then
+        cat > "$srcdir/qs-gl.py" <<'QSPYEOF'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+inc_anchor = '#include <qquickwindow.h>\n'
+assert s.count(inc_anchor) == 1, 'include anchor missing'
+if '#include <qsgrendererinterface.h>' not in s:
+    s = s.replace(inc_anchor, inc_anchor + '#include <qsgrendererinterface.h>\n')
+code_anchor = '\tQGuiApplication* app = nullptr;\n'
+assert s.count(code_anchor) == 1, 'app-decl anchor missing'
+patch = (
+    '\t// hyprcandy-qs: pin the OpenGL scene graph so QtWebEngine renders\n'
+    '\t// and Qt never selects the Vulkan/software backend for the QML RHI.\n'
+    '\tif (qEnvironmentVariable("QT_QUICK_BACKEND") != "software")\n'
+    '\t\tQQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);\n\n'
+)
+s = s.replace(code_anchor, patch + code_anchor)
+open(p, 'w').write(s)
+QSPYEOF
+        if ! python3 "$srcdir/qs-gl.py" "$f"; then
+            echo "ERROR: quickshell GL anchors not found in $f (upstream layout changed)." >&2
+            exit 1
+        fi
+        echo "hyprcandy-qs: patched $f (pinned OpenGL scene graph)"
+    fi
+    grep -q 'hyprcandy-qs: pin the OpenGL scene graph' "$f" || {
+        echo "ERROR: quickshell GL pin verification failed in $f." >&2
+        exit 1
+    }
 
     # Qt 6.12 + GCC 16 combined-AUTOMOC compat shim (toolchain-only, not a source
     # defect). Several quickshell modules hold two mutually forward-declared QObjects

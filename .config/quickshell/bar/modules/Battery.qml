@@ -69,7 +69,7 @@ Item {
         }
     }
     Timer {
-        interval: 30000; running: Config.showBattery; repeat: true; triggeredOnStart: true
+        interval: 2000; running: Config.showBattery; repeat: true; triggeredOnStart: true
         onTriggered: if (!batProc.running) batProc.running = true
     }
 
