@@ -5887,7 +5887,7 @@ PanelWindow {
                                         // NVIDIA first
                                         "command -v nvidia-smi >/dev/null 2>&1 && " +
                                         "  nvidia-smi --query-gpu=name --format=csv,noheader,nounits 2>/dev/null " +
-                                        "  | while read gname; do printf 'GPUINFO:%s~%s\n' \"${gname# }\" '0'; done; " +
+                                        "  | while read gname; do printf 'GPUINFO:%s~%s~%s\n' \"${gname# }\" '0' 'nvidia'; done; " +
                                         // AMD/Intel via driver symlinks — same heuristic as SystemMonitorPopup
                                         "for dp in /sys/class/drm/card*/device/driver; do " +
                                         "  [ -L \"$dp\" ] || continue; " +
@@ -5901,7 +5901,7 @@ PanelWindow {
                                         "  is_igpu=0; " +
                                         "  if echo \"$drv\" | grep -qE '^(i915|xe)$'; then is_igpu=1; echo \"$pname\" | grep -qiE '\\bArc\\b|\\bAlchemist\\b|\\bBattlemage\\b' && is_igpu=0; fi; " +
                                         "  echo \"$pname\" | grep -qiE 'Radeon Graphics|RENOIR|CEZANNE|REMBRANDT|RAPHAEL|PHOENIX|BARCELO|MENDOCINO|HAWK.?POINT|STRIX.?POINT|780M|760M|740M|VEGA|Radeon RX Vega [0-9]' && is_igpu=1; " +
-                                        "  printf 'GPUINFO:%s~%s\n' \"$pname\" \"$is_igpu\"; " +
+                                        "  printf 'GPUINFO:%s~%s~%s\n' \"$pname\" \"$is_igpu\" \"$drv\"; " +
                                         "done; " +
                                         "printf 'RAM:%s\n' \"$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.1f / %.1f GiB\", (t-a)/1048576, t/1048576}' /proc/meminfo)\"; " +
                                         "printf 'RAMPCT:%s\n' \"$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf \"%.0f\", (t-a)/t*100}' /proc/meminfo)\"; " +
@@ -5928,10 +5928,12 @@ PanelWindow {
                                         const displays = []    // [{name, res}]
                                         for (const [k, v] of sysInfoProc._buf) {
                                             if (k === "GPUINFO") {
-                                                // v = "name~is_igpu"  (~ tilde separator)
-                                                const sep = v.indexOf("~")
-                                                const gname   = sep >= 0 ? v.slice(0, sep) : v
-                                                const isIgpu  = sep >= 0 && v.slice(sep + 1) === "1"
+                                                // v = "name~is_igpu~drv" (name may hold "~", so peel from the right)
+                                                const _gp = v.split("~")
+                                                const drv    = _gp.length >= 3 ? _gp.pop() : ""
+                                                const _flag  = _gp.length >= 2 ? _gp.pop() : "0"
+                                                const gname  = _gp.join("~")
+                                                const isIgpu = _flag === "1"
                                                 // Clean verbose vendor prefixes (mirrors SystemMonitorPopup)
                                                 const clean = gname
                                                     .replace(/Advanced Micro Devices[^,]*,?\s*/i, "")
@@ -5942,7 +5944,7 @@ PanelWindow {
                                                     .replace(/NVIDIA\s*GeForce\s*/i, "")
                                                     .replace(/\[([^\]]+)\]/g, "$1")
                                                     .replace(/\s+/g, " ").trim()
-                                                gpus.push({ name: clean || gname || "GPU", isIgpu })
+                                                gpus.push({ name: clean || gname || "GPU", isIgpu, drv })
                                             } else if (k === "DISPLAY") {
                                                 // v = "monitorName|WxH@hz"
                                                 const bar = v.indexOf("|")
@@ -5969,6 +5971,48 @@ PanelWindow {
                                     return d > 0 ? d+"d "+h+"h "+m+"m" : h > 0 ? h+"h "+m+"m" : m+"m"
                                 }
 
+                                // Short vendor label from the driver, mirroring the
+                                // SystemMonitorPopup arc-gap text; falls back to the
+                                // (truncated) product name for unknown drivers.
+                                function _vendor(drv, name) {
+                                    const t = (drv || "").toLowerCase()
+                                    if (t === "nvidia" || t === "nouveau") return "NVIDIA"
+                                    if (t === "amdgpu" || t === "radeon")  return "AMD"
+                                    if (t === "i915"   || t === "xe")       return "Intel"
+                                    if (t === "vc4"    || t === "v3d")      return "Broadcom"
+                                    if (t === "panfury" || t === "lima")    return "Arm"
+                                    // NPU / accelerator drivers carry the vendor as a substring.
+                                    if (t.indexOf("amd") >= 0)    return "AMD"
+                                    if (t.indexOf("intel") >= 0)  return "Intel"
+                                    if (t.indexOf("nvidia") >= 0) return "NVIDIA"
+                                    const n = (name || "").trim()
+                                    if (n !== "") return n.length > 14 ? n.slice(0, 14) + "\u2026" : n
+                                    return t || "GPU"
+                                }
+
+                                // Ordered accelerator cards: NPU(s) → iGPU → dGPU(s),
+                                // each titled by role and valued by short vendor name.
+                                readonly property var gpuCards: {
+                                    const out = []
+                                    const npus = SystemMonitorPopupState.npus || []
+                                    for (let i = 0; i < npus.length; i++) {
+                                        const np = npus[i]
+                                        out.push({ glyph: "󰧑", title: "NPU",
+                                                   value: sysInfoRoot._vendor(np.driver, np.name) })
+                                    }
+                                    const gs = (sysInfoRoot.info && sysInfoRoot.info._gpus) ? sysInfoRoot.info._gpus : []
+                                    const ordered = gs.filter(g => g.isIgpu).concat(gs.filter(g => !g.isIgpu))
+                                    for (let i = 0; i < ordered.length; i++) {
+                                        const g = ordered[i]
+                                        out.push({ glyph: g.isIgpu ? "󱤓" : "󰢮",
+                                                   title: g.isIgpu ? "iGPU" : "dGPU",
+                                                   value: sysInfoRoot._vendor(g.drv, g.name) })
+                                    }
+                                    if (out.length === 0)
+                                        out.push({ glyph: "󰢮", title: "GPU", value: "—" })
+                                    return out
+                                }
+
                                 Connections {
                                     target: ccTabSettings
                                     function onActiveTabChanged() {
@@ -5983,7 +6027,12 @@ PanelWindow {
                                     // fires (and refreshes uptime/RAM/etc.) every open.
                                     // Guarded by the same license gate the other CC
                                     // readers honour in ControlCenterState.onVisibleChanged.
-                                    if (LicenseState.activated) sysInfoProc.running = true
+                                    if (LicenseState.activated) {
+                                        sysInfoProc.running = true
+                                        // Kick the shared NPU scan so the Info tab can
+                                        // list the NPU card even if the monitor is closed.
+                                        SystemMonitorPopupState.refreshNpus()
+                                    }
                                 }
                             }
 
@@ -6122,17 +6171,14 @@ PanelWindow {
                                     value: sysInfoRoot.info.CPU || "—"
                                 }
 
-                                // GPU cards — one per detected GPU (iGPU and dGPU shown separately)
-                                // Falls back to a single "Graphics" card with lspci output if _gpus is empty
+                                // GPU cards — ordered NPU → iGPU → dGPU(s), valued by vendor
                                 Repeater {
-                                    model: (sysInfoRoot.info._gpus && sysInfoRoot.info._gpus.length > 0)
-                                           ? sysInfoRoot.info._gpus
-                                           : [{ name: "—", isIgpu: false }]
+                                    model: sysInfoRoot.gpuCards
                                     SysStatCard {
                                         required property var modelData
-                                        glyph:  modelData.isIgpu ? "󱤓" : "󰢮"
-                                        title:  modelData.isIgpu ? "GPU Driver" : "dGPU Driver"
-                                        value:  modelData.name || "—"
+                                        glyph:  modelData.glyph
+                                        title:  modelData.title
+                                        value:  modelData.value
                                     }
                                 }
 

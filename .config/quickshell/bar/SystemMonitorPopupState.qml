@@ -18,6 +18,10 @@ QtObject {
     function toggleWidget() { root.widgetVisible = !root.widgetVisible }
     function closeWidget()  { root.widgetVisible = false }
 
+    // One-shot NPU scan trigger for other surfaces (e.g. Control Center Info)
+    // that want the NPU list without opening the monitor popup/widget.
+    function refreshNpus() { if (!npuScanProc.running) npuScanProc.running = true }
+
     // ── NPU Listing Support ───────────────────────────────────────────────
     property var npus: []
     readonly property bool hasNpu: npus.length > 0
