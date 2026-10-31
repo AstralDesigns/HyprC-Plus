@@ -2893,7 +2893,8 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             options: [{ key: "apps", label: "Apps" },
                                       { key: "groups", label: "Groups" },
-                                      { key: "packages", label: "Packages" }]
+                                      { key: "packages", label: "Packages" },
+                                      { key: "appimages", label: "AppImages" }]
                             current: win.subTab
                             onPicked: key => { win.subTab = key; win.focusIdx = -1 }
                         }
@@ -3345,6 +3346,13 @@ Item {
                             anchors.fill: parent
                             visible: win.tab === "launcher" && win.subTab === "packages"
                             query: win.pkgQuery
+                        }
+
+                        // ── AppImages page ────────────────────────────────
+                        AppImagesTab {
+                            anchors.fill: parent
+                            visible: win.tab === "launcher" && win.subTab === "appimages"
+                            query: win.query
                         }
 
                         // ── Clipboard page ────────────────────────────────
@@ -4894,7 +4902,10 @@ Item {
                 case "websearch": return " Search the web\u2026"
                 case "agent":     return " Ask the agent\u2026"
                 default:          return win.tab === "launcher" && win.subTab === "packages"
-                                        ? " Search packages\u2026" : " Search applications\u2026"
+                                        ? " Search packages\u2026"
+                                        : win.tab === "launcher" && win.subTab === "appimages"
+                                          ? " Search AppImages\u2026"
+                                          : " Search applications\u2026"
                 }
             }
 

@@ -81,6 +81,7 @@ singleton TrashState 1.0 TrashState.qml
 CCSegmented 1.0 CCSegmented.qml
 WebSearchPrefs 1.0 WebSearchPrefs.qml
 PackagesTab 1.0 PackagesTab.qml
+AppImagesTab 1.0 AppImagesTab.qml
 DockWindow 1.0 DockWindow.qml
 LauncherWindow 1.0 LauncherWindow.qml
 TrashDialog 1.0 TrashDialog.qml

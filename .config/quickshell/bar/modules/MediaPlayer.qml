@@ -107,10 +107,16 @@ Item {
                     	    onEntered: {
                     	        if (!Config.tipMedia) return
                     	        var tip = "Left-click: Player\nRight-click: Widget"
-                    	        // Scrolling the disc only does something when more than one
-                    	        // media source is open, so only hint it in that case.
-                    	        if (MediaPlayerState.mediaPlayers.length > 1)
-                    	            tip += "\nScroll: Switch source (" + (MediaPlayerState.activePlayerIndex + 1) + "/" + MediaPlayerState.mediaPlayers.length + ")"
+                    	        // mediaPlayers keeps Paused sources too (only stopped-and-
+                    	        // cleared ones are dropped), so the count stays >1 when a
+                    	        // second source is merely paused. Show the live (i/n) hint
+                    	        // in that case; otherwise a minimal placeholder so the
+                    	        // scroll gesture is still discoverable.
+                    	        var n = MediaPlayerState.mediaPlayers.length
+                    	        if (n > 1)
+                    	            tip += "\nScroll: Switch source (" + (MediaPlayerState.activePlayerIndex + 1) + "/" + n + ")"
+                    	        else
+                    	            tip += "\nScroll up/down: Switch source"
                     	        BarTipState.show(tip, activeMedia)
                     	    }
                     	    onExited: BarTipState.hide(activeMedia)
