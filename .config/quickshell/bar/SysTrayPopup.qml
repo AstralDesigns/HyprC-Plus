@@ -19,18 +19,24 @@ PanelWindow {
     readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 4
     readonly property real _panelMargin:  Config.barMode === "shell" ? Config.popupSideMargin + 5 : Config.popupSideMargin * 2
 
-    anchors { top: !_barAtBottom; bottom: _barAtBottom; right: true }
+    // StartMenu-style backdrop: full width, single bar-edge anchor, tall enough
+    // to reach the far screen edge so the z:-1 backdrop catches a click anywhere.
+    // A single vertical anchor (not top+bottom) keeps the surface a constant
+    // height so it never stretches when the bar position toggles — the earlier
+    // double-anchor left the pill detached (position/border lost) after a
+    // top→bottom→top toggle. The pill is pinned to its bar-side corner below.
+    anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
     margins {
         top:    _barAtBottom ? 0 : _barGap
         bottom: _barAtBottom ? _barGapBot : 0
-        right:  _barAtBottom ? _panelMargin + 146 : _panelMargin + 138
     }
+    readonly property real _rightOff: _barAtBottom ? _panelMargin + 146 : _panelMargin + 138
     // _pad drives symmetric padding on all sides, sourced from bar's outerMarginTop
     readonly property real _pad: Config.outerMarginTop
     // Minimum slot = 24px icon + pad on both sides so pill never collapses when empty
     readonly property real _minSlot: 28 + _pad * 2
 
-    implicitHeight: _minSlot
+    implicitHeight: (screen ? screen.height : 1080)
     implicitWidth:  popupRect.implicitWidth
     exclusionMode: ExclusionMode.Ignore
 
@@ -43,8 +49,13 @@ PanelWindow {
 
     Rectangle {
         id: popupRect
-        anchors.fill: parent
-        y: 0
+        anchors {
+            right:  parent.right
+            rightMargin:  win._rightOff
+        }
+        y: win._barAtBottom ? (parent.height - height) : 0
+        width:  implicitWidth
+        height: implicitHeight
 
         implicitHeight: win._minSlot
         implicitWidth:  Math.max(win._minSlot, trayRow.implicitWidth + win._pad * 2)

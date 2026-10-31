@@ -104,7 +104,15 @@ Item {
                     	    id: discMa; anchors.fill: parent; hoverEnabled: true
                     	    acceptedButtons: Qt.LeftButton | Qt.RightButton
                     	    // Anchor to non-rotating activeMedia (mapFromItem honours rotation).
-                    	    onEntered: if (Config.tipMedia) BarTipState.show("Left-click: Player\nRight-click: Widget", activeMedia)
+                    	    onEntered: {
+                    	        if (!Config.tipMedia) return
+                    	        var tip = "Left-click: Player\nRight-click: Widget"
+                    	        // Scrolling the disc only does something when more than one
+                    	        // media source is open, so only hint it in that case.
+                    	        if (MediaPlayerState.mediaPlayers.length > 1)
+                    	            tip += "\nScroll: Switch source (" + (MediaPlayerState.activePlayerIndex + 1) + "/" + MediaPlayerState.mediaPlayers.length + ")"
+                    	        BarTipState.show(tip, activeMedia)
+                    	    }
                     	    onExited: BarTipState.hide(activeMedia)
                     	    cursorShape: Qt.PointingHandCursor
                     	    onClicked: function(ev) {

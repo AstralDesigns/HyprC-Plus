@@ -22,6 +22,10 @@ PanelWindow {
     readonly property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop - 8) : Config.outerMarginTop + 4) + Config.barHeight
     readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom - 8) : Config.outerMarginBottom + 4) + Config.barHeight
 
+    // StartMenu-style backdrop: full width, single bar-edge anchor (exactly one
+    // of top/bottom active) sized to the full screen so the z:-1 backdrop catches
+    // a click anywhere. A single-edge anchor keeps the surface height constant so
+    // it never resizes per-frame; calPanel animates its own height inside it.
     anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
     margins {
         top:    _barAtBottom ? 0 : _barGap
@@ -29,9 +33,7 @@ PanelWindow {
     }
 
     implicitWidth:  320
-    // Fixed surface height: the layer window must NOT resize per-frame (that is
-    // what made the expand/collapse glitch). calPanel animates inside this.
-    implicitHeight: 640
+    implicitHeight: (screen ? screen.height : 1080)
 
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer:     WlrLayer.Top
@@ -232,10 +234,7 @@ PanelWindow {
     Rectangle {
         id: calPanel
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: !calWin._barAtBottom ? parent.top : undefined
-        anchors.bottom: calWin._barAtBottom ? parent.bottom : undefined
-        anchors.topMargin: 2
-        anchors.bottomMargin: 2
+        y: calWin._barAtBottom ? (parent.height - height) : 0
 
         implicitWidth:  320
         height: mainCol.implicitHeight + 24

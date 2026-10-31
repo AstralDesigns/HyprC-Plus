@@ -502,13 +502,17 @@ Item {
         visible: _stateVisible || _wxExitDelay.running
         on_StateVisibleChanged: { if (!_stateVisible) _wxExitDelay.restart() }
 
+        // StartMenu-style backdrop: full width, single bar-edge anchor, tall
+        // enough to reach the far screen edge so the z:-1 backdrop catches a
+        // click anywhere. Single vertical anchor avoids full-height stretch on
+        // bar-position toggle.
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
         margins {
-            top: _barAtBottom ? 0 : _barGap
+            top:    _barAtBottom ? 0 : _barGap
             bottom: _barAtBottom ? _barGapBot : 0
         }
 
-        implicitHeight: wxPanelPopup.implicitHeight
+        implicitHeight: (screen ? screen.height : 1080)
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "quickshell:weather-popup"
@@ -534,9 +538,8 @@ Item {
             anchors {
                 right: parent.right
                 rightMargin: wxPopup._panelMargin
-                top: parent.top
-                bottom: parent.bottom
             }
+            y: wxPopup._barAtBottom ? (parent.height - height) : 0
         }
     }
 

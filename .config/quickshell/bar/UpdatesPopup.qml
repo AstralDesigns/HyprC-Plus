@@ -18,15 +18,19 @@ PanelWindow {
     readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 4
     readonly property real _panelMargin: Config.barMode === "shell" ? Config.popupSideMargin : Config.popupSideMargin * 2
 
-    anchors { top: !_barAtBottom; bottom: _barAtBottom; right: true }
+    // StartMenu-style backdrop: full width, single bar-edge anchor, tall enough
+    // to reach the far screen edge so the z:-1 backdrop catches a click anywhere.
+    // A single vertical anchor (not top+bottom) keeps the surface a constant
+    // height so it never stretches when the bar position toggles. The card is
+    // pinned to the bar-side edge below.
+    anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
     margins {
         top:    _barAtBottom ? 0 : _barGap
         bottom: _barAtBottom ? _barGapBot : 0
-        right:  _panelMargin + 125
     }
     implicitWidth: 320
     exclusionMode: ExclusionMode.Ignore
-    implicitHeight: 460
+    implicitHeight: (screen ? screen.height : 1080)
 
     // ── Tracks whether Candy_Update.sh is alive in the OS, even across QS reloads ──
     property bool _hcScriptRunning: false
@@ -46,10 +50,10 @@ PanelWindow {
     Rectangle {
         id: popRect
         anchors {
-            top: !_barAtBottom ? parent.top : undefined
-            bottom: _barAtBottom ? parent.bottom : undefined
-            right: parent.right
+            right:  parent.right
+            rightMargin:  win._panelMargin + 125
         }
+        y: _barAtBottom ? (parent.height - height) : 0
 
         // Uniform gap, applied twice: once between the UI and the OnSecondary
         // card edge, once between the card edge and the blurred panel window.

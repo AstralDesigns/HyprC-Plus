@@ -72,7 +72,7 @@
 // iHD driver first, which fails to init on Gen7 and spams
 // "libva error: /usr/lib/dri/iHD_drv_video.so init failed". Pinning i965
 // (confirmed present via vainfo) selects the working driver and silences it.
-//@ pragma Env LIBVA_DRIVER_NAME=i965
+// //@ pragma Env LIBVA_DRIVER_NAME=i965
 
 // ── glibc heap-arena cap (RSS / thread-count trim) ──────────────────────────
 // A long-lived, many-threaded process gets one malloc arena per competing thread

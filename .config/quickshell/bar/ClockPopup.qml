@@ -459,14 +459,19 @@ Item {
         visible: _stateVisible || _clkExitDelay.running
         on_StateVisibleChanged: { if (!_stateVisible) _clkExitDelay.restart() }
 
+        // StartMenu-style backdrop: full width, anchored to the bar edge only,
+        // and tall enough to reach the far screen edge so the z:-1 backdrop
+        // catches a click anywhere on the desktop. A single vertical anchor
+        // (not top+bottom) avoids the full-height surface stretching when the
+        // bar position toggles.
         anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
         margins {
-            top: _barAtBottom ? 0 : _barGap
+            top:    _barAtBottom ? 0 : _barGap
             bottom: _barAtBottom ? _barGapBot : 0
         }
 
         implicitWidth: clkPanel.implicitWidth + 8
-        implicitHeight: clkPanel.implicitHeight + 8
+        implicitHeight: (screen ? screen.height : 1080)
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "quickshell:clock-popup"
@@ -487,7 +492,10 @@ Item {
         ClockPanel {
             id: clkPanel
             root: scope
-            anchors.horizontalCenter: parent.horizontalCenter
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+            }
+            y: clkPopup._barAtBottom ? (parent.height - height) : 0
             // Animate in/out with opacity + scale
             opacity: clkPopup._stateVisible ? 1.0 : 0.0
             scale:   clkPopup._stateVisible ? 1.0 : 0.92

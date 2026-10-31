@@ -9,6 +9,7 @@ pragma ComponentBehavior: Bound
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
+import Quickshell.Hyprland
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -773,8 +774,28 @@ ShellRoot {
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
         color: "transparent"
 
-        // Clip mask to panel only → no shadow on transparent fullscreen area
-        mask: Region { item: panel }
+        // Wallpaper dismiss uses the HyprlandFocusGrab below (a click that clears
+        // focus → quit) plus the transparent backdrop MouseArea inside the surface.
+        // The overlay stays in the usable area (no ExclusionMode.Ignore) so growing
+        // it fullscreen would otherwise resize/recentre the visible panel — exactly
+        // what we must avoid. The former `mask: Region { item: panel }` is removed:
+        // it clipped the surface's INPUT region to the panel, so the mouse fell
+        // through the empty area to the windows below. Without the mask the whole
+        // surface captures input and the backdrop handles click-away (the timer
+        // defers focus-grab activation until the window has mapped + taken
+        // exclusive keyboard focus, avoiding a spurious immediate clear).
+        HyprlandFocusGrab {
+            id: dismissGrab
+            windows: [win]
+            active: false
+            onCleared: root._quit()
+        }
+        Timer {
+            id: dismissGrabTimer
+            interval: 120
+            running: true
+            onTriggered: dismissGrab.active = win.visible
+        }
 
         Item {
             anchors.fill: parent
@@ -794,6 +815,8 @@ ShellRoot {
             Rectangle {
                 id: panel
                 anchors.centerIn: parent
+                // Size keyed to the surface (usable area) so the panel keeps its
+                // original pixel dimensions and centre position.
                 width:  Math.min(parent.width  - 80, 1380)
                 height: Math.min(parent.height - 80, 880)
                 radius: root.rLg

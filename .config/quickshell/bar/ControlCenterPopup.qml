@@ -812,8 +812,10 @@ PanelWindow {
     property real _panelH:  Math.min(_screenH - _activeGap - 24,
                                      Math.max(500, _screenH * 0.78))
 
-    // Anchor to bar edge (top or bottom) and center horizontally.
-    // Anchor to bar edge (top or bottom); span full width for click-outside dismiss.
+    // StartMenu-style backdrop: full width, single bar-edge anchor, tall enough
+    // to reach the far screen edge so the z:-1 backdrop catches a click anywhere.
+    // Single vertical anchor avoids the full-height surface stretching when the
+    // bar position toggles.
     anchors {
         top:    !_barAtBottom
         bottom:  _barAtBottom
@@ -824,7 +826,7 @@ PanelWindow {
         top:    _barAtBottom ? 0 : _barGap
         bottom: _barAtBottom ? _barGapBot : 0
     }
-    implicitHeight: _panelH
+    implicitHeight: (screen ? screen.height : 1080)
 
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top
@@ -1079,6 +1081,7 @@ PanelWindow {
             }
         }
     }
+    // Click-outside dismiss (StartMenu-style backdrop).
     MouseArea {
         anchors.fill: parent
         z: -1
@@ -1089,8 +1092,8 @@ PanelWindow {
     Rectangle {
         id: panel
         anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
+        y: ccWin._barAtBottom ? (parent.height - height) : 0
+        height: ccWin._panelH
         width: 825//ccWin._panelW
 
         radius: 20

@@ -457,6 +457,10 @@ Item {
         readonly property real _barGap: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginTop) : Config.outerMarginTop) + Config.barHeight + 4
         readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 4
 
+    	// StartMenu-style backdrop: full width, single bar-edge anchor, tall
+    	// enough to reach the far screen edge so the z:-1 backdrop catches a click
+    	// anywhere. A single vertical anchor (not top+bottom) keeps the surface a
+    	// constant height so it never stretches when the bar position toggles.
     	anchors {
             top:    !_barAtBottom
             bottom:  _barAtBottom
@@ -466,18 +470,11 @@ Item {
     	margins {
             top:    _barAtBottom ? 0 : _barGap
             bottom: _barAtBottom ? _barGapBot : 0
-            left:  _panelMargin
+            left:  0
     	}
-        implicitHeight: 560
+        implicitHeight: (screen ? screen.height : 1080)
         implicitWidth: 388
         color: "transparent"
-
-        // Click-outside dismiss
-        MouseArea {
-            anchors.fill: parent
-            z: -1
-            onClicked: NotificationsState.historyVisible = false
-        }
 
         Connections {
             target: (typeof HyprlandFocusedClient !== "undefined") ? HyprlandFocusedClient : null
@@ -485,13 +482,17 @@ Item {
             function onAddressChanged() { NotificationsState.historyVisible = false }
         }
 
+        // Click-outside dismiss (StartMenu-style backdrop). The card paints on
+        // top (z >= 0) so clicks on its controls are never intercepted.
+        MouseArea { anchors.fill: parent; z: -1; onClicked: NotificationsState.historyVisible = false }
+
         Rectangle {
             id: histPanel
             anchors {
-                top: !historyWindow._barAtBottom ? parent.top : undefined
-                bottom: historyWindow._barAtBottom ? parent.bottom : undefined
                 left: parent.left
+                leftMargin: historyWindow._panelMargin
             }
+            y: historyWindow._barAtBottom ? (parent.height - height) : 0
             width: 380
             height: Math.min(histScrollContent.implicitHeight + 76, 540)
             Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }

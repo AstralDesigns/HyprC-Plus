@@ -27,8 +27,23 @@ Scope {
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
             color: "transparent"
 
-            mask: Region {
-                item: columnLayout
+            // True fullscreen: ignore the reserved exclusive zones (bar + shell-res
+            // edges) so this edge-anchored surface spans the whole monitor (mimic
+            // StartMenuPopup). columnLayout is centered on the surface below.
+            exclusionMode: ExclusionMode.Ignore
+
+            // Full-surface click-away + no fall-through. The old
+            // `mask: Region { item: columnLayout }` clipped the surface's INPUT
+            // region to the columns, so the mouse fell through the empty
+            // (transparent) area to the windows below — it looked like the
+            // fullscreen backdrop wasn't there. With the mask gone the whole
+            // surface captures input, and this z:-1 MouseArea (under the columns)
+            // closes the overview on a click anywhere outside them, replacing the
+            // dismiss that used to rely on the fall-through.
+            MouseArea {
+                anchors.fill: parent
+                z: -1
+                onClicked: GlobalStates.overviewOpen = false
             }
 
             anchors {
@@ -193,9 +208,7 @@ Scope {
                 id: columnLayout
                 visible: GlobalStates.overviewOpen
                 anchors {
-                    horizontalCenter: parent.horizontalCenter
-                    top: parent.top
-                    topMargin: 40
+                    centerIn: parent
                 }
 
                 Loader {

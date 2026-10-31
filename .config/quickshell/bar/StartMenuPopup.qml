@@ -42,11 +42,15 @@ PanelWindow {
         bottom: _barAtBottom ? _barGapBot : 0
         right:  _panelMargin
     }
-    implicitHeight: 700
+    implicitHeight: (screen ? screen.height : 1080)
     implicitWidth: 348
     color: "transparent"
 
-    // Click-outside dismiss
+    // Click-outside dismiss (StartMenu-style full-width backdrop). The card
+    // (panelRect) paints on top (z >= 0) and is opaque, so clicks on its
+    // controls are never intercepted by this backdrop — only clicks in the
+    // empty area around the card close the menu. Escape / the start toggle
+    // remain as additional dismiss paths.
     MouseArea {
         anchors.fill: parent
         z: -1
@@ -56,10 +60,14 @@ PanelWindow {
     Rectangle {
         id: panelRect
         anchors {
-            top: !_barAtBottom ? parent.top : undefined
-            bottom: _barAtBottom ? parent.bottom : undefined
             right: parent.right
         }
+        // Vertical placement via explicit y, not top/bottom anchors: a stale
+        // conditional anchor is what stretched the card to backdrop height on
+        // repeated in-place bar-position toggles. y reproduces the exact same
+        // edges (parent.top => 0, parent.bottom => parent.height - height) and
+        // re-evaluates reactively, so it can never double-anchor.
+        y: _barAtBottom ? (parent.height - height) : 0
         width: 340
         height: Math.min(mainCol.implicitHeight + 18, 690)
         color: Theme.blurBackground
