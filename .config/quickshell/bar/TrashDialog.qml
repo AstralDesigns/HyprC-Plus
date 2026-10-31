@@ -7,10 +7,11 @@ import "."
 // ═══════════════════════════════════════════════════════════════════════════
 //  TrashDialog.qml — "Empty Trash?" confirm dialog (GJS hyprcandydock parity).
 //
-//  Floating centered overlay surface. Empties trash through the Nautilus
-//  DBus FileOperations2 service (exact GJS path), falling back to
-//  `gio trash --empty`. Caller drives visibility via the `visible` property
-//  and listens for `dismissed()` (any close path).
+//  Fullscreen transparent overlay with a fixed-size centered card; clicking
+//  anywhere outside the card dismisses the dialog (no Cancel button needed).
+//  Empties trash through the Nautilus DBus FileOperations2 service (exact GJS
+//  path), falling back to `gio trash --empty`. Caller drives visibility via the
+//  `visible` property and listens for `dismissed()` (any close path).
 // ═══════════════════════════════════════════════════════════════════════════
 
 PanelWindow {
@@ -25,16 +26,24 @@ PanelWindow {
     exclusionMode: ExclusionMode.Ignore
     exclusiveZone: 0
 
-    anchors { top: true; left: true }
-    margins {
-        left: Math.round((dlg.screen.width - dlg.width) / 2)
-        top: Math.round((dlg.screen.height - dlg.height) / 2)
+    anchors { top: true; bottom: true; left: true; right: true }
+    implicitWidth: (screen ? screen.width : 1920)
+    implicitHeight: (screen ? screen.height : 1080)
+
+    // Click-away backdrop: the surface is fullscreen and transparent, so a
+    // click in the empty area around the card closes the dialog. The card paints
+    // on top (z >= 0) and is opaque, so its button is never intercepted.
+    MouseArea {
+        anchors.fill: parent
+        z: -1
+        onClicked: dlg.dismissed()
     }
-    implicitWidth: 340
-    implicitHeight: 176
 
     Rectangle {
-        anchors.fill: parent
+        id: dialogBox
+        anchors.centerIn: parent
+        width: 340
+        height: 176
         radius: 20
         color: Theme.blurBackground
         border.width: 1
@@ -86,32 +95,6 @@ PanelWindow {
                 margins: 18
             }
             spacing: 12
-
-            Rectangle {
-                width: cancelMa.implicitWidth + 28
-                height: 34
-                radius: 17
-                color: cancelMa.containsMouse
-                       ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
-                       : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
-                border.width: 1
-                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                      Theme.cPrimary.b, 0.3)
-                Behavior on color { ColorAnimation { duration: 80 } }
-                Text {
-                    id: cancelMa
-                    anchors.centerIn: parent
-                    text: "Cancel"
-                    font.pixelSize: 12
-                    color: Theme.cOnSurf
-                }
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: dlg.dismissed()
-                }
-            }
 
             Rectangle {
                 width: emptyLabel.implicitWidth + 28
