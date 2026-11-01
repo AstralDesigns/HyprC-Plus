@@ -1744,12 +1744,12 @@ ShellRoot {
                                                     readonly property bool isActive: modelData.a
                                                     color: bma.containsMouse
                                                         ? (isActive
-                                                            ? Qt.rgba(root.cOnSecondary.r,root.cOnSecondary.g,root.cOnSecondary.b,0.75)
+                                                            ? Qt.rgba(root.SurfaceTint.r,root.SurfaceTint.g,root.SurfaceTint.b,0.75)
                                                             : (isCenter
                                                                 ? Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.75)
                                                                 : Qt.rgba(root.cPrimary.r,root.cPrimary.g,root.cPrimary.b,0.75)))
                                                         : (isActive
-                                                            ? Qt.rgba(root.cOnSecondary.r,root.cOnSecondary.g,root.cOnSecondary.b,0.75)
+                                                            ? Qt.rgba(root.SurfaceTint.r,root.SurfaceTint.g,root.SurfaceTint.b,0.75)
                                                             : Qt.rgba(root.cOnPrimary.r,root.cOnPrimary.g,root.cOnPrimary.b,0.75))
                                                     border.width: isActive ? 2 : 1
                                                     border.color: isActive
@@ -1762,7 +1762,7 @@ ShellRoot {
                                                         anchors.centerIn:parent
                                                         text: modelData.i; font.pixelSize:14; font.family:"Symbols Nerd Font Mono"
                                                         color: bma.containsMouse || parent.isActive
-                                                            ? root.cOnSecondary : root.cPrimary
+                                                            ? root.SurfaceTint : root.cPrimary
                                                         Behavior on color { ColorAnimation{duration:100} }
                                                     }
                                                     MouseArea { id:bma; anchors.fill:parent; hoverEnabled:true; onClicked: root.playerAction(modelData.c) }
