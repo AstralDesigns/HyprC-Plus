@@ -94,8 +94,9 @@ def _exec_target(val):
 
 
 def integration_for(real_path):
-    icon = ""
-    found = False
+    # Each .desktop is judged on its own: only return an icon from the file whose
+    # Exec actually points at this AppImage. Leaking state across files used to
+    # surface whatever icon happened to be scanned last in the folder.
     for d in app_dirs():
         if not os.path.isdir(d):
             continue
@@ -111,16 +112,18 @@ def integration_for(real_path):
                            errors="replace").read()
             except Exception:
                 continue
+            icon = ""
+            matched = False
             for line in txt.splitlines():
                 if line.startswith("Exec="):
                     tok = _exec_target(line[5:])
                     if tok and os.path.realpath(tok) == real_path:
-                        found = True
-                elif line.startswith("Icon=") and found:
+                        matched = True
+                elif line.startswith("Icon="):
                     icon = line[5:].strip()
-        if found:
-            break
-    return found, icon
+            if matched:
+                return True, icon
+    return False, ""
 
 
 def main():
