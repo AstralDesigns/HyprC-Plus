@@ -854,8 +854,7 @@ PanelWindow {
         property int activeTab: 1  // Default to Hyprland tab (index 1)
         property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
         property int activeKbSubTab:  0  // Remembered Keybinds sub-tab (0 = View, 1 = Edit)
-        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot)
-        property int activeDisplaySubTab: 0  // Remembered Display sub-tab (0 = Displays, 1 = SSH)
+        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH)
     }
     Settings {
         id: ccLocSettings
@@ -3932,63 +3931,6 @@ PanelWindow {
                             anchors.margins: 14
                             spacing: 8
 
-                            // ── Display sub-tab pills (Displays | SSH) ───────
-                            Row {
-                                Layout.fillWidth: true
-                                spacing: 4
-                                Repeater {
-                                    model: ["Displays", "SSH"]
-                                    delegate: Rectangle {
-                                        required property string modelData
-                                        required property int index
-                                        property int _subIdx: dispSubStack.currentIndex
-                                        height: 30
-                                        implicitWidth: _dstLabel.implicitWidth + 18
-                                        radius: 9
-                                        color: _subIdx === index
-                                            ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g,
-                                                      Theme.cSurfaceTint.b, 0.8)
-                                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
-                                                      Theme.cOnSecondary.b, 0.3)
-                                        border.width: _subIdx === index ? 1 : 0
-                                        border.color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                      Theme.cInversePrimary.b, 0.42)
-                                        Text {
-                                            id: _dstLabel; anchors.centerIn: parent
-                                            text: modelData; color: (_subIdx === index ? Theme.cOnSecondary : Theme.cPrimary)
-                                            font.family: Config.labelFont; font.pixelSize: 12
-                                            font.weight: (index !== undefined && _subIdx === index) ? 600 : 400
-                                        }
-                                        MouseArea {
-                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                            onClicked: {
-                                                dispSubStack.currentIndex = index
-                                                ccTabSettings.activeDisplaySubTab = index
-                                            }
-                                        }
-                                        Behavior on color { ColorAnimation { duration: 120 } }
-                                    }
-                                }
-                            }
-
-                            // Separator
-                            Rectangle {
-                                Layout.fillWidth: true; height: 1
-                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
-                            }
-
-                            StackLayout {
-                                id: dispSubStack
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                currentIndex: ccTabSettings.activeDisplaySubTab
-
-                                // ── SUB-TAB 0: Displays (nwg-look style) ────
-                                Item {
-                            ColumnLayout {
-                                anchors.fill: parent
-                                spacing: 8
-
                             // ── Header: title + actions ──────────────────────
                             RowLayout {
                                 Layout.fillWidth: true
@@ -4292,308 +4234,6 @@ PanelWindow {
                                     Item { height: 12 }
                                 }
                             }
-                                }
-                                } // ── end SUB-TAB 0: Displays ──
-
-                                // ── SUB-TAB 1: SSH ──────────────────────────
-                                Item {
-                                    id: sshPage
-                                    clip: true
-
-                                    // ── backing state ───────────────────────────
-                                    property var  hosts: []
-                                    property string statusText: ""
-                                    property bool sshdActive: false
-                                    property bool sshdEnabled: false
-                                    property bool sshdMissing: false
-                                    property string sshdUnit: ""
-                                    // add/edit form: -1 = closed, -2 = new entry, >= 0 = editing hosts[i]
-                                    property int  editingIndex: -1
-                                    property string fName: ""
-                                    property string fHost: ""
-                                    property string fUser: ""
-                                    property string fPort: ""
-                                    property string fIdent: ""
-
-                                    function refreshAll() {
-                                        _sshdStatusProc.running = false; _sshdStatusProc.running = true
-                                        _sshHostsProc.running  = false; _sshHostsProc.running  = true
-                                    }
-                                    function openAdd() {
-                                        fName = ""; fHost = ""; fUser = ""; fPort = ""; fIdent = ""
-                                        statusText = ""
-                                        editingIndex = -2
-                                    }
-                                    function openEdit(i) {
-                                        var h = hosts[i]
-                                        if (!h) return
-                                        fName = h.name; fHost = h.hostname; fUser = h.user
-                                        fPort = h.port; fIdent = h.identity
-                                        statusText = ""
-                                        editingIndex = i
-                                    }
-                                    function submitForm() {
-                                        var name = fName.trim(), host = fHost.trim()
-                                        var user = fUser.trim(), port = fPort.trim(), ident = fIdent.trim()
-                                        if (name === "") { statusText = "err — host name required"; return }
-                                        _sshMutateProc.command = editingIndex >= 0
-                                            ? [scriptDir + "/ssh-config.sh", "edit", hosts[editingIndex].name,
-                                               name, host, user, port, ident]
-                                            : [scriptDir + "/ssh-config.sh", "add", name, host, user, port, ident]
-                                        _sshMutateProc.running = false
-                                        _sshMutateProc.running = true
-                                    }
-                                    function removeHost(name) {
-                                        _sshMutateProc.command = [scriptDir + "/ssh-config.sh", "remove", name]
-                                        _sshMutateProc.running = false
-                                        _sshMutateProc.running = true
-                                    }
-                                    function connectHost(alias) {
-                                        _sshConnectProc.command = [scriptDir + "/ssh-connect.sh", alias]
-                                        _sshConnectProc.running = false
-                                        _sshConnectProc.running = true
-                                    }
-
-                                    Component.onCompleted: refreshAll()
-
-                                    CCScrollPane {
-                                        // Plain-Item page: Layout.* is inert here, so size via anchors
-                                        anchors.fill: parent
-
-                                        // ── Header: title + actions ─────────────
-                                        RowLayout {
-                                            Layout.fillWidth: true
-                                            spacing: 8
-                                            Text {
-                                                text: "󰌍 SSH"
-                                                color: Theme.cOnSurf
-                                                font.family: Config.labelFont; font.pixelSize: 15; font.weight: Font.Bold
-                                            }
-                                            Item { Layout.fillWidth: true }
-                                            CCPillBtn { text: "⟳ Refresh"; onClicked: sshPage.refreshAll() }
-                                            CCPillBtn { text: "＋ Add Host"; active: true; onClicked: sshPage.openAdd() }
-                                        }
-                                        Text {
-                                            Layout.fillWidth: true
-                                            visible: sshPage.statusText !== ""
-                                            text: sshPage.statusText
-                                            color: sshPage.statusText.indexOf("err") === 0 ? Theme.cTertiary : Theme.cPrimary
-                                            opacity: 0.8
-                                            font.family: Config.labelFont; font.pixelSize: 11
-                                            wrapMode: Text.Wrap
-                                        }
-
-                                        // ── Remote Login (sshd) ────────────────
-                                        CCSection { text: "Remote Login" }
-                                        Text {
-                                            Layout.fillWidth: true
-                                            text: "Lets other machines connect TO this computer over SSH (the sshd service). Leave off unless you need it. Toggling asks for authorisation."
-                                            color: Theme.cOnSurf; opacity: 0.65
-                                            font.family: Config.labelFont; font.pixelSize: 10
-                                            wrapMode: Text.Wrap
-                                        }
-                                        CCToggle {
-                                            id: sshdToggle
-                                            label: "Allow SSH connections"
-                                            value: sshPage.sshdActive
-                                            onToggled: function (v) {
-                                                sshPage.statusText = v ? "Enabling sshd… (authorisation prompt may appear)" : "Disabling sshd…"
-                                                _sshdToggleProc.command = [scriptDir + "/sshd.sh", v ? "on" : "off"]
-                                                _sshdToggleProc.running = false
-                                                _sshdToggleProc.running = true
-                                            }
-                                        }
-                                        Text {
-                                            visible: !sshPage.sshdMissing
-                                            Layout.fillWidth: true
-                                            text: "Unit: " + sshPage.sshdUnit + "   •   "
-                                                 + (sshPage.sshdActive ? "running" : "stopped")
-                                                 + "   •   at boot: " + (sshPage.sshdEnabled ? "enabled" : "disabled")
-                                            color: Theme.cPrimary; opacity: 0.7
-                                            font.family: Config.labelFont; font.pixelSize: 10
-                                        }
-                                        Text {
-                                            visible: sshPage.sshdMissing
-                                            Layout.fillWidth: true
-                                            text: "No ssh (sshd) service found — install openssh-server to enable Remote Login."
-                                            color: Theme.cTertiary; opacity: 0.85
-                                            font.family: Config.labelFont; font.pixelSize: 10
-                                            wrapMode: Text.Wrap
-                                        }
-
-                                        // ── Saved hosts (~/.ssh/config) ────────
-                                        CCSection { text: "Saved Hosts" }
-                                        Text {
-                                            Layout.fillWidth: true
-                                            text: "Shortcuts to machines YOU connect to, stored in ~/.ssh/config. Connect opens your terminal running ssh."
-                                            color: Theme.cOnSurf; opacity: 0.65
-                                            font.family: Config.labelFont; font.pixelSize: 10
-                                            wrapMode: Text.Wrap
-                                        }
-                                        Text {
-                                            visible: sshPage.hosts.length === 0
-                                            Layout.fillWidth: true
-                                            text: "No Host entries yet — press ＋ Add Host to create one."
-                                            color: Theme.cPrimary; opacity: 0.7
-                                            font.family: Config.labelFont; font.pixelSize: 11
-                                        }
-                                        Repeater {
-                                            model: sshPage.hosts
-                                            delegate: Rectangle {
-                                                required property var modelData
-                                                required property int index
-                                                Layout.fillWidth: true
-                                                implicitHeight: 56
-                                                radius: 10
-                                                color: hostHover.containsMouse
-                                                    ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.45)
-                                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.22)
-                                                border.width: 1
-                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
-                                                Behavior on color { ColorAnimation { duration: 120 } }
-
-                                                RowLayout {
-                                                    anchors { fill: parent; leftMargin: 12; rightMargin: 8 }
-                                                    spacing: 8
-                                                    Column {
-                                                        Layout.fillWidth: true
-                                                        spacing: 2
-                                                        Text {
-                                                            width: parent.width
-                                                            text: "󰋁 " + modelData.name
-                                                            color: Theme.cOnSurf
-                                                            font.family: Config.labelFont; font.pixelSize: 13; font.weight: Font.DemiBold
-                                                            elide: Text.ElideRight
-                                                        }
-                                                        Text {
-                                                            width: parent.width
-                                                            text: {
-                                                                var h = modelData
-                                                                var dest = ((h.user ? h.user + "@" : "") + (h.hostname || "") + (h.port ? ":" + h.port : ""))
-                                                                if (dest === "") dest = "(alias only — no HostName set)"
-                                                                return dest + (h.identity ? "   •   " + h.identity : "")
-                                                            }
-                                                            color: Theme.cPrimary; opacity: 0.7
-                                                            font.family: Config.labelFont; font.pixelSize: 10
-                                                            elide: Text.ElideRight
-                                                        }
-                                                    }
-                                                    CCPillBtn { text: "󰈀 Connect"; active: true; onClicked: sshPage.connectHost(modelData.name) }
-                                                    CCPillBtn { text: "Edit"; onClicked: sshPage.openEdit(index) }
-                                                    CCPillBtn { text: "Remove"; onClicked: sshPage.removeHost(modelData.name) }
-                                                }
-                                                MouseArea { id: hostHover; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
-                                            }
-                                        }
-
-                                        Item { height: 12 }
-                                    }
-
-                                    // ── Add / edit overlay form ──────────────────
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        visible: sshPage.editingIndex !== -1
-                                        color: Qt.rgba(0, 0, 0, 0.35)
-                                        Rectangle {
-                                            anchors.centerIn: parent
-                                            width: Math.min(470, parent.width - 24)
-                                            height: formCol.implicitHeight + 28
-                                            radius: 12
-                                            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.92)
-                                            border.width: 1
-                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
-                                            ColumnLayout {
-                                                id: formCol
-                                                anchors { fill: parent; margins: 14 }
-                                                spacing: 6
-                                                Text {
-                                                    text: sshPage.editingIndex === -2 ? "Add SSH Host" : "Edit Host: " + (sshPage.hosts[sshPage.editingIndex] ? sshPage.hosts[sshPage.editingIndex].name : "")
-                                                    color: Theme.cOnSurf
-                                                    font.family: Config.labelFont; font.pixelSize: 14; font.weight: Font.Bold
-                                                }
-                                                CCEntryRow { label: "Name";         value: sshPage.fName;  onApplied: function (v) { sshPage.fName = v } }
-                                                CCEntryRow { label: "HostName";     value: sshPage.fHost;  onApplied: function (v) { sshPage.fHost = v } }
-                                                CCEntryRow { label: "User";         value: sshPage.fUser;  onApplied: function (v) { sshPage.fUser = v } }
-                                                CCEntryRow { label: "Port";         value: sshPage.fPort;  onApplied: function (v) { sshPage.fPort = v } }
-                                                CCEntryRow { label: "IdentityFile"; value: sshPage.fIdent; onApplied: function (v) { sshPage.fIdent = v } }
-                                                Text {
-                                                    Layout.fillWidth: true
-                                                    text: "Only Name is required — the rest are optional (HostName = address/IP, IdentityFile = e.g. ~/.ssh/id_ed25519). Press Enter in a field to accept it."
-                                                    color: Theme.cOnSurf; opacity: 0.6
-                                                    font.family: Config.labelFont; font.pixelSize: 10
-                                                    wrapMode: Text.Wrap
-                                                }
-                                                RowLayout {
-                                                    Layout.fillWidth: true; spacing: 6
-                                                    Item { Layout.fillWidth: true }
-                                                    CCPillBtn { text: "Cancel"; onClicked: sshPage.editingIndex = -1 }
-                                                    CCPillBtn { text: "Save"; active: true; onClicked: sshPage.submitForm() }
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    // ── Processes ──────────────────────────────
-                                    Process {
-                                        id: _sshdStatusProc
-                                        running: false
-                                        command: [scriptDir + "/sshd.sh", "status"]
-                                        stdout: StdioCollector {
-                                            onStreamFinished: {
-                                                var kv = {}
-                                                text.trim().split(/\s+/).forEach(function (t) {
-                                                    var i = t.indexOf("=")
-                                                    if (i > 0) kv[t.slice(0, i)] = t.slice(i + 1)
-                                                })
-                                                sshPage.sshdUnit = kv.unit || "none"
-                                                sshPage.sshdActive = kv.active === "active"
-                                                sshPage.sshdEnabled = kv.enabled === "enabled"
-                                                sshPage.sshdMissing = sshPage.sshdUnit === "none"
-                                                // Re-sync the pill even after its binding was broken by a click
-                                                sshdToggle.value = sshPage.sshdActive
-                                                _sshdStatusProc.running = false
-                                            }
-                                        }
-                                    }
-                                    Process {
-                                        id: _sshdToggleProc
-                                        running: false
-                                        onExited: { _sshdStatusProc.running = true; _sshdToggleProc.running = false }
-                                    }
-                                    Process {
-                                        id: _sshHostsProc
-                                        running: false
-                                        command: [scriptDir + "/ssh-config.sh", "list"]
-                                        stdout: StdioCollector {
-                                            onStreamFinished: {
-                                                try { sshPage.hosts = JSON.parse(text.trim() || "[]") }
-                                                catch (e) { sshPage.hosts = [] }
-                                                _sshHostsProc.running = false
-                                            }
-                                        }
-                                    }
-                                    Process {
-                                        id: _sshMutateProc
-                                        running: false
-                                        stdout: StdioCollector {
-                                            onStreamFinished: {
-                                                var out = text.trim()
-                                                sshPage.statusText = out
-                                                if (out.indexOf("ok") === 0) sshPage.editingIndex = -1
-                                            }
-                                        }
-                                        onExited: { _sshHostsProc.running = true; _sshMutateProc.running = false }
-                                    }
-                                    Process {
-                                        id: _sshConnectProc
-                                        running: false
-                                        stdout: StdioCollector {
-                                            onStreamFinished: { sshPage.statusText = text.trim() }
-                                        }
-                                        onExited: running = false
-                                    }
-                                } // ── end SUB-TAB 1: SSH ──
-                            } // StackLayout
                         }
                     }
 
@@ -6136,7 +5776,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["Info", "Hotspot"]
+                                    model: ["Info", "Hotspot", "SSH"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -6777,6 +6417,305 @@ PanelWindow {
                                         Item { height: 4 }
                                     }
                                 }
+
+                                // ── SSH sub-tab ──────────────────────────────────
+                                Item {
+                                    id: sshPage
+                                    clip: true
+
+                                    // ── backing state ───────────────────────────
+                                    property var  hosts: []
+                                    property string statusText: ""
+                                    property bool sshdActive: false
+                                    property bool sshdEnabled: false
+                                    property bool sshdMissing: false
+                                    property string sshdUnit: ""
+                                    // add/edit form: -1 = closed, -2 = new entry, >= 0 = editing hosts[i]
+                                    property int  editingIndex: -1
+                                    property string fName: ""
+                                    property string fHost: ""
+                                    property string fUser: ""
+                                    property string fPort: ""
+                                    property string fIdent: ""
+
+                                    function refreshAll() {
+                                        _sshdStatusProc.running = false; _sshdStatusProc.running = true
+                                        _sshHostsProc.running  = false; _sshHostsProc.running  = true
+                                    }
+                                    function openAdd() {
+                                        fName = ""; fHost = ""; fUser = ""; fPort = ""; fIdent = ""
+                                        statusText = ""
+                                        editingIndex = -2
+                                    }
+                                    function openEdit(i) {
+                                        var h = hosts[i]
+                                        if (!h) return
+                                        fName = h.name; fHost = h.hostname; fUser = h.user
+                                        fPort = h.port; fIdent = h.identity
+                                        statusText = ""
+                                        editingIndex = i
+                                    }
+                                    function submitForm() {
+                                        var name = fName.trim(), host = fHost.trim()
+                                        var user = fUser.trim(), port = fPort.trim(), ident = fIdent.trim()
+                                        if (name === "") { statusText = "err — host name required"; return }
+                                        _sshMutateProc.command = editingIndex >= 0
+                                            ? [scriptDir + "/ssh-config.sh", "edit", hosts[editingIndex].name,
+                                               name, host, user, port, ident]
+                                            : [scriptDir + "/ssh-config.sh", "add", name, host, user, port, ident]
+                                        _sshMutateProc.running = false
+                                        _sshMutateProc.running = true
+                                    }
+                                    function removeHost(name) {
+                                        _sshMutateProc.command = [scriptDir + "/ssh-config.sh", "remove", name]
+                                        _sshMutateProc.running = false
+                                        _sshMutateProc.running = true
+                                    }
+                                    function connectHost(alias) {
+                                        _sshConnectProc.command = [scriptDir + "/ssh-connect.sh", alias]
+                                        _sshConnectProc.running = false
+                                        _sshConnectProc.running = true
+                                    }
+
+                                    Component.onCompleted: refreshAll()
+
+                                    CCScrollPane {
+                                        // Plain-Item page: Layout.* is inert here, so size via anchors
+                                        anchors.fill: parent
+
+                                        // ── Header: title + actions ─────────────
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+                                            Text {
+                                                text: "󰌍 SSH"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 15; font.weight: Font.Bold
+                                            }
+                                            Item { Layout.fillWidth: true }
+                                            CCPillBtn { text: "⟳ Refresh"; onClicked: sshPage.refreshAll() }
+                                            CCPillBtn { text: "＋ Add Host"; active: true; onClicked: sshPage.openAdd() }
+                                        }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            visible: sshPage.statusText !== ""
+                                            text: sshPage.statusText
+                                            color: sshPage.statusText.indexOf("err") === 0 ? Theme.cTertiary : Theme.cPrimary
+                                            opacity: 0.8
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                            wrapMode: Text.Wrap
+                                        }
+
+                                        // ── Remote Login (sshd) ────────────────
+                                        CCSection { text: "Remote Login" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Lets other machines connect TO this computer over SSH (the sshd service). Leave off unless you need it. Toggling asks for authorisation."
+                                            color: Theme.cOnSurf; opacity: 0.65
+                                            font.family: Config.labelFont; font.pixelSize: 10
+                                            wrapMode: Text.Wrap
+                                        }
+                                        CCToggle {
+                                            id: sshdToggle
+                                            label: "Allow SSH connections"
+                                            value: sshPage.sshdActive
+                                            onToggled: function (v) {
+                                                sshPage.statusText = v ? "Enabling sshd… (authorisation prompt may appear)" : "Disabling sshd…"
+                                                _sshdToggleProc.command = [scriptDir + "/sshd.sh", v ? "on" : "off"]
+                                                _sshdToggleProc.running = false
+                                                _sshdToggleProc.running = true
+                                            }
+                                        }
+                                        Text {
+                                            visible: !sshPage.sshdMissing
+                                            Layout.fillWidth: true
+                                            text: "Unit: " + sshPage.sshdUnit + "   •   "
+                                                 + (sshPage.sshdActive ? "running" : "stopped")
+                                                 + "   •   at boot: " + (sshPage.sshdEnabled ? "enabled" : "disabled")
+                                            color: Theme.cPrimary; opacity: 0.7
+                                            font.family: Config.labelFont; font.pixelSize: 10
+                                        }
+                                        Text {
+                                            visible: sshPage.sshdMissing
+                                            Layout.fillWidth: true
+                                            text: "No ssh (sshd) service found — install openssh-server to enable Remote Login."
+                                            color: Theme.cTertiary; opacity: 0.85
+                                            font.family: Config.labelFont; font.pixelSize: 10
+                                            wrapMode: Text.Wrap
+                                        }
+
+                                        // ── Saved hosts (~/.ssh/config) ────────
+                                        CCSection { text: "Saved Hosts" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Shortcuts to machines YOU connect to, stored in ~/.ssh/config. Connect opens your terminal running ssh."
+                                            color: Theme.cOnSurf; opacity: 0.65
+                                            font.family: Config.labelFont; font.pixelSize: 10
+                                            wrapMode: Text.Wrap
+                                        }
+                                        Text {
+                                            visible: sshPage.hosts.length === 0
+                                            Layout.fillWidth: true
+                                            text: "No Host entries yet — press ＋ Add Host to create one."
+                                            color: Theme.cPrimary; opacity: 0.7
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                        }
+                                        Repeater {
+                                            model: sshPage.hosts
+                                            delegate: Rectangle {
+                                                required property var modelData
+                                                required property int index
+                                                Layout.fillWidth: true
+                                                implicitHeight: 56
+                                                radius: 10
+                                                color: hostHover.containsMouse
+                                                    ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.45)
+                                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.22)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                                                Behavior on color { ColorAnimation { duration: 120 } }
+
+                                                RowLayout {
+                                                    anchors { fill: parent; leftMargin: 12; rightMargin: 8 }
+                                                    spacing: 8
+                                                    Column {
+                                                        Layout.fillWidth: true
+                                                        spacing: 2
+                                                        Text {
+                                                            width: parent.width
+                                                            text: "󰋁 " + modelData.name
+                                                            color: Theme.cOnSurf
+                                                            font.family: Config.labelFont; font.pixelSize: 13; font.weight: Font.DemiBold
+                                                            elide: Text.ElideRight
+                                                        }
+                                                        Text {
+                                                            width: parent.width
+                                                            text: {
+                                                                var h = modelData
+                                                                var dest = ((h.user ? h.user + "@" : "") + (h.hostname || "") + (h.port ? ":" + h.port : ""))
+                                                                if (dest === "") dest = "(alias only — no HostName set)"
+                                                                return dest + (h.identity ? "   •   " + h.identity : "")
+                                                            }
+                                                            color: Theme.cPrimary; opacity: 0.7
+                                                            font.family: Config.labelFont; font.pixelSize: 10
+                                                            elide: Text.ElideRight
+                                                        }
+                                                    }
+                                                    CCPillBtn { text: "󰈀 Connect"; active: true; onClicked: sshPage.connectHost(modelData.name) }
+                                                    CCPillBtn { text: "Edit"; onClicked: sshPage.openEdit(index) }
+                                                    CCPillBtn { text: "Remove"; onClicked: sshPage.removeHost(modelData.name) }
+                                                }
+                                                MouseArea { id: hostHover; anchors.fill: parent; hoverEnabled: true; acceptedButtons: Qt.NoButton }
+                                            }
+                                        }
+
+                                        Item { height: 12 }
+                                    }
+
+                                    // ── Add / edit overlay form ──────────────────
+                                    Rectangle {
+                                        anchors.fill: parent
+                                        visible: sshPage.editingIndex !== -1
+                                        color: Qt.rgba(0, 0, 0, 0.35)
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: Math.min(470, parent.width - 24)
+                                            height: formCol.implicitHeight + 28
+                                            radius: 12
+                                            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.92)
+                                            border.width: 1
+                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.3)
+                                            ColumnLayout {
+                                                id: formCol
+                                                anchors { fill: parent; margins: 14 }
+                                                spacing: 6
+                                                Text {
+                                                    text: sshPage.editingIndex === -2 ? "Add SSH Host" : "Edit Host: " + (sshPage.hosts[sshPage.editingIndex] ? sshPage.hosts[sshPage.editingIndex].name : "")
+                                                    color: Theme.cOnSurf
+                                                    font.family: Config.labelFont; font.pixelSize: 14; font.weight: Font.Bold
+                                                }
+                                                CCEntryRow { label: "Name";         value: sshPage.fName;  onApplied: function (v) { sshPage.fName = v } }
+                                                CCEntryRow { label: "HostName";     value: sshPage.fHost;  onApplied: function (v) { sshPage.fHost = v } }
+                                                CCEntryRow { label: "User";         value: sshPage.fUser;  onApplied: function (v) { sshPage.fUser = v } }
+                                                CCEntryRow { label: "Port";         value: sshPage.fPort;  onApplied: function (v) { sshPage.fPort = v } }
+                                                CCEntryRow { label: "IdentityFile"; value: sshPage.fIdent; onApplied: function (v) { sshPage.fIdent = v } }
+                                                Text {
+                                                    Layout.fillWidth: true
+                                                    text: "Only Name is required — the rest are optional (HostName = address/IP, IdentityFile = e.g. ~/.ssh/id_ed25519). Press Enter in a field to accept it."
+                                                    color: Theme.cOnSurf; opacity: 0.6
+                                                    font.family: Config.labelFont; font.pixelSize: 10
+                                                    wrapMode: Text.Wrap
+                                                }
+                                                RowLayout {
+                                                    Layout.fillWidth: true; spacing: 6
+                                                    Item { Layout.fillWidth: true }
+                                                    CCPillBtn { text: "Cancel"; onClicked: sshPage.editingIndex = -1 }
+                                                    CCPillBtn { text: "Save"; active: true; onClicked: sshPage.submitForm() }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // ── Processes ──────────────────────────────
+                                    Process {
+                                        id: _sshdStatusProc
+                                        running: false
+                                        command: [scriptDir + "/sshd.sh", "status"]
+                                        stdout: StdioCollector {
+                                            onStreamFinished: {
+                                                var kv = {}
+                                                text.trim().split(/\s+/).forEach(function (t) {
+                                                    var i = t.indexOf("=")
+                                                    if (i > 0) kv[t.slice(0, i)] = t.slice(i + 1)
+                                                })
+                                                sshPage.sshdUnit = kv.unit || "none"
+                                                sshPage.sshdActive = kv.active === "active"
+                                                sshPage.sshdEnabled = kv.enabled === "enabled"
+                                                sshPage.sshdMissing = sshPage.sshdUnit === "none"
+                                                // Re-sync the pill even after its binding was broken by a click
+                                                sshdToggle.value = sshPage.sshdActive
+                                                _sshdStatusProc.running = false
+                                            }
+                                        }
+                                    }
+                                    Process {
+                                        id: _sshdToggleProc
+                                        running: false
+                                        onExited: { _sshdStatusProc.running = true; _sshdToggleProc.running = false }
+                                    }
+                                    Process {
+                                        id: _sshHostsProc
+                                        running: false
+                                        command: [scriptDir + "/ssh-config.sh", "list"]
+                                        stdout: StdioCollector {
+                                            onStreamFinished: {
+                                                try { sshPage.hosts = JSON.parse(text.trim() || "[]") }
+                                                catch (e) { sshPage.hosts = [] }
+                                                _sshHostsProc.running = false
+                                            }
+                                        }
+                                    }
+                                    Process {
+                                        id: _sshMutateProc
+                                        running: false
+                                        stdout: StdioCollector {
+                                            onStreamFinished: {
+                                                var out = text.trim()
+                                                sshPage.statusText = out
+                                                if (out.indexOf("ok") === 0) sshPage.editingIndex = -1
+                                            }
+                                        }
+                                        onExited: { _sshHostsProc.running = true; _sshMutateProc.running = false }
+                                    }
+                                    Process {
+                                        id: _sshConnectProc
+                                        running: false
+                                        stdout: StdioCollector {
+                                            onStreamFinished: { sshPage.statusText = text.trim() }
+                                        }
+                                        onExited: running = false
+                                    }
+                                } // ── end SSH sub-tab ──
                             }
                         }
                     }
