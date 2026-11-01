@@ -960,12 +960,12 @@ Item {
                             readonly property bool isActive: modelData.a
                             color: bma.containsMouse
                                 ? (isActive
-                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.75)
+                                    ? Qt.rgba(Theme.SurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.75)
                                     : (isCenter
                                         ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.75)
                                         : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.75)))
                                 : (isActive
-                                    ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.75)
+                                    ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.75)
                                     : Qt.rgba(Theme.cOnPrimary.r, Theme.cOnPrimary.g, Theme.cOnPrimary.b, 0.75))
                             border.width: isActive ? 2 : 1
                             border.color: isActive
@@ -979,7 +979,7 @@ Item {
                                 text: modelData.i
                                 font.pixelSize: 14; font.family: "Symbols Nerd Font Mono"
                                 color: bma.containsMouse || parent.isActive
-                                    ? Theme.cOnSecondary : Theme.cPrimary
+                                    ? Theme.SurfaceTint : Theme.cPrimary
                                 Behavior on color { ColorAnimation { duration: 100 } }
                             }
                             MouseArea {
