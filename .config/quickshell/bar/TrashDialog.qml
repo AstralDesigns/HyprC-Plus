@@ -101,8 +101,8 @@ PanelWindow {
                 height: 34
                 radius: 17
                 color: emptyMa.containsMouse
-                       ? Qt.rgba(0.88, 0.30, 0.30, 1.0)
-                       : Qt.rgba(0.82, 0.24, 0.24, 0.85)
+                       ? Qt.rgba(0.88, 0.30, 0.30, 0.50)
+                       : Qt.rgba(0.82, 0.24, 0.24, 0.35)
                 Behavior on color { ColorAnimation { duration: 80 } }
                 Text {
                     id: emptyLabel
