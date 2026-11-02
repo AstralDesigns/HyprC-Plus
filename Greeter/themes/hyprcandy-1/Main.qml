@@ -1,8 +1,8 @@
-import QtQuick 2.15
-import QtQuick.Window 2.15
-import QtQuick.Layouts 1.15
-import QtQuick.Controls 2.15
-import QtQuick.Effects 2.15
+import QtQuick
+import QtQuick.Window
+import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Effects
 
 // hyprcandy-1 — Material You glass greeter (Qt6).
 // Palette comes from ../hyprcandy-shared (matugen + wallust, synced by
@@ -211,7 +211,6 @@ Pane {
                         asynchronous: false
                         source: root.faceFor(userModel.currentName)
                         sourceSize: Qt.size(168, 168)
-                        onFailed: source = ""
                         visible: status === Image.Ready
                         layer.enabled: true
                         layer.effect: MultiEffect {
@@ -500,12 +499,13 @@ Pane {
             dateText = Qt.formatDate(now, config.DateFormat && config.DateFormat !== "" ? config.DateFormat : "dddd, d of MMMM")
         }
         Component.onCompleted: refresh()
-        Timer {
-            interval: 1000
-            repeat: true
-            running: true
-            onTriggered: clockTimer.refresh()
-        }
+    }
+
+    Timer {
+        interval: 1000
+        repeat: true
+        running: true
+        onTriggered: clockTimer.refresh()
     }
 
     Component.onCompleted: {
