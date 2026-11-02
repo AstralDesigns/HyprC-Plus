@@ -855,6 +855,7 @@ PanelWindow {
         property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
         property int activeKbSubTab:  0  // Remembered Keybinds sub-tab (0 = View, 1 = Edit)
         property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH)
+        property int activeGreetSubTab: 0  // Remembered Greeter sub-tab (0 = Themes, 1 = Edit)
     }
     Settings {
         id: ccLocSettings
@@ -4489,7 +4490,7 @@ PanelWindow {
                                         }
                                         MouseArea {
                                             anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                            onClicked: greeterSubStack.currentIndex = index
+                                            onClicked: ccTabSettings.activeGreetSubTab = index
                                         }
                                     }
                                 }
@@ -4532,7 +4533,7 @@ PanelWindow {
                                 id: greeterSubStack
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                currentIndex: 0
+                                currentIndex: ccTabSettings.activeGreetSubTab
 
                                 // ── Themes sub-tab ──────────────────────────────
                                 Item {

@@ -32,7 +32,7 @@ QtObject {
     readonly property color cInversePrimary:  Colors.m3inversePrimary
     readonly property color cOutline:         Colors.m3outline
     readonly property color cOutlineVariant:  Colors.m3outlineVariant
-    readonly property color cError:           "#f2b8b5"
+    readonly property color cError:           "#d3372f"
     readonly property bool  darkmode:         Colors.darkmode
 
     // ── Wallust accents (color0–15) ─────────────────────────────────────
@@ -58,6 +58,21 @@ QtObject {
         cSurfaceContainerHigh.g, cSurfaceContainerHigh.b, 0.62)
     readonly property color fieldGlass: Qt.rgba(cInversePrimary.r,
         cInversePrimary.g, cInversePrimary.b, 0.34)
+    // Outer form: InversePrimary glass. Alpha is driven live from Main.qml
+    // (bound to config.BlurRadius via the CC "Blur R" slider), not static.
+    property real formAlpha: 0.45
+    readonly property color formGlass: Qt.rgba(cInversePrimary.r,
+        cInversePrimary.g, cInversePrimary.b, formAlpha)
+    // Inner sub-cards (candylock layering)
+    readonly property color innerCard: Qt.rgba(cOnSecondary.r,
+        cOnSecondary.g, cOnSecondary.b, 0.65)
+    readonly property color innerCardAlt: Qt.rgba(cOnSecondary.r,
+        cOnSecondary.g, cOnSecondary.b, 0.65)
+    // Power pill
+    readonly property color pill: Qt.rgba(cSurfaceTint.r,
+        cSurfaceTint.g, cSurfaceTint.b, 0.75)
+    readonly property color pillBtn: Qt.rgba(cOnSecondary.r,
+        cOnSecondary.g, cOnSecondary.b, 0.90)
     readonly property color hoverTint: Qt.rgba(cPrimary.r,
         cPrimary.g, cPrimary.b, 0.16)
     readonly property color outlineSoft: Qt.rgba(cOutline.r,
