@@ -15,6 +15,10 @@ import QtQuick.Effects
 Pane {
     id: root
 
+    // Pane insets its children by padding; zero it so the background image
+    // reaches the true screen edges (otherwise the backdrop shows as a ring).
+    padding: 0
+
     // Fill the physical screen; honor a config size only when the user set
     // one smaller than the real screen (otherwise the wallpaper auto-fits).
     width: (parseInt(config.ScreenWidth) || 0) > 0 && parseInt(config.ScreenWidth) < Screen.width
@@ -285,6 +289,19 @@ Pane {
                         font.letterSpacing: 2
                         font.family: root.labelFont
                         font.pixelSize: 11
+                    }
+                    // Header text from theme.conf; when the user clears it the
+                    // item hides so the header card collapses that line instead
+                    // of leaving blank space (ColumnLayout drops hidden items).
+                    Text {
+                        Layout.alignment: Qt.AlignHCenter
+                        visible: text !== ""
+                        text: config.HeaderText || ""
+                        color: theme.cWc11
+                        font.family: root.labelFont
+                        font.pixelSize: 18
+                        font.weight: Font.SemiBold
+                        topPadding: 3
                     }
                 }
             }

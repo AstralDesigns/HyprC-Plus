@@ -10069,6 +10069,14 @@ PanelWindow {
             color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+            // Focus highlight: cPrimary tint at 0.15 alpha while editing.
+            Rectangle {
+                anchors.fill: parent
+                radius: 7
+                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                opacity: _cerInput.activeFocus ? 1.0 : 0.0
+                Behavior on opacity { NumberAnimation { duration: 120 } }
+            }
             TextInput {
                 id: _cerInput
                 anchors { fill: parent; margins: 6 }
