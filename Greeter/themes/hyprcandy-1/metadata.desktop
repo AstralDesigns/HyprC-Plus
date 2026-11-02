@@ -12,3 +12,4 @@ ConfigFile=theme.conf
 Email=astraldesigns@proton.me
 Theme-Id=hyprcandy-1
 Theme-API=2.11
+QtVersion=6

@@ -1,4 +1,4 @@
-import QtQuick
+import QtQuick 2.15
 import "../hyprcandy-shared"
 
 // Color bridge for hyprcandy greeter themes.

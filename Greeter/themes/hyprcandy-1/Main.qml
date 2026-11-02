@@ -1,8 +1,8 @@
-import QtQuick
-import QtQuick.Window
-import QtQuick.Layouts
-import QtQuick.Controls
-import QtQuick.Effects
+import QtQuick 2.15
+import QtQuick.Window 2.15
+import QtQuick.Layouts 1.15
+import QtQuick.Controls 2.15
+import QtQuick.Effects 2.15
 
 // hyprcandy-1 — Material You glass greeter (Qt6).
 // Palette comes from ../hyprcandy-shared (matugen + wallust, synced by
