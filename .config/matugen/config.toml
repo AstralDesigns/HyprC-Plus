@@ -54,6 +54,11 @@ output_path = '~/.cache/quickshell/overview/Appearance.colors.qml'
 input_path = '~/.config/matugen/templates/Appearance.colors.qml'
 output_path = '~/.cache/quickshell/wallpaper/MatugenColors.qml'
 
+[templates.greeter]
+input_path = '~/.config/matugen/templates/Appearance.colors.qml'
+output_path = '~/.hyprcandy/Greeter/themes/Appearance.colors.qml'
+post_hook = 'sudo -n ~/.config/quickshell/bar/scripts/greeter-sync.sh'
+
 [templates.cava]
 input_path = '~/.config/matugen/templates/config'
 output_path = '~/.config/cava/config'

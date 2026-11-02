@@ -50,3 +50,4 @@ gtk3 = { src = 'colors-wallust.css', dst = '~/.config/gtk-3.0/colors-wallust.css
 gtk4 = { src = 'colors-wallust.css', dst = '~/.config/gtk-4.0/colors-wallust.css' }
 overview = { src = 'Appearance.wallust.qml', dst = '~/.cache/quickshell/overview/Appearance.wallust.qml' }
 wallpaper ={ src = 'Appearance.wallust.qml', dst = '~/.cache/quickshell/wallpaper/WallustColors.qml' }
+greeter = { src = 'Appearance.wallust.qml', dst = '~/.hyprcandy/Greeter/themes/Appearance.wallust.qml' }

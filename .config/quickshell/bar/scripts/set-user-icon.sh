@@ -53,4 +53,7 @@ if [ -n "$SRC" ] && [ -f "$SRC" ]; then
            -fill white -draw 'circle 48,48 48,0' \) \
         -alpha off -compose CopyOpacity -composite -strip \
         "$SM_ICON"
+
+    # Greeter avatar: SDDM reads /usr/share/sddm/faces/<user>.face.icon
+    sudo -n install -m 644 "$USER_ICON" "/usr/share/sddm/faces/$(id -un).face.icon" 2>/dev/null || true
 fi

@@ -648,9 +648,9 @@ PanelWindow {
     // Settings) — the qs launcher reads them reactively, so no external
     // reader/writer for GJS launcherConfig.js is needed anymore.
     
-    // Individual SDDM value readers — mirror the dock pattern so each field
-    // reads directly from theme.conf (world-readable, no sudo needed) and
-    // updates its property independently before the TextInput renders.
+    // Individual SDDM value readers — state-file override first, then the
+    // active theme's theme.conf via greeter-set.sh get (no sudo needed for
+    // reads; the setter script resolves whichever theme is current).
     Process {
         id: _sddmValReader
         command: ["bash", "-c", "true"]   // kept so existing _sddmValReader.running = true calls are harmless
@@ -661,7 +661,7 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_header.state\" ] && cat \"$sd/sddm_header.state\" || " +
-            "  grep -oP '^HeaderText=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get HeaderText 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -673,7 +673,7 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_form.state\" ] && cat \"$sd/sddm_form.state\" || " +
-            "  grep -oP '^FormPosition=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get FormPosition 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -685,7 +685,7 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_blur.state\" ] && cat \"$sd/sddm_blur.state\" || " +
-            "  grep -oP '^BlurRadius=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get BlurRadius 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -697,7 +697,7 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_width.state\" ] && cat \"$sd/sddm_width.state\" || " +
-            "  grep -oP '^ScreenWidth=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get ScreenWidth 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -709,7 +709,7 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_height.state\" ] && cat \"$sd/sddm_height.state\" || " +
-            "  grep -oP '^ScreenHeight=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get ScreenHeight 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -721,7 +721,7 @@ PanelWindow {
         command: ["bash", "-c",
             "sd=\"$HOME/.config/hyprcandy\"; " +
             "[ -f \"$sd/sddm_font.state\" ] && cat \"$sd/sddm_font.state\" || " +
-            "  grep -oP '^Font=\\K.*' /usr/share/sddm/themes/sugar-candy/theme.conf 2>/dev/null | sed -e 's/^\"//' -e 's/\"$//' | head -1"]
+            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get Font 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
@@ -4348,18 +4348,353 @@ PanelWindow {
                     }
 
                     // ── TAB 5: SDDM ──────────────────────────────────────────
-                    CCScrollPane {
+                    Item {
+                        id: greeterTabRoot
+
+                        property var themes: []
+                        property string currentTheme: ""
+                        property string applyingTheme: ""
+                        property string themeStatus: ""
+
+                        function _rerunProc(p) {
+                            if (p.running) p.running = false
+                            Qt.callLater(function() { p.running = true })
+                        }
+
+                        function reloadThemes() { _rerunProc(_themeListProc) }
+
+                        function reloadSddmReads() {
+                            _rerunProc(_sddmReadHeader); _rerunProc(_sddmReadForm)
+                            _rerunProc(_sddmReadBlur);   _rerunProc(_sddmReadWidth)
+                            _rerunProc(_sddmReadHeight); _rerunProc(_sddmReadFont)
+                        }
+
+                        function applyTheme(id) {
+                            if (!id || _themeApplyProc.running || id === greeterTabRoot.currentTheme) return
+                            greeterTabRoot.applyingTheme = id
+                            greeterTabRoot.themeStatus = "Switching to " + id + "..."
+                            _themeApplyProc._target = id
+                            _themeApplyProc.command = ["sudo", "-n", scriptDir + "/greeter-set.sh", "current", id]
+                            _themeApplyProc.running = true
+                        }
+
+                        // Themes list: id|name|description|current rows, parsed
+                        // like the Animations tab's preset list.
+                        Process {
+                            id: _themeListProc
+                            running: false
+                            property var _buf: []
+                            command: ["bash", "-c",
+                                "cur=\"$(\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" active 2>/dev/null)\"; " +
+                                "for d in /usr/share/sddm/themes/*/; do " +
+                                "  [ -f \"$d/metadata.desktop\" ] || continue; " +
+                                "  id=\"$(basename \"$d\")\"; " +
+                                "  name=\"$(grep -m1 '^Name=' \"$d/metadata.desktop\" | cut -d= -f2-)\"; " +
+                                "  [ -n \"$name\" ] || name=\"$id\"; " +
+                                "  desc=\"$(grep -m1 '^Comment=' \"$d/metadata.desktop\" | cut -d= -f2-)\"; " +
+                                "  [ -n \"$desc\" ] || desc=\"$(grep -m1 '^Description=' \"$d/metadata.desktop\" | cut -d= -f2-)\"; " +
+                                "  [ \"$id\" = \"$cur\" ] && mark=true || mark=false; " +
+                                "  printf '%s|%s|%s|%s\\n' \"$id\" \"$name\" \"$desc\" \"$mark\"; " +
+                                "done"]
+                            stdout: SplitParser {
+                                splitMarker: "\n"
+                                onRead: function(l) {
+                                    const t = l.trim()
+                                    if (t) _themeListProc._buf.push(t)
+                                }
+                            }
+                            onRunningChanged: if (running) _buf = []
+                            onExited: function() {
+                                const parsed = []
+                                let current = ""
+                                for (let i = 0; i < _buf.length; i++) {
+                                    const parts = _buf[i].split("|")
+                                    if (parts.length < 4) continue
+                                    const row = { id: parts[0], label: parts[1], desc: parts[2], current: parts[3] === "true" }
+                                    if (row.current) current = row.id
+                                    parsed.push(row)
+                                }
+                                greeterTabRoot.themes = parsed
+                                greeterTabRoot.currentTheme = current
+                                if (parsed.length === 0)
+                                    greeterTabRoot.themeStatus = "No SDDM themes found in /usr/share/sddm/themes."
+                                else if (greeterTabRoot.themeStatus.indexOf("Applied ") !== 0)
+                                    greeterTabRoot.themeStatus = "Select a theme - it applies at the next greeter launch."
+                            }
+                        }
+
+                        Process {
+                            id: _themeApplyProc
+                            running: false
+                            property string _target: ""
+                            onExited: function(code) {
+                                running = false
+                                if (code === 0) {
+                                    greeterTabRoot.currentTheme = _target
+                                    greeterTabRoot.themeStatus = "Applied " + _target + ". Takes effect at the next greeter launch."
+                                } else {
+                                    greeterTabRoot.themeStatus = "Failed to switch to " + _target + "."
+                                }
+                                greeterTabRoot.applyingTheme = ""
+                                greeterTabRoot.reloadThemes()
+                                greeterTabRoot.reloadSddmReads()
+                            }
+                        }
+
+                        Connections {
+                            target: ccTabSettings
+                            function onActiveTabChanged() {
+                                if (ccTabSettings.activeTab === 5) {
+                                    greeterTabRoot.reloadThemes()
+                                    greeterTabRoot.reloadSddmReads()
+                                }
+                            }
+                        }
+
+                        Component.onCompleted: greeterTabRoot.reloadThemes()
+
                         ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.margins: 14
+                            anchors.fill: parent
+                            anchors.margins: 14
                             spacing: 6
+
+                            // Themes | Edit sub-tab pills (mirrors the System tab:
+                            // buttons top-left, separator directly after the row)
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+
+                                Repeater {
+                                    model: ["Themes", "Edit"]
+                                    delegate: Rectangle {
+                                        required property string modelData
+                                        required property int index
+                                        property int _subIdx: greeterSubStack.currentIndex
+                                        height: 30
+                                        implicitWidth: _greeterSubLbl.implicitWidth + 18
+                                        radius: 9
+                                        color: _subIdx === index
+                                            ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.8)
+                                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.3)
+                                        border.width: _subIdx === index ? 1 : 0
+                                        border.color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.42)
+                                        Behavior on color { ColorAnimation { duration: 120 } }
+                                        Text {
+                                            id: _greeterSubLbl
+                                            anchors.centerIn: parent
+                                            text: modelData
+                                            color: (_subIdx === index ? Theme.cOnSecondary : Theme.cPrimary)
+                                            font.family: Config.labelFont; font.pixelSize: 12
+                                            font.weight: _subIdx === index ? 600 : 400
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                            onClicked: greeterSubStack.currentIndex = index
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    visible: greeterSubStack.currentIndex === 0
+                                    height: 30
+                                    implicitWidth: _greeterRefreshLbl.implicitWidth + 18
+                                    radius: 9
+                                    color: _greeterRefreshHov.containsMouse
+                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.38)
+                                        : Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.16)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    Text {
+                                        id: _greeterRefreshLbl
+                                        anchors.centerIn: parent
+                                        text: _themeListProc.running ? "Loading" : "Refresh"
+                                        color: Theme.cPrimary
+                                        font.family: Config.labelFont; font.pixelSize: 12
+                                    }
+                                    MouseArea {
+                                        id: _greeterRefreshHov
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: greeterTabRoot.reloadThemes()
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.22)
+                            }
+
+                            StackLayout {
+                                id: greeterSubStack
+                                Layout.fillWidth: true
+                                Layout.fillHeight: true
+                                currentIndex: 0
+
+                                // ── Themes sub-tab ──────────────────────────────
+                                Item {
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        spacing: 6
+
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: greeterTabRoot.themeStatus
+                                            color: Theme.cOnSurf
+                                            opacity: 0.65
+                                            font.family: Config.labelFont
+                                            font.pixelSize: 11
+                                            wrapMode: Text.Wrap
+                                            bottomPadding: 4
+                                        }
+
+                                        Item {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+
+                                            Flickable {
+                                                id: greeterThemesFlick
+                                                anchors.fill: parent
+                                                contentWidth: width
+                                                contentHeight: greeterThemesCol.implicitHeight + 20
+                                                clip: true
+                                                boundsBehavior: Flickable.StopAtBounds
+                                                ScrollBar.vertical: ScrollBar {
+                                                    policy: greeterThemesFlick.contentHeight > greeterThemesFlick.height
+                                                        ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+                                                    contentItem: Rectangle {
+                                                        implicitWidth: 3
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                                                        radius: 2
+                                                    }
+                                                    background: Rectangle { color: "transparent" }
+                                                }
+
+                                                ColumnLayout {
+                                                    id: greeterThemesCol
+                                                    width: parent.width - 8
+                                                    anchors { left: parent.left; leftMargin: 2; top: parent.top; topMargin: 8 }
+                                                    spacing: 0
+
+                                                    Text {
+                                                        visible: greeterTabRoot.themes.length === 0
+                                                        Layout.fillWidth: true
+                                                        text: _themeListProc.running
+                                                            ? "Loading themes..."
+                                                            : "No themes were found."
+                                                        color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.38)
+                                                        font.family: Config.labelFont
+                                                        font.pixelSize: 12
+                                                        horizontalAlignment: Text.AlignHCenter
+                                                        topPadding: 18
+                                                        bottomPadding: 10
+                                                    }
+
+                                                    Repeater {
+                                                        model: greeterTabRoot.themes
+                                                        delegate: Rectangle {
+                                                            required property var modelData
+                                                            required property int index
+                                                            Layout.fillWidth: true
+                                                            height: 46
+                                                            radius: 9
+                                                            color: modelData.current
+                                                                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.46)
+                                                                : (_themeRowHov.containsMouse
+                                                                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.22)
+                                                                    : (index % 2 === 0
+                                                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.10)
+                                                                        : "transparent"))
+                                                            border.width: modelData.current ? 1 : 0
+                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.38)
+                                                            Behavior on color { ColorAnimation { duration: 100 } }
+
+                                                            RowLayout {
+                                                                anchors { fill: parent; leftMargin: 10; rightMargin: 10 }
+                                                                spacing: 8
+
+                                                                Rectangle {
+                                                                    height: 26
+                                                                    implicitWidth: _themeNameLbl.implicitWidth + 16
+                                                                    radius: 7
+                                                                    color: modelData.current
+                                                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.50)
+                                                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
+                                                                    border.width: 1
+                                                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.30)
+                                                                    Text {
+                                                                        id: _themeNameLbl
+                                                                        anchors.centerIn: parent
+                                                                        text: modelData.label
+                                                                        color: Theme.cOnSurf
+                                                                        font.family: Config.labelFont
+                                                                        font.pixelSize: 11
+                                                                        font.weight: Font.Medium
+                                                                    }
+                                                                }
+
+                                                                Text {
+                                                                    Layout.fillWidth: true
+                                                                    text: modelData.desc
+                                                                    color: Theme.cOnSurf
+                                                                    opacity: 0.85
+                                                                    font.family: Config.labelFont
+                                                                    font.pixelSize: 12
+                                                                    elide: Text.ElideRight
+                                                                }
+
+                                                                Text {
+                                                                    visible: greeterTabRoot.applyingTheme === modelData.id
+                                                                    text: "..."
+                                                                    color: Theme.cOnSurf
+                                                                    opacity: 0.7
+                                                                    font.family: Config.labelFont
+                                                                    font.pixelSize: 12
+                                                                }
+
+                                                                Text {
+                                                                    visible: modelData.current && greeterTabRoot.applyingTheme !== modelData.id
+                                                                    text: "Active"
+                                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.75)
+                                                                    font.family: Config.labelFont
+                                                                    font.pixelSize: 10
+                                                                }
+                                                            }
+
+                                                            MouseArea {
+                                                                id: _themeRowHov
+                                                                anchors.fill: parent
+                                                                hoverEnabled: true
+                                                                cursorShape: _themeApplyProc.running ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+                                                                enabled: !_themeApplyProc.running
+                                                                onClicked: greeterTabRoot.applyTheme(modelData.id)
+                                                            }
+                                                        }
+                                                    }
+
+                                                    Item { height: 12 }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // ── Edit sub-tab ────────────────────────────────
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        Layout.margins: 14
+                                        spacing: 6
 
                             CCEntryRow {
                                 label: "Header"
                                 value: _sddmHeaderVal
                                 onApplied: function(v) {
                                     _sddmHeaderVal = v
-                                    _sddmHdr.command = [scriptDir + "/sddm-set.sh", "HeaderText", v, "sddm_header.state"]
+                                    _sddmHdr.command = ["sudo", "-n", scriptDir + "/greeter-set.sh", "set", "HeaderText", v, "sddm_header.state"]
                                     _sddmHdr.running = true
                                 }
                             }
@@ -4370,7 +4705,7 @@ PanelWindow {
                                 value: _sddmWidthVal
                                 onApplied: function(v) {
                                     _sddmWidthVal = v
-                                    _sddmWidth.command = [scriptDir + "/sddm-set.sh", "ScreenWidth", v, "sddm_width.state"]
+                                    _sddmWidth.command = ["sudo", "-n", scriptDir + "/greeter-set.sh", "set", "ScreenWidth", v, "sddm_width.state"]
                                     _sddmWidth.running = true
                                 }
                             }
@@ -4381,7 +4716,7 @@ PanelWindow {
                                 value: _sddmHeightVal
                                 onApplied: function(v) {
                                     _sddmHeightVal = v
-                                    _sddmHeight.command = [scriptDir + "/sddm-set.sh", "ScreenHeight", v, "sddm_height.state"]
+                                    _sddmHeight.command = ["sudo", "-n", scriptDir + "/greeter-set.sh", "set", "ScreenHeight", v, "sddm_height.state"]
                                     _sddmHeight.running = true
                                 }
                             }
@@ -4392,7 +4727,7 @@ PanelWindow {
                                 value: _sddmFontVal
                                 onApplied: function(v) {
                                     _sddmFontVal = v
-                                    _sddmFont.command = [scriptDir + "/sddm-set.sh", "Font", v, "sddm_font.state"]
+                                    _sddmFont.command = ["sudo", "-n", scriptDir + "/greeter-set.sh", "set", "Font", v, "sddm_font.state"]
                                     _sddmFont.running = true
                                 }
                             }
@@ -4416,7 +4751,7 @@ PanelWindow {
                                             active: _sddmFormVal === modelData
                                             onClicked: {
                                                 _sddmFormVal = modelData
-                                                _sddmForm.command = [scriptDir + "/sddm-set.sh", "FormPosition", modelData, "sddm_form.state"]
+                                                _sddmForm.command = ["sudo", "-n", scriptDir + "/greeter-set.sh", "set", "FormPosition", modelData, "sddm_form.state"]
                                                 _sddmForm.running = true
                                             }
                                         }
@@ -4432,7 +4767,7 @@ PanelWindow {
                                 onMoved: function(v) {
                                     const n = Math.round(v)
                                     _sddmBlurVal = n.toString()
-                                    _sddmBlur.command = [scriptDir + "/sddm-set.sh", "BlurRadius", n.toString(), "sddm_blur.state"]
+                                    _sddmBlur.command = ["sudo", "-n", scriptDir + "/greeter-set.sh", "set", "BlurRadius", n.toString(), "sddm_blur.state"]
                                     _sddmBlur.running = true
                                 }
                             }
@@ -4455,11 +4790,16 @@ PanelWindow {
                             Process {
                                 id: _sddmPreview
                                 command: ["bash", "-c",
-                                    "setsid sddm-greeter --test-mode --theme /usr/share/sddm/themes/sugar-candy </dev/null >/dev/null 2>&1 &"]
+                                    "t=\"$(\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" active 2>/dev/null)\"; " +
+                                    "[ -d \"/usr/share/sddm/themes/$t\" ] || t=sugar-candy; " +
+                                    "setsid sddm-greeter --test-mode --theme \"/usr/share/sddm/themes/$t\" </dev/null >/dev/null 2>&1 &"]
                                 running: false
                                 onExited: running = false
                             }
                             Item { height: 10 }
+                        }
+                                }
+                            }
                         }
                     }
 

@@ -1,0 +1,14 @@
+[SddmGreeterTheme]
+Name=HyprCandy 1
+Description=Material You glass greeter for HyprCandy+
+Author=AstralDesigns
+Copyright=Copyright (C) 2026 AstralDesigns
+License=GPL-3.0-or-later
+Type=sddm-theme
+Version=1.0
+Website=https://github.com/AstralDesigns/HyprC-Plus
+MainScript=Main.qml
+ConfigFile=theme.conf
+Email=astraldesigns@proton.me
+Theme-Id=hyprcandy-1
+Theme-API=2.11
