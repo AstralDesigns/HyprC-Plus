@@ -23,7 +23,8 @@
 // Chromium compositor; the web content's GL path is governed only by the
 // --use-gl/--use-angle flags (absent here = Chromium's own default). Kept at
 // opengl (no spaces -- "KEY = val" would set a malformed var and do nothing).
-//@ pragma Env QSG_RHI_BACKEND=opengl
+// //@ pragma Env QT_QUICK_BACKEND=vulkan
+// //@ pragma Env QSG_RHI_BACKEND=vulkan
 //
 // Flags: gpu-rasterization + ignore-gpu-blocklist keep the hardware path;
 // zero-copy shares GPU buffers (the very DMA-BUF path that failed under ANGLE-
@@ -83,6 +84,30 @@
 // Chromium child processes manage their own allocators). Pure allocator tuning --
 // no functional or rendering change.
 //@ pragma Env MALLOC_ARENA_MAX=4
+
+// ── Thread-count trim (QML scene graph + Mesa) ─────────────────────────────
+// Two knobs that cut 10 idle threads from this process with no functional
+// change:
+//
+//  QSG_RENDER_LOOP=basic — each visible QQuickWindow normally owns a
+//  QSGRenderThread (bar + 4 shell reservations + 2 shell islands + desktop
+//  layer + dock + launcher = 10). The basic loop renders on the GUI thread
+//  instead. Our surfaces are small and mostly idle; if any animation ever
+//  measurably stutters, delete this one line to go back to threaded.
+//
+//  GALLIUM_THREADPOOL=0 — caps Mesa's llvmpipe worker pool (no hardware DRI
+//  driver is mapped in this process). Chromium's own GPU pipeline is
+//  untouched.
+//
+//  NOT possible: QT_QUICK_BACKEND=software — it kills QtWebEngine rendering
+//  (blank web/agent tabs; the web view compositor requires the accelerated
+//  scene graph) and the variable is process-wide with no per-window override,
+//  so bar/dock cannot be software while the launcher stays GL. The remaining
+//  ~23 "qs:gdrv0" threads are Mesa per-context threaded drivers — one per
+//  live QQuickWindow's EGL context — and are the price of the GL backend
+//  unless the launcher is split into a separate qs process.
+//@ pragma Env QSG_RENDER_LOOP=basic
+//@ pragma Env GALLIUM_THREADPOOL=0
 
 pragma ComponentBehavior: Bound
 
