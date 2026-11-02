@@ -4792,7 +4792,9 @@ PanelWindow {
                                 command: ["bash", "-c",
                                     "t=\"$(\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" active 2>/dev/null)\"; " +
                                     "[ -d \"/usr/share/sddm/themes/$t\" ] || t=sugar-candy; " +
-                                    "setsid sddm-greeter --test-mode --theme \"/usr/share/sddm/themes/$t\" </dev/null >/dev/null 2>&1 &"]
+                                    "g=sddm-greeter; " +
+                                    "[ \"$(grep -m1 '^QtVersion=' \"/usr/share/sddm/themes/$t/metadata.desktop\" 2>/dev/null | cut -d= -f2)\" = 6 ] && [ -x /usr/bin/sddm-greeter-qt6 ] && g=sddm-greeter-qt6; " +
+                                    "setsid \"$g\" --test-mode --theme \"/usr/share/sddm/themes/$t\" </dev/null >/dev/null 2>&1 &"]
                                 running: false
                                 onExited: running = false
                             }
