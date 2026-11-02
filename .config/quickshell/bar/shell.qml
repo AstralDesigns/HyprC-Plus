@@ -347,8 +347,12 @@ ShellRoot {
         function toggleVisibility() {
             for (let i = 0; i < barVariants.instances.length; i++) {
                 const b = barVariants.instances[i]
-                if (Hyprland.monitorFor(b.screen)?.id === Hyprland.focusedMonitor?.id)
-                    b._altHidden = !b._altHidden
+                if (Hyprland.monitorFor(b.screen)?.id === Hyprland.focusedMonitor?.id) {
+                    // A manual hide ("Hide bar" menu row) takes precedence:
+                    // clear it instead of stacking a second hidden intent.
+                    if (b._manualHidden) b._manualHidden = false
+                    else b._altHidden = !b._altHidden
+                }
             }
         }
 

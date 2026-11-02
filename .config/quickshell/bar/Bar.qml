@@ -171,6 +171,7 @@ PanelWindow {
                         + Config.barPad * 2
 
         HoverHandler {
+            id: shellLeftHover
             // Opacity-0 island windows still take hover; gate so only the
             // thin hotspot strip can reveal while auto-hidden.
             enabled: !bar._triLeftAhHidden
@@ -182,6 +183,23 @@ PanelWindow {
                 } else {
                     if (!bar._triLeftPinned) triLeftHideTimer.restart()
                 }
+            }
+        }
+
+        // Right-click on empty island surface → bar menu. This is its own
+        // Top-layer surface, so translate the click to screen coords (the
+        // bar window spans the monitor in shell mode, where these islands
+        // live) via the anchor/margin math.
+        MouseArea {
+            anchors.fill: parent
+            z: -1
+            acceptedButtons: Qt.RightButton
+            onClicked: function(mouse) {
+                const rx = shellLeftPW.margins.left
+                const ry = bar._isBottom ? (bar.screen.height - shellLeftPW.margins.bottom - shellLeftPW.height)
+                                         : shellLeftPW.margins.top
+                bar._openBarMenu(rx + mouse.x, ry + mouse.y, rx, ry,
+                                 shellLeftPW.width, shellLeftPW.height)
             }
         }
 
@@ -281,6 +299,7 @@ PanelWindow {
                         + Config.barPad * 2
 
         HoverHandler {
+            id: shellRightHover
             // Opacity-0 island windows still take hover; gate so only the
             // thin hotspot strip can reveal while auto-hidden.
             enabled: !bar._triRightAhHidden
@@ -292,6 +311,21 @@ PanelWindow {
                 } else {
                     if (!bar._triRightPinned) triRightHideTimer.restart()
                 }
+            }
+        }
+
+        // Right-click on empty island surface → bar menu (screen coords via
+        // the anchor/margin math; right-anchored window origin).
+        MouseArea {
+            anchors.fill: parent
+            z: -1
+            acceptedButtons: Qt.RightButton
+            onClicked: function(mouse) {
+                const rx = bar.screen.width - shellRightPW.margins.right - shellRightPW.width
+                const ry = bar._isBottom ? (bar.screen.height - shellRightPW.margins.bottom - shellRightPW.height)
+                                         : shellRightPW.margins.top
+                bar._openBarMenu(rx + mouse.x, ry + mouse.y, rx, ry,
+                                 shellRightPW.width, shellRightPW.height)
             }
         }
 
@@ -455,6 +489,7 @@ PanelWindow {
                                        || CalendarPopupState.visible
                                        || WorkspacesPopupState.visible
                                        || MediaPlayerPopupState.visible
+                                       || bar._barMenuVisible
 
     // Tri AH: only pin the segment that owns the open popup. CC pins all three.
     readonly property bool _triLeftPinned: NotificationsState.historyVisible
@@ -497,7 +532,7 @@ PanelWindow {
         if (bar._ahEnabled) {
             if (bar.anyPanelOpen) {
                 _ahHideTimer.stop()
-                if (bar._ahHidden) { bar._ahHidden = false; bar.visible = !bar._altHidden }
+                if (bar._ahHidden) { bar._ahHidden = false; bar.visible = !bar._altHidden && !bar._manualHidden }
             } else {
                 _ahHideTimer.restart()
             }
@@ -610,6 +645,13 @@ PanelWindow {
     property bool _altHidden: false
     on_AltHiddenChanged: updateBarVisibility()
 
+    // One-shot manual hide ("Hide bar" row in the right-click menu): unmaps
+    // the surface but keeps the shell loaded so the edge hotspot can reveal
+    // it again — no re-hide timer (dock _manualHidden parity). Unlike
+    // _altHidden this leaves the hotspot armed.
+    property bool _manualHidden: false
+    on_ManualHiddenChanged: updateBarVisibility()
+
     function updateBarVisibility() {
         if (Config.barMode === "tri") {
             const leftVisible   = !Config.triLeftAutoHide   || !_triLeftAhHidden   || _triLeftPinned
@@ -620,13 +662,13 @@ PanelWindow {
             // hotspots reveal it again (previously bar.visible=false here
             // also killed every hotspot, making the bar unreachable without
             // ALT+1 once all three islands hid).
-            bar.visible = !bar._altHidden && (leftVisible || centerVisible || rightVisible)
+            bar.visible = !bar._altHidden && !bar._manualHidden && (leftVisible || centerVisible || rightVisible)
         } else if (Config.barMode === "shell") {
-            bar.visible = !bar._altHidden
+            bar.visible = !bar._altHidden && !bar._manualHidden
         } else {
             if (!bar._ahHidden) {
                 // Showing: make visible immediately so animation can play
-                bar.visible = !bar._altHidden
+                bar.visible = !bar._altHidden && !bar._manualHidden
             } else {
                 // Hiding: keep visible during exit animation, destroy after
                 _ahAnimExitTimer.restart()
@@ -811,7 +853,7 @@ PanelWindow {
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
 
-        visible: !bar._altHidden && bar._ahEnabled && bar._ahHidden && !_fullscreen
+        visible: !bar._altHidden && ((bar._ahEnabled && bar._ahHidden) || bar._manualHidden) && !_fullscreen
 
         WlrLayershell.layer:     WlrLayer.Top
         WlrLayershell.namespace: "quickshell:bar-autohide-hotspot"
@@ -833,13 +875,218 @@ PanelWindow {
 
         HoverHandler {
             onHoveredChanged: {
-                if (hovered && bar._ahEnabled) {
+                if (!hovered) return
+                if (bar._manualHidden) {
+                    // Manual hide is one-shot: reveal and stay put — the
+                    // re-hide timer belongs to auto-hide only.
+                    bar._manualHidden = false
+                    bar.visible = true
+                } else if (bar._ahEnabled) {
                     bar._ahHidden = false
                     bar.visible   = true
                     _ahHideTimer.stop()
                 }
             }
         }
+    }
+
+    // ── Bar right-click menu ─────────────────────────────────────────────
+    // DockWindow.qml menu parity: separate Overlay surface (layer surfaces
+    // get no outside-click, so dismissal is hover-exit timed), single
+    // one-shot Hide/Show bar row.
+    property bool _barMenuVisible: false
+    property real _menuMX: 0        // click point, bar-window coords
+    property real _menuMY: 0
+    // Screen rect of the right-clicked area (shell mode: arm band, center
+    // protrusion, or Top-layer island). Non-positive size = fall back to the
+    // bar-strip rect, which is what the non-shell modes hang the menu off.
+    property real _menuRX: 0
+    property real _menuRY: 0
+    property real _menuRW: 0
+    property real _menuRH: 0
+
+    function _openBarMenu(mx, my, rx, ry, rw, rh) {
+        bar._menuMX = mx
+        bar._menuMY = my
+        bar._menuRX = rx
+        bar._menuRY = ry
+        bar._menuRW = rw
+        bar._menuRH = rh
+        bar._barMenuVisible = true
+        barMenuDismissTimer.restart()
+    }
+
+    // Shell mode: resolve the clicked region so the menu sits tight against
+    // it (same snugness the other modes get from the strip rect). The bar
+    // window spans the monitor, so window coords are screen coords.
+    function _openBarMenuAt(mx, my) {
+        if (bar._shellMode) {
+            const scr = bar.screen
+            const cx = barBg.x + shellCenter.x
+            const cy = barBg.y + shellCenter.y
+            if (shellCenter.visible && shellCenter._shown
+                && mx >= cx && mx < cx + shellCenter.width
+                && my >= cy && my < cy + shellCenter.height) {
+                bar._openBarMenu(mx, my, cx, cy, shellCenter.width, shellCenter.height)
+                return
+            }
+            const dT = my, dB = scr.height - my, dL = mx, dR = scr.width - mx
+            if (dT <= dB && dT <= dL && dT <= dR) {
+                // Band = the drawn arm (shellArmThickness), same as the mask
+                // hollow inset — NOT _shellActiveThickness, which reaches
+                // down to the island bottoms and pushed the menu too deep.
+                bar._openBarMenu(mx, my, 0, 0, scr.width, bar._shellTopT)
+            } else if (dB < dT && dB <= dL && dB <= dR) {
+                bar._openBarMenu(mx, my, 0, scr.height - bar._shellBottomT, scr.width, bar._shellBottomT)
+            } else if (dL <= dR) {
+                bar._openBarMenu(mx, my, 0, 0, bar._shellLeftT, scr.height)
+            } else {
+                const t = bar._shellRightT
+                bar._openBarMenu(mx, my, scr.width - t, 0, t, scr.height)
+            }
+            return
+        }
+        bar._openBarMenu(mx, my, -1, -1, -1, -1)
+    }
+    function _hideBarMenu() { bar._barMenuVisible = false }
+
+    // Menu row noun per bar mode (Hide/Show <noun>).
+    readonly property string _menuNoun: Config.barMode === "tri"   ? "Tri-Islands"
+                                      : Config.barMode === "shell" ? "Shell"
+                                      : Config.barMode === "island" ? "Islands"
+                                                                    : "Bar"
+
+    Timer {
+        id: barMenuDismissTimer
+        interval: 400
+        repeat: false
+        onTriggered: {
+            if (!bar._barMenuVisible) return
+            // Keep-alive: the menu, the bar window, or either shell island
+            // window (separate surfaces — _barHover never fires there).
+            if (barMenuHover.hovered || _barHover.hovered
+                || shellLeftHover.hovered || shellRightHover.hovered)
+                barMenuDismissTimer.restart()
+            else bar._hideBarMenu()
+        }
+    }
+
+    PanelWindow {
+        id: barMenuWin
+        screen: bar.screen
+        visible: bar._barMenuVisible && bar.visible
+        color: "transparent"
+
+        WlrLayershell.namespace: "hyprcandy-bar-menu"
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        exclusionMode: ExclusionMode.Ignore
+        exclusiveZone: 0
+
+        // Screen origin of the bar window — PanelWindow.x/y are not reliably
+        // populated for auto-positioned surfaces, so derive from the same
+        // anchor/margin math the compositor uses (dock originX parity). In
+        // shell mode the window spans the monitor; the visible strip is the
+        // active arm, so origin/extent come from the arm thickness instead.
+        readonly property real barX: bar._shellMode
+            ? (bar._isRight ? screen.width - bar._shellActiveThickness : 0)
+            : (bar._isRight ? (screen.width  - bar.width  - bar.margins.right) : bar.margins.left)
+        readonly property real barY: bar._shellMode
+            ? (bar._isBottom ? screen.height - bar._shellActiveThickness : 0)
+            : (bar._isBottom ? (screen.height - bar.height - bar.margins.bottom) : bar.margins.top)
+        readonly property real absX: barX + bar._menuMX
+        readonly property real absY: barY + bar._menuMY
+        readonly property real stripW: bar._shellMode ? bar._shellActiveThickness : bar.width
+        readonly property real stripH: bar._shellMode ? bar._shellActiveThickness : bar.height
+
+        // Which edge the menu hangs off. In bar/island/tri modes it's the
+        // bar's anchored edge; in shell mode the window spans the monitor,
+        // so respect the region that was actually right-clicked (active arm,
+        // decorative arm, center protrusion, or a Top-layer island) by
+        // picking the screen edge nearest the click point.
+        readonly property real dTop: bar._menuMY
+        readonly property real dBot: screen.height - bar._menuMY
+        readonly property real dLft: bar._menuMX
+        readonly property real dRgt: screen.width - bar._menuMX
+        readonly property bool sTop: bar._shellMode ? (dTop <= dBot && dTop <= dLft && dTop <= dRgt) : bar._isTop
+        readonly property bool sBot: bar._shellMode ? (!sTop && dBot <= dLft && dBot <= dRgt) : bar._isBottom
+        readonly property bool sLft: bar._shellMode ? (!sTop && !sBot && dLft <= dRgt) : bar._isLeft
+        readonly property bool sRgt: bar._shellMode ? (!sTop && !sBot && !sLft) : bar._isRight
+
+        implicitWidth: barMenuCard.implicitWidth
+        implicitHeight: barMenuCard.implicitHeight
+        anchors { top: true; left: true }
+        // Screen rect to hang off: the right-clicked area's own rect (shell
+        // mode / islands) or the bar strip (all other modes). PanelWindow
+        // width/height are stale until the map lands — size the margins off
+        // the card's implicit size (evaluated now).
+        readonly property real rx: bar._menuRW > 0 ? bar._menuRX : barMenuWin.barX
+        readonly property real ry: bar._menuRH > 0 ? bar._menuRY : barMenuWin.barY
+        readonly property real rr: bar._menuRW > 0 ? (bar._menuRX + bar._menuRW)
+                                                   : (barMenuWin.barX + barMenuWin.stripW)
+        readonly property real rb: bar._menuRH > 0 ? (bar._menuRY + bar._menuRH)
+                                                   : (barMenuWin.barY + barMenuWin.stripH)
+        margins {
+            left: Math.round(barMenuWin.sLft ? Math.min(screen.width - barMenuCard.implicitWidth - 4,
+                                                        barMenuWin.rr + 6)
+                       : barMenuWin.sRgt ? Math.max(4, barMenuWin.rx - barMenuCard.implicitWidth - 6)
+                       : Math.max(4, Math.min(barMenuWin.absX - barMenuCard.implicitWidth / 2,
+                                              screen.width - barMenuCard.implicitWidth - 4)))
+            top: Math.round(barMenuWin.sTop ? barMenuWin.rb + 6
+                       : barMenuWin.sBot ? Math.max(4, barMenuWin.ry - barMenuCard.implicitHeight - 6)
+                       : Math.max(4, Math.min(barMenuWin.absY - barMenuCard.implicitHeight / 2,
+                                              screen.height - barMenuCard.implicitHeight - 4)))
+        }
+
+        Rectangle {
+            id: barMenuCard
+            width: implicitWidth
+            height: implicitHeight
+            implicitWidth: 180
+            implicitHeight: barMenuCol.implicitHeight + 16
+            color: Theme.cOnSecondary
+            radius: 12
+            border.width: 1
+            border.color: Qt.rgba(Theme.cSecondary.r, Theme.cSecondary.g,
+                                  Theme.cSecondary.b, 0.5)
+
+            HoverHandler {
+                id: barMenuHover
+                onHoveredChanged: {
+                    if (hovered) barMenuDismissTimer.stop()
+                    else if (bar._barMenuVisible) barMenuDismissTimer.restart()
+                }
+            }
+
+            Column {
+                id: barMenuCol
+                x: 8; y: 8
+                width: barMenuCard.width - 16
+                spacing: 2
+
+                // One-shot manual hide: unmaps the bar, edge hotspot reveals
+                // it again (no re-hide timer — auto-hide stays in the CC).
+                BarMenuBtn {
+                    label: bar._manualHidden ? "\u{F0208} Show " + bar._menuNoun
+                                             : "\u{F0701} Hide " + bar._menuNoun
+                    onTriggered: {
+                        bar._hideBarMenu()
+                        bar._manualHidden = !bar._manualHidden
+                    }
+                }
+            }
+        }
+    }
+
+    // Right-click on empty bar surface (all modes) → the menu above. Sits at
+    // z:-1 so modules keep their own click handlers; accepts only the right
+    // button. In shell mode the window mask already restricts input to the
+    // arms, so desktop clicks are untouched.
+    MouseArea {
+        anchors.fill: parent
+        z: -1
+        acceptedButtons: Qt.RightButton
+        onClicked: function(mouse) { bar._openBarMenuAt(mouse.x, mouse.y) }
     }
 
     // ── Bar state file ──────────────────────────────────────────────────
@@ -1844,7 +2091,7 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: !bar._altHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triLeftAhEnabled && bar._triLeftAhHidden && !_fullscreen
+        visible: !bar._altHidden && !bar._manualHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triLeftAhEnabled && bar._triLeftAhHidden && !_fullscreen
         screen: bar.screen
 
         WlrLayershell.layer:     WlrLayer.Top
@@ -1880,7 +2127,7 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: !bar._altHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triCenterAhEnabled && bar._triCenterAhHidden && !_fullscreen
+        visible: !bar._altHidden && !bar._manualHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triCenterAhEnabled && bar._triCenterAhHidden && !_fullscreen
         screen: bar.screen
 
         // Overlay (not Top): must sit above the Bottom-layer shell arm
@@ -1923,7 +2170,7 @@ PanelWindow {
             const mon = bar._monitor
             return !!(mon && mon.activeWindow && mon.activeWindow.fullscreen)
         }
-        visible: !bar._altHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triRightAhEnabled && bar._triRightAhHidden && !_fullscreen
+        visible: !bar._altHidden && !bar._manualHidden && (Config.barMode === "tri" || Config.barMode === "shell") && bar._triRightAhEnabled && bar._triRightAhHidden && !_fullscreen
         screen: bar.screen
 
         WlrLayershell.layer:     WlrLayer.Top
@@ -1968,6 +2215,40 @@ PanelWindow {
             Island { visible_: Config.showClock; Modules.Clock {} }
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
             Island { bgType: "startmenu"; Modules.PowerButton {} }
+        }
+    }
+
+    // Right-click menu row (simplified DockMenuBtn parity: label row with
+    // hover tint, click emits triggered).
+    component BarMenuBtn: Rectangle {
+        id: _bmb
+        property string label: ""
+        signal triggered()
+        width: parent ? parent.width : 180
+        height: _bmbLabel.implicitHeight + 9
+        radius: 6
+        color: _bmbMa.containsMouse
+               ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+               : "transparent"
+        Behavior on color { ColorAnimation { duration: 80 } }
+        Text {
+            id: _bmbLabel
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: 10
+            anchors.rightMargin: 4
+            anchors.verticalCenter: parent.verticalCenter
+            text: _bmb.label
+            font.pixelSize: 11
+            color: Theme.cPrimary
+            elide: Text.ElideRight
+        }
+        MouseArea {
+            id: _bmbMa
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: _bmb.triggered()
         }
     }
 }
