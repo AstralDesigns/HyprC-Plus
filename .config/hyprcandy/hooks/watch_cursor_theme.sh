@@ -34,8 +34,17 @@ update_hypr_cursor_env() {
     sed -i "s|^gtk-cursor-theme-size=.*|gtk-cursor-theme-size=$size|" "$GTK4_FILE" 
 
     # SDDM cursor update
-    sudo sed -i "s|^CursorTheme=.*|CursorTheme=$theme|" "/etc/sddm.conf.d/sugar-candy.conf"
-    sudo sed -i "s|^CursorSize=.*|CursorSize=$size|" "/etc/sddm.conf.d/sugar-candy.conf"
+    if ! sudo grep -q '^CursorTheme=' /etc/sddm.conf.d/hyprcandy.conf 2>/dev/null; then
+        printf '[Theme]\nCurrent=hyprcandy-1\nCursorTheme=%s\nCursorSize=%s\n' "$theme" "$size" | sudo tee /etc/sddm.conf.d/hyprcandy.conf > /dev/null
+    fi
+    sudo sed -i "s|^CursorTheme=.*|CursorTheme=$theme|" "/etc/sddm.conf.d/hyprcandy.conf"
+    sudo sed -i "s|^CursorSize=.*|CursorSize=$size|" "/etc/sddm.conf.d/hyprcandy.conf"
+
+    # Sync the SYSTEM default cursor pointer (/usr/share/icons/default) so the
+    # SDDM greeter — which runs as the sddm user and cannot read ~/.icons —
+    # resolves the same theme instead of falling back to the old default.
+    [ -f /usr/share/icons/default/index.theme ] && \
+        sudo sed -i "s|^Inherits=.*|Inherits=$theme|" /usr/share/icons/default/index.theme
 
     # Apply changes immediately
     apply_cursor_changes "$theme" "$size"
