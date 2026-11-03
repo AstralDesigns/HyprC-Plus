@@ -84,7 +84,7 @@ PanelWindow {
     property int    _dockMarginVal: Config.dockMargin
 
     // ── SDDM current values ───────────────────────────────────────────────
-    property string _sddmHeaderVal:  "󰫣󰫣󰫣"
+    property string _sddmHeaderVal:  ""
     property string _sddmFormVal:    "center"
     property string _sddmBlurVal:    "55"
     property string _sddmWidthVal:   ""
@@ -659,73 +659,61 @@ PanelWindow {
     Process {
         id: _sddmReadHeader
         command: ["bash", "-c",
-            "sd=\"$HOME/.config/hyprcandy\"; " +
-            "[ -f \"$sd/sddm_header.state\" ] && cat \"$sd/sddm_header.state\" || " +
-            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get HeaderText 2>/dev/null | head -1"]
+            "\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get HeaderText 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: function(l) { const v = l.trim(); if (v) _sddmHeaderVal = v }
+            onRead: function(l) { _sddmHeaderVal = l.trim() }
         }
     }
     Process {
         id: _sddmReadForm
         command: ["bash", "-c",
-            "sd=\"$HOME/.config/hyprcandy\"; " +
-            "[ -f \"$sd/sddm_form.state\" ] && cat \"$sd/sddm_form.state\" || " +
-            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get FormPosition 2>/dev/null | head -1"]
+            "\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get FormPosition 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: function(l) { const v = l.trim(); if (v) _sddmFormVal = v }
+            onRead: function(l) { _sddmFormVal = l.trim() }
         }
     }
     Process {
         id: _sddmReadBlur
         command: ["bash", "-c",
-            "sd=\"$HOME/.config/hyprcandy\"; " +
-            "[ -f \"$sd/sddm_blur.state\" ] && cat \"$sd/sddm_blur.state\" || " +
-            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get BlurRadius 2>/dev/null | head -1"]
+            "\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get BlurRadius 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: function(l) { const v = l.trim(); if (v && !isNaN(parseInt(v))) _sddmBlurVal = v }
+            onRead: function(l) { _sddmBlurVal = l.trim() }
         }
     }
     Process {
         id: _sddmReadWidth
         command: ["bash", "-c",
-            "sd=\"$HOME/.config/hyprcandy\"; " +
-            "[ -f \"$sd/sddm_width.state\" ] && cat \"$sd/sddm_width.state\" || " +
-            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get ScreenWidth 2>/dev/null | head -1"]
+            "\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get ScreenWidth 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: function(l) { const v = l.trim(); if (v) _sddmWidthVal = v }
+            onRead: function(l) { _sddmWidthVal = l.trim() }
         }
     }
     Process {
         id: _sddmReadHeight
         command: ["bash", "-c",
-            "sd=\"$HOME/.config/hyprcandy\"; " +
-            "[ -f \"$sd/sddm_height.state\" ] && cat \"$sd/sddm_height.state\" || " +
-            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get ScreenHeight 2>/dev/null | head -1"]
+            "\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get ScreenHeight 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: function(l) { const v = l.trim(); if (v) _sddmHeightVal = v }
+            onRead: function(l) { _sddmHeightVal = l.trim() }
         }
     }
     Process {
         id: _sddmReadFont
         command: ["bash", "-c",
-            "sd=\"$HOME/.config/hyprcandy\"; " +
-            "[ -f \"$sd/sddm_font.state\" ] && cat \"$sd/sddm_font.state\" || " +
-            "  \"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get Font 2>/dev/null | head -1"]
+            "\"$HOME/.config/quickshell/bar/scripts/greeter-set.sh\" get Font 2>/dev/null | head -1"]
         running: false
         stdout: SplitParser {
             splitMarker: "\n"
-            onRead: function(l) { const v = l.trim(); if (v) _sddmFontVal = v }
+            onRead: function(l) { _sddmFontVal = l.trim() }
         }
     }
 
@@ -4365,6 +4353,10 @@ PanelWindow {
                         function reloadThemes() { _rerunProc(_themeListProc) }
 
                         function reloadSddmReads() {
+                            // Clear first so an absent/empty key shows blank rather
+                            // than a stale value (all reads are theme.conf-authoritative).
+                            _sddmHeaderVal = ""; _sddmFormVal = ""; _sddmBlurVal = ""
+                            _sddmWidthVal = ""; _sddmHeightVal = ""; _sddmFontVal = ""
                             _rerunProc(_sddmReadHeader); _rerunProc(_sddmReadForm)
                             _rerunProc(_sddmReadBlur);   _rerunProc(_sddmReadWidth)
                             _rerunProc(_sddmReadHeight); _rerunProc(_sddmReadFont)
@@ -4778,6 +4770,8 @@ PanelWindow {
                             Timer {
                                 interval: 100; running: true; repeat: false
                                 onTriggered: {
+                                    _sddmHeaderVal = ""; _sddmFormVal = ""; _sddmBlurVal = ""
+                                    _sddmWidthVal = ""; _sddmHeightVal = ""; _sddmFontVal = ""
                                     _sddmReadHeader.running = true
                                     _sddmReadForm.running   = true
                                     _sddmReadBlur.running   = true
@@ -10069,14 +10063,6 @@ PanelWindow {
             color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-            // Focus highlight: cPrimary tint at 0.15 alpha while editing.
-            Rectangle {
-                anchors.fill: parent
-                radius: 7
-                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
-                opacity: _cerInput.activeFocus ? 1.0 : 0.0
-                Behavior on opacity { NumberAnimation { duration: 120 } }
-            }
             TextInput {
                 id: _cerInput
                 anchors { fill: parent; margins: 6 }
@@ -10084,6 +10070,9 @@ PanelWindow {
                 color: Theme.cPrimary
                 font.family: Config.labelFont; font.pixelSize: 12
                 verticalAlignment: TextInput.AlignVCenter; clip: true
+                // Text-selection highlight (ctrl+A / drag) — cPrimary @ 0.15.
+                selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                selectedTextColor: Theme.cPrimary
                 onAccepted: applied(text)
             }
         }
