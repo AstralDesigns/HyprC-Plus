@@ -377,16 +377,19 @@ Pane {
                                 radius: 65
                                 color: theme.cSurfaceContainer
 
-                                // Image clipped just inside the 4px ring so its
-                                // bottom arc can't bleed past the border (the
-                                // lockscreen fix).
+                                // Circular clipping via a Qt6 MultiEffect mask
+                                // (not a clip:true + radius box, which SDDM's Qt6
+                                // build can clip only to the square bounding
+                                // rect). The surface-high disc is the default
+                                // background, and a dedicated off-screen white
+                                // rounded rect is the mask so the icon is cropped
+                                // to a perfect circle without a self-referential
+                                // layer.
                                 Rectangle {
                                     anchors { fill: parent; margins: 4 }
                                     radius: 61
-                                    clip: true
-                                    // Default disc (candylock surface-high) shown
-                                    // behind the glyph when no user icon is set.
                                     color: theme.cSurfaceContainerHigh
+
                                     Image {
                                         id: avatarImg
                                         anchors.fill: parent
@@ -395,7 +398,15 @@ Pane {
                                         fillMode: Image.PreserveAspectCrop
                                         smooth: true
                                         cache: false
-                                        visible: status === Image.Ready
+                                        visible: false
+                                    }
+                                    MultiEffect {
+                                        anchors.fill: parent
+                                        source: avatarImg
+                                        maskEnabled: true
+                                        maskSource: avatarMask
+                                        maskThresholdMin: 0.5
+                                        maskSpreadAtMin: 1.0
                                     }
                                     Text {
                                         anchors.centerIn: parent
@@ -404,6 +415,22 @@ Pane {
                                         color: theme.cOnSurfaceVariant
                                         font.family: root.iconFont
                                         font.pixelSize: 52
+                                    }
+
+                                    // Off-screen mask source: a plain white
+                                    // circle. layer.enabled grabs its rounded
+                                    // shape as the mask texture; opacity:0 (not
+                                    // visible:false, which drops it from the
+                                    // render graph) keeps it from painting over
+                                    // the disc while still producing the texture.
+                                    Rectangle {
+                                        id: avatarMask
+                                        width: avatarImg.width
+                                        height: avatarImg.height
+                                        radius: width / 2
+                                        color: "white"
+                                        layer.enabled: true
+                                        opacity: 0
                                     }
                                 }
                                 Rectangle {
@@ -453,7 +480,7 @@ Pane {
                                 text: "\u{F0004}"
                                 font.family: root.iconFont
                                 font.pixelSize: 15
-                                color: theme.cWc5
+                                color: theme.cWc3
                             }
                             Repeater {
                                 model: userModel
@@ -517,7 +544,7 @@ Pane {
                             text: "\u{F030B}"
                             font.family: root.iconFont
                             font.pixelSize: 13
-                            color: theme.cWc3
+                            color: theme.cWc5
                             opacity: 0.85
                         }
                         Rectangle {

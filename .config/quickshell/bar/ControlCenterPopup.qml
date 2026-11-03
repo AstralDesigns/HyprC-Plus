@@ -4499,10 +4499,6 @@ PanelWindow {
                                     }
                                 }
 
-                                // Push the following controls to the top-right of
-                                // the Themes header.
-                                Item { Layout.fillWidth: true; visible: greeterSubStack.currentIndex === 0 }
-
                                 // Filter the theme list by id / label / description.
                                 Rectangle {
                                     visible: greeterSubStack.currentIndex === 0
@@ -4543,6 +4539,11 @@ PanelWindow {
                                         }
                                     }
                                 }
+
+                                // Push the preview / refresh controls to the
+                                // top-right of the Themes header, leaving the
+                                // search field docked right after the Edit pill.
+                                Item { Layout.fillWidth: true; visible: greeterSubStack.currentIndex === 0 }
 
                                 // Same preview action as the Edit sub-tab's button,
                                 // surfaced on the Themes tab header.
