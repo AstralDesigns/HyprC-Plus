@@ -384,7 +384,9 @@ Pane {
                                     anchors { fill: parent; margins: 4 }
                                     radius: 61
                                     clip: true
-                                    color: "transparent"
+                                    // Default disc (candylock surface-high) shown
+                                    // behind the glyph when no user icon is set.
+                                    color: theme.cSurfaceContainerHigh
                                     Image {
                                         id: avatarImg
                                         anchors.fill: parent
@@ -398,11 +400,10 @@ Pane {
                                     Text {
                                         anchors.centerIn: parent
                                         visible: avatarImg.status !== Image.Ready
-                                        text: (name || "?").slice(0, 1).toUpperCase()
+                                        text: "\u{F0004}"
                                         color: theme.cOnSurfaceVariant
-                                        font.family: root.labelFont
-                                        font.pixelSize: 56
-                                        font.weight: Font.DemiBold
+                                        font.family: root.iconFont
+                                        font.pixelSize: 52
                                     }
                                 }
                                 Rectangle {
