@@ -140,17 +140,33 @@ Pane {
     readonly property real cardPos: config.FormPosition === "left" ? 0.16
                                   : config.FormPosition === "right" ? 0.84 : 0.5
 
-    // Real frosted blur: an aligned, blurred copy of the wallpaper clipped to
+    // Real frosted blur: an aligned, blurred copy of the wallpaper rounded to
     // the form silhouette, sitting behind the translucent InversePrimary form.
-    Rectangle {
+    // Qt's clip ignores radius, so a rounded-rect MultiEffect mask (candylock
+    // pattern) is used instead of a square clip.
+    Item {
         id: formBlur
         x: form.x
         y: form.y
         width: form.width
         height: form.height
-        radius: root.cardRadius
-        color: "transparent"
-        clip: true
+
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: formBlurMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1.0
+        }
+
+        Rectangle {
+            id: formBlurMask
+            anchors.fill: parent
+            radius: root.cardRadius
+            color: "white"
+            opacity: 0
+            layer.enabled: true
+        }
 
         Image {
             x: -form.x
@@ -666,32 +682,35 @@ Pane {
                     }
                 }
             }
-
-            // Host name (only reserves space when actually set).
-            Text {
-                Layout.alignment: Qt.AlignHCenter
-                visible: text !== ""
-                text: sddm.hostName
-                color: root.colText
-                opacity: 0.5
-                font.family: root.labelFont
-                font.pixelSize: 11
-            }
         }
     }
 
     // ── Power pill: its own frosted form below the main form (candylock
     //    layout — the login area and the power pill each sit in their own
     //    glass, so the main form stays evenly framed). ──────────────────
-    Rectangle {
+    Item {
         id: pillBlur
         x: powerPill.x
         y: powerPill.y
         width: powerPill.width
         height: powerPill.height
-        radius: 99
-        color: "transparent"
-        clip: true
+
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: pillBlurMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1.0
+        }
+
+        Rectangle {
+            id: pillBlurMask
+            anchors.fill: parent
+            radius: 99
+            color: "white"
+            opacity: 0
+            layer.enabled: true
+        }
 
         Image {
             x: -powerPill.x
@@ -710,6 +729,7 @@ Pane {
                 blurMax: 64
             }
         }
+
     }
 
     Rectangle {
