@@ -23,8 +23,8 @@
 // Chromium compositor; the web content's GL path is governed only by the
 // --use-gl/--use-angle flags (absent here = Chromium's own default). Kept at
 // opengl (no spaces -- "KEY = val" would set a malformed var and do nothing).
-// //@ pragma Env QT_QUICK_BACKEND=vulkan
-// //@ pragma Env QSG_RHI_BACKEND=vulkan
+//@ pragma Env QT_QUICK_BACKEND=opengl
+//@ pragma Env QSG_RHI_BACKEND=opengl
 //
 // Flags: gpu-rasterization + ignore-gpu-blocklist keep the hardware path;
 // zero-copy shares GPU buffers (the very DMA-BUF path that failed under ANGLE-

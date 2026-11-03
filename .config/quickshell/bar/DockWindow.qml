@@ -83,10 +83,47 @@ PanelWindow {
     // (Normal + explicit exclusiveZone was ignored by hyprland here).
     exclusionMode: ExclusionMode.Auto
 
-    implicitWidth:  isHorizontal ? rowOuter.implicitWidth  + 2 * Config.dockInnerPadding
+    implicitWidth:  isHorizontal ? dock._len
                                  : dock.contentThickness
     implicitHeight: isHorizontal ? dock.contentThickness
-                                 : colOuter.implicitHeight + 2 * Config.dockInnerPadding
+                                 : dock._len
+
+    // ── Smooth expand/collapse along the length axis ────────────────────
+    // The surface used to bind straight to the button row/column implicit
+    // size, so a running-unpinned app appearing or closing snapped the dock
+    // (a sharp jolt). The length is driven by a single eased animation, but
+    // debounced: opening/closing a window fires a burst of transient
+    // implicitWidth changes while the Repeater settles, and animating each
+    // one restarted the driver mid-flight (the thrash that made the last
+    // attempt look broken). Now we ignore the churn and, once the size has
+    // settled, run ONE eased resize from the current length to the new one.
+    // The compact auto-reserving surface is preserved (no fixed band, no
+    // inner clip panel); the glass (bg/border anchors.fill: parent) and the
+    // centred dockContent simply track the animating surface.
+    readonly property real _targetLen: isHorizontal
+        ? rowOuter.implicitWidth  + 2 * Config.dockInnerPadding
+        : colOuter.implicitHeight + 2 * Config.dockInnerPadding
+    property real _len: _targetLen
+    // Debounce: (re)arm on every target change; only settle once it quiets.
+    on_TargetLenChanged: _lenDebounce.restart()
+    Timer {
+        id: _lenDebounce
+        interval: 100
+        repeat: false
+        onTriggered: _lenAnim.restart()
+    }
+    NumberAnimation {
+        id: _lenAnim
+        target: dock
+        property: "_len"
+        to: dock._targetLen
+        duration: 220
+        easing.type: Easing.OutCubic
+        // Repeater delegates may still be laying out when the debounce fires,
+        // capturing a stale `to`. Re-check after finishing; one catch-up pass
+        // is enough because delegates are fully realised by then.
+        onFinished: if (Math.abs(dock._len - dock._targetLen) > 1) _lenAnim.restart()
+    }
 
     readonly property real dockPadding: Config.dockPadding
 

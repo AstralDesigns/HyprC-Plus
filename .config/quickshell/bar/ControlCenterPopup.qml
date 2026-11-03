@@ -6299,9 +6299,9 @@ PanelWindow {
                                         "  card=$(echo \"$dp\" | grep -oE 'card[0-9]+'); " +
                                         "  drv=$(readlink -f \"$dp\" 2>/dev/null | grep -oE '[^/]+$'); " +
                                         "  echo \"$drv\" | grep -qE '^(amdgpu|radeon|i915|xe)$' || continue; " +
-                                        "  pci=$(cat /sys/class/drm/$card/device/address 2>/dev/null); " +
+                                        "  slot=$(grep -m1 '^PCI_SLOT_NAME=' /sys/class/drm/$card/device/uevent 2>/dev/null | cut -d= -f2); " +
                                         "  pname=$(cat /sys/class/drm/$card/device/product_name 2>/dev/null); " +
-                                        "  if [ -z \"$pname\" ] && [ -n \"$pci\" ]; then pname=$(lspci -D -s \"$pci\" 2>/dev/null | sed 's/.*: //'); fi; " +
+                                        "  if [ -z \"$pname\" ] && [ -n \"$slot\" ]; then pname=$(lspci -D -s \"$slot\" 2>/dev/null | sed 's/.*: //'); fi; " +
                                         "  [ -z \"$pname\" ] && pname=$drv; " +
                                         "  is_igpu=0; " +
                                         "  if echo \"$drv\" | grep -qE '^(i915|xe)$'; then is_igpu=1; echo \"$pname\" | grep -qiE '\\bArc\\b|\\bAlchemist\\b|\\bBattlemage\\b' && is_igpu=0; fi; " +
@@ -6339,16 +6339,35 @@ PanelWindow {
                                                 const _flag  = _gp.length >= 2 ? _gp.pop() : "0"
                                                 const gname  = _gp.join("~")
                                                 const isIgpu = _flag === "1"
-                                                // Clean verbose vendor prefixes (mirrors SystemMonitorPopup)
-                                                const clean = gname
-                                                    .replace(/Advanced Micro Devices[^,]*,?\s*/i, "")
-                                                    .replace(/\bAMD\s+/i, "")
-                                                    .replace(/ATI(\s+Technologies\s+Inc\.?)?\s*/i, "")
-                                                    .replace(/Intel\s+Corporation\s*/i, "")
-                                                    .replace(/\bIntel\s+/i, "")
-                                                    .replace(/NVIDIA\s*GeForce\s*/i, "")
-                                                    .replace(/\[([^\]]+)\]/g, "$1")
-                                                    .replace(/\s+/g, " ").trim()
+                                                // Condense verbose lspci descriptions to the
+                                                // user-facing product name. pci.ids style names
+                                                // bracket the marketing name last, e.g.
+                                                //   "Intel Corporation Ivy Bridge mobile GT2
+                                                //    [HD Graphics 4000] (rev 09)"  → "HD Graphics 4000"
+                                                //   "Advanced Micro Devices, Inc. [AMD/ATI]
+                                                //    Mars [Radeon HD 8670M]"        → "Radeon HD 8670M"
+                                                // Vendor-code / codename brackets come first,
+                                                // so the LAST bracket wins. Bare "1234:5678"
+                                                // id brackets carry no name → skip them. When
+                                                // no bracket exists, strip the vendor phrase
+                                                // and the (rev ..) tail instead.
+                                                let clean = gname
+                                                const groups = gname.match(/\[([^\]]+)\]/g)
+                                                let last = groups && groups.length
+                                                    ? groups[groups.length - 1].slice(1, -1)
+                                                    : ""
+                                                const isHexId  = /^[0-9a-f]{4}:[0-9a-f]{4}$/i.test(last)
+                                                const isVendor = /^(AMD|ATI|AMD\/ATI|Intel|NVIDIA|VIA|Silicon|SMC)$/i.test(last)
+                                                if (last && !isHexId && !isVendor)
+                                                    clean = last
+                                                else
+                                                    clean = gname
+                                                        .replace(/\s*\((?:rev|if)[^)]*\)/gi, "")
+                                                        .replace(/Advanced Micro Devices(?:[,.]?\s*(?:Inc\.?|\[[^\]]*\]))+/gi, "")
+                                                        .replace(/Intel\s+Corporation\s*/i, "")
+                                                        .replace(/ATI\s+Technologies(\s+Inc\.?)?\s*/i, "")
+                                                        .replace(/NVIDIA\s+Corporation\s*/i, "")
+                                                        .replace(/\s+/g, " ").trim()
                                                 gpus.push({ name: clean || gname || "GPU", isIgpu, drv })
                                             } else if (k === "DISPLAY") {
                                                 // v = "monitorName|WxH@hz"
@@ -6395,15 +6414,28 @@ PanelWindow {
                                     return t || "GPU"
                                 }
 
+                                // Device (product) name for the Info GPU/NPU cards.
+                                // The parsing already strips vendor prefixes, so
+                                // this shows the model (e.g. "HD Graphics 4000",
+                                // "Radeon HD 8670M") rather than the driver/vendor;
+                                // SystemMonitorPopup keeps its own vendor arc
+                                // labels untouched. The card elides overflow, so no
+                                // hard truncation here (a mid-word slice reads worse
+                                // than the elide's ellipsis at the card edge).
+                                function _device(name) {
+                                    const n = (name || "").trim()
+                                    return n === "" ? "GPU" : n
+                                }
+
                                 // Ordered accelerator cards: NPU(s) → iGPU → dGPU(s),
-                                // each titled by role and valued by short vendor name.
+                                // each titled by role and valued by device name.
                                 readonly property var gpuCards: {
                                     const out = []
                                     const npus = SystemMonitorPopupState.npus || []
                                     for (let i = 0; i < npus.length; i++) {
                                         const np = npus[i]
                                         out.push({ glyph: "󰧑", title: "NPU",
-                                                   value: sysInfoRoot._vendor(np.driver, np.name) })
+                                                   value: sysInfoRoot._device(np.name) })
                                     }
                                     const gs = (sysInfoRoot.info && sysInfoRoot.info._gpus) ? sysInfoRoot.info._gpus : []
                                     const ordered = gs.filter(g => g.isIgpu).concat(gs.filter(g => !g.isIgpu))
@@ -6411,7 +6443,7 @@ PanelWindow {
                                         const g = ordered[i]
                                         out.push({ glyph: g.isIgpu ? "󱤓" : "󰢮",
                                                    title: g.isIgpu ? "iGPU" : "dGPU",
-                                                   value: sysInfoRoot._vendor(g.drv, g.name) })
+                                                   value: sysInfoRoot._device(g.name) })
                                     }
                                     if (out.length === 0)
                                         out.push({ glyph: "󰢮", title: "GPU", value: "—" })

@@ -62,6 +62,25 @@ QtObject {
         onExited: {
             let found = []
             let seen = {}
+            // Condense verbose lspci descriptions to the marketing name held
+            // in the last bracket group (pci.ids style); fall back to vendor
+            // phrase stripping when unbracketed. Consumers truncate for their
+            // own labels (monitor gauge, CC Info card elide), so no slicing
+            // here. Mirrors the GPU cleaning in ControlCenterPopup.
+            function _short(raw) {
+                const s = (raw || "").trim()
+                if (s === "") return "NPU"
+                const groups = s.match(/\[([^\]]+)\]/g)
+                const last = groups && groups.length ? groups[groups.length - 1].slice(1, -1) : ""
+                if (last && !/^[0-9a-f]{4}:[0-9a-f]{4}$/i.test(last)
+                    && !/^(AMD|ATI|AMD\/ATI|Intel|NVIDIA|VIA|Silicon|SMC)$/i.test(last)) return last
+                return s
+                    .replace(/\s*\((?:rev|if)[^)]*\)/gi, "")
+                    .replace(/Advanced Micro Devices(?:[,.]?\s*(?:Inc\.?|\[[^\]]*\]))+/gi, "")
+                    .replace(/Intel\s+Corporation\s*/i, "")
+                    .replace(/NVIDIA\s+Corporation\s*/i, "")
+                    .replace(/\s+/g, " ").trim() || s
+            }
             for (const l of npuScanProc._buf) {
                 if (l.startsWith("NPU:")) {
                     const parts = l.slice(4).split("§")
@@ -70,7 +89,7 @@ QtObject {
                     const pct  = parseInt(parts[2]) || 0
                     if (!seen[name]) {
                         seen[name] = true
-                        found.push({ name: name.trim().slice(0, 14), driver: drv, pct: Math.max(0, Math.min(100, pct)) })
+                        found.push({ name: _short(name), driver: drv, pct: Math.max(0, Math.min(100, pct)) })
                     }
                 } else if (l.startsWith("PCI_NPU:")) {
                     const parts = l.slice(8).split("§")
@@ -79,7 +98,7 @@ QtObject {
                     if (!seen[name] && !seen[pci]) {
                         seen[name] = true
                         seen[pci] = true
-                        found.push({ name: name.replace(/Intel\s+Corporation\s*/i, "").replace(/Advanced Micro Devices[^,]*,?\s*/i, "").trim().slice(0, 14), driver: "pci", pct: 0 })
+                        found.push({ name: _short(name), driver: "pci", pct: 0 })
                     }
                 }
             }
