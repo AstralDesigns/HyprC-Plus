@@ -52,7 +52,12 @@ repair_links() {
     for th in "$GT_DIR"/*/; do
         [ -d "$th" ] || continue
         id=$(basename "$th")
-        ln -sfn "${th%/}" "/usr/share/sddm/themes/$id"
+        dst="/usr/share/sddm/themes/$id"
+        # ln can't replace a pre-existing real directory (a stale copy left by an
+        # older installer), which would make SDDM keep reading the old theme. Drop
+        # it first so the symlink to the live dotfile tree can take its place.
+        [ -d "$dst" ] && [ ! -L "$dst" ] && rm -rf "$dst"
+        ln -sfn "${th%/}" "$dst"
     done
     # drop dangling hyprcandy links (theme dir was removed)
     for th in /usr/share/sddm/themes/*/; do

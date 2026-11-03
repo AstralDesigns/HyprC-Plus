@@ -4345,6 +4345,18 @@ PanelWindow {
                         property string applyingTheme: ""
                         property string themeStatus: ""
 
+                        // Theme-name filter for the Themes list (mirrors the
+                        // Keybinds search); proactive for when the list grows.
+                        property string _themeSearch: ""
+                        readonly property var visibleThemes: {
+                            const q = _themeSearch.trim().toLowerCase()
+                            if (q === "") return themes
+                            return themes.filter(function (t) {
+                                return ((t.id || "") + " " + (t.label || "") + " " + (t.desc || ""))
+                                    .toLowerCase().indexOf(q) !== -1
+                            })
+                        }
+
                         function _rerunProc(p) {
                             if (p.running) p.running = false
                             Qt.callLater(function() { p.running = true })
@@ -4487,6 +4499,59 @@ PanelWindow {
                                     }
                                 }
 
+                                // Push the following controls to the top-right of
+                                // the Themes header.
+                                Item { Layout.fillWidth: true; visible: greeterSubStack.currentIndex === 0 }
+
+                                // Filter the theme list by id / label / description.
+                                Rectangle {
+                                    visible: greeterSubStack.currentIndex === 0
+                                    height: 30
+                                    width: 180
+                                    radius: 99
+                                    color: Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                   Theme.cInversePrimary.b, 0.3)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                          Theme.cPrimary.b, 0.18)
+                                    Row {
+                                        anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                        spacing: 5
+                                        Text {
+                                            text: "\u{F0349}"
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.5)
+                                            font.family: Config.fontFamily; font.pixelSize: 13
+                                            anchors.verticalCenter: parent.verticalCenter
+                                        }
+                                        Item {
+                                            width: 140; height: 20
+                                            TextInput {
+                                                anchors.fill: parent
+                                                color: Theme.cPrimary
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                verticalAlignment: TextInput.AlignVCenter
+                                                onTextChanged: greeterTabRoot._themeSearch = text
+                                            }
+                                            Text {
+                                                anchors.fill: parent
+                                                text: "Search themes..."
+                                                color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.8)
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                                verticalAlignment: Text.AlignVCenter
+                                                visible: greeterTabRoot._themeSearch.length === 0
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Same preview action as the Edit sub-tab's button,
+                                // surfaced on the Themes tab header.
+                                CCPillBtn {
+                                    visible: greeterSubStack.currentIndex === 0
+                                    text: "\u{F0208} Preview"
+                                    onClicked: _sddmPreview.running = true
+                                }
+
                                 Rectangle {
                                     visible: greeterSubStack.currentIndex === 0
                                     height: 30
@@ -4573,11 +4638,13 @@ PanelWindow {
                                                     spacing: 0
 
                                                     Text {
-                                                        visible: greeterTabRoot.themes.length === 0
+                                                        visible: greeterTabRoot.visibleThemes.length === 0
                                                         Layout.fillWidth: true
                                                         text: _themeListProc.running
                                                             ? "Loading themes..."
-                                                            : "No themes were found."
+                                                            : (greeterTabRoot.themes.length > 0
+                                                                ? "No themes match your search."
+                                                                : "No themes were found.")
                                                         color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.38)
                                                         font.family: Config.labelFont
                                                         font.pixelSize: 12
@@ -4587,7 +4654,7 @@ PanelWindow {
                                                     }
 
                                                     Repeater {
-                                                        model: greeterTabRoot.themes
+                                                        model: greeterTabRoot.visibleThemes
                                                         delegate: Rectangle {
                                                             required property var modelData
                                                             required property int index
