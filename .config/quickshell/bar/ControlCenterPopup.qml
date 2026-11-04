@@ -6061,7 +6061,7 @@ PanelWindow {
                                             Layout.fillWidth: true
                                             text: _animListProc.running
                                                 ? "Loading animation presets..."
-                                                : "No .conf animation presets were found."
+                                                : "No animation presets were found."
                                             color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
                                                            Theme.cPrimary.b, 0.38)
                                             font.family: Config.labelFont
