@@ -1991,8 +1991,8 @@ ShellRoot {
                     Text {
                         anchors.centerIn: parent
                         text: root._hasBattery
-                            ? (root._batCharging ? "󱐋" : "󰻠")
-                            : "󰕯"
+                            ? (root._batCharging ? "󱐌" : "󰻃")
+                            : "󰻃"
                         font.family: "Symbols Nerd Font Mono"
                         font.pixelSize: 20
                         color: root.dialsVisible ? root.cSecondary : root.cPrimary
@@ -2143,7 +2143,7 @@ ShellRoot {
                                     : (root._batCharging ? Qt.rgba(0.3, 0.9, 0.5, 1) : root.cWc6)
                                 property real  cv:  Math.max(0, Math.min(100, root._batCapacity)) / 100
                                 property string gt: root._batCapacity + "%"
-                                property string gl: root._batCharging ? "󱐋" : "󰁹"
+                                property string gl: root._batCharging ? "󱐌" : "󰻃"
                                 property color onS: root.cOnSurf
                                 onDialColChanged: requestPaint(); onCvChanged: requestPaint(); onOnSChanged: requestPaint()
                                 Connections {

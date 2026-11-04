@@ -50,6 +50,12 @@ Item {
         return Config.batteryTextColor
     }
 
+    // PC-aware arc colour and the centre power-state glyph: bolt when plugged /
+    // charging, plain battery when unplugged / discharging (and for desktops).
+    readonly property color  _arcColor:    _hasBattery ? _iconColor : Config.batteryIconColor
+    readonly property string _centerGlyph: _hasBattery ? (_charging ? "\u{F140C}" : "\u{F0EC3}") : "\u{F0EC3}"
+    readonly property color  _centerColor: _hasBattery ? _iconColor : Config.batteryIconColor
+
     Process {
         id: batProc
         command: ["bash", "-c",
@@ -96,11 +102,14 @@ Item {
                     ctx.reset()
                     const cx = width/2, cy = height/2
                     const r  = Math.min(cx, cy) - Config.batteryRadialWidth/2
-                    ctx.beginPath()
-                    ctx.arc(cx, cy, r, -Math.PI/2, Math.PI * 1.5)
+                    const gh = 0.125*Math.PI   // half-gap at top & bottom
                     ctx.strokeStyle = Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.3)
                     ctx.lineWidth   = Config.batteryRadialWidth
-                    ctx.stroke()
+                    ctx.lineCap     = "round"
+                    // Two side curves with empty gaps top & bottom:
+                    //  left  (lower-left → upper-left), right (upper-right → lower-right).
+                    ctx.beginPath(); ctx.arc(cx, cy, r, 0.5*Math.PI + gh, 1.5*Math.PI - gh); ctx.stroke()
+                    ctx.beginPath(); ctx.arc(cx, cy, r, 1.5*Math.PI + gh, 2.5*Math.PI - gh); ctx.stroke()
                 }
             }
 
@@ -108,7 +117,7 @@ Item {
             Canvas {
                 id: radialFill
                 anchors.fill: parent
-                property color arcColor: root._iconColor
+                property color arcColor: root._arcColor
                 onArcColorChanged: requestPaint()
 
                 Connections {
@@ -122,29 +131,40 @@ Item {
                     ctx.reset()
                     const cx   = width/2, cy = height/2
                     const r    = Math.min(cx, cy) - Config.batteryRadialWidth/2
+                    const gh   = 0.125*Math.PI
+                    const len  = Math.PI - 2*gh          // each side curve length
                     // PC (no battery): always full; laptop: real capacity
                     const cap  = root._hasBattery ? root._capacity : 100
                     const pct  = Math.max(0, Math.min(100, cap)) / 100
-                    const end  = -Math.PI/2 + pct * Math.PI * 2
-                    ctx.beginPath()
-                    ctx.arc(cx, cy, r, -Math.PI/2, end)
                     ctx.strokeStyle = radialFill.arcColor
                     ctx.lineWidth   = Config.batteryRadialWidth
                     ctx.lineCap     = "round"
-                    ctx.stroke()
+                    // Left curve carries 0–50%: fills bottom-left up to top-left.
+                    const lf = Math.min(pct, 0.5) / 0.5
+                    if (lf > 0.005) {
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, r, 0.5*Math.PI + gh, 0.5*Math.PI + gh + lf*len)
+                        ctx.stroke()
+                    }
+                    // Right curve carries 50–100%: fills top-right down to bottom-right.
+                    const rf = Math.max(0, pct - 0.5) / 0.5
+                    if (rf > 0.005) {
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, r, 1.5*Math.PI + gh, 1.5*Math.PI + gh + rf*len)
+                        ctx.stroke()
+                    }
                 }
             }
 
-            // ── Lightning bolt overlay ─────────────────────────────
-            // PC: always shown (always plugged in); Laptop: only when charging.
+            // ── Centre power-state glyph ───────────────────────────
+            // Bolt when plugged / charging; plain battery when unplugged /
+            // discharging or on a desktop (no battery reported).
             Text {
-                visible: root._hasBattery ? root._charging : true
                 anchors.centerIn: parent
-                text: "󱐋"
-                color: Config.batteryChargingColor
+                text: root._centerGlyph
+                color: root._centerColor
                 font.family: Config.fontFamily
-                font.pixelSize: Math.max(6, Math.round(Config.batteryRadialSize * 0.55))
-                Behavior on visible { }
+                font.pixelSize: Math.max(6, Math.round(Config.batteryRadialSize * 0.5))
             }
         }
 

@@ -344,7 +344,7 @@ Item {
         if (scope._swapOk) {
             list.push({
                 value: scope._swap,
-                glyph: "",
+                glyph: "\u{F04E1}",   // md-swap_horizontal
                 label: "Swap",
                 valStr: Math.round(scope._swap * 100) + "%",
                 sub: scope._fmtBytes(scope._swapUsed),
@@ -382,10 +382,11 @@ Item {
             const bSta = scope._batStatus
             list.push({
                 value: bPct / 100,
-                // Charging → bolt in the ring gap; discharging → charge-level
-                // battery glyph. No sub line, so the percentage sits centered.
-                glyph: bSta === "Charging" ? "\u{F140C}"
-                           : bPct > 80 ? "󰁹" : bPct > 60 ? "󰂀" : bPct > 40 ? "󰁾" : bPct > 20 ? "󰁼" : "󰁺",
+                // The arc already encodes charge level, so the gap glyph only
+                // signals power state: bolt when plugged/charging, plain battery
+                // when discharging, alert battery when very low (<=20%).
+                glyph: bSta !== "Discharging" ? "\u{F140C}"
+                           : bPct <= 20 ? "\u{F12A1}" : "\u{F0EC3}",
                 label: "Battery",
                 valStr: bPct + "%",
                 arcColor: bPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1) : bSta === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1) : Theme.cWc6
