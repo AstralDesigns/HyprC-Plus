@@ -382,11 +382,12 @@ Item {
             const bSta = scope._batStatus
             list.push({
                 value: bPct / 100,
-                glyph: bPct > 80 ? "󰁹" : bPct > 60 ? "󰂀" : bPct > 40 ? "󰁾" : bPct > 20 ? "󰁼" : "󰁺",
+                // Charging → bolt in the ring gap; discharging → charge-level
+                // battery glyph. No sub line, so the percentage sits centered.
+                glyph: bSta === "Charging" ? "\u{F140C}"
+                           : bPct > 80 ? "󰁹" : bPct > 60 ? "󰂀" : bPct > 40 ? "󰁾" : bPct > 20 ? "󰁼" : "󰁺",
                 label: "Battery",
                 valStr: bPct + "%",
-                sub: bSta === "Charging" ? "󱐌" : "󰍶",
-                subGlyph: true,
                 arcColor: bPct <= 20 ? Qt.rgba(1.0, 0.3, 0.3, 1) : bSta === "Charging" ? Qt.rgba(0.3, 0.9, 0.5, 1) : Theme.cWc6
             })
         }
