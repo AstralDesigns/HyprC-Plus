@@ -601,7 +601,7 @@ Pane {
                         }
                     }
 
-                    // Login button — pill (radius 99), SurfaceTint backdrop whose
+                    // Login button — pill (radius 99), dark OnPrimary backdrop whose
                     // alpha rises 0.35→0.5→0.85 (empty / typed / hover); SurfaceTint label.
                     Rectangle {
                         id: loginBtn
@@ -612,7 +612,7 @@ Pane {
                         radius: 99
                         readonly property bool enabledLogin:
                             config.AllowEmptyPassword === "true" || pwdField.text.length > 0
-                        color: Qt.rgba(theme.cSurfaceTint.r, theme.cSurfaceTint.g, theme.cSurfaceTint.b,
+                        color: Qt.rgba(theme.cOnPrimary.r, theme.cOnPrimary.g, theme.cOnPrimary.b,
                                        enabledLogin ? (loginHov.containsMouse ? 0.85 : 0.5) : 0.35)
                         border.width: 1
                         border.color: theme.outlineSoft

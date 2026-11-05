@@ -19,6 +19,7 @@ ShellRoot {
     property string _m3surfaceContainerHigh: ""
     property string _m3onSurface:            ""
     property string _m3onSurfaceVariant:     ""
+    property string _m3outline:              ""
     property string _m3outlineVariant:       ""
     property string _m3error:                ""
     property string _m3primaryFixedDim:      ""
@@ -40,6 +41,7 @@ ShellRoot {
     readonly property color cBg:                Qt.color(_m3background)
     readonly property color cInvPrimary:        Qt.color(_m3inversePrimary)
     readonly property color cSurfHi:            Qt.color(_m3surfaceContainerHigh)
+    readonly property color cOutline:           Qt.color(_m3outline)
     readonly property color cOutVar:            Qt.color(_m3outlineVariant)
     readonly property color cErr:               Qt.color(_m3error)
     readonly property color cPrimFixedDim:      Qt.color(_m3primaryFixedDim)
@@ -75,6 +77,7 @@ ShellRoot {
             case "m3surfaceContainerHigh": root._m3surfaceContainerHigh=m[2]; break
             case "m3onSurface":            root._m3onSurface=m[2]; break
             case "m3onSurfaceVariant":     root._m3onSurfaceVariant=m[2]; break
+            case "m3outline":              root._m3outline=m[2]; break
             case "m3outlineVariant":       root._m3outlineVariant=m[2]; break
             case "m3error":                root._m3error=m[2]; break
             case "m3primaryFixedDim":      root._m3primaryFixedDim=m[2]; break
@@ -1077,7 +1080,7 @@ ShellRoot {
                                     radius: 20
                                     color: root.cCardWarm
                                     border.width: 1
-                                    border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.1)
+                                    border.color: Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b, 0.42)
 
                                     RowLayout {
                                         id: userTopRow
@@ -1224,11 +1227,11 @@ ShellRoot {
                                                 Rectangle {
                                                     anchors.fill: parent; radius: 21
                                                     color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.25)
-                                                    border.width: 2
+                                                    border.width: 1
                                                     border.color: root.authFailed ? root.cErr
                                                         : (root.authChecking
-                                                            ? root.cWc12
-                                                            : root.cWc3)
+                                                            ? root.cWc3
+                                                            : Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b, 0.42))
                                                     Behavior on border.color { ColorAnimation { duration: 250 } }
                                                 }
                                                 RowLayout {
@@ -1327,7 +1330,7 @@ ShellRoot {
                                     radius: 20
                                     color: root.cCardWarm
                                     border.width: 1
-                                    border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.1)
+                                    border.color:Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b,0.42)
 
                                     RowLayout {
                                         anchors.left: parent.left
@@ -1515,7 +1518,7 @@ ShellRoot {
                                 Rectangle {
                                     anchors.fill: parent
                                     radius: 20; color: "transparent"
-                                    border.width: 1; border.color: Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.22)
+                                    border.width: 1; border.color: Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b,0.42)
                                 }
 
                                 // ── LEFT: info + progress + controls ───────────────
@@ -2051,7 +2054,7 @@ ShellRoot {
                         anchors.fill: parent; radius: 20
                         color: root.cPanel
                         border.width: 1
-                        border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.22)
+                        border.color: Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b, 0.42)
                     }
 
                     // Clip to rounded rect
@@ -2218,7 +2221,7 @@ ShellRoot {
                         anchors.fill: parent; radius: height / 2
                         color: root.cPanel
                         border.width: 1
-                        border.color: Qt.rgba(root.cOutVar.r, root.cOutVar.g, root.cOutVar.b, 0.18)
+                        border.color: Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b, 0.42)
                     }
 
                     // Clip pill so blur doesn't leak outside rounded corners
