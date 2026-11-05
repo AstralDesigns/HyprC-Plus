@@ -2241,7 +2241,7 @@ PanelWindow {
 
                                         CCSection { text: "Battery" }
                                         CCToggle { label:"Radial Visible"; value:Config.batteryRadialVisible; onToggled:function(v){Config.batteryRadialVisible=v} }
-                                        CCSlider { label:"Radial Size";  from:16;to:48; stepSize:2; value:Config.batteryRadialSize;  onMoved:function(v){Config.batteryRadialSize=v} }
+                                        CCSlider { label:"Radial Size";  from:12;to:48; stepSize:2; value:Config.batteryRadialSize;  onMoved:function(v){Config.batteryRadialSize=v} }
                                         CCSlider { label:"Radial Stroke";from:1;to:6;  value:Config.batteryRadialWidth; onMoved:function(v){Config.batteryRadialWidth=v} }
 
                                         CCSection { text: "Tray" }
