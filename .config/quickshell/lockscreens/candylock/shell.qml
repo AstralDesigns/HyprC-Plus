@@ -5,6 +5,7 @@ import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Effects
+import QtQuick.Window
 
 ShellRoot {
     id: root
@@ -176,6 +177,7 @@ ShellRoot {
     property string _pendingPin:""; property bool focusPinRequest:false
     property bool   dialsVisible: false
     function submitPin() {
+        if (root._preview) { Qt.quit(); return }
         if(authChecking||root.pinEntry.length===0) return
         root._pendingPin=root.pinEntry; root.pinEntry=""; root.authChecking=true; root.authFailed=false
         authProc.running=true
@@ -962,18 +964,13 @@ ShellRoot {
     }
 
     // ── Session lock ──────────────────────────────────────────────────────────
-    WlSessionLock { id:sessionLock
-        // Request the lock imperatively once the component is complete. The
-        // suspend is driven from the surface's Component.onCompleted below
-        // (the grant event never reaches onLockedChanged on this fork).
-        Component.onCompleted: Qt.callLater(function () { sessionLock.locked = true })
-        WlSessionLockSurface {
-            // Reliable "lock is actually up" hook: Quickshell instantiates this
-            // surface per screen only once the ext-session-lock is engaged. Arm
-            // the marker-gated suspend from here via a short settle delay.
-            Component.onCompleted: lockSettleTimer.restart()
-            Rectangle {
-                id:mainRect; anchors.fill:parent; color:root.cBg; focus:true
+    // ── Preview mode (launched by the CC Lockscreen tab) ──────────────────
+    // CANDYLOCK_PREVIEW set → render the same UI in a normal app window and do
+    // NOT engage the session lock or PAM. Close via the WM window-close keybind
+    // or Esc. Real lock path is untouched when the env is absent.
+    readonly property bool _preview: (Quickshell.env("CANDYLOCK_PREVIEW") || "") !== ""
+
+    component LockUI: Rectangle {                id:uiRoot; anchors.fill:parent; color:root.cBg; focus:true
                 Keys.onPressed: function(ev){ if(!ev.isAutoRepeat) pinInput.forceActiveFocus() }
 
                 // Wallpaper
@@ -1044,7 +1041,7 @@ ShellRoot {
                         layer.effect: MultiEffect { blurEnabled:true; blur:1.0; blurMax:64 }
                         AnimatedImage {
                             x: -centerPanel.x; y: -centerPanel.y
-                            width: mainRect.width; height: mainRect.height
+                            width: uiRoot.width; height: uiRoot.height
                             source: root.wallpaperPath?"file://"+root.wallpaperPath:""
                             fillMode:Image.PreserveAspectCrop; smooth:true; playing:true; cache:true
                             visible: root.wallpaperPath!==""
@@ -1896,7 +1893,7 @@ ShellRoot {
                         layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
                         AnimatedImage {
                             x: -notifToggle.x; y: -notifToggle.y
-                            width: mainRect.width; height: mainRect.height
+                            width: uiRoot.width; height: uiRoot.height
                             source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
                             fillMode: Image.PreserveAspectCrop
                             smooth: true; playing: true; cache: true
@@ -1967,7 +1964,7 @@ ShellRoot {
                         layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
                         AnimatedImage {
                             x: -batToggle.x; y: -batToggle.y
-                            width: mainRect.width; height: mainRect.height
+                            width: uiRoot.width; height: uiRoot.height
                             source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
                             fillMode: Image.PreserveAspectCrop
                             smooth: true; playing: true; cache: true
@@ -2042,7 +2039,7 @@ ShellRoot {
                         layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
                         AnimatedImage {
                             x: -dialsPopup.x; y: -dialsPopup.y
-                            width: mainRect.width; height: mainRect.height
+                            width: uiRoot.width; height: uiRoot.height
                             source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
                             fillMode: Image.PreserveAspectCrop; smooth: true; playing: true; cache: true
                             visible: root.wallpaperPath !== ""
@@ -2209,7 +2206,7 @@ ShellRoot {
                         layer.smooth: true
                         AnimatedImage {
                             x: -powerRow.x; y: -powerRow.y
-                            width: mainRect.width; height: mainRect.height
+                            width: uiRoot.width; height: uiRoot.height
                             source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
                             fillMode: Image.PreserveAspectCrop; smooth: true; playing: true; cache: true
                             visible: root.wallpaperPath !== ""
@@ -2351,6 +2348,44 @@ ShellRoot {
                     Component.onCompleted: forceActiveFocus()
                 }
             }
+
+    Window {
+        id: lsPreviewWin
+        visible: root._preview
+        // Design canvas = the actual primary screen's native size, so the fit
+        // math adapts to any resolution and aspect ratio (16:9, 16:10, 21:9…).
+        readonly property size _scr: Quickshell.primaryScreen
+            ? Qt.size(Quickshell.primaryScreen.geometry.width, Quickshell.primaryScreen.geometry.height)
+            : Qt.size(1280, 800)
+        // Open at ~70% of the screen, preserving the screen aspect so the UI
+        // fills the window with no letterbox; resizing later just re-scales.
+        width:  Math.round(Math.min(_scr.width * 0.7, 1680))
+        height: Math.round(width * _scr.height / _scr.width)
+        title: "Candylock preview"
+        color: root.cBg
+        Item {
+            id: lsPreviewFit
+            anchors.centerIn: parent
+            width: lsPreviewWin._scr.width; height: lsPreviewWin._scr.height
+            transformOrigin: Item.Center
+            scale: Math.min(parent.width / width, parent.height / height)
+            LockUI { }
+        }
+        Shortcut { sequence: StandardKey.Cancel; onActivated: if (root._preview) Qt.quit() }
+    }
+
+
+    WlSessionLock { id:sessionLock
+        // Request the lock imperatively once the component is complete. The
+        // suspend is driven from the surface's Component.onCompleted below
+        // (the grant event never reaches onLockedChanged on this fork).
+        Component.onCompleted: if (!root._preview) Qt.callLater(function () { sessionLock.locked = true })
+        WlSessionLockSurface {
+            // Reliable "lock is actually up" hook: Quickshell instantiates this
+            // surface per screen only once the ext-session-lock is engaged. Arm
+            // the marker-gated suspend from here via a short settle delay.
+            Component.onCompleted: lockSettleTimer.restart()
+                LockUI { }
         }
     }
 }

@@ -7624,6 +7624,14 @@ PanelWindow {
                             _lsApplyProc.command = [scriptDir + "/hyprcandy-lockscreens.sh", "apply", name]
                             _lsApplyProc.running = true
                         }
+                        function preview(name) {
+                            if (!name) return
+                            _lsPreviewProc.command = ["bash", "-c",
+                                "setsid env CANDYLOCK_PREVIEW=1 qs -p \"$HOME/.config/quickshell/lockscreens/" + name + "\" </dev/null >/dev/null 2>&1 &"]
+                            _lsPreviewProc.running = true
+                        }
+
+                        Process { id: _lsPreviewProc; running: false; onExited: running = false }
 
                         Process {
                             id: _lsListProc
@@ -7665,10 +7673,34 @@ PanelWindow {
                         ColumnLayout {
                             anchors { fill: parent; margins: 8 }
                             spacing: 8
-                            Text {
-                                text: "Lockscreen Theme"
-                                color: Theme.cOnSurf
-                                font.family: Config.labelFont; font.pixelSize: 15; font.weight: Font.DemiBold
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 8
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: "Lockscreen Theme"
+                                    color: Theme.cOnSurf
+                                    font.family: Config.labelFont; font.pixelSize: 15; font.weight: Font.DemiBold
+                                }
+                                Rectangle {
+                                    enabled: lockscreenTabRoot.currentTheme !== ""
+                                    opacity: enabled ? 1.0 : 0.4
+                                    height: 24; radius: 7
+                                    implicitWidth: _lsHdrPrevLbl.implicitWidth + 16
+                                    color: _lsHdrPrevHov.containsMouse
+                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
+                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                    border.width: 1
+                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.30)
+                                    Text { id: _lsHdrPrevLbl; anchors.centerIn: parent; text: "\u{F06E} Preview"; color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 11 }
+                                    MouseArea {
+                                        id: _lsHdrPrevHov
+                                        anchors.fill: parent; hoverEnabled: true
+                                        enabled: lockscreenTabRoot.currentTheme !== ""
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: lockscreenTabRoot.preview(lockscreenTabRoot.currentTheme)
+                                    }
+                                }
                             }
                             Text {
                                 Layout.fillWidth: true
