@@ -1294,7 +1294,7 @@ PanelWindow {
                     // ── Nav buttons ───────────────────────────────────────
                     Repeater {
                         model: [
-                            { icon: "", label: "Hyprland",   idx: 1 },
+                            { icon: "", label: "Desktop",   idx: 1 },
                             { icon: "󰇜", label: "Bar",        idx: 0 },
                             { icon: "󰔎", label: "Themes",     idx: 2 },
                             { icon: "󰍹", label: "Display",    idx: 3 },
@@ -3074,7 +3074,7 @@ PanelWindow {
                             spacing: 6
 
                             // ── Desktop icon layer ────────────────────────────────
-                            CCSection { text: "Desktop" }
+                            CCSection { text: "Desktop Icons" }
                             CCToggle { label:"Show Icons";  value:Config.desktopVisible;   onToggled:function(v){ Config.desktopVisible=v } }
                             CCSlider { label:"Icon Size";  from:24; to:128; stepSize:4;
                                        value:Config.desktopIconSize;
