@@ -2368,7 +2368,10 @@ ShellRoot {
             anchors.centerIn: parent
             width: lsPreviewWin._scr.width; height: lsPreviewWin._scr.height
             transformOrigin: Item.Center
-            scale: Math.min(parent.width / width, parent.height / height)
+            // Cap at 1.0: never render larger than the lock's native size,
+            // so fullscreen (whose content area can slightly exceed the reported
+            // geometry) doesn't overflow. Only ever scales down to fit.
+            scale: Math.min(1.0, parent.width / width, parent.height / height)
             LockUI { }
         }
         Shortcut { sequence: StandardKey.Cancel; onActivated: if (root._preview) Qt.quit() }

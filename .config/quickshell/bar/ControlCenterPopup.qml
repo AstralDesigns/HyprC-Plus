@@ -7618,8 +7618,8 @@ PanelWindow {
                         }
                         function apply(name) {
                             if (!name || _lsApplyProc.running) return
-                            applying = name
-                            statusText = "Applying " + name + "…"
+                            currentTheme = name   // optimistic: move the highlight the instant you click
+                            statusText = "Applied " + name + "."   // applies instantly — no "Applying…" transient
                             _lsApplyProc._target = name
                             _lsApplyProc.command = [scriptDir + "/hyprcandy-lockscreens.sh", "apply", name]
                             _lsApplyProc.running = true
@@ -7663,8 +7663,17 @@ PanelWindow {
                             property string _target: ""
                             onExited: function(code) {
                                 running = false
-                                if (code === 0) { currentTheme = _target; statusText = "Applied " + _target + "." }
-                                else statusText = "Failed to apply " + _target + "."
+                                if (code === 0) {
+                                    currentTheme = _target
+                                    statusText = "Applied " + _target + "."
+                                    // Flip the highlight synchronously so the tab
+                                    // updates in-session without waiting on the async
+                                    // list re-read (which can miss when the screen locks).
+                                    const next = []
+                                    for (const t of themes)
+                                        next.push({ name: t.name, label: t.label, current: (t.name === _target) })
+                                    themes = next
+                                } else statusText = "Failed to apply " + _target + "."
                                 applying = ""
                                 reload()
                             }
@@ -7716,7 +7725,7 @@ PanelWindow {
                                     required property int index
                                     Layout.fillWidth: true
                                     height: 46; radius: 9
-                                    color: modelData.current
+                                    color: modelData.name === lockscreenTabRoot.currentTheme
                                         ? (hov.containsMouse
                                             ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
                                             : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35))
@@ -7725,7 +7734,7 @@ PanelWindow {
                                             : (index % 2 === 0
                                                 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.10)
                                                 : "transparent"))
-                                    border.width: modelData.current ? 2 : 0
+                                    border.width: modelData.name === lockscreenTabRoot.currentTheme ? 2 : 0
                                     border.color: Theme.cPrimary
                                     Behavior on color { ColorAnimation { duration: 100 } }
                                     RowLayout {
@@ -7735,7 +7744,7 @@ PanelWindow {
                                             height: 26
                                             implicitWidth: _lsNameLbl.implicitWidth + 16
                                             radius: 7
-                                            color: modelData.current
+                                            color: modelData.name === lockscreenTabRoot.currentTheme
                                                 ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.50)
                                                 : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
                                             border.width: 1
@@ -7750,7 +7759,7 @@ PanelWindow {
                                         }
                                         Item { Layout.fillWidth: true }
                                         Text {
-                                            visible: modelData.current
+                                            visible: modelData.name === lockscreenTabRoot.currentTheme
                                             text: "Active"
                                             color: Theme.cPrimary
                                             font.family: Config.labelFont; font.pixelSize: 11; font.weight: Font.DemiBold
