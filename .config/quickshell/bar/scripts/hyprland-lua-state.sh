@@ -93,9 +93,6 @@ legacy_default() {
         inactive_border)
             value="$(awk -F= '/col\.inactive_border[[:space:]]*=/{gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $2; exit}' "$LEGACY_CONF" 2>/dev/null || true)"
             printf '%s\n' "${value:-\$background}" ;;
-        kb_layout)
-            value="$(grep -m1 'kb_layout[[:space:]]*=' "$LEGACY_CONF" 2>/dev/null | sed 's/.*= *//' | awk '{print $1}' || true)"
-            printf '%s\n' "${value:-us}" ;;
         xray) echo "false" ;;
         *) echo "" ;;
     esac
@@ -134,7 +131,7 @@ emit_num_key() {
 }
 
 render_lua() {
-    local opacity blur_size blur_passes gaps_in gaps_out border_size rounding active_border inactive_border kb_layout xray
+    local opacity blur_size blur_passes gaps_in gaps_out border_size rounding active_border inactive_border kb_layout kb_variant kb_model kb_options xray
     opacity="$(read_state opacity)"
     blur_size="$(read_state blur_size)"
     blur_passes="$(read_state blur_passes)"
@@ -145,6 +142,9 @@ render_lua() {
     active_border="$(read_state active_border)"
     inactive_border="$(read_state inactive_border)"
     kb_layout="$(read_state kb_layout)"
+    kb_variant="$(read_state kb_variant)"
+    kb_model="$(read_state kb_model)"
+    kb_options="$(read_state kb_options)"
     xray="$(read_state xray)"
 
     {
@@ -177,9 +177,12 @@ render_lua() {
         fi
         printf '%s\n' '        },'
         printf '%s\n' '    },'
-        if [ -n "$kb_layout" ]; then
+        if [ -n "$kb_layout" ] || [ -n "$kb_variant" ] || [ -n "$kb_model" ] || [ -n "$kb_options" ]; then
             printf '%s\n' '    input = {'
-            printf '        kb_layout = "%s",\n' "$(lua_string "$kb_layout")"
+            [ -n "$kb_layout" ]  && printf '        kb_layout = "%s",\n'  "$(lua_string "$kb_layout")"
+            [ -n "$kb_variant" ] && printf '        kb_variant = "%s",\n' "$(lua_string "$kb_variant")"
+            [ -n "$kb_model" ]   && printf '        kb_model = "%s",\n'   "$(lua_string "$kb_model")"
+            [ -n "$kb_options" ] && printf '        kb_options = "%s",\n' "$(lua_string "$kb_options")"
             printf '%s\n' '    },'
         fi
         printf '%s\n' '})'

@@ -788,7 +788,7 @@ PanelWindow {
     property real _panelW:  Math.min(1060, Math.max(700, (screen ? screen.width : 1920) * 0.62))
     property real _activeGap: _barAtBottom ? _barGapBot : _barGap
     property real _panelH:  Math.min(_screenH - _activeGap - 24,
-                                     Math.max(500, _screenH * 0.78))
+                                     Math.max(500, _screenH * 0.82))
 
     // StartMenu-style backdrop: full width, single bar-edge anchor, tall enough
     // to reach the far screen edge so the z:-1 backdrop catches a click anywhere.
@@ -1300,6 +1300,7 @@ PanelWindow {
                             { icon: "󰍹", label: "Display",    idx: 3 },
                             { icon: "󰮫", label: "Menus",      idx: 4 },
                             { icon: "󰍂", label: "Greeter",    idx: 5 },
+                            { icon: "󰌾", label: "Lockscreen", idx: 11 },
                             { icon: "󰌌", label: "Keybinds",   idx: 7 },
                             { icon: "󰗘", label: "Animations", idx: 8 },
                             { icon: "󰍛", label: "System",     idx: 9 }
@@ -7598,6 +7599,128 @@ PanelWindow {
                             }
                         }
                     }
+                    // ── TAB 11: Lockscreen ────────────────────────────────
+                    Item {
+                        id: lockscreenTabRoot
+
+                        property var themes: []
+                        property string currentTheme: ""
+                        property string applying: ""
+                        property string statusText: ""
+
+                        function reload() {
+                            if (_lsListProc.running) _lsListProc.running = false
+                            Qt.callLater(function() { _lsListProc.running = true })
+                        }
+                        function apply(name) {
+                            if (!name || _lsApplyProc.running) return
+                            applying = name
+                            statusText = "Applying " + name + "…"
+                            _lsApplyProc._target = name
+                            _lsApplyProc.command = [scriptDir + "/hyprcandy-lockscreens.sh", "apply", name]
+                            _lsApplyProc.running = true
+                        }
+
+                        Process {
+                            id: _lsListProc
+                            command: [scriptDir + "/hyprcandy-lockscreens.sh", "list"]
+                            running: false
+                            property var _buf: []
+                            stdout: SplitParser { splitMarker: "\n"; onRead: function(l){ const t=l.trim(); if(t) _lsListProc._buf.push(t) } }
+                            onRunningChanged: if (running) _buf = []
+                            onExited: {
+                                const parsed = []; let cur = ""
+                                for (const line of _buf) {
+                                    const q = line.split("|"); if (q.length < 3) continue
+                                    const row = { name: q[0], label: q[1], current: q[2] === "true" }
+                                    if (row.current) cur = row.name
+                                    parsed.push(row)
+                                }
+                                lockscreenTabRoot.themes = parsed
+                                lockscreenTabRoot.currentTheme = cur
+                                if (parsed.length === 0)
+                                    lockscreenTabRoot.statusText = "No lockscreen themes found under ~/.config/quickshell/lockscreens."
+                                else if (lockscreenTabRoot.statusText.indexOf("Applied ") !== 0)
+                                    lockscreenTabRoot.statusText = "Select a lockscreen theme. Takes effect the next time the screen locks."
+                            }
+                        }
+
+                        Process {
+                            id: _lsApplyProc
+                            running: false
+                            property string _target: ""
+                            onExited: function(code) {
+                                running = false
+                                if (code === 0) { currentTheme = _target; statusText = "Applied " + _target + "." }
+                                else statusText = "Failed to apply " + _target + "."
+                                applying = ""
+                                reload()
+                            }
+                        }
+
+                        ColumnLayout {
+                            anchors { fill: parent; margins: 8 }
+                            spacing: 8
+                            Text {
+                                text: "Lockscreen Theme"
+                                color: Theme.cOnSurf
+                                font.family: Config.labelFont; font.pixelSize: 15; font.weight: Font.DemiBold
+                            }
+                            Text {
+                                Layout.fillWidth: true
+                                text: lockscreenTabRoot.statusText
+                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                font.family: Config.labelFont; font.pixelSize: 11
+                                wrapMode: Text.WordWrap
+                            }
+                            Repeater {
+                                model: lockscreenTabRoot.themes
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    height: 46; radius: 12
+                                    color: hov.containsMouse
+                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
+                                        : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
+                                    border.width: modelData.current ? 2 : 1
+                                    border.color: modelData.current ? Theme.cPrimary : "transparent"
+                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    RowLayout {
+                                        anchors { fill: parent; leftMargin: 12; rightMargin: 10 }
+                                        spacing: 8
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: modelData.label
+                                            color: Theme.cOnSurf
+                                            font.family: Config.labelFont; font.pixelSize: 13; font.weight: Font.Medium
+                                        }
+                                        Text {
+                                            visible: modelData.current
+                                            text: "Active"
+                                            color: Theme.cPrimary
+                                            font.family: Config.labelFont; font.pixelSize: 11; font.weight: Font.DemiBold
+                                        }
+                                        Text {
+                                            visible: lockscreenTabRoot.applying === modelData.name
+                                            text: "…"
+                                            color: Theme.cOnSurf
+                                            font.family: Config.labelFont; font.pixelSize: 13
+                                        }
+                                    }
+                                    MouseArea {
+                                        id: hov
+                                        anchors.fill: parent; hoverEnabled: true
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: lockscreenTabRoot.apply(modelData.name)
+                                    }
+                                }
+                            }
+                            Item { Layout.fillHeight: true }
+                        }
+
+                        Component.onCompleted: reload()
+                    }
+
                 }
             }
         }

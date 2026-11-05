@@ -189,7 +189,7 @@ ShellRoot {
 
     Process {
         id:authProc; stdinEnabled:true
-        command:[Quickshell.env("HOME")+"/.config/quickshell/candylock/pam_auth"]
+        command:[Quickshell.env("HOME")+"/.config/quickshell/lockscreens/candylock/pam_auth"]
         onRunningChanged: if(running){ write(root._pendingPin+"\n"); root._pendingPin="" }
         onExited: function(code){
             root.authChecking=false
