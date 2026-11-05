@@ -131,7 +131,7 @@ PanelWindow {
                 Text {
                     id: sysRerunBtn
                     visible: !UpdatesPopupState.hasUpdates && !_sysUpdateProc.running
-                    text: ""
+                    text: "\u{F01DA}"   // re-run arrow (matches HC idle arrow)
                     color: sysRerunHover.containsMouse
                         ? Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.75)
                         : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 0.35)

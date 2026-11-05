@@ -4295,14 +4295,14 @@ PanelWindow {
                                     Config.launcherBorderRadius = Math.round(v)
                                 }
                             }
-                            CCSlider {
-                                label: "Outer Width"
-                                from: 0; to: 8
-                                value: Config.launcherBorderWidth
-                                onMoved: function(v) {
-                                    Config.launcherBorderWidth = Math.round(v)
-                                }
-                            }
+                            //CCSlider {
+                                //label: "Outer Width"
+                                //from: 0; to: 8
+                                //value: Config.launcherBorderWidth
+                                //onMoved: function(v) {
+                                    //Config.launcherBorderWidth = Math.round(v)
+                                //}
+                            //}
                             // Search Radius slider stays off — the qs search field is a
                             // fixed 99px pill (GJS .search-frame parity).
                             CCSlider {

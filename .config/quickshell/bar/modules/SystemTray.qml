@@ -22,20 +22,30 @@ Item {
     // ── Tray icon glyph ──────────────────────────────────────────────────────
     Text {
         id: icon
+        // Single tray glyph; every toggle spins it a further 180° — open faces
+        // bottom, close completes the turn back upright, always same direction.
+        property real _spin: 0
         anchors.centerIn: parent
-        text:  "󰧈"   // nf-md-dots_grid 󱗼 — generic "system tray" glyph 󰧈 󱊔
+        text: "\u{F0B2D}"
+        rotation: _spin
         color: SysTrayPopupState.visible ? Theme.cPrimary : Config.glyphColor
         font.family:    Config.fontFamily
         font.pixelSize: Config.fontSize
         font.weight:    Config.fontWeight
+        Behavior on rotation { NumberAnimation { duration: 240; easing.type: Easing.OutCubic } }
         Behavior on color { ColorAnimation { duration: 150 } }
+
+        Connections {
+            target: SysTrayPopupState
+            function onVisibleChanged() { icon._spin += 180 }
+        }
     }
 
     // ── Item-count badge (shown when popup is closed and items > 0) ──────────
     Rectangle {
         id: badge
         visible: !SysTrayPopupState.visible && SystemTray.items.values.length > 0
-        anchors { top: icon.top; right: icon.right; topMargin: -3; rightMargin: -4 }
+        anchors { top: icon.top; right: icon.right; topMargin: -3; rightMargin: -8 }
         width:  badgeTxt.implicitWidth + 4
         height: 12
         radius: 6

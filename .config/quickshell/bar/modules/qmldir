@@ -4,7 +4,6 @@ DateDisplay 1.0 DateDisplay.qml
 PowerProfiles 1.0 PowerProfiles.qml
 Updates 1.0 Updates.qml
 Notifications 1.0 Notifications.qml
-PowerButton 1.0 PowerButton.qml
 SystemTray 1.0 SystemTray.qml
 Weather 1.0 Weather.qml
 Battery 1.0 Battery.qml

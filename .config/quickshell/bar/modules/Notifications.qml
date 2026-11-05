@@ -6,7 +6,7 @@ import ".."
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
-    implicitWidth:  notifText.implicitWidth + Config.modPadH * 2 + (countBadge.visible ? 6 : 0)
+    implicitWidth:  notifText.implicitWidth + Config.modPadH * 2 
     implicitHeight: Config.moduleHeight
 
     // Read state directly from the in-process singleton
@@ -48,7 +48,7 @@ Item {
     Rectangle {
         id: countBadge
         visible: root._count > 0
-        anchors { top: parent.top; right: parent.right; topMargin: 3; rightMargin: 1 }
+        anchors { top: notifText.top; right: notifText.right; topMargin: -3; rightMargin: -6 }
         width: countLabel.implicitWidth + 4
         height: 10; radius: 5
         color: root._dnd

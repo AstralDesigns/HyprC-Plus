@@ -385,7 +385,7 @@ PanelWindow {
                 spacing: Config.islandSpacing
                 layoutDirection: Qt.RightToLeft
 
-                Island { bgType: "startmenu"; Modules.PowerButton {} }
+                Island { bgType: "startmenu"; Modules.StartMenu {} }
                 Island {
                     bgType: "weatherbat"
                     visible_: Config.showBattery || Config.showWeather
@@ -1694,7 +1694,7 @@ PanelWindow {
             }
             spacing: Config.islandSpacing
             layoutDirection: Qt.RightToLeft
-            Island { bgType: "startmenu"; Modules.PowerButton {} }
+            Island { bgType: "startmenu"; Modules.StartMenu {} }
             Island {
                 bgType: "weatherbat"
                 visible_: Config.showBattery || Config.showWeather
@@ -2064,7 +2064,7 @@ PanelWindow {
                 spacing: Config.islandSpacing
                 layoutDirection: Qt.RightToLeft
 
-                Island { bgType: "startmenu"; Modules.PowerButton {} }
+                Island { bgType: "startmenu"; Modules.StartMenu {} }
                 Island {
                     bgType: "weatherbat"
                     visible_: Config.showBattery || Config.showWeather
@@ -2214,7 +2214,7 @@ PanelWindow {
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
             Island { visible_: Config.showClock; Modules.Clock {} }
             Item { implicitWidth: 1; implicitHeight: Config.islandSpacing * 2 }
-            Island { bgType: "startmenu"; Modules.PowerButton {} }
+            Island { bgType: "startmenu"; Modules.StartMenu {} }
         }
     }
 

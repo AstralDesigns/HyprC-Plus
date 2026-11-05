@@ -9,7 +9,7 @@ import ".."
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
-    implicitWidth:  updIcon.implicitWidth + Config.moduleHPad * 2 + (updBadge.visible ? 6 : 0)
+    implicitWidth:  updIcon.implicitWidth + Config.moduleHPad * 2 
     implicitHeight: Config.moduleHeight
 
     // ── System update state ───────────────────────────────────────────────────
@@ -26,15 +26,6 @@ Item {
 
     readonly property bool _anyUpdates: _hasUpdates || UpdatesPopupState.hcHasUpdates
     readonly property bool _anyChecking: _checking   || _hcChecking
-
-    // ── Loader animation ──────────────────────────────────────────────────────
-    readonly property var _loaderFrames: ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"]
-    property int _loaderIdx: 0
-    Timer {
-        id: loaderTick
-        interval: 80; running: root._anyChecking; repeat: true
-        onTriggered: root._loaderIdx = (root._loaderIdx + 1) % root._loaderFrames.length
-    }
 
     // ── Gaming detection ────────────────────────────────────────────────────────
     // Process/executable name fragments for common Linux gaming launchers,
@@ -166,8 +157,9 @@ Item {
     // ── Icon ──────────────────────────────────────────────────────────────────
     Text {
         id: updIcon
+        property real _rot: 0
         anchors.centerIn: parent
-        text:  root._anyChecking ? root._loaderFrames[root._loaderIdx]
+        text:  root._anyChecking ? "\u{F1978}"
                                  : (root._anyUpdates ? "󰏖" : "󰏗")
         color: root._anyChecking ? Config.rightGroupColor
              : root._anyUpdates  ? Theme.cPrimary
@@ -175,13 +167,23 @@ Item {
         font.family:    Config.fontFamily
         font.pixelSize: Config.fontSize
         font.weight:    Config.fontWeight
+        rotation: _rot
+        NumberAnimation on _rot {
+            running: root._anyChecking
+            from: 0; to: 360; duration: 1200; loops: Animation.Infinite
+            easing.type: Easing.Linear
+        }
+        Connections {
+            target: root
+            function on_AnyCheckingChanged() { if (!root._anyChecking) updIcon._rot = 0 }
+        }
         Behavior on color { ColorAnimation { duration: 150 } }
     }
 
     Rectangle {
         id: updBadge
         visible: root._anyUpdates
-        anchors { top: parent.top; right: parent.right; topMargin: 3; rightMargin: 1 }
+        anchors { top: updIcon.top; right: updIcon.right; topMargin: -3; rightMargin: -6 }
         width: badgeLabel.implicitWidth + 4
         height: 10; radius: 5
         color: Theme.cPrimary

@@ -168,7 +168,8 @@ Item {
         implicitHeight: root.panelContentHeight + root.outerPadding * 2
         radius: Appearance.rounding.large
         color: Appearance.colors.colOverviewBg
-        border.width: 0
+        border.width: Appearance.barBorderWidth
+        border.color: Qt.rgba(Appearance.barBorderColor.r, Appearance.barBorderColor.g, Appearance.barBorderColor.b, Appearance.barBorderAlpha)
 
         // Wheel over the overview cycles workspaces
         WheelHandler {

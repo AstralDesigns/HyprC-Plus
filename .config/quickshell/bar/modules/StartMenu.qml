@@ -1,82 +1,56 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell
+import Quickshell.Io
 import ".."
 
-// Start-menu / power button.
-// Left-click → toggle start menu
 Item {
     id: root
     Layout.alignment: Qt.AlignVCenter
-    implicitWidth: Math.max(Config.moduleHeight, smIcon.implicitWidth + Config.btnPadLeft + Config.btnPadRight)
+    implicitWidth: Config.moduleHeight
     implicitHeight: Config.moduleHeight
 
-    property string _glyph: Config.ccGlyph
+    // This button sits at the trailing (right) edge, so nudge its tooltip left by
+    // the active mode's side margin to keep the popup off the screen edge.
+    readonly property real _tipMargin: Config.barMode === "shell" ? Config.popupSideMargin * 3 : Config.popupSideMargin * 2
 
-    Rectangle {
-        id: smBg
-        anchors.fill: parent
-        radius: Config.islandRadius
-        clip: true
-        z: 0
-
-        // Flat mode: SurfaceTint color background
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            visible: Config.islandBgStyle !== "gradient"
-            color: Theme.cSurfaceTint
-            Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
-        }
-
-        // Gradient mode: InversePrimary at top -> SurfaceTint in center -> InversePrimary at bottom
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            visible: Config.islandBgStyle === "gradient"
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-                GradientStop { position: 0.0; color: Theme.cInversePrimary }
-                GradientStop { position: 0.35; color: Theme.cSurfaceTint }
-                GradientStop { position: 0.7; color: Theme.cSurfaceTint }
-                GradientStop { position: 1.0; color: Theme.cInversePrimary }
-            }
-        }
+    Process {
+        id: smProc
+        command: [Config.scriptsDir + "/startmenu.sh"]
+        running: false
     }
 
-    Rectangle {
-        anchors.fill: parent
-        radius: Config.islandRadius
-        color: "transparent"
-        border.width: Config.islandBorder
-        border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
-                              Config.islandBorderColor.b, Config.islandBorderAlpha)
-        visible: Config.islandBorder > 0 && Config.islandBorderAlpha > 0
-        z: 1
-    }
-
+    // Single power glyph; every StartMenu visibility change (button toggle open/
+    // close, backdrop click, or Esc) spins it a further 180° in the same direction.
     Text {
-        id: smIcon
+        id: powerText
+        property real _spin: 0
         anchors.centerIn: parent
-        text: root._glyph
+        text: ""
         color: Config.powerGlyphColor
         font.family: Config.fontFamily
-        font.pixelSize: Config.glyphSize + 2
-        z: 2
-        Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
+        font.pixelSize: Config.fontSize
+        transformOrigin: Item.Center
+        rotation: _spin
+        Behavior on rotation { NumberAnimation { duration: 300; easing.type: Easing.OutCubic } }
+
+        Connections {
+            target: StartMenuState
+            function onMenuVisibleChanged() { powerText._spin += 180 }
+        }
     }
 
     opacity: ma.containsMouse ? 0.7 : 1.0
-    Behavior on opacity { NumberAnimation { duration: 150 } }
+    Behavior on opacity { NumberAnimation { duration: 80 } }
 
     MouseArea {
         id: ma
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        z: 3
-        onEntered: if (Config.tipStartMenu) BarTipState.show("Left-click: Applications", parent)
+        onEntered: if (Config.tipPower) BarTipState.show("Left-click: Start menu", parent, -root._tipMargin)
         onExited: BarTipState.hide(parent)
-        onClicked: StartMenuState.toggle()
+        onClicked: {
+            if (!smProc.running) smProc.running = true
+        }
     }
 }

@@ -15,6 +15,7 @@ Singleton {
 
     // ── Matugen color strings (updated live by FileView below) ────────────────
     property string _m3primary:                  ""
+    property string _m3primaryFixedDim:          ""
     property string _m3onPrimary:                ""
     property string _m3primaryContainer:         ""
     property string _m3onPrimaryContainer:       ""
@@ -38,14 +39,17 @@ Singleton {
     property string _m3outline:                  ""
     property string _m3outlineVariant:           ""
     property string _m3shadow:                   ""
+    property var _m3map: ({})
 
     function parseColors(text) {
         const re = /property color (\w+): "(#[0-9a-fA-F]+)"/g
-        let m
+        let m; const map = ({})
         while ((m = re.exec(text)) !== null) {
             const key = m[1], val = m[2]
+            map[key] = val
             switch (key) {
                 case "m3primary":                root._m3primary = val; break
+                case "m3primaryFixedDim":        root._m3primaryFixedDim = val; break
                 case "m3onPrimary":              root._m3onPrimary = val; break
                 case "m3primaryContainer":       root._m3primaryContainer = val; break
                 case "m3onPrimaryContainer":     root._m3onPrimaryContainer = val; break
@@ -71,6 +75,7 @@ Singleton {
                 case "m3shadow":                 root._m3shadow = val; break
             }
         }
+        root._m3map = map
     }
 
     FileView {
@@ -81,9 +86,56 @@ Singleton {
         onLoaded: root.parseColors(text())
     }
 
+    // ── Wallust palette (mirrors the bar's wallust colour source) ─────────────
+    property var _wallust: ({})
+    function parseWallust(text) {
+        const re = /property color (\w+): "(#[0-9a-fA-F]+)"/g
+        let m; const o = ({})
+        while ((m = re.exec(text)) !== null) o[m[1]] = m[2]
+        root._wallust = o
+    }
+    FileView {
+        path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) +
+              "/quickshell/overview/Appearance.wallust.qml"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseWallust(text())
+    }
+
+    // ── Bar-border mirror (reads the shared bar conf so panels match the bar) ──
+    property int    barBorderWidth: 1
+    property real   barBorderAlpha: 0.25
+    property string _bbMode:       "wallust"
+    property string _bbWallustVar: "$color0"
+    property string _bbMatugenVar: "$primary_fixed_dim"
+    function parseBarBorderConf(text) {
+        const g = k => { const m = text.match(new RegExp("^" + k + "=(.*)$", "m")); return m ? m[1].trim() : "" }
+        const w = g("barBorderWidth"), a = g("barBorderAlpha")
+        if (w !== "") root.barBorderWidth = parseInt(w)
+        if (a !== "") root.barBorderAlpha = parseFloat(a)
+        if (g("barBorderMode"))       root._bbMode = g("barBorderMode")
+        if (g("barBorderWallustVar")) root._bbWallustVar = g("barBorderWallustVar")
+        if (g("barBorderVar"))        root._bbMatugenVar = g("barBorderVar")
+    }
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hyprcandy/hyprcandy-bar.conf"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseBarBorderConf(text())
+    }
+    readonly property color barBorderColor: {
+        if (_bbMode === "wallust") {
+            const key = "m3" + _bbWallustVar.replace(/^\$/, "")
+            return Qt.color(_wallust[key] || _wallust["m3color7"] || "#000000")
+        }
+        const name = "m3" + _bbMatugenVar.replace(/^\$/, "").replace(/_(\w)/g, (mm, c) => c.toUpperCase())
+        return Qt.color(_m3map[name] || _m3map["m3primary"] || "#888888")
+    }
+
     property QtObject matugenColors: QtObject {
         property bool darkmode: true
         property color m3primary:                Qt.color(root._m3primary)
+        property color m3primaryFixedDim:        Qt.color(root._m3primaryFixedDim)
         property color m3onPrimary:              Qt.color(root._m3onPrimary)
         property color m3primaryContainer:       Qt.color(root._m3primaryContainer)
         property color m3onPrimaryContainer:     Qt.color(root._m3onPrimaryContainer)

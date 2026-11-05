@@ -24,6 +24,7 @@ ShellRoot {
     // the QS config dir) so matugen rewrites never trigger a hot-reload.
     // onTextChanged fires live whenever the file changes → instant color update.
     property string _m3primary:                 ""
+    property string _m3primaryFixedDim:         ""
     property string _m3onPrimary:               ""
     property string _m3onSecondary:             ""
     property string _m3secondary:               ""
@@ -37,6 +38,7 @@ ShellRoot {
     property string _m3outline:                 ""
     property string _m3outlineVariant:          ""
     property string _m3inversePrimary:          ""
+    property var _m3map: ({})
 
     // Derived semantic colors
     readonly property color cBg:        Qt.color(_m3background)
@@ -45,6 +47,7 @@ ShellRoot {
     readonly property color cOnSurface: Qt.color(_m3onSurface)
     readonly property color cOnSurfVar: Qt.color(_m3onSurfaceVariant)
     readonly property color cPrimary:   Qt.color(_m3primary)
+    readonly property color cPrimaryFixedDIm: Qt.color(_m3primaryFixedDim)
     readonly property color cOnPrimary: Qt.color(_m3onPrimary)
     readonly property color cSecCont:   Qt.color(_m3secondaryContainer)
     readonly property color cOnSecCont: Qt.color(_m3onSecondaryContainer)
@@ -64,11 +67,13 @@ ShellRoot {
 
     function parseColors(text) {
         const re = /property color (\w+): "(#[0-9a-fA-F]+)"/g
-        let m
+        let m; const map = ({})
         while ((m = re.exec(text)) !== null) {
             const key = m[1], val = m[2]
+            map[key] = val
             switch (key) {
                 case "m3primary":             root._m3primary = val; break
+                case "_m3primaryFixedDim":    root._m3primaryFixedDim = val; break
                 case "m3onPrimary":           root._m3onPrimary = val; break
                 case "m3onSecondary":         root._m3onSecondary = val; break
                 case "m3secondary":           root._m3secondary = val; break
@@ -84,6 +89,7 @@ ShellRoot {
                 case "m3inversePrimary":      root._m3inversePrimary = val; break
             }
         }
+        root._m3map = map
     }
 
     FileView {
@@ -93,6 +99,52 @@ ShellRoot {
         watchChanges: true
         onFileChanged: reload()          // re-read when matugen rewrites the file
         onLoaded: root.parseColors(text()) // text() is a function; fires on initial load + after reload()
+    }
+
+    // ── Wallust palette (mirrors the bar's wallust colour source) ─────────────
+    property var _wallust: ({})
+    function parseWallust(text) {
+        const re = /property color (\w+): "(#[0-9a-fA-F]+)"/g
+        let m; const o = ({})
+        while ((m = re.exec(text)) !== null) o[m[1]] = m[2]
+        root._wallust = o
+    }
+    FileView {
+        path: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) +
+              "/quickshell/wallpaper/WallustColors.qml"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseWallust(text())
+    }
+
+    // ── Bar-border mirror (reads the shared bar conf so the panel matches) ────
+    property int    barBorderWidth: 1
+    property real   barBorderAlpha: 0.25
+    property string _bbMode:       "wallust"
+    property string _bbWallustVar: "$color0"
+    property string _bbMatugenVar: "$primary_fixed_dim"
+    function parseBarBorderConf(text) {
+        const g = k => { const m = text.match(new RegExp("^" + k + "=(.*)$", "m")); return m ? m[1].trim() : "" }
+        const w = g("barBorderWidth"), a = g("barBorderAlpha")
+        if (w !== "") root.barBorderWidth = parseInt(w)
+        if (a !== "") root.barBorderAlpha = parseFloat(a)
+        if (g("barBorderMode"))       root._bbMode = g("barBorderMode")
+        if (g("barBorderWallustVar")) root._bbWallustVar = g("barBorderWallustVar")
+        if (g("barBorderVar"))        root._bbMatugenVar = g("barBorderVar")
+    }
+    FileView {
+        path: Quickshell.env("HOME") + "/.config/hyprcandy/hyprcandy-bar.conf"
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: root.parseBarBorderConf(text())
+    }
+    readonly property color barBorderColor: {
+        if (_bbMode === "wallust") {
+            const key = "m3" + _bbWallustVar.replace(/^\$/, "")
+            return Qt.color(_wallust[key] || _wallust["m3color7"] || "#000000")
+        }
+        const name = "m3" + _bbMatugenVar.replace(/^\$/, "").replace(/_(\w)/g, (mm, c) => c.toUpperCase())
+        return Qt.color(_m3map[name] || _m3map["m3primary"] || "#888888")
     }
 
     // ── Rounding (mirrors Appearance.qml) ────────────────────────────────────
@@ -822,6 +874,9 @@ ShellRoot {
                 radius: root.rLg
                 // Same colOverviewBg transparent style as the overview
                 color:  root.cPanelBg
+                border.color: Qt.rgba(
+                        root.barBorderColor.r, root.barBorderColor.g, root.barBorderColor.b, root.barBorderAlpha)
+                border.width: root.barBorderWidth
                 clip:   false
 
                 // Border

@@ -2543,11 +2543,9 @@ Item {
                        : win.height - win.edgeMargin - height)
                 radius: Config.launcherBorderRadius
                 color: Theme.blurBackground
-                // GJS window shell: border-width ${bw}px + border-color @<borderColorVar>
-                // — config.js holds borderColorVar: 'color6' (wallust), the same source
-                // the bar/dock border uses → Config.barBorderColor (mode-aware resolve).
-                border.width: Config.launcherBorderWidth
-                border.color: Config.barBorderColor
+                border.width: Config.barBorderWidth
+                border.color: Qt.rgba(Config.barBorderColor.r, Config.barBorderColor.g,
+                                      Config.barBorderColor.b, Config.barBorderAlpha)
                 clip: true
                 opacity: win.visible ? 1.0 : 0.0
                 Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
