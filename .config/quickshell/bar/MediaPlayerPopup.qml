@@ -1245,15 +1245,18 @@ Item {
         readonly property real _barGapBot: (Config.barMode === "shell" ? (Config.shellArmThickness + Config.outerMarginBottom) : Config.outerMarginBottom) + Config.barHeight + 4
         readonly property real _leftMargin: Config.popupSideMargin
 
-        anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true }
+        anchors { top: !_barAtBottom; bottom: _barAtBottom; left: true; right: true }
         margins {
             top:    _barAtBottom ? 0 : _barGap
             bottom: _barAtBottom ? _barGapBot : 0
-            left:   _leftMargin
         }
 
-        implicitWidth:  mpPanel.implicitWidth + 8
-        implicitHeight: 480
+        // Full-screen backdrop (StartMenu/Calendar style): the surface spans the
+        // whole monitor so the z:-1 MouseArea catches a click anywhere outside the
+        // card. Exactly one of top/bottom is anchored, so the height stays
+        // constant and never resizes per-frame; the card positions itself inside.
+        implicitWidth:  (screen ? screen.width  : 1920)
+        implicitHeight: (screen ? screen.height : 1080)
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Top
         WlrLayershell.namespace: "quickshell"
@@ -1277,7 +1280,7 @@ Item {
             root: scope
             popupMode: true
             anchors {
-                left: parent.left
+                left: parent.left; leftMargin: mpPopup._leftMargin
                 top:    !mpPopup._barAtBottom ? parent.top    : undefined
                 bottom:  mpPopup._barAtBottom ? parent.bottom : undefined
             }
