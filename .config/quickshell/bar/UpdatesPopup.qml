@@ -120,7 +120,7 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
-                    text: UpdatesPopupState.hasUpdates ? "Updates Available   " : "OS Is Up To Date    "
+                    text: UpdatesPopupState.hasUpdates ? "Updates Available" : "OS Is Up To Date"
                     color: Theme. cOnSurf
                     font.family:    Config.labelFont
                     font.pixelSize: Config.labelFontSize + 1

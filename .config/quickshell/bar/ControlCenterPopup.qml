@@ -100,7 +100,6 @@ PanelWindow {
     property string _borderWEntryVal:    ""
     property string _borderREntryVal:    ""
     property string _currentLayout:      ""   // "scrolling" | "dwindle" | "master" | "monocle"
-    property string _kbLayout:           ""   // keyboard layout — empty until first user entry
 
     // ── Hyprland slider real-number backing (used by CCSlider; seeded from
     //    hyprcandy-bar.conf [hyprland] on open, or Config.hyprDefault* if unset) ──
@@ -317,7 +316,6 @@ PanelWindow {
                 _hyprlandValReader.running = true
                 _layoutReader.running = true
                 _hyprStateReader.running = true
-                _kbLayoutReader.running  = true
                 _xrayStatusReader.running = true
                 ccWin._maybereVerify()
             }
@@ -334,7 +332,6 @@ PanelWindow {
         _sddmValReader.running     = true
         _weatherLocReader.running  = true
         _hyprStateReader.running   = true
-        _kbLayoutReader.running    = true
         _winBgAlphaReader.running  = true
         _xrayStatusReader.running  = true
         // Seed from persisted value immediately; reader overrides only on first-ever launch
@@ -530,6 +527,13 @@ PanelWindow {
     }
 
     // ── Read [hyprland] slider values from hyprcandy-bar.conf ────────────────
+    // Keyboard layout overrides — mirror hyprcandy-bar.conf [hyprland] kb_* keys.
+    // Blank when never set (fresh install); _hyprStateReader repopulates on open.
+    property string _kbLayout:  ""
+    property string _kbVariant: ""
+    property string _kbModel:   ""
+    property string _kbOptions: ""
+
     // Values written here take priority over Config.hyprDefault* fallbacks.
     Process {
         id: _hyprStateReader
@@ -559,28 +563,14 @@ PanelWindow {
                 else if (k === "gaps_out")    { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprGapsOutSlider = i }
                 else if (k === "border_size") { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprBorderWSlider = i }
                 else if (k === "rounding")    { const i = parseInt(v);   if (!isNaN(i)) ccWin._hyprBorderRSlider = i }
-                else if (k === "kb_layout"  ) { if (v.length > 0) ccWin._kbLayout = v }
+                else if (k === "kb_layout")   { ccWin._kbLayout  = v }
+                else if (k === "kb_variant")  { ccWin._kbVariant = v }
+                else if (k === "kb_model")    { ccWin._kbModel   = v }
+                else if (k === "kb_options")  { ccWin._kbOptions = v }
             }
         }
     }
 
-    // ── Read kb_layout from Lua-aware Hyprland state/defaults ─
-    Process {
-        id: _kbLayoutReader
-        command: ["bash", "-c",
-            "h=\"$HOME/.config/quickshell/bar/scripts/hyprland-lua-state.sh\"; " +
-            "[ -x \"$h\" ] && \"$h\" get kb_layout"]
-        running: false
-        stdout: SplitParser {
-            splitMarker: "\n"
-            onRead: function(l) {
-                const v = l.trim()
-                // Only populate if state file has not set a layout yet
-                if (ccWin._kbLayout === "" && v.length > 0)
-                    ccWin._kbLayout = v
-            }
-        }
-    }
 
     // Reads current alpha from gtk4 matugen template so the slider seeds correctly on open.
     Process {
@@ -842,7 +832,7 @@ PanelWindow {
         property int activeTab: 1  // Default to Hyprland tab (index 1)
         property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
         property int activeKbSubTab:  0  // Remembered Keybinds sub-tab (0 = View, 1 = Edit)
-        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH)
+        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH, 3 = Keyboard)
         property int activeGreetSubTab: 0  // Remembered Greeter sub-tab (0 = Themes, 1 = Edit)
     }
     Settings {
@@ -1015,7 +1005,6 @@ PanelWindow {
                             _hyprlandValReader.running = true
                             _layoutReader.running = true
                             _hyprStateReader.running = true
-                            _kbLayoutReader.running  = true
                             mainStack.currentIndex = 1
                             ccTabSettings.activeTab = 1
                         }
@@ -1586,6 +1575,7 @@ PanelWindow {
                                                               Theme.cPrimary.b, 0.2)
                                                 Behavior on border.color { ColorAnimation { duration: 120 } }
                                                 TextInput {
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                     id: _wLocInput
                                                     anchors { fill: parent; margins: 6 }
                                                     color: Theme.cPrimary
@@ -3095,46 +3085,6 @@ PanelWindow {
                                        value:Config.desktopLabelRadius;
                                        onMoved:function(v){ Config.desktopLabelRadius=v } }
 
-                            // ── Keyboard Layout ───────────────────────────────────
-                            CCSection { text: "Keyboard Layout" }
-                            RowLayout {
-                                Layout.fillWidth: true; spacing: 8
-                                Text {
-                                    text: "Keyboard"
-                                    color: Theme.cOnSurf
-                                    font.family: Config.labelFont; font.pixelSize: 13
-                                    Layout.preferredWidth: 100
-                                }
-                                Rectangle {
-                                    Layout.preferredWidth: 40; height: 28; radius: 7
-                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
-                                    TextInput {
-                                        id: _kbLayoutTI
-                                        anchors { fill: parent; margins: 6 }
-                                        text: ccWin._kbLayout
-                                        color: Theme.cPrimary
-                                        font.family: Config.labelFont; font.pixelSize: 12
-                                        verticalAlignment: TextInput.AlignVCenter; clip: true
-                                        onAccepted: {
-                                            const v = text.trim()
-                                            if (v.length === 0) return
-                                            ccWin._kbLayout = v
-                                            ccWin._writeHyprState("kb_layout", v)
-                                            _kbLayoutSetProc.command = ["bash", "-c", "hyprctl reload 2>/dev/null || true"]
-                                            _kbLayoutSetProc.running = true
-                                        }
-                                        Connections {
-                                            target: ccWin
-                                            function on_KbLayoutChanged() {
-                                                if (!_kbLayoutTI.activeFocus) _kbLayoutTI.text = ccWin._kbLayout
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            Process { id: _kbLayoutSetProc; running: false }
 
                             // ── Layout switcher ───────────────────────────────────
                             CCSection { text: "Layout" }
@@ -4424,7 +4374,7 @@ PanelWindow {
                                 if (parsed.length === 0)
                                     greeterTabRoot.themeStatus = "No SDDM themes found in /usr/share/sddm/themes."
                                 else if (greeterTabRoot.themeStatus.indexOf("Applied ") !== 0)
-                                    greeterTabRoot.themeStatus = "Select a theme - it applies at the next greeter launch."
+                                    greeterTabRoot.themeStatus = "Select a theme - it applies at the next reboot or re-login."
                             }
                         }
 
@@ -4436,7 +4386,7 @@ PanelWindow {
                                 running = false
                                 if (code === 0) {
                                     greeterTabRoot.currentTheme = _target
-                                    greeterTabRoot.themeStatus = "Applied " + _target + ". Takes effect at the next greeter launch."
+                                    greeterTabRoot.themeStatus = "Applied " + _target + ". Takes effect at the next reboot or re-login."
                                 } else {
                                     greeterTabRoot.themeStatus = "Failed to switch to " + _target + "."
                                 }
@@ -4522,6 +4472,7 @@ PanelWindow {
                                         Item {
                                             width: 140; height: 20
                                             TextInput {
+                                                selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                 anchors.fill: parent
                                                 color: Theme.cPrimary
                                                 font.family: Config.labelFont; font.pixelSize: 12
@@ -5256,6 +5207,7 @@ PanelWindow {
                                         Item {
                                             width: 140; height: 20
                                             TextInput {
+                                                selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                 id: kbSearchInput
                                                 anchors.fill: parent
                                                 color: Theme.cPrimary
@@ -5708,6 +5660,7 @@ PanelWindow {
                                                               leftMargin: 8; rightMargin: 8; verticalCenter: parent.verticalCenter }
                                                     height: 20
                                                     TextInput {
+                                                        selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                         id: kbKeysInput
                                                         anchors.fill: parent
                                                         text: kbTabRoot.editKeys
@@ -5748,6 +5701,7 @@ PanelWindow {
                                                               leftMargin: 8; rightMargin: 8; verticalCenter: parent.verticalCenter }
                                                     height: 20
                                                     TextInput {
+                                                        selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                         id: kbCmdInput
                                                         anchors.fill: parent
                                                         text: kbTabRoot.editCmd
@@ -5788,6 +5742,7 @@ PanelWindow {
                                                               leftMargin: 8; rightMargin: 8; verticalCenter: parent.verticalCenter }
                                                     height: 20
                                                     TextInput {
+                                                        selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                         id: kbDescInput
                                                         anchors.fill: parent
                                                         text: kbTabRoot.editDesc
@@ -6181,7 +6136,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["Info", "Hotspot", "SSH"]
+                                    model: ["Info", "Hotspot", "SSH", "Keyboard"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -6759,7 +6714,7 @@ PanelWindow {
                                                     id: hsSsidTI
                                                     anchors { fill: parent; margins: 8 }
                                                     color: Theme.cPrimary
-                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                     font.family: Config.labelFont; font.pixelSize: 12
                                                     verticalAlignment: TextInput.AlignVCenter; clip: true
                                                     onTextChanged: { hsTab.dirty = true; hsTab.saved = false }
@@ -6791,7 +6746,7 @@ PanelWindow {
                                                     anchors { left: parent.left; right: hsReveal.left; top: parent.top; bottom: parent.bottom }
                                                     anchors.leftMargin: 8; anchors.rightMargin: 30
                                                     color: Theme.cPrimary
-                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                     echoMode: hsTab.reveal ? TextInput.Normal : TextInput.Password
                                                     font.family: Config.labelFont; font.pixelSize: 12
                                                     verticalAlignment: TextInput.AlignVCenter; clip: true
@@ -7153,6 +7108,141 @@ PanelWindow {
                                         onExited: running = false
                                     }
                                 } // ── end SSH sub-tab ──
+
+                                // ── Keyboard sub-tab ─────────────────────────────────────────
+                                Item {
+                                    id: keyboardPage
+                                    ColumnLayout {
+                                        anchors { fill: parent; margins: 4 }
+                                        spacing: 10
+
+                                        CCSection { text: "Keyboard Layout" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Blank keeps Hyprland's built-in default. Type a value and press Enter to override it; changes are written to the Hyprland input overrides and reloaded."
+                                            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                            wrapMode: Text.WordWrap
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Layout"; color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 90 }
+                                            Rectangle {
+                                                Layout.preferredWidth: 100; Layout.maximumWidth: 150; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                TextInput {
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    id: kbLayoutTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    text: ccWin._kbLayout
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onAccepted: {
+                                                        const v = text.trim()
+                                                        ccWin._kbLayout = v
+                                                        ccWin._writeHyprState("kb_layout", v)
+                                                        _kbSysReloadProc.running = true
+                                                    }
+                                                    Connections {
+                                                        target: ccWin
+                                                        function on_KbLayoutChanged() { if (!kbLayoutTI.activeFocus) kbLayoutTI.text = ccWin._kbLayout }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Variant"; color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 90 }
+                                            Rectangle {
+                                                Layout.preferredWidth: 100; Layout.maximumWidth: 150; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                TextInput {
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    id: kbVariantTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    text: ccWin._kbVariant
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onAccepted: {
+                                                        const v = text.trim()
+                                                        ccWin._kbVariant = v
+                                                        ccWin._writeHyprState("kb_variant", v)
+                                                        _kbSysReloadProc.running = true
+                                                    }
+                                                    Connections {
+                                                        target: ccWin
+                                                        function on_KbVariantChanged() { if (!kbVariantTI.activeFocus) kbVariantTI.text = ccWin._kbVariant }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Model"; color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 90 }
+                                            Rectangle {
+                                                Layout.preferredWidth: 100; Layout.maximumWidth: 150; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                TextInput {
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    id: kbModelTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    text: ccWin._kbModel
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onAccepted: {
+                                                        const v = text.trim()
+                                                        ccWin._kbModel = v
+                                                        ccWin._writeHyprState("kb_model", v)
+                                                        _kbSysReloadProc.running = true
+                                                    }
+                                                    Connections {
+                                                        target: ccWin
+                                                        function on_KbModelChanged() { if (!kbModelTI.activeFocus) kbModelTI.text = ccWin._kbModel }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text { text: "Options"; color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 13; Layout.preferredWidth: 90 }
+                                            Rectangle {
+                                                Layout.preferredWidth: 100; Layout.maximumWidth: 150; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                TextInput {
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    id: kbOptionsTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    text: ccWin._kbOptions
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onAccepted: {
+                                                        const v = text.trim()
+                                                        ccWin._kbOptions = v
+                                                        ccWin._writeHyprState("kb_options", v)
+                                                        _kbSysReloadProc.running = true
+                                                    }
+                                                    Connections {
+                                                        target: ccWin
+                                                        function on_KbOptionsChanged() { if (!kbOptionsTI.activeFocus) kbOptionsTI.text = ccWin._kbOptions }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Process { id: _kbSysReloadProc; command: ["bash", "-c", "hyprctl reload 2>/dev/null || true"]; running: false }
+                                }
                             }
                         }
                     }
@@ -7348,6 +7438,7 @@ PanelWindow {
                                                 color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
                                                 border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                                 TextInput { id: addNameTI; anchors { fill: parent; margins: 6 }
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                     color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
                                                     verticalAlignment: TextInput.AlignVCenter; clip: true
                                                     onTextChanged: loginHint.text = text.trim() ? "login: " + userTab.deriveUser(text.trim()) : "" } } }
@@ -7359,6 +7450,7 @@ PanelWindow {
                                                 color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
                                                 border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                                 TextInput { id: addPassTI; anchors { fill: parent; margins: 6 }
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                     echoMode: TextInput.Password
                                                     color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
                                                     verticalAlignment: TextInput.AlignVCenter; clip: true } } }
@@ -7368,6 +7460,7 @@ PanelWindow {
                                                 color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
                                                 border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                                 TextInput { id: addPass2TI; anchors { fill: parent; margins: 6 }
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                     echoMode: TextInput.Password
                                                     color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
                                                     verticalAlignment: TextInput.AlignVCenter; clip: true } } }
@@ -7457,6 +7550,7 @@ PanelWindow {
                                                     color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
                                                     border.width: 1; border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
                                                     TextInput { id: passSetTI; anchors { fill: parent; margins: 6 }
+                                                        selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                                         echoMode: TextInput.Password
                                                         color: Theme.cPrimary; font.family: Config.labelFont; font.pixelSize: 12
                                                         verticalAlignment: TextInput.AlignVCenter; clip: true } }
@@ -8013,6 +8107,7 @@ PanelWindow {
                                 font.pixelSize: 13; font.family: Config.fontFamily
                             }
                             TextInput {
+                                selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                                 id: wpSearchInput
                                 Layout.fillWidth: true
                                 color: Theme.cPrimary
@@ -8924,7 +9019,7 @@ PanelWindow {
                             font.pixelSize: 12
                             verticalAlignment: TextInput.AlignVCenter
                             clip: true
-                            selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                            selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                             text: ccIconGalleryOverlay.searchText
                             onTextChanged: ccIconGalleryOverlay.searchText = text
                             Keys.onEscapePressed: {
@@ -10129,6 +10224,7 @@ PanelWindow {
             border.width: 1
             border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
             TextInput {
+                selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                 anchors { fill: parent; margins: 6 }
                 text: value; color: Theme.cPrimary
                 font.family: Config.labelFont; font.pixelSize: 12
@@ -10171,7 +10267,7 @@ PanelWindow {
                 font.family: Config.labelFont; font.pixelSize: 12
                 verticalAlignment: TextInput.AlignVCenter; clip: true
                 // Text-selection highlight (ctrl+A / drag) — cPrimary @ 0.15.
-                selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
                 selectedTextColor: Theme.cPrimary
                 onAccepted: applied(text)
             }

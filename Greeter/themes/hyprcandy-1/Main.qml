@@ -522,9 +522,8 @@ Pane {
                         height: 34
                         radius: 10
                         color: theme.fieldGlass
-                        border.width: pwdField.activeFocus ? 2 : 1
-                        border.color: pwdField.activeFocus ? theme.cWc3 : theme.outlineSoft
-                        Behavior on border.color { ColorAnimation { duration: 150 } }
+                        border.width: 1
+                        border.color: theme.outlineSoft
 
                         TextInput {
                             id: pwdField
@@ -602,8 +601,8 @@ Pane {
                         }
                     }
 
-                    // Login button — pill (radius 99), SurfaceTint glass with
-                    // OnSecondary label, hugs its own width.
+                    // Login button — pill (radius 99), SurfaceTint backdrop whose
+                    // alpha rises 0.35→0.5→0.85 (empty / typed / hover); SurfaceTint label.
                     Rectangle {
                         id: loginBtn
                         Layout.alignment: Qt.AlignHCenter
@@ -613,8 +612,8 @@ Pane {
                         radius: 99
                         readonly property bool enabledLogin:
                             config.AllowEmptyPassword === "true" || pwdField.text.length > 0
-                        color: !enabledLogin ? theme.cSurfaceContainer
-                             : (loginHov.containsMouse ? theme.cSurfaceTint : theme.pill)
+                        color: Qt.rgba(theme.cSurfaceTint.r, theme.cSurfaceTint.g, theme.cSurfaceTint.b,
+                                       enabledLogin ? (loginHov.containsMouse ? 0.85 : 0.5) : 0.35)
                         border.width: 1
                         border.color: theme.outlineSoft
                         Behavior on color { ColorAnimation { duration: 120 } }
@@ -622,7 +621,7 @@ Pane {
                         Text {
                             anchors.centerIn: parent
                             text: "Login"
-                            color: loginBtn.enabledLogin ? theme.cOnSecondary : theme.cSurfaceTint
+                            color: theme.cSurfaceTint
                             font.family: root.labelFont
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
