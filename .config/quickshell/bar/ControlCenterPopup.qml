@@ -4615,14 +4615,16 @@ PanelWindow {
                                                             height: 46
                                                             radius: 9
                                                             color: modelData.current
-                                                                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.46)
+                                                                ? (_themeRowHov.containsMouse
+                                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
+                                                                    : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35))
                                                                 : (_themeRowHov.containsMouse
                                                                     ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.22)
                                                                     : (index % 2 === 0
                                                                         ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.10)
                                                                         : "transparent"))
-                                                            border.width: modelData.current ? 1 : 0
-                                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.38)
+                                                            border.width: modelData.current ? 2 : 0
+                                                            border.color: Theme.cPrimary
                                                             Behavior on color { ColorAnimation { duration: 100 } }
 
                                                             RowLayout {
@@ -6036,8 +6038,11 @@ PanelWindow {
                                                 height: 46
                                                 radius: 9
                                                 color: modelData.current
-                                                    ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
-                                                              Theme.cInversePrimary.b, 0.46)
+                                                    ? (_animRowHov.containsMouse
+                                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                  Theme.cPrimary.b, 0.14)
+                                                        : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g,
+                                                                  Theme.cOnSecondary.b, 0.35))
                                                     : (_animRowHov.containsMouse
                                                         ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                   Theme.cInversePrimary.b, 0.22)
@@ -6045,9 +6050,8 @@ PanelWindow {
                                                             ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
                                                                       Theme.cInversePrimary.b, 0.10)
                                                             : "transparent"))
-                                                border.width: modelData.current ? 1 : 0
-                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
-                                                                      Theme.cPrimary.b, 0.38)
+                                                border.width: modelData.current ? 2 : 0
+                                                border.color: Theme.cPrimary
                                                 Behavior on color { ColorAnimation { duration: 100 } }
 
                                                 RowLayout {
@@ -7677,23 +7681,42 @@ PanelWindow {
                                 model: lockscreenTabRoot.themes
                                 delegate: Rectangle {
                                     required property var modelData
+                                    required property int index
                                     Layout.fillWidth: true
-                                    height: 46; radius: 12
-                                    color: hov.containsMouse
-                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
-                                        : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
-                                    border.width: modelData.current ? 2 : 1
-                                    border.color: modelData.current ? Theme.cPrimary : "transparent"
-                                    Behavior on color { ColorAnimation { duration: 120 } }
+                                    height: 46; radius: 9
+                                    color: modelData.current
+                                        ? (hov.containsMouse
+                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
+                                            : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35))
+                                        : (hov.containsMouse
+                                            ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.22)
+                                            : (index % 2 === 0
+                                                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.10)
+                                                : "transparent"))
+                                    border.width: modelData.current ? 2 : 0
+                                    border.color: Theme.cPrimary
+                                    Behavior on color { ColorAnimation { duration: 100 } }
                                     RowLayout {
-                                        anchors { fill: parent; leftMargin: 12; rightMargin: 10 }
+                                        anchors { fill: parent; leftMargin: 10; rightMargin: 10 }
                                         spacing: 8
-                                        Text {
-                                            Layout.fillWidth: true
-                                            text: modelData.label
-                                            color: Theme.cOnSurf
-                                            font.family: Config.labelFont; font.pixelSize: 13; font.weight: Font.Medium
+                                        Rectangle {
+                                            height: 26
+                                            implicitWidth: _lsNameLbl.implicitWidth + 16
+                                            radius: 7
+                                            color: modelData.current
+                                                ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g, Theme.cInversePrimary.b, 0.50)
+                                                : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.14)
+                                            border.width: 1
+                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.30)
+                                            Text {
+                                                id: _lsNameLbl
+                                                anchors.centerIn: parent
+                                                text: modelData.label
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 11; font.weight: Font.Medium
+                                            }
                                         }
+                                        Item { Layout.fillWidth: true }
                                         Text {
                                             visible: modelData.current
                                             text: "Active"
