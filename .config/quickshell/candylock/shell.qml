@@ -1353,7 +1353,7 @@ ShellRoot {
                                             Text {
                                                 Layout.alignment: Qt.AlignHCenter
                                                 text: root.weatherTemp
-                                                color: root.cWc2
+                                                color: root.cWc5
                                                 font.pixelSize: 18
                                                 font.weight: Font.Bold
                                                 font.family: "C059"
