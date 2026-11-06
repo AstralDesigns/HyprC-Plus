@@ -53,7 +53,7 @@ Item {
     // PC-aware arc colour and the centre power-state glyph: bolt when plugged /
     // charging, plain battery when unplugged / discharging (and for desktops).
     readonly property color  _arcColor:    _hasBattery ? _iconColor : Config.batteryIconColor
-    readonly property string _centerGlyph: _hasBattery ? (_charging ? "\u{F140C}" : "\u{F0EC3}") : "\u{F0EC3}"
+    readonly property string _centerGlyph: _hasBattery ? (_charging ? "\u{F0820}" : "\u{F0EC3}") : "\u{F0EC3}"
     readonly property color  _centerColor: _hasBattery ? _iconColor : Config.batteryIconColor
 
     Process {
