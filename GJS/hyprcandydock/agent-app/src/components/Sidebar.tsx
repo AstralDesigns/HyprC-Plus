@@ -75,6 +75,8 @@ export const Sidebar: React.FC = () => {
   const [projectResults, setProjectResults] = useState<ProjectEntry[] | null>(null);
   // Folder the project tree should scroll to + flash after a search "jump to".
   const [revealPath, setRevealPath] = useState<string | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const sidebarPanelRef = useRef<HTMLDivElement>(null);
   const projectTreeRef = useRef<HTMLDivElement>(null);
   // Last-seen mtime per watched directory, for the explorer auto-refresh poll.
   const dirMtimeRef = useRef<Record<string, number>>({});
@@ -429,6 +431,135 @@ export const Sidebar: React.FC = () => {
     return item.name.toLowerCase().includes(filterSearch.toLowerCase());
   });
 
+  // Flat list of currently visible/navigable entries across Files and Project modes.
+  type NavItem = {
+    id: string;
+    path: string;
+    isDir: boolean;
+    select: () => void;
+  };
+
+  const navigableItems = useMemo<NavItem[]>(() => {
+    if (store.sidebarMode === 'files') {
+      if (filterSearch.trim()) {
+        if (!fileResults || fileResults.length === 0) return [];
+        return fileResults.map(entry => ({
+          id: entry.path,
+          path: entry.path,
+          isDir: entry.isDir,
+          select: () => handleSearchEntryClick(entry),
+        }));
+      }
+      return filteredFiles.map(item => ({
+        id: item.path,
+        path: item.path,
+        isDir: item.type === 'folder',
+        select: () => {
+          if (item.type === 'folder') storeActions.navigateTo(item.path);
+          else storeActions.openFileByPath(item.path);
+        },
+      }));
+    } else {
+      if (projectSearch.trim()) {
+        if (!projectResults || projectResults.length === 0) return [];
+        return projectResults.map(entry => ({
+          id: entry.path,
+          path: entry.path,
+          isDir: entry.isDir,
+          select: () => handleSearchEntryClick(entry),
+        }));
+      }
+      const items: NavItem[] = [];
+      const flattenProject = (entries: ProjectEntry[]) => {
+        for (const entry of entries) {
+          items.push({
+            id: entry.path,
+            path: entry.path,
+            isDir: entry.isDir,
+            select: () => {
+              if (entry.isDir) toggleProjectFolder(entry.path);
+              else storeActions.openFileByPath(entry.path);
+            },
+          });
+          if (entry.isDir && expandedFolders.has(entry.path)) {
+            const kids = folderChildren[entry.path] || [];
+            flattenProject(kids);
+          }
+        }
+      };
+      flattenProject(projectFiles);
+      return items;
+    }
+  }, [
+    store.sidebarMode,
+    filterSearch,
+    fileResults,
+    filteredFiles,
+    projectSearch,
+    projectResults,
+    projectFiles,
+    expandedFolders,
+    folderChildren,
+  ]);
+
+  // Keep selection valid as items change; scroll newly selected items into view.
+  useEffect(() => {
+    if (selectedPath && !navigableItems.some(item => item.id === selectedPath)) {
+      setSelectedPath(null);
+    }
+  }, [navigableItems, selectedPath]);
+
+  useEffect(() => {
+    if (!selectedPath || !sidebarPanelRef.current) return;
+    const el = Array.from(sidebarPanelRef.current.querySelectorAll<HTMLElement>('[data-nav-path]'))
+      .find(node => node.getAttribute('data-nav-path') === selectedPath);
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }, [selectedPath]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      if (filterSearch || projectSearch) {
+        e.preventDefault();
+        setFilterSearch('');
+        setProjectSearch('');
+        setSelectedPath(null);
+      }
+      return;
+    }
+
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Enter') {
+      return;
+    }
+
+    if (navigableItems.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const currIdx = selectedPath ? navigableItems.findIndex(it => it.id === selectedPath) : -1;
+      const nextIdx = currIdx < 0 ? 0 : Math.min(currIdx + 1, navigableItems.length - 1);
+      setSelectedPath(navigableItems[nextIdx].id);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const currIdx = selectedPath ? navigableItems.findIndex(it => it.id === selectedPath) : -1;
+      const isInput = (e.target as HTMLElement)?.tagName === 'INPUT';
+      if (currIdx === 0 && isInput) {
+        setSelectedPath(null);
+      } else {
+        const prevIdx = currIdx < 0 ? 0 : Math.max(currIdx - 1, 0);
+        setSelectedPath(navigableItems[prevIdx].id);
+      }
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const currIdx = selectedPath ? navigableItems.findIndex(it => it.id === selectedPath) : -1;
+      const target = currIdx >= 0 ? navigableItems[currIdx] : navigableItems[0];
+      if (target) {
+        target.select();
+      }
+    }
+  };
+
   const breadcrumbs = storeActions.getBreadcrumbs();
 
   const handlePickProjectFolder = async () => {
@@ -480,11 +611,14 @@ export const Sidebar: React.FC = () => {
     return (
       <React.Fragment key={entry.path}>
         <div
-          className="sidebar-tree-item"
+          className={`sidebar-tree-item ${selectedPath === entry.path ? 'keyboard-selected' : ''}`}
           data-tree-path={entry.path}
+          data-nav-path={entry.path}
           style={{ paddingLeft: `${8 + depth * 12}px` }}
           onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, entry }); }}
           onClick={() => {
+            setSelectedPath(entry.path);
+            sidebarPanelRef.current?.focus({ preventScroll: true });
             if (entry.isDir) toggleProjectFolder(entry.path);
             else storeActions.openFileByPath(entry.path);
           }}
@@ -548,7 +682,12 @@ export const Sidebar: React.FC = () => {
   const projectFolderName = store.projectPath.split('/').filter(Boolean).pop() || 'Project';
 
   return (
-    <div className="sidebar-inner-panel">
+    <div
+      className="sidebar-inner-panel"
+      ref={sidebarPanelRef}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
       {/* Right resize handle */}
       <div className="resize-handle resize-handle-right" onMouseDown={startResize} />
 
@@ -661,8 +800,13 @@ export const Sidebar: React.FC = () => {
                   {fileResults.map(entry => (
                     <div
                       key={entry.path}
-                      className="sidebar-file-row sidebar-search-row"
-                      onClick={() => handleSearchEntryClick(entry)}
+                      data-nav-path={entry.path}
+                      className={`sidebar-file-row sidebar-search-row ${selectedPath === entry.path ? 'keyboard-selected' : ''}`}
+                      onClick={() => {
+                        setSelectedPath(entry.path);
+                        sidebarPanelRef.current?.focus({ preventScroll: true });
+                        handleSearchEntryClick(entry);
+                      }}
                       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, entry }); }}
                       title={entry.path}
                     >
@@ -681,8 +825,11 @@ export const Sidebar: React.FC = () => {
                 return (
                   <div
                     key={item.path}
-                    className="sidebar-file-row"
+                    data-nav-path={item.path}
+                    className={`sidebar-file-row ${selectedPath === item.path ? 'keyboard-selected' : ''}`}
                     onClick={() => {
+                      setSelectedPath(item.path);
+                      sidebarPanelRef.current?.focus({ preventScroll: true });
                       if (item.type === 'folder') {
                         storeActions.navigateTo(item.path);
                       } else {
@@ -758,8 +905,13 @@ export const Sidebar: React.FC = () => {
                   {projectResults.map(entry => (
                     <div
                       key={entry.path}
-                      className="sidebar-file-row sidebar-search-row"
-                      onClick={() => handleSearchEntryClick(entry)}
+                      data-nav-path={entry.path}
+                      className={`sidebar-file-row sidebar-search-row ${selectedPath === entry.path ? 'keyboard-selected' : ''}`}
+                      onClick={() => {
+                        setSelectedPath(entry.path);
+                        sidebarPanelRef.current?.focus({ preventScroll: true });
+                        handleSearchEntryClick(entry);
+                      }}
                       onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setContextMenu({ x: event.clientX, y: event.clientY, entry }); }}
                       title={entry.path}
                     >

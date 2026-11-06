@@ -320,6 +320,8 @@ body,
   height: 100%;
   padding: 0 4px;
   scrollbar-width: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .header-center-tabs::-webkit-scrollbar {
@@ -335,6 +337,8 @@ body,
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid transparent;
+  user-select: none;
+  -webkit-user-select: none;
   /* Inactive+no-hover tab text: keep it at ~0.8 of the primary ink so it stays
      legible on light-mode surfaces. --text-secondary (matugen on_surface_variant)
      washed out against light backgrounds; hover/active still promote to full. */
@@ -437,6 +441,8 @@ body,
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .tab-close-btn {
@@ -1063,6 +1069,10 @@ body,
   overflow: hidden;
 }
 
+.sidebar-inner-panel:focus {
+  outline: none;
+}
+
 .sidebar-mode-header {
   height: 40px;
   min-height: 40px;
@@ -1314,6 +1324,18 @@ body,
 .sidebar-tree-item:hover {
   background: rgba(255, 255, 255, 0.05);
   color: var(--text-primary);
+}
+
+.sidebar-file-row.keyboard-selected,
+.sidebar-tree-item.keyboard-selected {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 18%, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--matugen-primary, #a0c9dc) 45%, transparent);
+}
+
+.sidebar-file-row.keyboard-selected .item-context-btn,
+.sidebar-tree-item.keyboard-selected .item-context-btn {
+  opacity: 1;
 }
 
 /* Brief flash on a folder the user jumped to from a recursive search hit, so

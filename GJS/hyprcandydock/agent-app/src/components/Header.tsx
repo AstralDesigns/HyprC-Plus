@@ -166,12 +166,17 @@ export const Header: React.FC = () => {
         dragging = true;
         suppressClickRef.current = true;
         setDraggedId(start.id);
+        window.getSelection()?.removeAllRanges();
+        document.body.style.userSelect = 'none';
+        (document.body.style as any).webkitUserSelect = 'none';
       }
       const overId = hitTest(e.clientX);
       setDragOverId(overId && overId !== start.id ? overId : null);
     };
 
     const onUp = () => {
+      document.body.style.userSelect = '';
+      (document.body.style as any).webkitUserSelect = '';
       const start = pointerStartRef.current;
       pointerStartRef.current = null;
       if (dragging && start) {
@@ -338,7 +343,7 @@ export const Header: React.FC = () => {
       </div>
 
       {/* Center: Open Pane Tabs */}
-      <div className="header-center-tabs" ref={tabsContainerRef} onWheel={handleWheelTabs}>
+      <div className="header-center-tabs" ref={tabsContainerRef} onWheel={handleWheelTabs} style={{ userSelect: 'none', WebkitUserSelect: 'none' }}>
         {store.panes.map(pane => {
           const isActive = pane.id === store.activePaneId;
           return (
@@ -346,6 +351,7 @@ export const Header: React.FC = () => {
               key={pane.id}
               ref={(el) => { tabRefs.current[pane.id] = el; }}
               className={`header-tab ${isActive ? 'active' : ''} ${dragOverId === pane.id ? 'tab-drag-over' : ''} ${draggedId === pane.id ? 'tab-dragging' : ''}`}
+              style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
               onClick={() => { if (!suppressClickRef.current) storeActions.setActivePane(pane.id); }}
               data-tip={pane.path || pane.name}
               onContextMenu={(e) => {
@@ -362,6 +368,7 @@ export const Header: React.FC = () => {
                 // provide (drag sessions can get stuck with no drop ever
                 // firing). Plain pointer events work the same everywhere.
                 if (e.button !== 0) return;
+                window.getSelection()?.removeAllRanges();
                 pointerStartRef.current = { x: e.clientX, y: e.clientY, id: pane.id };
               }}
             >
