@@ -949,7 +949,7 @@ QtObject {
     property real wsEmptyOpacity
     readonly property color wsActiveColor:     Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, wsActiveOpacity)
     readonly property color wsPersistentColor: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, wsPersistentOpacity)
-    readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc9.r, Theme.cWc9.g, Theme.cWc9.b, wsEmptyOpacity)
+    readonly property color wsEmptyColor:      Qt.rgba(Theme.cWc13.r, Theme.cWc13.g, Theme.cWc13.b, wsEmptyOpacity)
 
     // ── Workspace icon size ───────────────────────────────────────────────
     //  wsGlyphSize controls the font size of workspace button icons.
