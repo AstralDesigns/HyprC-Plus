@@ -302,7 +302,7 @@ hl.window_rule({
 hl.window_rule({
     name = "windowrule-38",
     match = {
-        title = "^(nm-connection-editor)$",
+        class = "^(Nm-connection-editor)$",
     },
     float = true,
 })
@@ -539,7 +539,7 @@ hl.window_rule({
     center = true,
 })
 hl.window_rule({
-    name = "windowrule-72",
+    name = "windowrule-71",
     match = {
         class = "(clock)",
     },
