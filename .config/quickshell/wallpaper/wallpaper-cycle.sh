@@ -92,6 +92,36 @@ TRANSITION_DURATION="$(get_ini_value awww_transition_duration)"
 TRANSITION_FPS="$(get_ini_value awww_transition_fps)"
 AWWW_RESIZE="$(get_ini_value awww_resize)"
 
+# ── Direction ─────────────────────────────────────────────────────────────────
+DIRECTION="${1:---next}"
+
+# ── Bing mode: cycle Bing's recent daily archive instead of the local folder ──
+BING_MARKER="${XDG_CONFIG_HOME:-$HOME/.config}/hyprcandy/bing-enabled"
+BING_DONE=""
+if [[ -e "$BING_MARKER" ]]; then
+  CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/hyprcandy/bing"
+  mkdir -p "$CACHE"
+  IDX_FILE="$CACHE/.cycle-idx"; MAXIDX=14
+  idx=$(cat "$IDX_FILE" 2>/dev/null || echo 0); [[ "$idx" =~ ^[0-9]+$ ]] || idx=0
+  if [[ "$DIRECTION" == "--prev" || "$DIRECTION" == "-p" ]]; then
+    idx=$((idx-1)); (( idx<0 )) && idx=0
+  else
+    idx=$((idx+1)); (( idx>MAXIDX )) && idx=$MAXIDX
+  fi
+  bjson=$(curl -fsSL --max-time 15 "https://www.bing.com/HPImageArchive.aspx?format=js&idx=${idx}&n=1&mkt=en-US") || { echo "bing cycle: fetch failed" >&2; exit 1; }
+  burl=$(printf '%s' "$bjson" | grep -oP '"url"\s*:\s*"\K[^"]+')
+  [[ -z "$burl" ]] && { echo "bing cycle: no image at idx $idx" >&2; exit 1; }
+  btgt="$CACHE/bing-${idx}.jpg"
+  buhd="${burl//_1920x1080.jpg/_UHD.jpg}"
+  curl -fsSL --max-time 30 -o "$btgt" "https://www.bing.com${buhd}" 2>/dev/null || curl -fsSL --max-time 30 -o "$btgt" "https://www.bing.com${burl}"
+  [[ -s "$btgt" ]] || { echo "bing cycle: download failed" >&2; exit 1; }
+  echo "$idx" > "$IDX_FILE"
+  TARGET="$btgt"
+  BING_DONE=1
+  echo "Bing cycle: idx=$idx -> $TARGET"
+fi
+
+if [[ -z "$BING_DONE" ]]; then
 # ── Validate folder ───────────────────────────────────────────────────────────
 if [[ ! -d "$FOLDER" ]]; then
   echo "Error: wallpaper folder not found: $FOLDER"
@@ -154,6 +184,8 @@ fi
 
 echo "Current : $CURRENT"
 echo "Target  : $TARGET"
+
+fi
 
 # ── Ensure awww daemon is running ─────────────────────────────────────────────
 if ! awww query &>/dev/null; then

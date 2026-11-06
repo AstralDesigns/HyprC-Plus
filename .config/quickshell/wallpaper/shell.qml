@@ -33,6 +33,7 @@ ShellRoot {
     property string _m3background:              ""
     property string _m3surfaceContainer:        ""
     property string _m3surfaceContainerHigh:    ""
+    property string _m3surfaceTint:             ""
     property string _m3onSurface:               ""
     property string _m3onSurfaceVariant:        ""
     property string _m3outline:                 ""
@@ -42,6 +43,7 @@ ShellRoot {
 
     // Derived semantic colors
     readonly property color cBg:        Qt.color(_m3background)
+    readonly property color cSurfTint:  Qt.color(_m3surfaceTint)
     readonly property color cSurfHi:    Qt.color(_m3surfaceContainer)
     readonly property color cSurfHiHi:  Qt.color(_m3surfaceContainerHigh)
     readonly property color cOnSurface: Qt.color(_m3onSurface)
@@ -83,6 +85,7 @@ ShellRoot {
                 case "m3surfaceContainer":    root._m3surfaceContainer = val; break
                 case "m3surfaceContainerHigh":root._m3surfaceContainerHigh = val; break
                 case "m3onSurface":           root._m3onSurface = val; break
+                case "m3surfaceTint":         root._m3surfaceTint = val; break
                 case "m3onSurfaceVariant":    root._m3onSurfaceVariant = val; break
                 case "m3outline":             root._m3outline = val; break
                 case "m3outlineVariant":      root._m3outlineVariant = val; break
@@ -390,6 +393,30 @@ ShellRoot {
 
     // ── Wallhaven state & download pipeline ───────────────────────────────────
     property string activeTab: "local" // "local" | "wallhaven"
+    // ── Bing daily wallpaper (state shared with the always-on bar via a marker file) ──
+    readonly property string _home: Quickshell.env("HOME")
+    property bool bingEnabled: false
+    readonly property string _bingMarker: _home + "/.config/hyprcandy/bing-enabled"
+    readonly property string _bingScript: _home + "/.config/quickshell/wallpaper/wallpaper-bing.sh"
+    function toggleBing() {
+        root.bingEnabled = !root.bingEnabled
+        bingCtlProc._cmd = root.bingEnabled
+            ? "mkdir -p \"$(dirname " + JSON.stringify(root._bingMarker) + ")\"; touch " + JSON.stringify(root._bingMarker) + "; setsid bash " + JSON.stringify(root._bingScript) + " --force >/dev/null 2>&1 < /dev/null &"
+            : "rm -f " + JSON.stringify(root._bingMarker)
+        bingCtlProc.running = true
+    }
+    Process {
+        id: bingCtlProc
+        property string _cmd: ""
+        command: ["bash", "-c", _cmd]
+        running: false
+    }
+    Process {
+        id: bingFlagRead
+        command: ["bash", "-c", "test -e " + JSON.stringify(root._bingMarker) + " && echo 1 || echo 0"]
+        stdout: SplitParser { splitMarker: "\n"; onRead: function(l){ const t=l.trim(); if(t==="0"||t==="1") root.bingEnabled=(t==="1") } }
+        Component.onCompleted: running = true
+    }
     property string wallhavenQuery: ""
     property var    wallhavenResults: []
     property bool   wallhavenLoading: false
@@ -1236,6 +1263,42 @@ ShellRoot {
                                         } else {
                                             root.scanDir()
                                         }
+                                    }
+                                }
+                            }
+
+                            // ── Bing daily-wallpaper toggle ──
+                            Rectangle {
+                                width: 34; height: 34
+                                radius: root.rFull
+                                color: root.bingEnabled ? root.cOnSecondary : root.cPrimary
+                                border.width: 1
+                                border.color: root.cPrimary
+                                Behavior on color { ColorAnimation { duration: 130 } }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "\u{F00A4}"
+                                    color: root.bingEnabled ? root.cPrimary : root.cOnSecondary
+                                    font.family: "Symbols Nerd Font Mono"; font.pixelSize: 16
+                                }
+                                MouseArea {
+                                    id: bingHov
+                                    anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.toggleBing()
+                                }
+                                Rectangle {
+                                    visible: bingHov.containsMouse
+                                    anchors.bottom: parent.top; anchors.horizontalCenter: parent.horizontalCenter
+                                    anchors.bottomMargin: 8
+                                    width: bingTipLbl.implicitWidth + 16; height: 22
+                                    radius: 6
+                                    color: root.cOnSecondary
+                                    Text {
+                                        id: bingTipLbl
+                                        anchors.centerIn: parent
+                                        text: root.bingEnabled ? "Bing wallpapers enabled" : "Bing wallpapers disabled"
+                                        color: root.cSurfTint
+                                        font.family: "monospace"; font.pixelSize: 10
                                     }
                                 }
                             }

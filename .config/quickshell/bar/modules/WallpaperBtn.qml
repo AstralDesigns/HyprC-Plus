@@ -26,6 +26,22 @@ Item {
     Process { id: wpPrevProc;   command: [Config.home + "/.config/quickshell/wallpaper/wallpaper-cycle.sh", "--prev"];     running: false }
     Process { id: wpReColorProc; command: [Config.home + "/.config/hyprcandy/hooks/wallpaper_integration.sh"]; running: false }
 
+    // ── Bing daily-wallpaper scheduler ── the bar runs even when hidden, so it
+    //    owns the periodic fetch; the picker only flips the marker file. The
+    //    script is idempotent per day, so a 30-min tick is cheap (one curl).
+    readonly property string _bingMarker: Config.home + "/.config/hyprcandy/bing-enabled"
+    readonly property string _bingScript: Config.home + "/.config/quickshell/wallpaper/wallpaper-bing.sh"
+    Process {
+        id: bingTickProc
+        command: ["bash", "-c",
+            "if [ -e " + JSON.stringify(root._bingMarker) + " ]; then bash " + JSON.stringify(root._bingScript) + "; fi"]
+        running: false
+    }
+    Timer {
+        interval: 30 * 60 * 1000; repeat: true; running: true; triggeredOnStart: true
+        onTriggered: if (!bingTickProc.running) bingTickProc.running = true
+    }
+
     MouseArea {
         id: ma
         anchors.fill: parent
