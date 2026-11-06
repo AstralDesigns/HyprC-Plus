@@ -1362,7 +1362,7 @@ ShellRoot {
 
                                         RowLayout {
                                             Layout.alignment: Qt.AlignVCenter
-                                            spacing: 20
+                                            spacing: 14
 
                                             Repeater {
                                                 model: [
@@ -1373,7 +1373,7 @@ ShellRoot {
                                                 ]
                                                 delegate: RowLayout {
                                                     required property var modelData
-                                                    spacing: 0
+                                                    spacing: 4
 
                                                     Text {
                                                         text: modelData.glyph
@@ -1382,7 +1382,7 @@ ShellRoot {
                                                         font.family: "Symbols Nerd Font Mono"
                                                     }
                                                     ColumnLayout {
-                                                        spacing: 0
+                                                        spacing: 4
                                                         Text {
                                                             text: modelData.label
                                                             color: root.cOnSurfVar
