@@ -110,7 +110,7 @@ function paint(ctx, style, bands, w, h, o) {
             // vertical bars from the floor
             var bw = Math.max(1, step * 0.62)
             for (var i = 0; i < n; i++) {
-                var bh = bands[i] * (h - lw)
+                var bh = o.idle ? Math.max(2, lw) : bands[i] * (h - lw)
                 ctx.fillRect(xs[i] - bw / 2, h - bh, bw, bh)
             }
             break
@@ -121,7 +121,7 @@ function paint(ctx, style, bands, w, h, o) {
             var dy = h / rows
             var r = Math.max(0.8, Math.min(step, dy) * 0.3)
             for (var i = 0; i < n; i++) {
-                var filled = Math.round(bands[i] * rows)
+                var filled = o.idle ? 1 : Math.round(bands[i] * rows)
                 for (var j = 0; j < filled; j++) {
                     var cy = h - (j + 0.5) * dy
                     ctx.beginPath()

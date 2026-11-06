@@ -7,9 +7,9 @@ import ".."
 import "../scripts/cavapaint.js" as CP
 
 // Cava visualizer — one cava child per side.
-// Keeps a light cava proc alive whenever the module is visible so level-0 ASCII
-// and the Transparent Inactive toggle stay cava-driven (not QS-drawn).
-// Framerate drops when audio is idle to limit CPU.
+// When no media is playing the cava proc is stopped (CPU/leak savings); the
+// idle level-0 flatline is then drawn in QML (_sizer.text) instead, and the
+// "Transparent Inactive" toggle + Inactive Opacity govern its look. cava restarts
 Item {
     id: root
     property string side: "left"   // "left" or "right"
@@ -20,7 +20,7 @@ Item {
     readonly property bool _mediaActive: MediaPlayerState.anyPlaying || MediaPlayerState.active
 
     // Run whenever the island is shown — smooth continuous stream.
-    readonly property bool _procShouldRun: Config.showCava && (!root._autoHideActive || root._mediaActive)
+    readonly property bool _procShouldRun: Config.showCava && root._mediaActive
     readonly property int  _cavaFramerate: 60
 
     implicitWidth: {
@@ -59,6 +59,7 @@ Item {
             cavaProc.running = false
             root._text = ""
             root._active = false
+            root._bands = []
         }
     }
 
@@ -73,6 +74,7 @@ Item {
         function onCavaAutoHideChanged() { root._syncCavaProc() }
     }
     Component.onCompleted: root._syncCavaProc()
+    on_ProcShouldRunChanged: if (waveCanvas.visible) waveCanvas.requestPaint()
 
     Process {
         id: cavaProc
@@ -214,7 +216,7 @@ Item {
             width: parent.width
             height: parent.height * Config.cavaGradientSplit
             clip: true
-            text: root._text
+            text: cavaProc.running ? root._text : _sizer.text
             topPadding: Config.cavaStyle === "bars" ? -2 : 0
             color: root._colorTop
             font.family:      Config.fontFamily
@@ -230,7 +232,7 @@ Item {
             width:  parent.width
             height: parent.height * (1.0 - Config.cavaGradientSplit)
             clip:   true
-            text:   root._text
+            text:   cavaProc.running ? root._text : _sizer.text
             topPadding: -(parent.height * Config.cavaGradientSplit) + (Config.cavaStyle === "bars" ? -2 : 0)
             color: Config.cavaGradientEnabled ? root._colorBot : root._colorTop
             font.family:      Config.fontFamily
@@ -298,12 +300,15 @@ Item {
             // the start-colour trails, keeping both modules symmetric about
             // the bar centre.
             const mirrored = root.side === "right"
-            CP.paint(ctx, Config.cavaPaintMap[Config.cavaStyle], root._bands,
+            // Idle (cava stopped): draw a flat baseline from zero-amplitude bands.
+            const bands = root._bands.length ? root._bands : new Array(Config.cavaWidth).fill(0)
+            CP.paint(ctx, Config.cavaPaintMap[Config.cavaStyle], bands,
                      width, height,
                      { c0: root._rgba(mirrored ? root._colorBot : root._colorTop),
                        c1: root._rgba(mirrored ? root._colorTop : root._colorBot),
                        thickness: Config.cavaWaveThickness,
-                       smooth: Config.cavaWaveSmooth })
+                       smooth: Config.cavaWaveSmooth,
+                       idle: root._bands.length === 0 })
         }
     }
 
