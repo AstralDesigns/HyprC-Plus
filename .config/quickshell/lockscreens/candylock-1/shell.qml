@@ -189,6 +189,20 @@ ShellRoot {
         running: false
     }
 
+    // quickshell does not reap its long-running child monitors (playerctl -F,
+    // cava) when the process is killed externally or the window is closed via
+    // the compositor — they orphan to init and accumulate across launches. This
+    // watcher shares the lock's process group (setsid makes qs -p the leader),
+    // outlives the parent just long enough, then kills the whole group — scoped
+    // to THIS instance, so other live previews/bar are untouched.
+    Process {
+        id: monitorReaper
+        running: true
+        command: ["bash", "-c",
+            "while [ -e /proc/" + Quickshell.processId + " ]; do sleep 2; done; " +
+            "kill -TERM -" + Quickshell.processId + " 2>/dev/null"]
+    }
+
     Process {
         id:authProc; stdinEnabled:true
         command:[Quickshell.env("HOME")+"/.config/quickshell/lockscreens/candylock-1/pam_auth"]
@@ -2351,6 +2365,9 @@ ShellRoot {
         width:  Math.round(Math.min(_scr.width * 0.7, 1680))
         height: Math.round(width * _scr.height / _scr.width)
         title: "Candylock preview"
+        // Closing the window (WM / Hyprland killwindow) must quit the process too —
+        // otherwise quickshell keeps running windowless and the qs -p lingers.
+        onClosing: (closeEvent) => { closeEvent.accepted = false; Qt.quit() }
         color: root.cBg
         Item {
             id: lsPreviewFit
