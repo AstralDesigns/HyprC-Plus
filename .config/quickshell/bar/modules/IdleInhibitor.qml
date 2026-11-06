@@ -25,7 +25,7 @@ Item {
     Text {
         id: icon
         anchors.centerIn: parent
-        text: root._active ? "󰅶" : "󰾪"
+        text: root._active ? "󰛊" : "󰾫" // 󰅶" : "󰾪"
         color: root._active ? Config.rightGroupColor : Theme.cOnSurf
         font.family: Config.fontFamily
         font.pixelSize: Config.fontSize
