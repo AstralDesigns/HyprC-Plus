@@ -41,12 +41,16 @@ Item {
         layer.enabled: true
     }
 
-    // Blurred wallpaper slice. The slice stays form-sized (an oversized slice
-    // perturbs the form's layout/centering); instead the blur lives on the
-    // bg-sized wallpaper Image inside it, which carries real pixels past the
-    // form's edges, so the corners blur evenly with no edge falloff.
+    // Blurred wallpaper slice — mirrors the power-pill/dials recipe that blurs
+    // fully: a form-sized Item carries the blur layer (with layer.smooth) and the
+    // bg-sized wallpaper Image overflows inside it, offset to the form's position
+    // in `bg`, so every part of the form samples real wallpaper with no edge falloff.
     Item {
         anchors.fill: parent
+        anchors.margins: -80          // oversize so the form edges sit inside the blurred layer (no falloff)
+        layer.enabled: true
+        layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
+        layer.smooth: true
         Image {
             readonly property point _o: parent.mapToItem(bg || parent, 0, 0)
             x: -_o.x
@@ -57,8 +61,6 @@ Item {
             fillMode: Image.PreserveAspectCrop
             smooth: true
             cache: true
-            layer.enabled: true
-            layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
         }
     }
 

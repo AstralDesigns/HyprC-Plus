@@ -1039,6 +1039,7 @@ ShellRoot {
                         anchors.fill:parent
                         layer.enabled: wallImg.visible
                         layer.effect: MultiEffect { blurEnabled:true; blur:1.0; blurMax:64 }
+                        layer.smooth: true
                         AnimatedImage {
                             x: -centerPanel.x; y: -centerPanel.y
                             width: uiRoot.width; height: uiRoot.height

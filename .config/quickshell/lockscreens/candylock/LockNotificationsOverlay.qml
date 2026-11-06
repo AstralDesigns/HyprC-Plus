@@ -273,11 +273,14 @@ Item {
         }
 
         Item {
+            id: blurBox
             anchors.fill: parent
+            anchors.margins: -80          // oversize so the card edges sit inside the blurred layer
             layer.enabled: frosted.wp !== ""
             layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
+            layer.smooth: true
             AnimatedImage {
-                property point _origin: frosted.mapToItem(frosted.blurRoot, 0, 0)
+                property point _origin: blurBox.mapToItem(frosted.blurRoot, 0, 0)
                 x: -_origin.x
                 y: -_origin.y
                 width: frosted.blurRoot.width
