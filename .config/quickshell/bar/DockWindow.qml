@@ -1690,12 +1690,13 @@ PanelWindow {
         width: iconD + 2 * dock.dockPadding
         height: width
         radius: 999
-        color: Config.islandBgStyle === "gradient" ? "transparent" : Theme.cSurfaceTint
+        color: Config.islandBgStyle === "gradient" ? "transparent"
+               : Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b,
+                         Theme.cSurfaceTint.a * (hover.hovered ? 0.75 : 1.0))
         border.width: Config.borderStartTrash ? Config.islandBorder : 0
         border.color: Qt.rgba(Config.islandBorderColor.r, Config.islandBorderColor.g,
                               Config.islandBorderColor.b, Config.islandBorderAlpha)
-        opacity: hover.hovered ? 0.45 : 1.0
-        Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
+        Behavior on color { ColorAnimation { duration: Config.hoverDuration } }
 
         Rectangle {
             anchors.fill: parent
@@ -1705,6 +1706,8 @@ PanelWindow {
             anchors.margins: badge.border.width
             radius: parent.radius
             visible: Config.islandBgStyle === "gradient"
+                opacity: hover.hovered ? 0.75 : 1.0
+                Behavior on opacity { NumberAnimation { duration: Config.hoverDuration } }
             gradient: Gradient {
                 orientation: dock.isHorizontal ? Gradient.Vertical : Gradient.Horizontal
                 GradientStop { position: 0.0;  color: Theme.cInversePrimary }
