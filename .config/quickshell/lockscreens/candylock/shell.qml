@@ -1214,9 +1214,11 @@ ShellRoot {
                                             }
                                             
                                             Rectangle {
-                                    		    width: 190; height: 1
-                                    		    color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
-                                	    }
+                                                Layout.alignment: Qt.AlignHCenter
+                                                Layout.preferredWidth: 170
+                                                height: 1
+                                                color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
+                                            }
 
                                             // PIN ENTRY
                                             Item {

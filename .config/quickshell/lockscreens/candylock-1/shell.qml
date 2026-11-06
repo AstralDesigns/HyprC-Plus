@@ -225,6 +225,14 @@ ShellRoot {
     // Seconds tick drives the clock coverflow indicator (front slot = current second).
     Timer { interval:1000; repeat:true; running:true; onTriggered: root.clockSec = new Date().getSeconds() }
 
+    // quickshell auto-reloads on file save (Quickshell.watchFiles defaults true) and
+    // shows a built-in "reloaded" popup. Keep live reload but silence that popup.
+    Connections {
+        target: Quickshell
+        function onReloadCompleted() { Quickshell.inhibitReloadPopup() }
+        function onReloadFailed(errorString: string) { Quickshell.inhibitReloadPopup() }
+    }
+
     // ── Weather ───────────────────────────────────────────────────────────────
     // Logic mirrors WeatherPopupState exactly:
     //   • same _pinnedLocFile (~/.config/hyprcandy/weather-location.conf)
@@ -464,6 +472,7 @@ ShellRoot {
     // the last-known reading on frame 0 (while the transition overlay is still up),
     // before the live open-meteo fetch lands and refreshes it.
     Component.onCompleted: {
+        if (root._preview) Quickshell.watchFiles = false   // preview = UI-only: no live-reload respawn
         wxCacheProc.running = true
         wxUnitProc.running  = true
     }
@@ -984,6 +993,7 @@ ShellRoot {
 
                 LockNotificationsOverlay {
                     id: lockNotif
+                    previewMode: root._preview
                     anchors.fill: parent
                     wallpaperPath: root.wallpaperPath
                     cOnSecondary: root.cOnSecondary
@@ -1016,9 +1026,9 @@ ShellRoot {
                     id:centerPanel
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.verticalCenter:   parent.verticalCenter
-                    anchors.verticalCenterOffset: -58
-                    width:520
-                    height:panelCol.implicitHeight+52
+                    anchors.verticalCenterOffset: -44
+                    width: panelCol.implicitWidth
+                    height:panelCol.implicitHeight+34
 
                     layer.enabled: true
                     layer.effect: MultiEffect {
@@ -1056,31 +1066,31 @@ ShellRoot {
 
                     ColumnLayout {
                         id:panelCol
-                        anchors { left:parent.left; right:parent.right; top:parent.top; margins:24 }
+                        anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; margins:24 }
                         spacing:10
 
                         // ══════ MAIN GRID: (clock + dials) | (info + weather/media) ══
                         RowLayout {
-                            Layout.fillWidth:true; spacing:14; Layout.bottomMargin:4
+                            Layout.alignment: Qt.AlignHCenter; spacing:14; Layout.bottomMargin:4
 
 
 
                             // ── RIGHT COLUMN: info + weather/media ──────────────
                             ColumnLayout {
                                 id:rightCol
-                                Layout.fillWidth:true; spacing:10
+                                Layout.alignment: Qt.AlignHCenter; spacing:10
 
                                 // ── TOP ROW: Unified Card (Clock | User & PIN | Date) ──
                                     Item {
                                         Layout.alignment: Qt.AlignHCenter
-                                        width: userTopCard.width + 20
-                                        height: userTopCard.height + 20
+                                        Layout.preferredWidth: userTopCard.width + 20
+                                        Layout.preferredHeight: userTopCard.height + 20
                                         GlassForm { anchors.fill: parent; radius: 30; wallpaper: root.wallpaperPath; tintColor: root.cInvPrimary; bg: uiRoot }
                                         Rectangle {
                                             id: userTopCard
                                             anchors.centerIn: parent
                                             width: userTopRow.implicitWidth + 28
-                                            height: userTopRow.implicitHeight
+                                            height: userTopRow.implicitHeight + 28
                                             radius: 20
                                             color: root.cCardWarm
                                             border.width: 1
@@ -1091,8 +1101,8 @@ ShellRoot {
                                         anchors.fill: parent
                                         anchors.leftMargin: 14
                                         anchors.rightMargin: 14
-                                        anchors.topMargin: 10
-                                        anchors.bottomMargin: 12
+                                        anchors.topMargin: 14
+                                        anchors.bottomMargin: 14
                                         spacing: 6
                                         // ── LEFT: Clock (greeter-style: horizontal, vertical seconds) ──
                                         RowLayout {
@@ -1162,7 +1172,7 @@ ShellRoot {
                                             Layout.alignment: Qt.AlignHCenter
                                             Layout.preferredWidth: 150
                                             height: 1
-                                            color: Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b, 0.42)
+                                            color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
                                         }
                                         // ── CENTER: User icon + PIN Entry ─────────────────
                                         ColumnLayout {
@@ -1208,9 +1218,11 @@ ShellRoot {
                                             }
                                             
                                             Rectangle {
-                                    		    width: 190; height: 1
-                                    		    color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
-                                	    }
+                                                Layout.alignment: Qt.AlignHCenter
+                                                Layout.preferredWidth: 150
+                                                height: 1
+                                                color: Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.16)
+                                            }
 
                                             // PIN ENTRY
                                             Item {
@@ -1227,7 +1239,7 @@ ShellRoot {
                                                 }
                                                 RowLayout {
                                                     anchors.centerIn: parent; spacing: 6
-                                                    visible: root.pinEntry.length === 0 && !root.authChecking
+                                                    visible: root.pinEntry.length === 0 && !root.authChecking && !root.authFailed
                                                     Text { text: "󰀄"; font.family: "Symbols Nerd Font Mono"; font.pixelSize: 13; color: root.cWc3 }
                                                     Text { text: Quickshell.env("USER"); font.family: "C059"; font.pixelSize: 13; font.italic: true; color: root.cPrimary; opacity: 1.00 }
                                                 }
@@ -1264,15 +1276,15 @@ ShellRoot {
                                                         onClicked: root.pinVisible = !root.pinVisible
                                                     }
                                                 }
+                                                // wrong-password hint — shown inside the field so the card height never bumps
+                                                Text {
+                                                    anchors.centerIn: parent
+                                                    visible: root.authFailed
+                                                    text: "Wrong password"
+                                                    color: root.cErr; font.pixelSize: 11; font.italic: true
+                                                }
                                             }
 
-                                            Text {
-                                                Layout.alignment: Qt.AlignHCenter
-                                                text: root.authFailed ? "Wrong password" : ""
-                                                color: root.cErr; font.pixelSize: 11; font.italic: true
-                                                opacity: root.authFailed ? 1 : 0
-                                                Behavior on opacity { NumberAnimation { duration: 200 } }
-                                            }
                                         }
                                     }
                                         }
@@ -1280,13 +1292,15 @@ ShellRoot {
 
                             ColumnLayout {
                                 id: rightBottomCol
-                                Layout.fillWidth: true
+                                Layout.alignment: Qt.AlignHCenter
                                 spacing: 10
 
                                 // ── WEATHER CARD — horizontal current conditions ──
                                     Item {
-                                        Layout.fillWidth: true
-                                        height: weatherContentRow.implicitHeight + 48
+                                        id: weatherForm
+                                        Layout.alignment: Qt.AlignHCenter
+                                        Layout.preferredWidth: weatherContentRow.implicitWidth + 48
+                                        Layout.preferredHeight: weatherContentRow.implicitHeight + 48
                                         GlassForm { anchors.fill: parent; radius: 30; wallpaper: root.wallpaperPath; tintColor: root.cInvPrimary; bg: uiRoot }
                                         Rectangle {
                                             id: weatherCard
@@ -1299,18 +1313,13 @@ ShellRoot {
 
                                     RowLayout {
                                         id: weatherContentRow
-                                        anchors.left: parent.left
-                                        anchors.right: parent.right
-                                        anchors.top: parent.top
-                                        anchors.bottom: parent.bottom
-                                        anchors.margins: 14
-                                        spacing: 10
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 6
 
                                         ColumnLayout {
-                                            Layout.preferredWidth: 76
-                                            Layout.maximumWidth: 76
                                             Layout.alignment: Qt.AlignVCenter
-                                            spacing: 2
+                                            spacing: 4
 
                                             // icon + temp side-by-side, condition below -> shorter card
                                             RowLayout {
@@ -1332,7 +1341,6 @@ ShellRoot {
                                                 }
                                             }
                                             Text {
-                                                Layout.fillWidth: true
                                                 text: root.weatherCondStr
                                                 color: root.cOnSurfVar
                                                 font.pixelSize: 9
@@ -1353,9 +1361,8 @@ ShellRoot {
                                         }
 
                                         RowLayout {
-                                            Layout.fillWidth: true
                                             Layout.alignment: Qt.AlignVCenter
-                                            spacing: 6
+                                            spacing: 20
 
                                             Repeater {
                                                 model: [
@@ -1366,8 +1373,7 @@ ShellRoot {
                                                 ]
                                                 delegate: RowLayout {
                                                     required property var modelData
-                                                    spacing: 3
-                                                    Layout.fillWidth: true
+                                                    spacing: 0
 
                                                     Text {
                                                         text: modelData.glyph
@@ -1377,14 +1383,12 @@ ShellRoot {
                                                     }
                                                     ColumnLayout {
                                                         spacing: 0
-                                                        Layout.fillWidth: true
                                                         Text {
                                                             text: modelData.label
                                                             color: root.cOnSurfVar
                                                             font.pixelSize: 9
                                                             font.family: "monospace"
                                                             elide: Text.ElideRight
-                                                            Layout.fillWidth: true
                                                         }
                                                         Text {
                                                             text: modelData.val
@@ -1393,7 +1397,6 @@ ShellRoot {
                                                             font.weight: Font.Medium
                                                             font.family: "monospace"
                                                             elide: Text.ElideRight
-                                                            Layout.fillWidth: true
                                                         }
                                                     }
                                                 }
@@ -1405,9 +1408,10 @@ ShellRoot {
 
                             // ── MEDIA CARD — compact horizontal layout ────────────
                             Item {
+                                id: mediaForm
                                 Layout.alignment: Qt.AlignHCenter
-                                width: mediaCard.width + 20
-                                height: mediaCard.height + 20
+                                Layout.preferredWidth: mediaCard.width + 20
+                                Layout.preferredHeight: mediaCard.height + 20
                                 GlassForm { anchors.fill: parent; radius: 30; wallpaper: root.wallpaperPath; tintColor: root.cInvPrimary; bg: uiRoot }
                                 Item {
                                     id: mediaCard
@@ -2171,7 +2175,7 @@ ShellRoot {
                     id: powerRow
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top:             centerPanel.bottom
-                    anchors.topMargin:       16
+                    anchors.topMargin:       8
                     width:  pwrRowInner.implicitWidth  + 32
                     height: pwrRowInner.implicitHeight + 20
 

@@ -41,18 +41,14 @@ Item {
         layer.enabled: true
     }
 
-    // Blurred wallpaper slice, positioned so it lines up with what is behind this
-    // item on screen (scene coordinates via mapToItem(null, …)).
+    // Blurred wallpaper slice. The slice stays form-sized (an oversized slice
+    // perturbs the form's layout/centering); instead the blur lives on the
+    // bg-sized wallpaper Image inside it, which carries real pixels past the
+    // form's edges, so the corners blur evenly with no edge falloff.
     Item {
         anchors.fill: parent
-        layer.enabled: true
-        layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
         Image {
-            // Align the blurred slice to the wallpaper that fills `bg` (uiRoot),
-            // exactly like the powerpill/centerPanel slices (x: -powerRow.x, w:
-            // uiRoot.width). The earlier scene-space mapToItem(null) left the far
-            // side of the form uncovered, which read as transparent instead of blurred.
-            readonly property point _o: glass.mapToItem(bg || glass, 0, 0)
+            readonly property point _o: parent.mapToItem(bg || parent, 0, 0)
             x: -_o.x
             y: -_o.y
             width:  bg ? bg.width  : glass._screen.width
@@ -61,6 +57,8 @@ Item {
             fillMode: Image.PreserveAspectCrop
             smooth: true
             cache: true
+            layer.enabled: true
+            layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
         }
     }
 

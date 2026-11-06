@@ -9,6 +9,7 @@ import Quickshell.Io
 // Notifications toasts + history inside WlSessionLockSurface (frosted wallpaper blur).
 Item {
     id: overlay
+    property bool previewMode: false   // true in CANDYLOCK_PREVIEW: don't take over the notification server
 
     property color cSourceColor
     property color cPrimary
@@ -217,7 +218,7 @@ Item {
                 try { overlay._handleEvent(JSON.parse(l)) } catch (e) {}
             }
         }
-        Component.onCompleted: notifHandoffProc.running = true
+        Component.onCompleted: if (!overlay.previewMode) notifHandoffProc.running = true
         onRunningChanged: if (!running) notifDaemonRestart.restart()
     }
     Timer {

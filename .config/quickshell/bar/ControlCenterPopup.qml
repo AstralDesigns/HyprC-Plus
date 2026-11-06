@@ -1294,7 +1294,7 @@ PanelWindow {
                     // ── Nav buttons ───────────────────────────────────────
                     Repeater {
                         model: [
-                            { icon: "", label: "Desktop",   idx: 1 },
+                            { icon: "", label: "Desktop",    idx: 1 },
                             { icon: "󰇜", label: "Bar",        idx: 0 },
                             { icon: "󰔎", label: "Themes",     idx: 2 },
                             { icon: "󰍹", label: "Display",    idx: 3 },
@@ -1821,7 +1821,7 @@ PanelWindow {
                                                  Config.launcherBorderWidth = Math.round(v)
                                             }
                                          }
-                                         CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
+                                         CCSlider { label:"Border 󰀫";  from:0;to:1;stepSize:0.01;decimals:2; value:Config.barBorderAlpha;    onMoved:function(v){Config.barBorderAlpha=v} }
                                          CCSlider {
                                              label: "Island B-W"
                                              from: 0; to: 8
@@ -1831,8 +1831,8 @@ PanelWindow {
                                              }
                                          }
                                          CCSlider {
-                                             label: "Island B-α"
-                                             from: 0; to: 1; stepSize: 0.05; decimals: 2
+                                             label: "Island B-󰀫"
+                                             from: 0; to: 1; stepSize: 0.01; decimals: 2
                                              value: Config.islandBorderAlpha
                                              onMoved: function(v) {
                                                  Config.islandBorderAlpha = v
@@ -7691,24 +7691,9 @@ PanelWindow {
                                     color: Theme.cOnSurf
                                     font.family: Config.labelFont; font.pixelSize: 15; font.weight: Font.DemiBold
                                 }
-                                Rectangle {
-                                    enabled: lockscreenTabRoot.currentTheme !== ""
-                                    opacity: enabled ? 1.0 : 0.4
-                                    height: 24; radius: 7
-                                    implicitWidth: _lsHdrPrevLbl.implicitWidth + 16
-                                    color: _lsHdrPrevHov.containsMouse
-                                        ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.20)
-                                        : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.30)
-                                    Text { id: _lsHdrPrevLbl; anchors.centerIn: parent; text: "\u{F06E} Preview"; color: Theme.cOnSurf; font.family: Config.labelFont; font.pixelSize: 11 }
-                                    MouseArea {
-                                        id: _lsHdrPrevHov
-                                        anchors.fill: parent; hoverEnabled: true
-                                        enabled: lockscreenTabRoot.currentTheme !== ""
-                                        cursorShape: Qt.PointingHandCursor
-                                        onClicked: lockscreenTabRoot.preview(lockscreenTabRoot.currentTheme)
-                                    }
+                                CCPillBtn {
+                                    text: "\u{F0208} Preview"
+                                    onClicked: lockscreenTabRoot.preview(lockscreenTabRoot.currentTheme)
                                 }
                             }
                             Text {
