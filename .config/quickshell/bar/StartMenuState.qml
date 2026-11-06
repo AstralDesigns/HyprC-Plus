@@ -53,6 +53,7 @@ Item {
         _autoScanGate.open()
         if (!netSavedProc.running) netSavedProc.running = true
         if (!netRescanProc.running) netRescanProc.running = true
+        if (!netEthProc.running) netEthProc.running = true
     }
 
     // ── BT status state ─────────────────────────────────────────────────
@@ -256,6 +257,9 @@ Item {
     // don't destroy either the open row or the partially-typed password.
     property string netPasswordSSID: ""
     property string netPasswordText: ""
+    // Identity (username) typed for 802-1X enterprise networks; lives in State
+    // so it survives networkList refreshes just like netPasswordText.
+    property string netIdentityText: ""
 
     // Status proc — picks up wifi first, falls back to ethernet if no wifi iface found
     Process { id: netStatusProc
@@ -278,6 +282,15 @@ Item {
         }}
         onExited: {
             if (!netRadioProc.running) netRadioProc.running = true
+            // NOTE: wired link speed is refreshed by netEthProc (which knows the
+            // active wired device independently of this wifi-first status probe),
+            // so it is not touched here.
+            // Refresh captive-portal state (NM caches it, so this is cheap).
+            if (sm.networkStatus === "connected") {
+                if (!portalCheckProc.running) portalCheckProc.running = true
+            } else {
+                sm.netPortalDetected = false
+            }
             if (sm.networkExpanded && sm.netPasswordSSID === "" && !sm._forgetInFlight && !netScanProc.running
                     && _autoScanGate.elapsed)
                 netScanProc.running = true
@@ -294,6 +307,9 @@ Item {
     property string netRxRateStr: "0 B/s"
     property string netTxRateStr: "0 B/s"
     property var    _prevNetTraffic: null
+    // Negotiated wired link capacity (Mb/s → formatted), distinct from the live
+    // rx/tx throughput above. Read from /sys/class/net/<dev>/speed when ethernet is up.
+    property string netLinkSpeedStr: ""
 
     function _fmtRate(bps) {
         if (bps < 1024)    return Math.round(bps) + " B/s"
@@ -328,6 +344,34 @@ Item {
         interval: 1500; repeat: true; running: sm.menuVisible
         onTriggered: if (!netRateProc.running) netRateProc.running = true
     }
+
+    // Reads the active wired NIC's negotiated speed (Mb/s) and formats it.
+    Process { id: netLinkSpeedProc; property string _cmd:""
+        command:["bash","-c",netLinkSpeedProc._cmd]
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
+            const mbps = parseInt(l) || 0
+            sm.netLinkSpeedStr = mbps <= 0 ? ""
+                : (mbps >= 1000 ? (mbps/1000).toFixed(mbps % 1000 ? 1 : 0) + " Gb/s" : mbps + " Mb/s")
+        }}
+    }
+
+    // ── Captive-portal detection ────────────────────────────────────────
+    // nmcli never emits the portal URL, but NetworkManager's connectivity
+    // check reports "portal" when the gateway intercepts HTTP. On that state
+    // the delegate surfaces an "Open login page" button that launches the
+    // browser at a known non-HTTPS probe (neverssl.com), which the gateway
+    // redirects to its real login page.
+    property bool netPortalDetected: false
+    Process { id: portalCheckProc
+        command:["bash","-c","nmcli -t -f CONNECTIVITY general status 2>/dev/null"]
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
+            sm.netPortalDetected = /portal/i.test(l)
+        }}
+    }
+    Process { id: portalLaunchProc
+        command:["bash","-c","xdg-open http://neverssl.com/ >/dev/null 2>&1; true"]
+    }
+    function openPortalPage() { if (!portalLaunchProc.running) portalLaunchProc.running = true }
 
     // Auto-scan gate — allows at most one background nmcli wifi list call per
     // 30 seconds.  Resets whenever the network panel is first expanded or when
@@ -426,6 +470,8 @@ Item {
         onTriggered: { if (!hotspotResumeProc.running) hotspotResumeProc.running = true } }
 
     property var _netBuf: []
+    property var _ethBuf: []         // cached wired (802-3-ethernet) profiles
+    property string _activeEthDev: "" // NIC the active wired profile is up on (for link-speed read)
     property var _savedNets: []
     property bool _forgetPending: false
     // True while a forget delete+saved-rebuild cycle is in flight.
@@ -467,45 +513,122 @@ Item {
         }
     }
     Process { id: netScanProc
-        command:["bash","-c","nmcli --escape no -t -f IN-USE,SECURITY,SIGNAL,SSID dev wifi list 2>/dev/null | head -25"]
+        command:["bash","-c","nmcli --escape no -t -f IN-USE,SECURITY,SIGNAL,FREQ,SSID dev wifi list 2>/dev/null | head -25"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
-            const c1=l.indexOf(":"), c2=l.indexOf(":",c1+1), c3=l.indexOf(":",c2+1)
-            if(c3<0) return
+            // SSID is placed last so its (possibly colon-bearing, nmcli-escaped)
+            // value is simply "everything after the 4th delimiter".
+            const c1=l.indexOf(":"), c2=l.indexOf(":",c1+1), c3=l.indexOf(":",c2+1), c4=l.indexOf(":",c3+1)
+            if(c4<0) return
             const inuse=l.substring(0,c1)
             const sec=l.substring(c1+1,c2)
             const sig=l.substring(c2+1,c3)
-            const ssid=l.substring(c3+1)
+            const freq=l.substring(c3+1,c4)
+            const ssid=l.substring(c4+1).replace(/\\:/g,":")
+            const mhz=parseInt(freq)||0
+            // Band derived purely from channel frequency: <3GHz=2.4G, <5925MHz=5G, else 6G (Wi-Fi 6E).
+            const band = mhz>0 ? (mhz<3000 ? "2.4G" : (mhz<5925 ? "5G" : "6G")) : ""
             const saved = sm._savedNets.indexOf(ssid) >= 0
-            if(ssid) sm._netBuf.push({active:inuse==="*",secure:sec!=="",signal:parseInt(sig)||0,ssid:ssid,saved:saved})
+            if(ssid) sm._netBuf.push({active:inuse==="*",secure:sec!=="",signal:parseInt(sig)||0,ssid:ssid,saved:saved,band:band,enterprise:/802-1X/i.test(sec)})
         }}
+
         onRunningChanged: {
             sm.netScanProcRunning = running
-            if(running) { sm._netBuf=[] } else {
-                if (sm.netPasswordSSID === "") {
-                    let list = sm._netBuf.slice()
-                    // If Ethernet is active, ensure it is represented at the top of the list
-                    if (sm.netIsEthernet && sm.networkStatus === "connected") {
-                        const ethName = sm.networkSSID || "Ethernet"
-                        list.unshift({ active: true, secure: false, signal: 100, ssid: ethName, saved: true, isEthernet: true })
-                    }
-                    // Sort so the active/connected network is always placed first at the top
-                    list.sort(function(a, b) {
-                        return (b.active ? 1 : 0) - (a.active ? 1 : 0)
-                    })
-                    sm.networkList = list
-                }
+            if(running) { sm._netBuf=[]; if (!netEthProc.running) netEthProc.running = true } else {
+                rebuildNetworkList()
                 // Start the 30-second cooldown so the next STATUS→scan cycle
                 // won't re-run nmcli wifi list until the gate reopens.
                 _autoScanGate.reset()
             }
         }
     }
+    // netEthProc — enumerate saved/available wired profiles so they appear in
+    // the same list as the Wi-Fi APs. `con show` prints NAME:TYPE:DEVICE; the
+    // DEVICE column is populated only for the profile that is currently up, so
+    // that one is marked active. connectNetwork's `nmcli connection up` path
+    // already activates these by name, so no extra plumbing is needed there.
+    Process { id: netEthProc
+        command:["bash","-c","nmcli --escape no -t -f NAME,TYPE,DEVICE con show 2>/dev/null"]
+        property string token: ":802-3-ethernet:"
+        stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
+            const idxT = l.indexOf(netEthProc.token)
+            if (idxT < 0) return
+            const name = l.substring(0, idxT).replace(/\\:/g, ":")
+            const dev = l.substring(idxT + netEthProc.token.length)
+            if (name) {
+                if (dev !== "") sm._activeEthDev = dev   // profile currently up on this NIC
+                sm._ethBuf.push({active:dev!=="", secure:false, signal:100, ssid:name, saved:true, isEthernet:true})
+            }
+        }}
+        onRunningChanged: {
+            if (running) { sm._ethBuf = []; sm._activeEthDev = "" }
+            else {
+                // Read the active wired NIC's link speed here (not from the wifi-first
+                // status proc), so it works even when Wi-Fi is also connected.
+                if (sm._activeEthDev !== "") {
+                    netLinkSpeedProc._cmd = "cat /sys/class/net/" + sm._activeEthDev + "/speed 2>/dev/null"
+                    netLinkSpeedProc.running = true
+                } else {
+                    sm.netLinkSpeedStr = ""
+                }
+                rebuildNetworkList()
+            }
+        }
+    }
+    // Merge the Wi-Fi scan (_netBuf) + wired profiles (_ethBuf) into networkList,
+    // de-duplicating by name, always keeping the connected one at the top. Called
+    // by both scan processes so the list updates whenever either finishes.
+    function rebuildNetworkList() {
+        if (sm.netPasswordSSID !== "") return
+        // Merge same-SSID Wi-Fi BSSes (e.g. one network broadcasting on 2.4G + 5G)
+        // into a single row whose band badge reads "2.4G/5G". Signal is the best
+        // across bands; active/secure/saved/enterprise are OR'd.
+        const rank = { "2.4G": 0, "5G": 1, "6G": 2 }
+        const merged = []
+        for (const w of sm._netBuf) {
+            let m = null
+            for (const x of merged) { if (x.ssid === w.ssid) { m = x; break } }
+            if (m) {
+                if (w.band && m.bands.indexOf(w.band) < 0) m.bands.push(w.band)
+                m.active = m.active || w.active
+                m.secure = m.secure || w.secure
+                m.saved  = m.saved  || w.saved
+                m.enterprise = m.enterprise || w.enterprise
+                if (w.signal > m.signal) m.signal = w.signal
+            } else {
+                merged.push({ active:w.active, secure:w.secure, signal:w.signal, ssid:w.ssid,
+                              saved:w.saved, enterprise:w.enterprise, bands: w.band ? [w.band] : [] })
+            }
+        }
+        let list = []
+        for (const m of merged) {
+            m.bands.sort(function(a, b) { return (rank[a] !== undefined ? rank[a] : 9) - (rank[b] !== undefined ? rank[b] : 9) })
+            m.band = m.bands.join("/")   // kept for any single-string consumers
+            list.push(m)                 // m.bands array drives the per-band pills
+        }
+        // Append wired profiles (de-duped against Wi-Fi names).
+        let ethActiveSeen = false
+        for (const e of sm._ethBuf) {
+            if (e.active) ethActiveSeen = true
+            if (!list.some(x => x.ssid === e.ssid)) list.push(e)
+        }
+        // Fallback: wired link is up but its profile wasn't captured above — still
+        // represent it so the header/list never loses the active ethernet row.
+        if (!ethActiveSeen && sm.netIsEthernet && sm.networkStatus === "connected") {
+            const ethName = sm.networkSSID || "Ethernet"
+            if (!list.some(x => x.ssid === ethName))
+                list.unshift({ active:true, secure:false, signal:100, ssid:ethName, saved:true, isEthernet:true })
+        }
+        list.sort(function(a, b) { return (b.active ? 1 : 0) - (a.active ? 1 : 0) })
+        sm.networkList = list
+    }
+
     Process { id: netConnProc; property string _cmd:""; property string _lastSSID:"";
         command:["bash","-c",netConnProc._cmd]
         onExited: function(code) {
             sm.netConnecting_=false
             sm.netPasswordSSID = ""
             sm.netPasswordText = ""
+            sm.netIdentityText = ""
             if (code === 0) {
                 sm.netConnectedSSID = netConnProc._lastSSID
                 netConnFeedbackTimer.restart()
@@ -542,11 +665,19 @@ Item {
             }
         }
     }
-    function connectNetwork(ssid, password){
+    function connectNetwork(ssid, password, identity){
         const esc=ssid.replace(/'/g,"'\\''")
-        netConnProc._cmd = password
-            ? "nmcli device wifi connect '"+esc+"' password '"+password.replace(/'/g,"'\\''")+"'"
-            : "nmcli connection up '"+esc+"' 2>/dev/null || nmcli device wifi connect '"+esc+"'"
+        const escPw=(password||"").replace(/'/g,"'\\''")
+        if (identity && identity !== "") {
+            // 802-1X PEAP/MSCHAPv2 (username + password) — the common campus/enterprise setup.
+            netConnProc._cmd = "nmcli device wifi connect '"+esc+"' 802-1x.eap peap " +
+                "802-1x.phase2-auth mschapv2 802-1x.identity '"+identity.replace(/'/g,"'\\''")+"' " +
+                "802-1x.password '"+escPw+"'"
+        } else if (password) {
+            netConnProc._cmd = "nmcli device wifi connect '"+esc+"' password '"+escPw+"'"
+        } else {
+            netConnProc._cmd = "nmcli connection up '"+esc+"' 2>/dev/null || nmcli device wifi connect '"+esc+"'"
+        }
         sm.netConnecting_=true; sm.netConnectTarget=ssid; netConnProc._lastSSID=ssid
         if (sm.hotspotOn) {
             // Drop the AP now; netConnProc is started by hotspotOffForSwitchProc

@@ -11,10 +11,12 @@ PanelWindow {
     WlrLayershell.layer:         WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
-    anchors.left:   false
-    anchors.right:  false
-    anchors.top:    false
-    anchors.bottom: false
+    // Fullscreen transparent surface (TrashDialog style): the surface spans the
+    // whole monitor so the z:-1 backdrop MouseArea below catches a click anywhere
+    // outside the centered card. ExclusionMode.Ignore keeps it from reserving space.
+    anchors { top: true; bottom: true; left: true; right: true }
+    exclusionMode: ExclusionMode.Ignore
+    exclusiveZone: 0
 
     // ── Deferred-destroy animation pattern ──────────────────────────────
     property bool _stateVisible: RecorderPopupState.visible
@@ -23,8 +25,8 @@ PanelWindow {
     on_StateVisibleChanged: { if (!_stateVisible) _recExitDelay.restart() }
     color:   "transparent"
 
-    implicitWidth:  card.width
-    implicitHeight: card.height
+    implicitWidth:  (screen ? screen.width  : 1920)
+    implicitHeight: (screen ? screen.height : 1080)
 
     // ── Click-outside dismissal ───────────────────────────────────────────────
     MouseArea {

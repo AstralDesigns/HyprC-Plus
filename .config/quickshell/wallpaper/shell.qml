@@ -1297,7 +1297,7 @@ ShellRoot {
                                         id: bingTipLbl
                                         anchors.centerIn: parent
                                         text: root.bingEnabled ? "Bing wallpapers enabled" : "Bing wallpapers disabled"
-                                        color: root.cSurfTint
+                                        color: root.cPrimary
                                         font.family: "monospace"; font.pixelSize: 10
                                     }
                                 }

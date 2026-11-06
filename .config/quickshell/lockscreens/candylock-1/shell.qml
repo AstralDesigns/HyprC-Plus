@@ -2190,8 +2190,8 @@ ShellRoot {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.top:             centerPanel.bottom
                     anchors.topMargin:       8
-                    width:  pwrRowInner.implicitWidth  + 32
-                    height: pwrRowInner.implicitHeight + 20
+                    width:  pwrRowInner.implicitWidth  + 16
+                    height: pwrRowInner.implicitHeight + 12
 
                     // Frosted pill backdrop
                     // Pill mask for clipping blur + tint

@@ -35,11 +35,20 @@ hotspot_status() {
 }
 
 do_on() {
-    local upl ssid phych hsfreq hwmodeset pw psk ssid_raw phyinfo phyname hsctry hsdrv
-    upl=$(nmcli -t -f DEVICE,STATE dev | awk -F: '$2=="connected" && $1!="lo"{print $1;exit}')
-    [ -z "$upl" ] && { echo "no connected interface to share" >&2; exit 1; }
+    local upl wifidev ssid phych hsfreq hwmodeset pw psk ssid_raw phyinfo phyname hsctry hsdrv
+    # Wi-Fi client iface = the radio we broadcast the AP on. Its band/channel is
+    # mirrored so the hotspot follows whichever network the user is connected to
+    # (never a hardcoded 2.4G). A connected Wi-Fi is required to have a channel.
+    wifidev=$(nmcli -t -f DEVICE,TYPE,STATE dev | awk -F: '$2=="wifi" && $3=="connected"{print $1; exit}')
+    [ -z "$wifidev" ] && { echo "connect to a Wi-Fi network first — the hotspot mirrors its band/channel" >&2; exit 1; }
 
-    phyinfo=$(iw dev "$upl" info)
+    # Uplink to NAT through: prefer a connected wired iface (it wins routing by
+    # metric, so clients egress the wire and the radio isn't double-used); else
+    # share the same Wi-Fi link (single-radio AP+STA, the original behaviour).
+    upl=$(nmcli -t -f DEVICE,TYPE,STATE dev | awk -F: '$2=="ethernet" && $3=="connected"{print $1; exit}')
+    [ -z "$upl" ] && upl="$wifidev"
+
+    phyinfo=$(iw dev "$wifidev" info)
     ssid_raw=$(printf '%s\n' "$phyinfo" | awk '/ssid/{print $2; exit}')
     [ -z "$ssid_raw" ] && ssid_raw="HyprCandy"
     phych=$(printf '%s\n' "$phyinfo" | awk '/channel/{print $2; exit}')
@@ -55,7 +64,7 @@ do_on() {
     if ! iw phy "$phyname" info 2>/dev/null \
           | awk '/Supported interface modes:/{f=1;next} f&&/Band/{f=0} f' \
           | grep -qE '^[[:space:]]*\*[[:space:]]*AP[[:space:]]*$'; then
-        hsdrv=$(basename "$(readlink -f "/sys/class/net/$upl/device/driver" 2>/dev/null)" 2>/dev/null)
+        hsdrv=$(basename "$(readlink -f "/sys/class/net/$wifidev/device/driver" 2>/dev/null)" 2>/dev/null)
         echo "This Wi-Fi card (driver: ${hsdrv:-unknown}) has no AP/hotspot mode — it can only be a client. To tether on Wi-Fi use a USB adapter (Intel/Atheros/MediaTek) or the open b43/brcmsmac driver." >&2
         exit 1
     fi

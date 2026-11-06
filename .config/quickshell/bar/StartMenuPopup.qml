@@ -628,6 +628,16 @@ PanelWindow {
                                     hoverEnabled: true
                                     cursorShape: netDelegate.modelData.active
                                         ? Qt.ArrowCursor : Qt.PointingHandCursor
+                                    // Wired rows: surface the negotiated link speed in a
+                                    // floating tooltip (standard OnSecondary bg / cPrimary text, r10)
+                                    // since the SSID label truncates an inline value.
+                                    onEntered: {
+                                        if (netDelegate.modelData.isEthernet && netDelegate.modelData.active
+                                                && StartMenuState.netLinkSpeedStr !== "")
+                                            BarTipState.show("Wired link speed: " + StartMenuState.netLinkSpeedStr,
+                                                netRow, 0, 10)
+                                    }
+                                    onExited: BarTipState.hide(netRow)
                                     onClicked: function(mouse) {
                                         if (netDelegate.modelData.active) return
                                         if (StartMenuState.netConnecting_ &&
@@ -666,6 +676,43 @@ PanelWindow {
                                         elide: Text.ElideRight
                                         Behavior on color { ColorAnimation { duration: 150 } }
                                     }
+                                    // Band pills (Wi-Fi only) — one per band the SSID is seen on,
+                                    // so a dual-band network reads as two badges (2.4G + 5G).
+                                    Repeater {
+                                        model: netDelegate.modelData.isEthernet ? [] : (netDelegate.modelData.bands || [])
+                                        Rectangle {
+                                            required property string modelData
+                                            Layout.alignment: Qt.AlignVCenter
+                                            height: 14; radius: 4
+                                            implicitWidth: bandLbl.implicitWidth + 8
+                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                                            border.width: 1
+                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.35)
+                                            Text {
+                                                id: bandLbl; anchors.centerIn: parent
+                                                text: modelData
+                                                font.pixelSize: 8; font.family: Config.labelFont; color: Theme.cPrimary
+                                            }
+                                        }
+                                    }
+                                    // Enterprise (802-1X) badge
+                                    Rectangle {
+                                        visible: !!netDelegate.modelData.enterprise
+                                        Layout.alignment: Qt.AlignVCenter
+                                        height: 14; radius: 4
+                                        implicitWidth: entLbl.implicitWidth + 8
+                                        color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.12)
+                                        border.width: 1
+                                        border.color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.30)
+                                        Text {
+                                            id: entLbl; anchors.centerIn: parent
+                                            text: "802.1X"
+                                            font.pixelSize: 8; font.family: Config.labelFont; color: Theme.cOnSurfVar
+                                        }
+                                    }
+                                    // Wired link speed is surfaced via a hover tooltip on the
+                                    // row (see rowHover.onEntered) — the SSID often truncates
+                                    // the inline label, so it lives in the floating tip instead.
                                     // Lock icon (secured + not active)
                                     Text {
                                         text: "󰒃"; font.pixelSize: 10; font.family: Config.fontFamily
@@ -706,6 +753,33 @@ PanelWindow {
                                             spacing: 3
                                             Text { text: "󰁝"; color: Theme.cPrimary; font.pixelSize: 7; font.family: Config.fontFamily; anchors.verticalCenter: parent.verticalCenter }
                                             Text { text: StartMenuState.netTxRateStr; color: Theme.cOnSurfVar; font.pixelSize: 7; font.family: Config.labelFont; anchors.verticalCenter: parent.verticalCenter }
+                                        }
+                                    }
+                                    // Open captive-portal login page (active + portal detected)
+                                    Rectangle {
+                                        visible: netDelegate.modelData.active && StartMenuState.netPortalDetected
+                                        Layout.alignment: Qt.AlignVCenter
+                                        height: 20; radius: 5
+                                        implicitWidth: visible ? plLbl.implicitWidth + 14 : 0
+                                        color: plMA.containsMouse
+                                            ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                            : "transparent"
+                                        border.width: 1
+                                        border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b,
+                                                              plMA.containsMouse ? 0.55 : 0.28)
+                                        Behavior on color        { ColorAnimation { duration: 100 } }
+                                        Behavior on border.color { ColorAnimation { duration: 100 } }
+                                        Text {
+                                            id: plLbl; anchors.centerIn: parent
+                                            text: "󰖡 Login"; font.pixelSize: 9
+                                            font.family: Config.labelFont
+                                            color: plMA.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar
+                                            Behavior on color { ColorAnimation { duration: 100 } }
+                                        }
+                                        MouseArea {
+                                            id: plMA; anchors.fill: parent; hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: StartMenuState.openPortalPage()
                                         }
                                     }
                                     // Disconnect — active network only
@@ -769,48 +843,83 @@ PanelWindow {
                                 }
                             }
 
-                            // ── Password entry (unsaved secure networks) ─────────────
-                            Row {
+                            // ── Credential entry (secure / enterprise networks) ────────
+                            Column {
                                 visible: netDelegate._showPass; width: parent.width; spacing: 4
-                                Rectangle {
-                                    width: parent.width - 34 - 4; height: 30; radius: 8
-                                    color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.7)
-                                    border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.5)
-                                    RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 4
-                                        TextInput {
-                                            id: pwIn; Layout.fillWidth: true
-                                            echoMode: StartMenuState.netPasswordVisible ? TextInput.Normal : TextInput.Password
-                                            color: Theme.cOnSurf; font.pixelSize: 11
-                                            // Bind to State so typed text survives networkList refreshes.
-                                            text: StartMenuState.netPasswordText
-                                            onTextChanged: StartMenuState.netPasswordText = text
-                                            onAccepted: {
-                                                StartMenuState.connectNetwork(netDelegate.modelData.ssid, text)
-                                                StartMenuState.netPasswordSSID = ""
+
+                                // Identity (username) row — shown only for 802-1X enterprise APs
+                                Row {
+                                    visible: !!netDelegate.modelData.enterprise
+                                    width: parent.width; spacing: 4
+                                    Rectangle {
+                                        width: parent.width - 34 - 4; height: 30; radius: 8
+                                        color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.7)
+                                        border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.5)
+                                        RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 4
+                                            Text { text: "󰀄"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cOnSurfVar; Layout.alignment: Qt.AlignVCenter }
+                                            TextInput {
+                                                id: idIn; Layout.fillWidth: true
+                                                color: Theme.cOnSurf; font.pixelSize: 11
+                                                text: StartMenuState.netIdentityText
+                                                onTextChanged: StartMenuState.netIdentityText = text
+                                            }
+                                            Text {
+                                                text: "Username / Identity"
+                                                color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.5)
+                                                font.pixelSize: 11; font.italic: true
+                                                Layout.alignment: Qt.AlignVCenter
+                                                visible: idIn.text === "" && !idIn.activeFocus
                                             }
                                         }
-                                        Text {
-                                            text: pwIn.text === "" ? "Password" : ""
-                                            color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.5)
-                                            font.pixelSize: 11; font.italic: true
-                                            Layout.alignment: Qt.AlignVCenter
-                                            visible: pwIn.text === "" && !pwIn.activeFocus
-                                        }
-                                        Text {
-                                            text: StartMenuState.netPasswordVisible ? "󰈉" : "󰈈"
-                                            font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cOnSurfVar
-                                            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                                                onClicked: StartMenuState.netPasswordVisible = !StartMenuState.netPasswordVisible }
+                                    }
+                                    Rectangle { width: 34; height: 30; color: "transparent" }
+                                }
+
+                                // Password row (all secure networks)
+                                Row {
+                                    width: parent.width; spacing: 4
+                                    Rectangle {
+                                        width: parent.width - 34 - 4; height: 30; radius: 8
+                                        color: Qt.rgba(Theme.cSurfHi.r, Theme.cSurfHi.g, Theme.cSurfHi.b, 0.7)
+                                        border.width: 1; border.color: Qt.rgba(Theme.cOutVar.r, Theme.cOutVar.g, Theme.cOutVar.b, 0.5)
+                                        RowLayout { anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8; spacing: 4
+                                            TextInput {
+                                                id: pwIn; Layout.fillWidth: true
+                                                echoMode: StartMenuState.netPasswordVisible ? TextInput.Normal : TextInput.Password
+                                                color: Theme.cOnSurf; font.pixelSize: 11
+                                                // Bind to State so typed text survives networkList refreshes.
+                                                text: StartMenuState.netPasswordText
+                                                onTextChanged: StartMenuState.netPasswordText = text
+                                                onAccepted: {
+                                                    StartMenuState.connectNetwork(netDelegate.modelData.ssid, text,
+                                                        netDelegate.modelData.enterprise ? StartMenuState.netIdentityText : "")
+                                                    StartMenuState.netPasswordSSID = ""
+                                                }
+                                            }
+                                            Text {
+                                                text: pwIn.text === "" ? "Password" : ""
+                                                color: Qt.rgba(Theme.cOnSurfVar.r, Theme.cOnSurfVar.g, Theme.cOnSurfVar.b, 0.5)
+                                                font.pixelSize: 11; font.italic: true
+                                                Layout.alignment: Qt.AlignVCenter
+                                                visible: pwIn.text === "" && !pwIn.activeFocus
+                                            }
+                                            Text {
+                                                text: StartMenuState.netPasswordVisible ? "󰈉" : "󰈈"
+                                                font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cOnSurfVar
+                                                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                    onClicked: StartMenuState.netPasswordVisible = !StartMenuState.netPasswordVisible }
+                                            }
                                         }
                                     }
-                                }
-                                Rectangle {
-                                    width: 30; height: 30; radius: 8; color: Theme.cPrimary
-                                    Text { anchors.centerIn: parent; text: "󰌑"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cOnPrim }
-                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: {
-                                        StartMenuState.connectNetwork(netDelegate.modelData.ssid, StartMenuState.netPasswordText)
-                                        StartMenuState.netPasswordSSID = ""
-                                    }}
+                                    Rectangle {
+                                        width: 30; height: 30; radius: 8; color: Theme.cPrimary
+                                        Text { anchors.centerIn: parent; text: "󰌑"; font.pixelSize: 12; font.family: Config.fontFamily; color: Theme.cOnPrim }
+                                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: {
+                                            StartMenuState.connectNetwork(netDelegate.modelData.ssid, StartMenuState.netPasswordText,
+                                                netDelegate.modelData.enterprise ? StartMenuState.netIdentityText : "")
+                                            StartMenuState.netPasswordSSID = ""
+                                        }}
+                                    }
                                 }
                             }
                         }
