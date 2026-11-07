@@ -80,7 +80,7 @@ else
 fi
 
 echo "== 2/2: agent-app frontend (React UI) =="
-if [[ ! -d node_modules ]]; then
+if [[ ! -d node_modules || ! -d node_modules/@xterm/xterm ]]; then
   npm ci --include=dev --no-audit --no-fund --loglevel=error || npm install --include=dev --no-audit --no-fund
 fi
 ./node_modules/.bin/tsc --noEmit

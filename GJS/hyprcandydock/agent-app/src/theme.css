@@ -4189,3 +4189,124 @@ body,
   position: relative;
   top: -1px;
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Terminal Panel (TerminalPanel.tsx — embedded xterm.js PTY)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.terminal-panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--matugen-background, #0d1117) 96%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--matugen-primary, #a9c5cf) 20%, transparent);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  transition: height 0s; /* height set by JS drag — no CSS transition */
+  min-height: 80px;
+}
+
+.terminal-panel.terminal-hidden {
+  display: none !important;
+}
+
+/* Drag resize handle */
+.terminal-resize-handle {
+  height: 5px;
+  flex-shrink: 0;
+  cursor: ns-resize;
+  background: transparent;
+  transition: background var(--transition-fast);
+  position: relative;
+}
+.terminal-resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--matugen-primary, #a9c5cf) 30%, transparent);
+  transition: background var(--transition-fast);
+}
+.terminal-resize-handle:hover::after {
+  background: color-mix(in srgb, var(--matugen-primary, #a9c5cf) 60%, transparent);
+}
+
+/* Header bar */
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0 8px;
+  background: color-mix(in srgb, var(--matugen-surface, #161b22) 90%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--matugen-primary, #a9c5cf) 12%, transparent);
+  user-select: none;
+}
+
+.terminal-header-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #8b949e);
+  flex: 1;
+  text-transform: uppercase;
+}
+
+.terminal-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.terminal-header-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--text-secondary, #8b949e);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  padding: 0;
+}
+.terminal-header-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary, #e4eef3);
+}
+.terminal-header-btn-close:hover {
+  background: color-mix(in srgb, var(--wallust-color1, #f28b82) 20%, transparent);
+  color: var(--wallust-color1, #f28b82);
+}
+
+/* xterm mount container — fills remaining height */
+.terminal-xterm-container {
+  flex: 1;
+  overflow: hidden;
+  padding: 4px 6px;
+  /* xterm.js injects its own canvas; don't clip it */
+  position: relative;
+}
+
+/* Override xterm.js viewport so it fills the container */
+.terminal-xterm-container .xterm {
+  height: 100%;
+}
+.terminal-xterm-container .xterm-viewport {
+  overflow-y: auto !important;
+}
+.terminal-xterm-container .xterm-screen canvas {
+  display: block;
+}

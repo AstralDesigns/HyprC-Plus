@@ -586,6 +586,10 @@ export const Canvas: React.FC = () => {
             <span className="shortcut-label">Toggle Agent Chat</span>
             <kbd className="shortcut-key">Ctrl + 2</kbd>
           </div>
+          <div className="canvas-shortcut-row">
+            <span className="shortcut-label">Toggle Terminal</span>
+            <kbd className="shortcut-key">Ctrl + 3</kbd>
+          </div>
         </div>
 
         <div className="canvas-empty-actions">

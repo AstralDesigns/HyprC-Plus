@@ -506,6 +506,40 @@ class AgentBridge {
       return false;
     }
   }
+
+  /* ── PTY / embedded terminal ─────────────────────────────────────────── */
+
+  /**
+   * Spawn a new PTY shell session. Returns the opaque sessionId used by all
+   * subsequent pty_* actions and the SSE stream URL.
+   */
+  public ptySpawn(opts?: { cwd?: string; cols?: number; rows?: number }): Promise<{ sessionId: string }> {
+    return this.postToHost('pty_spawn', opts || {}, 10000);
+  }
+
+  /** Send keystrokes / data to the PTY master. */
+  public ptyWrite(sessionId: string, data: string): Promise<{ ok: boolean }> {
+    return this.postToHost('pty_write', { sessionId, data }, 5000);
+  }
+
+  /** Notify the shell of a terminal resize. */
+  public ptyResize(sessionId: string, cols: number, rows: number): Promise<{ ok: boolean }> {
+    return this.postToHost('pty_resize', { sessionId, cols, rows }, 5000);
+  }
+
+  /** Kill the PTY session. */
+  public ptyKill(sessionId: string): Promise<{ ok: boolean }> {
+    return this.postToHost('pty_kill', { sessionId }, 5000);
+  }
+
+  /**
+   * Build the SSE stream URL for a PTY session. The bridge token is embedded
+   * as a query parameter (the SSE GET cannot carry custom headers).
+   */
+  public getPtyStreamUrl(sessionId: string): string {
+    const token = (window as any).__HC_BRIDGE_TOKEN || '';
+    return `/pty/stream?id=${encodeURIComponent(sessionId)}&token=${encodeURIComponent(token)}`;
+  }
 } // end class AgentBridge
 
 export const bridge = new AgentBridge();

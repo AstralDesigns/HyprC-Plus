@@ -46,8 +46,15 @@ import mimetypes
 import datetime as _dt
 import urllib.request
 import urllib.error
+import pty
+import termios
+import fcntl
+import struct
+import signal
+import select
+import base64
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import unquote, quote, urlparse
+from urllib.parse import unquote, quote, urlparse, parse_qs
 
 
 def _shq(s):
@@ -82,6 +89,10 @@ _ALLOWED_ORIGINS = {
 _RUNTIME_U = urlparse(RUNTIME_URL)
 _RUNTIME_HOSTS = {"127.0.0.1", "localhost", "::1", _RUNTIME_U.hostname}
 _RUNTIME_PORT = _RUNTIME_U.port or 17900
+
+# ── PTY session store ──────────────────────────────────────────────────────
+_pty_sessions = {}
+_pty_lock = threading.Lock()
 
 DEFAULT_PROJECT_ROOT = os.path.join(
     HOME, ".hyprcandy", "GJS", "hyprcandydock")
@@ -384,6 +395,110 @@ def handle_exec_command(id_, payload):
             "exitCode": p.returncode, "stdout": p.stdout or "", "stderr": p.stderr or ""}}
     except Exception as err:  # noqa: BLE001
         return {"id": id_, "type": "response", "error": str(err)}
+
+
+# ── Interactive PTY sessions (embedded terminal) ───────────────────────────
+def handle_pty_spawn(id_, payload):
+    cols = max(10, int(payload.get("cols") or 80))
+    rows = max(4, int(payload.get("rows") or 24))
+    cwd = payload.get("cwd") or HOME
+    if not os.path.isdir(cwd):
+        cwd = HOME
+    try:
+        master, slave = pty.openpty()
+        winsize = struct.pack("HHHH", rows, cols, 0, 0)
+        fcntl.ioctl(slave, termios.TIOCSWINSZ, winsize)
+        fcntl.ioctl(master, termios.TIOCSWINSZ, winsize)
+
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.close(master)
+                os.setsid()
+                fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+                os.dup2(slave, 0)
+                os.dup2(slave, 1)
+                os.dup2(slave, 2)
+                if slave > 2:
+                    os.close(slave)
+                os.chdir(cwd)
+                env = dict(os.environ)
+                env["TERM"] = "xterm-256color"
+                env["COLORTERM"] = "truecolor"
+                shell = os.environ.get("SHELL") or "/bin/bash"
+                os.execve(shell, [shell], env)
+            except Exception:
+                os._exit(1)
+        else:
+            os.close(slave)
+            os.set_blocking(master, False)
+            session_id = secrets.token_hex(16)
+            with _pty_lock:
+                _pty_sessions[session_id] = {
+                    "master": master,
+                    "pid": pid,
+                    "created": time.time(),
+                }
+            return {"id": id_, "type": "response", "payload": {"sessionId": session_id}}
+    except Exception as err:
+        return {"id": id_, "type": "response", "error": str(err)}
+
+
+def handle_pty_write(id_, payload):
+    session_id = payload.get("sessionId")
+    data = payload.get("data") or ""
+    with _pty_lock:
+        sess = _pty_sessions.get(session_id)
+    if not sess:
+        return {"id": id_, "type": "response", "error": "PTY session not found"}
+    try:
+        raw = data.encode("utf-8") if isinstance(data, str) else bytes(data)
+        os.write(sess["master"], raw)
+        return {"id": id_, "type": "response", "payload": {"ok": True}}
+    except Exception as err:
+        return {"id": id_, "type": "response", "error": str(err)}
+
+
+def handle_pty_resize(id_, payload):
+    session_id = payload.get("sessionId")
+    cols = max(10, int(payload.get("cols") or 80))
+    rows = max(4, int(payload.get("rows") or 24))
+    with _pty_lock:
+        sess = _pty_sessions.get(session_id)
+    if not sess:
+        return {"id": id_, "type": "response", "error": "PTY session not found"}
+    try:
+        winsize = struct.pack("HHHH", rows, cols, 0, 0)
+        fcntl.ioctl(sess["master"], termios.TIOCSWINSZ, winsize)
+        try:
+            os.kill(sess["pid"], signal.SIGWINCH)
+        except ProcessLookupError:
+            pass
+        return {"id": id_, "type": "response", "payload": {"ok": True}}
+    except Exception as err:
+        return {"id": id_, "type": "response", "error": str(err)}
+
+
+def handle_pty_kill(id_, payload):
+    session_id = payload.get("sessionId")
+    with _pty_lock:
+        sess = _pty_sessions.pop(session_id, None)
+    if sess:
+        try:
+            os.close(sess["master"])
+        except Exception:
+            pass
+        try:
+            os.kill(sess["pid"], signal.SIGTERM)
+            time.sleep(0.05)
+            os.kill(sess["pid"], signal.SIGKILL)
+        except (ProcessLookupError, PermissionError):
+            pass
+        try:
+            os.waitpid(sess["pid"], os.WNOHANG)
+        except Exception:
+            pass
+    return {"id": id_, "type": "response", "payload": {"ok": True}}
 
 
 def handle_fetch_url(id_, payload):
@@ -691,6 +806,10 @@ ACTIONS = {
     "open_external_url": handle_open_external,
     "store_persist": handle_store_persist,
     "theme": handle_theme,
+    "pty_spawn": handle_pty_spawn,
+    "pty_write": handle_pty_write,
+    "pty_resize": handle_pty_resize,
+    "pty_kill": handle_pty_kill,
 }
 
 
@@ -846,9 +965,110 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._send_file(fp, head_only, "no-cache")
 
+    def _pty_stream(self):
+        """SSE endpoint: GET /pty/stream?id=<sessionId>&token=<BRIDGE_TOKEN>
+        Streams PTY stdout as base64-encoded SSE data events until the session
+        exits or the client disconnects."""
+        if not self._host_origin_ok():
+            self.close_connection = True
+            self._respond(403, "text/plain", b"forbidden")
+            return
+        qs = parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+        token = (qs.get("token") or [""])[0]
+        if token != BRIDGE_TOKEN:
+            self.close_connection = True
+            self._respond(403, "text/plain", b"forbidden")
+            return
+        session_id = (qs.get("id") or [""])[0]
+        with _pty_lock:
+            sess = _pty_sessions.get(session_id)
+        if not sess:
+            self._respond(404, "text/plain", b"session not found")
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("X-Accel-Buffering", "no")
+        self._isolation_headers()
+        self.end_headers()
+        try:
+            self.wfile.flush()
+        except Exception:
+            pass
+
+        master = sess["master"]
+        last_ping = time.time()
+        try:
+            while True:
+                with _pty_lock:
+                    alive = session_id in _pty_sessions
+                if not alive:
+                    break
+                try:
+                    r, _, _ = select.select([master], [], [], 0.1)
+                except (ValueError, OSError):
+                    break
+                if r:
+                    try:
+                        chunk = os.read(master, 4096)
+                    except (BlockingIOError, InterruptedError):
+                        continue
+                    except OSError:
+                        break
+                    if not chunk:
+                        break
+                    b64 = base64.b64encode(chunk).decode("ascii")
+                    msg = ("data: %s\n\n" % b64).encode("utf-8")
+                    try:
+                        self.wfile.write(msg)
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        break
+
+                now = time.time()
+                if now - last_ping > 15:
+                    last_ping = now
+                    try:
+                        self.wfile.write(b": ping\n\n")
+                        self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        break
+
+                # Check if child exited
+                try:
+                    r2 = os.waitpid(sess["pid"], os.WNOHANG)
+                    if r2[0] != 0:
+                        # Child done; drain remaining output then stop
+                        try:
+                            remaining = os.read(master, 65536)
+                            if remaining:
+                                b64 = base64.b64encode(remaining).decode("ascii")
+                                self.wfile.write(("data: %s\n\n" % b64).encode("utf-8"))
+                                self.wfile.flush()
+                        except OSError:
+                            pass
+                        break
+                except (ChildProcessError, OSError):
+                    break
+        except Exception:  # noqa: BLE001
+            pass
+        # Send a close event
+        try:
+            self.wfile.write(b"event: close\ndata: {}\n\n")
+            self.wfile.flush()
+        except Exception:  # noqa: BLE001
+            pass
+        # Reap session
+        with _pty_lock:
+            _pty_sessions.pop(session_id, None)
+
     def _dispatch(self, head_only):
         if self.path.startswith("/_media_file/"):
             self._media(self.path, head_only)
+        elif self.path.startswith("/pty/stream"):
+            self._pty_stream()
         else:
             self._static(self.path, head_only)
 

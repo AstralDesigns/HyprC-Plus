@@ -232,6 +232,8 @@ export interface AppState {
   sidebarWidth: number;
   chatVisible: boolean;
   chatWidth: number;
+  terminalVisible: boolean;
+  terminalHeight: number;
   modelManagerOpen: boolean;
   /** Which sub-tab the model manager popup shows. Transient UI state (not
    *  persisted); the chat gate flips this to 'agents' when opening the popup
@@ -394,6 +396,8 @@ function loadInitialState(): AppState {
     sidebarWidth: 260,
     chatVisible: true,
     chatWidth: 380,
+    terminalVisible: false,
+    terminalHeight: 240,
     modelManagerOpen: false,
     modelManagerTab: 'completions' as const,
     profileOpen: false,
@@ -471,6 +475,7 @@ function persistedSnapshot() {
     sidebarWidth: next.sidebarWidth,
     chatVisible: next.chatVisible,
     chatWidth: next.chatWidth,
+    terminalHeight: next.terminalHeight,
     sidebarMode: next.sidebarMode,
     contextMode: next.contextMode,
     customModels: next.customModels,
@@ -555,6 +560,8 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     contextMode: 'minimal',
     sidebarWidth: typeof parsed.sidebarWidth === 'number' ? parsed.sidebarWidth : 260,
     chatWidth: typeof parsed.chatWidth === 'number' ? parsed.chatWidth : 380,
+    terminalVisible: false, // always start hidden
+    terminalHeight: typeof parsed.terminalHeight === 'number' ? parsed.terminalHeight : 240,
     customModels: Array.isArray(parsed.customModels)
       ? parsed.customModels.filter((model: ModelInfo) => model?.id)
       : [],
@@ -748,6 +755,8 @@ export const storeActions = {
   // Floating panel toggles
   toggleSidebar: () => setStore(prev => ({ sidebarVisible: !prev.sidebarVisible })),
   toggleChat: () => setStore(prev => ({ chatVisible: !prev.chatVisible })),
+  toggleTerminal: () => setStore(prev => ({ terminalVisible: !prev.terminalVisible })),
+  setTerminalHeight: (h: number) => setStore({ terminalHeight: Math.max(80, Math.min(h, 700)) }),
   // Open a directory through the native folder picker and load it as the project.
   openFolderDialog: async () => {
     try {

@@ -24,6 +24,7 @@ import {
   Pin,
   ArrowRight,
   PenLine,
+  TerminalSquare,
 } from 'lucide-react';
 import { useStore, setStore, storeActions, PRESET_MODELS, FilePane } from '../store';
 import { fileStatusClass, fileStatusLetter } from '../utils/gitStatus';
@@ -531,6 +532,15 @@ export const Header: React.FC = () => {
           data-tip="Agent memories"
         >
           <BookOpen size={15} />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => storeActions.toggleTerminal()}
+          className={`header-icon-btn ${store.terminalVisible ? 'active' : ''}`}
+          data-tip="Toggle terminal (Ctrl+3)"
+        >
+          <TerminalSquare size={15} />
         </button>
 
         <button

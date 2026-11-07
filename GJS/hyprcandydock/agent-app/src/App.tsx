@@ -8,6 +8,7 @@ import { ChatPanel } from './components/ChatPanel';
 import { ModelManager } from './components/ModelManager';
 import { ProfileModal } from './components/ProfileModal';
 import { MemoryPanel } from './components/MemoryPanel';
+import { TerminalPanel } from './components/TerminalPanel';
 import { agentEngine } from './engine/agent-engine';
 
 interface ErrorBoundaryProps { children: ReactNode; }
@@ -195,6 +196,11 @@ export const App: React.FC = () => {
         ev.preventDefault();
         storeActions.toggleChat();
       }
+      // Ctrl+3 toggles the embedded terminal panel.
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === '3') {
+        ev.preventDefault();
+        storeActions.toggleTerminal();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
 
@@ -379,6 +385,8 @@ export const App: React.FC = () => {
           >
             <ChatPanel />
           </aside>
+
+          <TerminalPanel />
         </div>
 
         <ModelManager />
