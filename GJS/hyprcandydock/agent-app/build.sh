@@ -80,9 +80,51 @@ else
 fi
 
 echo "== 2/2: agent-app frontend (React UI) =="
-if [[ ! -d node_modules || ! -d node_modules/@xterm/xterm ]]; then
+if [[ ! -d node_modules || ! -d node_modules/@xterm/addon-image ]]; then
   npm ci --include=dev --no-audit --no-fund --loglevel=error || npm install --include=dev --no-audit --no-fund
 fi
+
+# Ensure @xterm/addon-image supports IIP inline images without explicit size= (fastfetch compatibility)
+python3 -c "
+for path in ['node_modules/@xterm/addon-image/lib/addon-image.mjs', 'node_modules/@xterm/addon-image/lib/addon-image.js']:
+    try:
+        with open(path, 'r') as f: c = f.read()
+        target = '!this._header.inline||!this._header.size||this._header.size>this._opts.iipSizeLimit'
+        repl = 'this._header.size=this._header.size||this._opts.iipSizeLimit,!this._header.inline||this._header.size>this._opts.iipSizeLimit'
+        if target in c:
+            with open(path, 'w') as f: f.write(c.replace(target, repl, 1))
+            print('[build.sh] Patched ' + path + ' for IIP image size support')
+    except Exception:
+        pass
+"
+
+# Install smart fastfetch wrapper to ~/.local/bin/fastfetch if missing or outdated
+mkdir -p "$HOME/.local/bin"
+cat << 'EOF' > "$HOME/.local/bin/fastfetch"
+#!/usr/bin/env bash
+# HyprCandy fastfetch smart graphics wrapper
+has_logo_flag=0
+for arg in "$@"; do
+    case "$arg" in
+        --logo-type*|--kitty*|--iterm*|--sixel*|--chafa*|--file*|--raw*|-l|--logo)
+            has_logo_flag=1
+            break
+            ;;
+    esac
+done
+
+if [ "$has_logo_flag" -eq 0 ]; then
+    if [ -n "$HYPRCANDY_WORKSPACE_TERM" ]; then
+        exec /usr/bin/fastfetch --logo-type iterm "$@"
+    elif [ -n "$KITTY_WINDOW_ID" ] || [ -n "$KITTY_PID" ] || [[ "${TERM:-}" == *"kitty"* ]]; then
+        exec /usr/bin/fastfetch --logo-type kitty "$@"
+    fi
+fi
+
+exec /usr/bin/fastfetch "$@"
+EOF
+chmod +x "$HOME/.local/bin/fastfetch"
+
 ./node_modules/.bin/tsc --noEmit
 ./node_modules/.bin/vite build
 

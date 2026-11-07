@@ -425,6 +425,8 @@ def handle_pty_spawn(id_, payload):
                 env = dict(os.environ)
                 env["TERM"] = "xterm-256color"
                 env["COLORTERM"] = "truecolor"
+                env["TERM_PROGRAM"] = "HyprCandy-Workspace"
+                env["HYPRCANDY_WORKSPACE_TERM"] = "1"
                 shell = os.environ.get("SHELL") or "/bin/bash"
                 os.execve(shell, [shell], env)
             except Exception:
