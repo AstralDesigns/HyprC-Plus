@@ -2321,7 +2321,7 @@ PanelWindow {
                                         }
 
                                         CCSection { text: "Sizing" }
-                                        CCSlider { label:"Glyph Size"; from:8;to:24; value:Config.wsGlyphSize; onMoved:function(v){Config.wsGlyphSize=v} }
+                                        CCSlider { label:"Glyph Size"; from:8;to:24;stepSize:2; value:Config.wsGlyphSize; onMoved:function(v){Config.wsGlyphSize=v} }
 
                                         CCSection { text: "Spacing (0 = true zero)" }
                                         CCSlider { label:"WS Spacing";   from:0;to:20; value:Config.wsSpacing;   onMoved:function(v){Config.wsSpacing=v} }
