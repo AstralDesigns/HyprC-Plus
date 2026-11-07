@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-image": "^0.9.0",
+    "@xterm/xterm": "^6.0.0",
     "luaparse": "^0.3.1",
     "lucide-react": "^0.447.0",
     "monaco-editor": "^0.55.1",
