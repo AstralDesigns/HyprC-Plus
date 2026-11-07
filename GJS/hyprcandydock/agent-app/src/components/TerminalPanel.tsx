@@ -19,6 +19,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { ImageAddon } from '@xterm/addon-image';
 import '@xterm/xterm/css/xterm.css';
 import { X, RotateCcw, Trash2, TerminalSquare } from 'lucide-react';
 import { useStore, storeActions } from '../store';
@@ -90,6 +91,16 @@ export const TerminalPanel: React.FC = () => {
       });
       const fit = new FitAddon();
       term.loadAddon(fit);
+
+      const imageAddon = new ImageAddon({
+        sixelSupport: true,
+        sixelScrolling: true,
+        iipSupport: true,
+        enableSizeReports: true,
+        storageLimit: 128,
+        showPlaceholder: true,
+      });
+      term.loadAddon(imageAddon);
 
       if (containerRef.current) {
         containerRef.current.innerHTML = '';
