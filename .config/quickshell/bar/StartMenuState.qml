@@ -393,7 +393,16 @@ Item {
     Process { id: netRadioProc
         command:["bash","-c","nmcli radio wifi 2>/dev/null"]
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
-            sm.netRadioEnabled = l.trim() === "enabled"
+            const en = l.trim() === "enabled"
+            if (sm.netRadioEnabled !== en) {
+                sm.netRadioEnabled = en
+                if (!en) {
+                    sm._netBuf = []
+                    rebuildNetworkList()
+                } else {
+                    sm.startNetScan()
+                }
+            }
         }}
     }
     Process { id: netRadioSetProc; property string _cmd:""
@@ -470,9 +479,12 @@ Item {
         onTriggered: { if (!hotspotResumeProc.running) hotspotResumeProc.running = true } }
 
     property var _netBuf: []
+    property var _netIncomingBuf: []
     property var _ethBuf: []         // cached wired (802-3-ethernet) profiles
+    property var _ethIncomingBuf: []
     property string _activeEthDev: "" // NIC the active wired profile is up on (for link-speed read)
     property var _savedNets: []
+    property var _savedNetsIncoming: []
     property bool _forgetPending: false
     // True while a forget delete+saved-rebuild cycle is in flight.
     // Any code path that wants to start netScanProc must check this first;
@@ -485,12 +497,13 @@ Item {
     Process { id: netSavedProc
         command: ["bash", "-c", "nmcli --escape no -t -f NAME con show 2>/dev/null"]
         stdout: SplitParser { splitMarker: "\n"; onRead: function(l) {
-            const n = l.trim(); if (n) sm._savedNets.push(n)
+            const n = l.trim(); if (n) sm._savedNetsIncoming.push(n)
         }}
         onRunningChanged: {
             sm.netSavedProcRunning = running
-            if (running) { sm._savedNets = [] }
+            if (running) { sm._savedNetsIncoming = [] }
             else {
+                sm._savedNets = sm._savedNetsIncoming
                 if (sm._forgetPending) {
                     sm._forgetPending  = false
                     sm._forgetInFlight = false
@@ -508,7 +521,7 @@ Item {
     Process { id: netRescanProc
         command: ["bash", "-c", "nmcli dev wifi rescan 2>/dev/null; true"]
         onRunningChanged: {
-            if (running) { sm.netScanProcRunning = true; sm._netBuf = [] }
+            if (running) { sm.netScanProcRunning = true }
             else if (!sm._forgetInFlight && sm.netPasswordSSID === "" && !netScanProc.running) netScanProc.running = true
         }
     }
@@ -528,12 +541,22 @@ Item {
             // Band derived purely from channel frequency: <3GHz=2.4G, <5925MHz=5G, else 6G (Wi-Fi 6E).
             const band = mhz>0 ? (mhz<3000 ? "2.4G" : (mhz<5925 ? "5G" : "6G")) : ""
             const saved = sm._savedNets.indexOf(ssid) >= 0
-            if(ssid) sm._netBuf.push({active:inuse==="*",secure:sec!=="",signal:parseInt(sig)||0,ssid:ssid,saved:saved,band:band,enterprise:/802-1X/i.test(sec)})
+            if(ssid) sm._netIncomingBuf.push({active:inuse==="*",secure:sec!=="",signal:parseInt(sig)||0,ssid:ssid,saved:saved,band:band,enterprise:/802-1X/i.test(sec)})
         }}
 
         onRunningChanged: {
             sm.netScanProcRunning = running
-            if(running) { sm._netBuf=[]; if (!netEthProc.running) netEthProc.running = true } else {
+            if (running) {
+                sm._netIncomingBuf = []
+                if (!netEthProc.running) netEthProc.running = true
+            } else {
+                if (sm.netRadioEnabled) {
+                    if (sm._netIncomingBuf.length > 0 || sm._netBuf.length === 0) {
+                        sm._netBuf = sm._netIncomingBuf
+                    }
+                } else {
+                    sm._netBuf = []
+                }
                 rebuildNetworkList()
                 // Start the 30-second cooldown so the next STATUS→scan cycle
                 // won't re-run nmcli wifi list until the gate reopens.
@@ -556,12 +579,13 @@ Item {
             const dev = l.substring(idxT + netEthProc.token.length)
             if (name) {
                 if (dev !== "") sm._activeEthDev = dev   // profile currently up on this NIC
-                sm._ethBuf.push({active:dev!=="", secure:false, signal:100, ssid:name, saved:true, isEthernet:true})
+                sm._ethIncomingBuf.push({active:dev!=="", secure:false, signal:100, ssid:name, saved:true, isEthernet:true})
             }
         }}
         onRunningChanged: {
-            if (running) { sm._ethBuf = []; sm._activeEthDev = "" }
+            if (running) { sm._ethIncomingBuf = []; sm._activeEthDev = "" }
             else {
+                sm._ethBuf = sm._ethIncomingBuf
                 // Read the active wired NIC's link speed here (not from the wifi-first
                 // status proc), so it works even when Wi-Fi is also connected.
                 if (sm._activeEthDev !== "") {
@@ -618,7 +642,29 @@ Item {
             if (!list.some(x => x.ssid === ethName))
                 list.unshift({ active:true, secure:false, signal:100, ssid:ethName, saved:true, isEthernet:true })
         }
-        list.sort(function(a, b) { return (b.active ? 1 : 0) - (a.active ? 1 : 0) })
+        list.sort(function(a, b) {
+            if (b.active !== a.active) return (b.active ? 1 : 0) - (a.active ? 1 : 0)
+            if (b.isEthernet !== a.isEthernet) return (b.isEthernet ? 1 : 0) - (a.isEthernet ? 1 : 0)
+            if (b.saved !== a.saved) return (b.saved ? 1 : 0) - (a.saved ? 1 : 0)
+            if (b.signal !== a.signal) return b.signal - a.signal
+            return a.ssid.localeCompare(b.ssid)
+        })
+
+        // Avoid reassigning if the list items have not meaningfully changed
+        if (sm.networkList && sm.networkList.length === list.length) {
+            let unchanged = true
+            for (let i = 0; i < list.length; i++) {
+                const a = sm.networkList[i]
+                const b = list[i]
+                if (a.ssid !== b.ssid || a.active !== b.active || a.isEthernet !== b.isEthernet ||
+                    a.saved !== b.saved || a.secure !== b.secure || a.band !== b.band ||
+                    Math.abs((a.signal || 0) - (b.signal || 0)) > 6) {
+                    unchanged = false
+                    break
+                }
+            }
+            if (unchanged) return
+        }
         sm.networkList = list
     }
 
