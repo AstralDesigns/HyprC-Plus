@@ -9,6 +9,7 @@ import {
   X,
   GitCompare,
   RotateCcw,
+  Lock,
 } from 'lucide-react';
 import { useStoreSelector, storeActions, getStore } from '../store';
 import { MediaGallery } from './MediaGallery';
@@ -457,6 +458,13 @@ export const Canvas: React.FC = () => {
     pendingFiles: s.pendingFiles,
     projectPath: s.projectPath,
     monacoTheme: s.monacoTheme,
+    sidebarVisible: s.sidebarVisible,
+    chatVisible: s.chatVisible,
+    terminalVisible: s.terminalVisible,
+    modelManagerOpen: s.modelManagerOpen,
+    profileOpen: s.profileOpen,
+    memoryPanelOpen: s.memoryPanelOpen,
+    editorFocusToken: s.editorFocusToken,
   }));
   const activePane = store.panes.find(p => p.id === store.activePaneId);
   const monacoRef = useRef<any>(null);
@@ -517,6 +525,26 @@ export const Canvas: React.FC = () => {
     markerDispRef.current = null;
   }, []);
 
+  // Clean up cached Monaco models when their tabs are closed
+  useEffect(() => {
+    if (!monacoRef.current) return;
+    try {
+      const openPaths = new Set(store.panes.map(p => p.path).filter(Boolean));
+      const models = monacoRef.current.editor.getModels();
+      for (const m of models) {
+        if (!m || m.isDisposed?.()) continue;
+        const uri = m.uri;
+        if (uri && (uri.scheme === 'file' || uri.scheme === 'inmemory')) {
+          const p = uri.path;
+          const fs = uri.fsPath;
+          if (p && !openPaths.has(p) && (!fs || !openPaths.has(fs))) {
+            m.dispose();
+          }
+        }
+      }
+    } catch { /* noop */ }
+  }, [store.panes]);
+
   // Push EXTERNAL content reloads (reject / revert / re-open) into the mounted
   // editor imperatively. Typing is uncontrolled (defaultValue below) so the
   // library's full-document value-sync can't fire mid-keystroke and collapse
@@ -557,6 +585,76 @@ export const Canvas: React.FC = () => {
     window.addEventListener('focus', refocusCanvas);
     return () => window.removeEventListener('focus', refocusCanvas);
   }, []);
+
+  // Return focus to the active Monaco editor when sidebars (file explorer, chat),
+  // terminal, or popups (model manager, profile, memory, password prompt) are hidden/closed,
+  // even without mouse cursor movement.
+  const claimEditorFocus = () => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    const doFocus = () => {
+      try {
+        const ae = document.activeElement as HTMLElement | null;
+        if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA') && !ed.getDomNode()?.contains(ae)) {
+          ae.blur();
+        }
+        ed.focus();
+        const domNode = ed.getDomNode();
+        const ta = domNode?.querySelector('textarea.inputarea') as HTMLTextAreaElement | null;
+        if (ta) ta.focus({ preventScroll: true });
+      } catch { /* noop */ }
+    };
+    doFocus();
+    requestAnimationFrame(doFocus);
+    [25, 60, 140, 280].forEach(d => setTimeout(doFocus, d));
+  };
+
+  const prevPanelStateRef = useRef({
+    sidebar: store.sidebarVisible,
+    chat: store.chatVisible,
+    terminal: store.terminalVisible,
+    modelManager: store.modelManagerOpen,
+    profile: store.profileOpen,
+    memory: store.memoryPanelOpen,
+  });
+
+  useEffect(() => {
+    const prev = prevPanelStateRef.current;
+    const current = {
+      sidebar: store.sidebarVisible,
+      chat: store.chatVisible,
+      terminal: store.terminalVisible,
+      modelManager: store.modelManagerOpen,
+      profile: store.profileOpen,
+      memory: store.memoryPanelOpen,
+    };
+    prevPanelStateRef.current = current;
+
+    const anyClosed =
+      (prev.sidebar && !current.sidebar) ||
+      (prev.chat && !current.chat) ||
+      (prev.terminal && !current.terminal) ||
+      (prev.modelManager && !current.modelManager) ||
+      (prev.profile && !current.profile) ||
+      (prev.memory && !current.memory);
+
+    if (anyClosed) {
+      claimEditorFocus();
+    }
+  }, [
+    store.sidebarVisible,
+    store.chatVisible,
+    store.terminalVisible,
+    store.modelManagerOpen,
+    store.profileOpen,
+    store.memoryPanelOpen,
+  ]);
+
+  useEffect(() => {
+    if (store.editorFocusToken > 0) {
+      claimEditorFocus();
+    }
+  }, [store.editorFocusToken]);
 
   if (!activePane) {
     return (
@@ -638,6 +736,21 @@ export const Canvas: React.FC = () => {
                   onToggleDiff={() => setDiffView(v => !v)}
                 />
               )}
+              {pane.isReadOnly && (
+                <div className="canvas-readonly-banner animate-fade-in">
+                  <Lock size={12} />
+                  <span className="canvas-readonly-text">Read-only (outside home)</span>
+                  <button
+                    type="button"
+                    className="canvas-readonly-unlock-btn"
+                    onClick={() => {
+                      if (pane.path) storeActions.openPasswordPrompt(pane.path, undefined, 'file', 'canvas');
+                    }}
+                  >
+                    Unlock to Edit
+                  </button>
+                </div>
+              )}
               <div className="canvas-editor-pane">
                 {showDiff ? (
                   <DiffEditor
@@ -649,6 +762,8 @@ export const Canvas: React.FC = () => {
                     key={`${pane.path}:${pendingEdit!.timestamp}`}
                     height="100%"
                     theme={targetTheme}
+                    keepCurrentOriginalModel={true}
+                    keepCurrentModifiedModel={true}
                     beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); monacoRef.current = monaco; }}
                     language={pane.language || 'plaintext'}
                     original={pendingEdit!.oldContent}
@@ -670,12 +785,20 @@ export const Canvas: React.FC = () => {
                     height="100%"
                     path={pane.path}
                     theme={targetTheme}
+                    keepCurrentModel={true}
+                    saveViewState={true}
                     beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); monacoRef.current = monaco; }}
                     onMount={(editor, monaco) => {
                       editorRef.current = editor;
-                      // Explicitly force the correct theme after all themes are registered.
-                      // The `theme` prop alone can race with defineTheme; this guarantees winner.
-                      try { monaco.editor.setTheme(targetTheme); } catch (_) {}
+                      // Explicitly force the correct theme only if changed.
+                      try {
+                        const current = (monaco.editor as any)._themeService?._theme?.themeName;
+                        if (current !== targetTheme) {
+                          monaco.editor.setTheme(targetTheme);
+                        }
+                      } catch (_) {
+                        try { monaco.editor.setTheme(targetTheme); } catch (_) {}
+                      }
                       // Live syntax markers for languages without a Monaco worker
                       // (Lua via luaparse, QML structural check); JSON/CSS/HTML/TS
                       // are validated by their own workers.
@@ -875,8 +998,16 @@ export const Canvas: React.FC = () => {
                         try {
                           const ae = document.activeElement as HTMLElement | null;
                           if (editorNode && ae && editorNode.contains(ae)) return;
-                          if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+                          if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
+                            const isHidden = ae.closest('.sidebar-panel:not(.sidebar-visible)') ||
+                                             ae.closest('.chat-panel:not(.chat-visible)') ||
+                                             (ae.offsetWidth === 0 && ae.offsetHeight === 0);
+                            if (!isHidden) return;
+                            ae.blur();
+                          }
                           editor.focus();
+                          const ta = editorNode?.querySelector('textarea.inputarea') as HTMLTextAreaElement | null;
+                          if (ta) ta.focus({ preventScroll: true });
                         } catch { /* editor torn down mid-hover */ }
                       };
                       if (editorNode) editorNode.addEventListener('mouseenter', hoverFocus);
@@ -947,6 +1078,7 @@ export const Canvas: React.FC = () => {
                     defaultValue={pane.content}
                     onChange={handleEditChange}
                     options={{
+                      readOnly: !!pane.isReadOnly,
                       minimap: { enabled: true, side: 'right', showSlider: 'always', renderCharacters: false, maxColumn: 120 },
                       fontSize: 13,
                       lineNumbers: 'on',

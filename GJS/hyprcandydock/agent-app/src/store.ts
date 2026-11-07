@@ -161,6 +161,8 @@ export interface FilePane {
   path?: string;
   type: FilePaneType;
   content: string;
+  sudoPassword?: string;
+  isReadOnly?: boolean;
   isUnsaved?: boolean;
   language?: string;
   data?: any;
@@ -234,6 +236,16 @@ export interface AppState {
   chatWidth: number;
   terminalVisible: boolean;
   terminalHeight: number;
+  editorFocusToken: number;
+  sidebarFocusToken: number;
+  passwordPrompt: {
+    open: boolean;
+    filePath: string;
+    targetType?: 'file' | 'directory';
+    source?: 'sidebar' | 'canvas';
+    error?: string;
+    loading?: boolean;
+  };
   modelManagerOpen: boolean;
   /** Which sub-tab the model manager popup shows. Transient UI state (not
    *  persisted); the chat gate flips this to 'agents' when opening the popup
@@ -398,6 +410,16 @@ function loadInitialState(): AppState {
     chatWidth: 380,
     terminalVisible: false,
     terminalHeight: 240,
+    editorFocusToken: 0,
+    sidebarFocusToken: 0,
+    passwordPrompt: {
+      open: false,
+      filePath: '',
+      targetType: undefined,
+      source: undefined,
+      error: undefined,
+      loading: false,
+    },
     modelManagerOpen: false,
     modelManagerTab: 'completions' as const,
     profileOpen: false,
@@ -475,6 +497,7 @@ function persistedSnapshot() {
     sidebarWidth: next.sidebarWidth,
     chatVisible: next.chatVisible,
     chatWidth: next.chatWidth,
+    terminalVisible: next.terminalVisible,
     terminalHeight: next.terminalHeight,
     sidebarMode: next.sidebarMode,
     contextMode: next.contextMode,
@@ -557,10 +580,20 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     activePaneId: parsed.activePaneId || null,
     sidebarVisible: typeof parsed.sidebarVisible === 'boolean' ? parsed.sidebarVisible : true,
     chatVisible: typeof parsed.chatVisible === 'boolean' ? parsed.chatVisible : true,
+    terminalVisible: typeof parsed.terminalVisible === 'boolean' ? parsed.terminalVisible : false,
+    editorFocusToken: 0,
+    sidebarFocusToken: 0,
+    passwordPrompt: {
+      open: false,
+      filePath: '',
+      targetType: undefined,
+      source: undefined,
+      error: undefined,
+      loading: false,
+    },
     contextMode: 'minimal',
     sidebarWidth: typeof parsed.sidebarWidth === 'number' ? parsed.sidebarWidth : 260,
     chatWidth: typeof parsed.chatWidth === 'number' ? parsed.chatWidth : 380,
-    terminalVisible: false, // always start hidden
     terminalHeight: typeof parsed.terminalHeight === 'number' ? parsed.terminalHeight : 240,
     customModels: Array.isArray(parsed.customModels)
       ? parsed.customModels.filter((model: ModelInfo) => model?.id)
@@ -750,12 +783,273 @@ function metaFromPath(path: string): { name: string; ext: string; type: FilePane
   return { name, ext, type: 'code', language: getLanguageForExt(ext) };
 }
 
+// Determine whether a file requires superuser / password authentication to open.
+// Standard exclusions: mounted drives, external devices (/media/, /run/media/, /mnt/)
+// and temporary paths (/tmp/, /dev/shm/, /run/user/), unless permission fails.
+export function isPathProtected(filePath: string): boolean {
+  if (!filePath) return false;
+  const home = (typeof window !== 'undefined' && ((window as any).__hyprcandyHome || (window as any).__USER_HOME__)) || '/home';
+  if (filePath.startsWith(home) || filePath.startsWith('/home/')) {
+    return false;
+  }
+  const exclusions = [
+    '/media/',
+    '/run/media/',
+    '/mnt/',
+    '/tmp/',
+    '/dev/shm/',
+    '/run/user/',
+  ];
+  for (const excl of exclusions) {
+    if (filePath.startsWith(excl)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+let lastToggleSidebarTime = 0;
+let lastToggleChatTime = 0;
+let lastToggleTerminalTime = 0;
+
 /* Store Actions */
 export const storeActions = {
-  // Floating panel toggles
-  toggleSidebar: () => setStore(prev => ({ sidebarVisible: !prev.sidebarVisible })),
-  toggleChat: () => setStore(prev => ({ chatVisible: !prev.chatVisible })),
-  toggleTerminal: () => setStore(prev => ({ terminalVisible: !prev.terminalVisible })),
+  focusEditor: () => {
+    setStore(prev => ({ editorFocusToken: prev.editorFocusToken + 1 }));
+  },
+  // Floating panel toggles (debounced to prevent duplicate trigger on capture/bubble)
+  toggleSidebar: () => {
+    const now = Date.now();
+    if (now - lastToggleSidebarTime < 180) return;
+    lastToggleSidebarTime = now;
+    setStore(prev => {
+      const nextVisible = !prev.sidebarVisible;
+      if (!nextVisible) {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        return {
+          sidebarVisible: false,
+          editorFocusToken: prev.editorFocusToken + 1,
+        };
+      }
+      return { sidebarVisible: true };
+    });
+  },
+  toggleChat: () => {
+    const now = Date.now();
+    if (now - lastToggleChatTime < 180) return;
+    lastToggleChatTime = now;
+    setStore(prev => {
+      const nextVisible = !prev.chatVisible;
+      if (!nextVisible) {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        return {
+          chatVisible: false,
+          editorFocusToken: prev.editorFocusToken + 1,
+        };
+      }
+      return { chatVisible: true };
+    });
+  },
+  toggleTerminal: () => {
+    const now = Date.now();
+    if (now - lastToggleTerminalTime < 180) return;
+    lastToggleTerminalTime = now;
+    setStore(prev => {
+      const nextVisible = !prev.terminalVisible;
+      if (!nextVisible) {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        return {
+          terminalVisible: false,
+          editorFocusToken: prev.editorFocusToken + 1,
+        };
+      }
+      return { terminalVisible: true };
+    });
+  },
+  setSidebarVisible: (v: boolean) => {
+    setStore(prev => {
+      if (!v && prev.sidebarVisible) {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        return {
+          sidebarVisible: false,
+          editorFocusToken: prev.editorFocusToken + 1,
+        };
+      }
+      return { sidebarVisible: v };
+    });
+  },
+  setChatVisible: (v: boolean) => {
+    setStore(prev => {
+      if (!v && prev.chatVisible) {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        return {
+          chatVisible: false,
+          editorFocusToken: prev.editorFocusToken + 1,
+        };
+      }
+      return { chatVisible: v };
+    });
+  },
+  setTerminalVisible: (v: boolean) => {
+    setStore(prev => {
+      if (!v && prev.terminalVisible) {
+        if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+        return {
+          terminalVisible: false,
+          editorFocusToken: prev.editorFocusToken + 1,
+        };
+      }
+      return { terminalVisible: v };
+    });
+  },
+  focusSidebar: () => {
+    setStore(prev => ({ sidebarFocusToken: prev.sidebarFocusToken + 1 }));
+  },
+  openPasswordPrompt: (
+    filePath: string,
+    error?: string,
+    targetType: 'file' | 'directory' = 'file',
+    source?: 'sidebar' | 'canvas',
+  ) => {
+    const determinedSource = source || (targetType === 'directory' ? 'sidebar' : 'canvas');
+    setStore({
+      passwordPrompt: {
+        open: true,
+        filePath,
+        targetType,
+        source: determinedSource,
+        error,
+        loading: false,
+      },
+    });
+  },
+  closePasswordPrompt: () => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    const current = currentState;
+    const shouldReturnToSidebar =
+      current.sidebarVisible &&
+      (current.passwordPrompt.source === 'sidebar' || current.passwordPrompt.targetType === 'directory');
+    setStore(prev => ({
+      passwordPrompt: {
+        open: false,
+        filePath: '',
+        targetType: undefined,
+        source: undefined,
+        error: undefined,
+        loading: false,
+      },
+      ...(shouldReturnToSidebar
+        ? { sidebarFocusToken: prev.sidebarFocusToken + 1 }
+        : { editorFocusToken: prev.editorFocusToken + 1 }),
+    }));
+  },
+  submitPasswordPrompt: async (password: string): Promise<boolean> => {
+    const { filePath, targetType, source } = currentState.passwordPrompt;
+    if (!filePath) return false;
+    setStore(prev => ({
+      passwordPrompt: { ...prev.passwordPrompt, loading: true, error: undefined },
+    }));
+    try {
+      const shouldReturnToSidebar =
+        currentState.sidebarVisible &&
+        (source === 'sidebar' || targetType === 'directory');
+      const focusUpdate = shouldReturnToSidebar
+        ? { sidebarFocusToken: currentState.sidebarFocusToken + 1 }
+        : { editorFocusToken: currentState.editorFocusToken + 1 };
+
+      if (targetType === 'directory') {
+        const items = await bridge.listDirectory(filePath, password);
+        const filtered = currentState.showDotfiles ? items : items.filter(i => !i.name.startsWith('.'));
+        const sorted: FileSystemItem[] = filtered.map(i => ({
+          name: i.name,
+          path: `${filePath.replace(/\/$/, '')}/${i.name}`,
+          type: (i.isDir ? 'folder' : 'file') as 'file' | 'folder',
+          size: i.size,
+        })).sort((a, b) => {
+          if (a.type === 'folder' && b.type === 'file') return -1;
+          if (a.type === 'file' && b.type === 'folder') return 1;
+          return a.name.localeCompare(b.name);
+        });
+        setStore(prev => ({
+          directoryContent: sorted,
+          passwordPrompt: { open: false, filePath: '', loading: false },
+          ...focusUpdate,
+        }));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('agent_sudo_unlocked', { detail: { path: filePath, targetType } }));
+        }
+        return true;
+      }
+
+      // Target is a file: read with password and open/update as editable
+      const content = await bridge.readFile(filePath, undefined, undefined, password);
+      const meta = metaFromPath(filePath);
+      const name = meta.name;
+      const type = meta.type;
+      const language = meta.language;
+
+      const existing = currentState.panes.find(p => p.id === filePath);
+      if (existing) {
+        setStore(prev => ({
+          panes: prev.panes.map(p => p.id === filePath ? { ...p, content, sudoPassword: password, isReadOnly: false, isUnsaved: false } : p),
+          activePaneId: filePath,
+          activeOpenFile: filePath,
+          openFileContents: { ...prev.openFileContents, [filePath]: content },
+          passwordPrompt: { open: false, filePath: '', loading: false },
+          ...focusUpdate,
+        }));
+      } else {
+        const newPane: FilePane = {
+          id: filePath,
+          name,
+          path: filePath,
+          type,
+          content,
+          language,
+          sudoPassword: password,
+          isReadOnly: false,
+          isUnsaved: false,
+        };
+        setStore(prev => ({
+          panes: [...prev.panes, newPane],
+          activePaneId: newPane.id,
+          openFiles: prev.openFiles.includes(filePath) ? prev.openFiles : [...prev.openFiles, filePath],
+          activeOpenFile: filePath,
+          openFileContents: { ...prev.openFileContents, [filePath]: content },
+          passwordPrompt: { open: false, filePath: '', loading: false },
+          ...focusUpdate,
+        }));
+      }
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('agent_sudo_unlocked', { detail: { path: filePath, targetType } }));
+      }
+      return true;
+    } catch (err: any) {
+      const msg = typeof err === 'string' ? err : (err?.message || 'Authentication failed');
+      setStore(prev => ({
+        passwordPrompt: {
+          ...prev.passwordPrompt,
+          loading: false,
+          error: msg.includes('Incorrect password') ? 'Incorrect password. Please try again.' : msg,
+        },
+      }));
+      return false;
+    }
+  },
   setTerminalHeight: (h: number) => setStore({ terminalHeight: Math.max(80, Math.min(h, 700)) }),
   // Open a directory through the native folder picker and load it as the project.
   openFolderDialog: async () => {
@@ -1291,7 +1585,7 @@ export const storeActions = {
     const pane = currentState.panes.find(p => p.id === paneId);
     if (!pane || !pane.path) return;
     try {
-      const res = await bridge.writeFile(pane.path, pane.content);
+      const res = await bridge.writeFile(pane.path, pane.content, pane.sudoPassword);
       if (res && res.success !== false) {
         // Clear diskMtime so the next poll re-baselines against our own write
         // instead of mistaking it for an external edit and reloading.
@@ -1300,7 +1594,11 @@ export const storeActions = {
         }));
         storeActions.refreshGitStatus();
       }
-    } catch (e) {
+    } catch (e: any) {
+      const msg = String(e?.message || e || '');
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('Permission denied') || msg.includes('EACCES')) {
+        storeActions.openPasswordPrompt(pane.path, undefined, 'file', 'canvas');
+      }
       console.error('Failed to save file:', e);
     }
   },
@@ -1477,17 +1775,43 @@ export const storeActions = {
   },
 
   openFileByPath: async (filePath: string) => {
+    // If the file is already open in a pane, switch directly to it
+    const existing = currentState.panes.find(p => p.id === filePath);
+    if (existing) {
+      setStore(prev => ({
+        activePaneId: filePath,
+        activeOpenFile: filePath,
+        editorFocusToken: prev.editorFocusToken + 1,
+      }));
+      return;
+    }
+
     const meta = metaFromPath(filePath);
     const name = meta.name;
     let type: FilePaneType = meta.type;
     let language = meta.language;
     let content = '';
     let data: any = null;
+    let isReadOnly = false;
+    const isProtected = isPathProtected(filePath);
 
     // text-backed panes read their bytes; image/video galleries also gather
     // sibling media so the gallery surface can page across the folder.
     if (type === 'markdown' || type === 'code') {
-      try { content = await bridge.readFile(filePath); } catch (e) { console.warn(e); }
+      try {
+        content = await bridge.readFile(filePath);
+        // Files outside home open as read-only by default; user can unlock via password prompt to edit
+        if (isProtected) {
+          isReadOnly = true;
+        }
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (msg.includes('PERMISSION_DENIED') || msg.includes('Permission denied') || msg.includes('EACCES')) {
+          storeActions.openPasswordPrompt(filePath, undefined, 'file', currentState.sidebarVisible ? 'sidebar' : 'canvas');
+          return;
+        }
+        console.warn(e);
+      }
     } else if (type === 'image-gallery' || type === 'video-gallery') {
       const set = type === 'image-gallery' ? ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'] : ['mp4', 'webm', 'mov', 'mkv'];
       const dirPath = filePath.substring(0, filePath.lastIndexOf('/')) || '/';
@@ -1497,15 +1821,14 @@ export const storeActions = {
           .filter(i => !i.isDir && set.includes(i.name.split('.').pop()?.toLowerCase() || ''))
           .map(i => ({ name: i.name, path: `${dirPath.replace(/\/$/, '')}/${i.name}`, type: 'file' as const, size: i.size }));
         data = mediaFiles.length > 0 ? mediaFiles : [{ name, path: filePath, type: 'file', size: 0 }];
-      } catch (e) {
+      } catch (e: any) {
+        const msg = String(e?.message || e || '');
+        if (msg.includes('PERMISSION_DENIED') || msg.includes('Permission denied') || msg.includes('EACCES')) {
+          storeActions.openPasswordPrompt(filePath, undefined, 'file', currentState.sidebarVisible ? 'sidebar' : 'canvas');
+          return;
+        }
         data = [{ name, path: filePath, type: 'file', size: 0 }];
       }
-    }
-
-    const existing = currentState.panes.find(p => p.id === filePath);
-    if (existing) {
-      setStore({ activePaneId: filePath, activeOpenFile: filePath });
-      return;
     }
 
     const newPane: FilePane = {
@@ -1516,6 +1839,7 @@ export const storeActions = {
       content,
       language,
       data,
+      isReadOnly,
       isUnsaved: false,
     };
 
@@ -1525,6 +1849,7 @@ export const storeActions = {
       openFiles: prev.openFiles.includes(filePath) ? prev.openFiles : [...prev.openFiles, filePath],
       activeOpenFile: filePath,
       openFileContents: { ...prev.openFileContents, [filePath]: content },
+      editorFocusToken: prev.editorFocusToken + 1,
     }));
   },
 
@@ -1616,7 +1941,13 @@ export const storeActions = {
         return a.name.localeCompare(b.name);
       });
       setStore({ directoryContent: sorted });
-    } catch (e) {
+    } catch (e: any) {
+      const msg = String(e?.message || e || '');
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('Permission denied') || msg.includes('EACCES')) {
+        setStore({ directoryContent: [] });
+        storeActions.openPasswordPrompt(currentState.currentPath, undefined, 'directory', 'sidebar');
+        return;
+      }
       console.warn('Failed to refresh directory:', e);
       setStore({ directoryContent: [] });
     }

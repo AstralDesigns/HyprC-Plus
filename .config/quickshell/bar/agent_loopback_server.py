@@ -39,6 +39,7 @@ import sys
 import json
 import time
 import shutil
+import tempfile
 import threading
 import secrets
 import subprocess
@@ -67,6 +68,9 @@ DIST = os.path.expanduser(os.environ.get(
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("HC_AGENT_PORT", "17842"))
 RUNTIME_URL = os.environ.get("HC_RUNTIME_URL", "http://127.0.0.1:17900")
+
+# Cached sudo credentials for authenticated operations across the session
+CACHED_SUDO_PASSWORD = None
 
 # ── Bridge access control ──────────────────────────────────────────────────
 # The /bridge endpoint dispatches privileged host actions (exec_command,
@@ -332,30 +336,106 @@ def handle_searxng_start(id_, _payload):
 
 # ── File / project navigation (GJS _agentHandleMessage parity) ─────────────
 def handle_list_directory(id_, payload):
+    global CACHED_SUDO_PASSWORD
     dir_path = payload.get("path") or HOME
-    try:
-        items = []
-        with os.scandir(dir_path) as it:
-            for entry in it:
-                try:
-                    is_dir = entry.is_dir()
-                    size = 0 if is_dir else entry.stat().st_size
-                except OSError:
-                    is_dir = entry.is_dir(follow_symlinks=False)
-                    size = 0
-                items.append({"name": entry.name, "isDir": bool(is_dir), "size": int(size)})
-        # Dirs first, then case-insensitive name — matches the tree UX.
-        items.sort(key=lambda x: (not x["isDir"], x["name"].lower()))
-        return {"id": id_, "type": "response", "payload": items}
-    except Exception as err:  # noqa: BLE001
-        return {"id": id_, "type": "response", "error": str(err)}
+    password = payload.get("password") or CACHED_SUDO_PASSWORD
+
+    # If no explicit password was supplied, try standard unprivileged scandir first
+    if not payload.get("password"):
+        try:
+            items = []
+            with os.scandir(dir_path) as it:
+                for entry in it:
+                    try:
+                        is_dir = entry.is_dir()
+                        size = 0 if is_dir else entry.stat().st_size
+                    except OSError:
+                        is_dir = entry.is_dir(follow_symlinks=False)
+                        size = 0
+                    items.append({"name": entry.name, "isDir": bool(is_dir), "size": int(size)})
+            items.sort(key=lambda x: (not x["isDir"], x["name"].lower()))
+            return {"id": id_, "type": "response", "payload": items}
+        except PermissionError:
+            if not password:
+                return {"id": id_, "type": "response", "error": "PERMISSION_DENIED"}
+        except Exception as err:  # noqa: BLE001
+            return {"id": id_, "type": "response", "error": str(err)}
+
+    # If password is provided or cached from prior sudo authentication, list via sudo
+    if password:
+        code = (
+            "import os, json\n"
+            "items = []\n"
+            f"with os.scandir({repr(dir_path)}) as it:\n"
+            "    for entry in it:\n"
+            "        try:\n"
+            "            is_dir = entry.is_dir()\n"
+            "            size = 0 if is_dir else entry.stat().st_size\n"
+            "        except OSError:\n"
+            "            is_dir = entry.is_dir(follow_symlinks=False)\n"
+            "            size = 0\n"
+            "        items.append({'name': entry.name, 'isDir': bool(is_dir), 'size': int(size)})\n"
+            "items.sort(key=lambda x: (not x['isDir'], x['name'].lower()))\n"
+            "print(json.dumps(items))\n"
+        )
+        proc = subprocess.run(
+            ["sudo", "-S", "-k", "python3", "-c", code],
+            input=password + "\n",
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if proc.returncode != 0:
+            err = proc.stderr.strip()
+            lower_err = err.lower()
+            if any(x in lower_err for x in ["incorrect password", "sorry, try again", "1 incorrect password attempt", "no password was provided"]):
+                return {"id": id_, "type": "response", "error": "Incorrect password. Please try again."}
+            return {"id": id_, "type": "response", "error": err or "Authentication failed"}
+        CACHED_SUDO_PASSWORD = password
+        try:
+            items = json.loads(proc.stdout)
+            return {"id": id_, "type": "response", "payload": items}
+        except Exception as err:  # noqa: BLE001
+            return {"id": id_, "type": "response", "error": str(err)}
+
+    return {"id": id_, "type": "response", "error": "PERMISSION_DENIED"}
 
 
 def handle_read_file(id_, payload):
+    global CACHED_SUDO_PASSWORD
     path = payload.get("path")
+    password = payload.get("password") or CACHED_SUDO_PASSWORD
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            text = f.read()
+        text = None
+        if not payload.get("password"):
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as f:
+                    text = f.read()
+            except PermissionError:
+                if not password:
+                    return {"id": id_, "type": "response", "error": "PERMISSION_DENIED"}
+            except Exception as err:  # noqa: BLE001
+                return {"id": id_, "type": "response", "error": str(err)}
+
+        if text is None:
+            if not password:
+                return {"id": id_, "type": "response", "error": "PERMISSION_DENIED"}
+            proc = subprocess.run(
+                ["sudo", "-S", "-k", "cat", path],
+                input=password + "\n",
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if proc.returncode != 0:
+                err = proc.stderr.strip()
+                lower_err = err.lower()
+                if any(x in lower_err for x in ["incorrect password", "sorry, try again", "1 incorrect password attempt", "no password was provided"]):
+                    return {"id": id_, "type": "response", "error": "Incorrect password. Please try again."}
+                return {"id": id_, "type": "response", "error": err or "Authentication failed"}
+            CACHED_SUDO_PASSWORD = password
+            text = proc.stdout
+
         offset = int(payload.get("offset") or 0)
         limit = int(payload.get("limit") or 0)
         if offset > 0 or limit > 0:
@@ -364,23 +444,52 @@ def handle_read_file(id_, payload):
             end = start + limit if limit > 0 else len(lines)
             text = "\n".join(lines[start:end])
         return {"id": id_, "type": "response", "payload": text}
+    except PermissionError:
+        return {"id": id_, "type": "response", "error": "PERMISSION_DENIED"}
     except Exception as err:  # noqa: BLE001
         return {"id": id_, "type": "response", "error": str(err)}
 
 
 def handle_write_file(id_, payload):
+    global CACHED_SUDO_PASSWORD
     path = payload.get("path")
     content = payload.get("content")
+    password = payload.get("password") or CACHED_SUDO_PASSWORD
     if not path or not isinstance(content, str):
         return {"id": id_, "type": "response",
                 "error": "write_file requires a path and string content"}
     try:
+        if password:
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as tf:
+                tf.write(content)
+                tf_path = tf.name
+            try:
+                proc = subprocess.run(
+                    ["sudo", "-S", "-k", "cp", tf_path, path],
+                    input=password + "\n",
+                    capture_output=True,
+                    text=True,
+                    timeout=15,
+                )
+                if proc.returncode != 0:
+                    err = proc.stderr.strip()
+                    lower_err = err.lower()
+                    if any(x in lower_err for x in ["incorrect password", "sorry, try again", "1 incorrect password attempt", "no password was provided"]):
+                        return {"id": id_, "type": "response", "error": "Incorrect password. Please try again."}
+                    return {"id": id_, "type": "response", "error": err or "Write failed"}
+                CACHED_SUDO_PASSWORD = password
+                return {"id": id_, "type": "response", "payload": {"success": True}}
+            finally:
+                if os.path.exists(tf_path):
+                    os.unlink(tf_path)
         parent = os.path.dirname(path)
         if parent:
             os.makedirs(parent, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
         return {"id": id_, "type": "response", "payload": {"success": True}}
+    except PermissionError:
+        return {"id": id_, "type": "response", "error": "PERMISSION_DENIED"}
     except Exception as err:  # noqa: BLE001
         return {"id": id_, "type": "response", "error": str(err)}
 

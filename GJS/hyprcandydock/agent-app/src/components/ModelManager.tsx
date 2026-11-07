@@ -1700,6 +1700,13 @@ export const ModelManager: FC = () => {
   const subTab = store.modelManagerTab ?? 'completions';
   const setSubTab = (id: 'completions' | 'agents') => setStore({ modelManagerTab: id });
 
+  const handleClose = () => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    setStore(prev => ({ modelManagerOpen: false, editorFocusToken: prev.editorFocusToken + 1 }));
+  };
+
   if (!store.modelManagerOpen) return null;
 
   const statusSubtitle =
@@ -1711,7 +1718,7 @@ export const ModelManager: FC = () => {
 
   return (
     <div
-      onClick={() => setStore({ modelManagerOpen: false })}
+      onClick={handleClose}
       style={{
         position: 'absolute', inset: 0, background: 'rgba(0,0,0,.65)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,

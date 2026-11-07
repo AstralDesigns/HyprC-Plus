@@ -1827,7 +1827,7 @@ PanelWindow {
                 model: Math.min(2, btn.instances.length)
                 Rectangle {
                     width: 5; height: 5; radius: 2.5
-                    color: Theme.cSurfaceTint
+                    color: Theme.cPrimary
                 }
             }
         }

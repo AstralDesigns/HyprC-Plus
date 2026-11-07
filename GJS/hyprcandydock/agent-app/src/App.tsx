@@ -9,6 +9,7 @@ import { ModelManager } from './components/ModelManager';
 import { ProfileModal } from './components/ProfileModal';
 import { MemoryPanel } from './components/MemoryPanel';
 import { TerminalPanel } from './components/TerminalPanel';
+import { PasswordPromptDialog } from './components/PasswordPromptDialog';
 import { agentEngine } from './engine/agent-engine';
 
 interface ErrorBoundaryProps { children: ReactNode; }
@@ -100,6 +101,8 @@ export const App: React.FC = () => {
     });
 
     const onToggleSidebar = () => storeActions.toggleSidebar();
+    const onToggleChat = () => storeActions.toggleChat();
+    const onToggleTerminal = () => storeActions.toggleTerminal();
     const onToggleModel = () => setStore(prev => ({ modelManagerOpen: !prev.modelManagerOpen }));
     const onNewChat = () => storeActions.createSession();
     const onOpenFile = (e: any) => {
@@ -138,6 +141,8 @@ export const App: React.FC = () => {
     };
 
     window.addEventListener('agent_toggle_sidebar', onToggleSidebar);
+    window.addEventListener('agent_toggle_chat', onToggleChat);
+    window.addEventListener('agent_toggle_terminal', onToggleTerminal);
     window.addEventListener('agent_toggle_model_manager', onToggleModel);
     window.addEventListener('agent_new_chat', onNewChat);
     window.addEventListener('agent_open_file', onOpenFile);
@@ -187,22 +192,27 @@ export const App: React.FC = () => {
         return;
       }
       // Ctrl+1 / Ctrl+2 toggle the floating side panels (same key shows/hides).
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === '1') {
+      if ((ev.ctrlKey || ev.metaKey) && (ev.key === '1' || ev.code === 'Digit1')) {
         ev.preventDefault();
+        ev.stopPropagation();
         storeActions.toggleSidebar();
         return;
       }
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === '2') {
+      if ((ev.ctrlKey || ev.metaKey) && (ev.key === '2' || ev.code === 'Digit2')) {
         ev.preventDefault();
+        ev.stopPropagation();
         storeActions.toggleChat();
+        return;
       }
       // Ctrl+3 toggles the embedded terminal panel.
-      if ((ev.ctrlKey || ev.metaKey) && ev.key === '3') {
+      if ((ev.ctrlKey || ev.metaKey) && (ev.key === '3' || ev.code === 'Digit3')) {
         ev.preventDefault();
+        ev.stopPropagation();
         storeActions.toggleTerminal();
+        return;
       }
     };
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, { capture: true });
 
     // The host webview only receives key events once it holds keyboard focus,
     // which the compositor grants lazily. Give the page a focused element from
@@ -267,13 +277,15 @@ export const App: React.FC = () => {
 
     return () => {
       window.removeEventListener('agent_toggle_sidebar', onToggleSidebar);
+      window.removeEventListener('agent_toggle_chat', onToggleChat);
+      window.removeEventListener('agent_toggle_terminal', onToggleTerminal);
       window.removeEventListener('agent_toggle_model_manager', onToggleModel);
       window.removeEventListener('agent_new_chat', onNewChat);
       window.removeEventListener('agent_open_file', onOpenFile);
       window.removeEventListener('unhandledrejection', onUnhandledRejection);
       window.removeEventListener('error', onUncaughtError);
       window.removeEventListener('beforeunload', onBeforeUnload);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, { capture: true });
       try { persistStoreNow(); } catch (_) { /* noop */ }
     };
   }, []);
@@ -392,6 +404,7 @@ export const App: React.FC = () => {
         <ModelManager />
         <ProfileModal />
         <MemoryPanel />
+        <PasswordPromptDialog />
       </div>
     </AppErrorBoundary>
   );

@@ -99,6 +99,17 @@ const LockedGate: React.FC = () => {
 
 export const ChatPanel: React.FC = () => {
   const [store] = useStore();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!store.chatVisible) {
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae && (panelRef.current?.contains(ae) || ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT')) {
+        ae.blur();
+      }
+    }
+  }, [store.chatVisible]);
+
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
 
@@ -165,7 +176,7 @@ export const ChatPanel: React.FC = () => {
   };
 
   return (
-    <div className="chat-panel-inner">
+    <div className="chat-panel-inner" ref={panelRef}>
       {/* Left resize handle */}
       <div className="resize-handle resize-handle-left" onMouseDown={startResize} />
 

@@ -23,6 +23,7 @@ import {
   Check,
   Pin,
   ArrowRight,
+  Lock,
   PenLine,
   TerminalSquare,
 } from 'lucide-react';
@@ -374,6 +375,19 @@ export const Header: React.FC = () => {
               }}
             >
               {getTabIcon(pane)}
+              {pane.isReadOnly && (
+                <button
+                  type="button"
+                  className="tab-readonly-badge"
+                  data-tip="Read-only · Click to unlock with superuser password"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (pane.path) storeActions.openPasswordPrompt(pane.path, undefined, 'file', 'canvas');
+                  }}
+                >
+                  <Lock size={10} />
+                </button>
+              )}
               {pane.isUnsaved && <span className="tab-unsaved-dot" data-tip="Unsaved changes" />}
               {pane.externalChanged && (
                 <button
@@ -545,7 +559,7 @@ export const Header: React.FC = () => {
 
         <button
           type="button"
-          onClick={() => setStore({ chatVisible: !store.chatVisible })}
+          onClick={() => storeActions.toggleChat()}
           className={`header-icon-btn ${store.chatVisible ? 'active' : ''}`}
           data-tip="Toggle chat panel"
         >

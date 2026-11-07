@@ -102,6 +102,16 @@ class AgentBridge {
       return;
     }
 
+    if (msg.type === 'toggle_chat') {
+      window.dispatchEvent(new CustomEvent('agent_toggle_chat'));
+      return;
+    }
+
+    if (msg.type === 'toggle_terminal') {
+      window.dispatchEvent(new CustomEvent('agent_toggle_terminal'));
+      return;
+    }
+
     if (msg.type === 'toggle_model_manager') {
       window.dispatchEvent(new CustomEvent('agent_toggle_model_manager'));
       return;
@@ -303,16 +313,16 @@ class AgentBridge {
     return this.postToHost('exec_command', { command, cwd }, 0);
   }
 
-  public readFile(path: string, offset?: number, limit?: number): Promise<string> {
-    return this.postToHost('read_file', { path, offset, limit });
+  public readFile(path: string, offset?: number, limit?: number, password?: string): Promise<string> {
+    return this.postToHost('read_file', { path, offset, limit, password });
   }
 
-  public writeFile(path: string, content: string): Promise<{ success: boolean }> {
-    return this.postToHost('write_file', { path, content });
+  public writeFile(path: string, content: string, password?: string): Promise<{ success: boolean }> {
+    return this.postToHost('write_file', { path, content, password });
   }
 
-  public listDirectory(path: string): Promise<Array<{ name: string; isDir: boolean; size: number }>> {
-    return this.postToHost('list_directory', { path });
+  public listDirectory(path: string, password?: string): Promise<Array<{ name: string; isDir: boolean; size: number }>> {
+    return this.postToHost('list_directory', { path, password });
   }
 
   public openFileDialog(options?: { title?: string; directory?: boolean; currentFolder?: string }): Promise<string | null> {

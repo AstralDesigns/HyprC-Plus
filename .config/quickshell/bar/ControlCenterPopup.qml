@@ -832,7 +832,7 @@ PanelWindow {
         property int activeTab: 1  // Default to Hyprland tab (index 1)
         property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
         property int activeKbSubTab:  0  // Remembered Keybinds sub-tab (0 = View, 1 = Edit)
-        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH, 3 = Keyboard)
+        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH, 3 = Keyboard, 4 = Hypridle)
         property int activeGreetSubTab: 0  // Remembered Greeter sub-tab (0 = Themes, 1 = Edit)
     }
     Settings {
@@ -6141,7 +6141,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["Info", "Hotspot", "SSH", "Keyboard"]
+                                    model: ["Info", "Hotspot", "SSH", "Keyboard", "Hypridle"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -7247,6 +7247,322 @@ PanelWindow {
                                         }
                                     }
                                     Process { id: _kbSysReloadProc; command: ["bash", "-c", "hyprctl reload 2>/dev/null || true"]; running: false }
+                                }
+
+                                // ── Hypridle sub-tab ──────────────────────────────────────────
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        id: idleTab
+                                        width: parent.width
+                                        spacing: 12
+
+                                        property string dim: ""
+                                        property string lock: ""
+                                        property string off: ""
+                                        property string suspend: ""
+                                        property bool loaded: false
+                                        property bool dirty: false
+                                        property bool saving: false
+                                        property bool isError: false
+                                        property string statusText: ""
+
+                                        function save() {
+                                            const d = parseInt(idleDimTI.text.trim())
+                                            const l = parseInt(idleLockTI.text.trim())
+                                            const o = parseInt(idleOffTI.text.trim())
+                                            const s = parseInt(idleSuspendTI.text.trim())
+                                            if (isNaN(d) || isNaN(l) || isNaN(o) || isNaN(s) || d <= 0 || l <= 0 || o <= 0 || s <= 0) {
+                                                idleTab.isError = true
+                                                idleTab.statusText = "All timers must be positive integers"
+                                                return
+                                            }
+                                            idleTab.isError = false
+                                            idleTab.saving = true
+                                            idleTab.statusText = "Saving..."
+                                            idleWriteProc.command = [
+                                                "python3", scriptDir + "/hypridle-config.py", "set",
+                                                "--dim", d.toString(),
+                                                "--lock", l.toString(),
+                                                "--off", o.toString(),
+                                                "--suspend", s.toString()
+                                            ]
+                                            idleWriteProc.running = true
+                                        }
+
+
+                                        Process {
+                                            id: idleReadProc
+                                            running: false
+                                            command: ["python3", scriptDir + "/hypridle-config.py", "get"]
+                                            stdout: SplitParser {
+                                                splitMarker: "\n"
+                                                onRead: function(line) {
+                                                    const parts = line.trim().split("\t")
+                                                    if (parts.length < 2) return
+                                                    const key = parts[0].trim()
+                                                    const val = parts[1].trim()
+                                                    if (key === "DIM") {
+                                                        idleTab.dim = val
+                                                        if (!idleDimTI.activeFocus) idleDimTI.text = val
+                                                    } else if (key === "LOCK") {
+                                                        idleTab.lock = val
+                                                        if (!idleLockTI.activeFocus) idleLockTI.text = val
+                                                    } else if (key === "OFF") {
+                                                        idleTab.off = val
+                                                        if (!idleOffTI.activeFocus) idleOffTI.text = val
+                                                    } else if (key === "SUSPEND") {
+                                                        idleTab.suspend = val
+                                                        if (!idleSuspendTI.activeFocus) idleSuspendTI.text = val
+                                                    }
+                                                }
+                                            }
+                                            onExited: {
+                                                idleTab.loaded = true
+                                                idleTab.dirty = false
+                                                idleTab.saving = false
+                                            }
+                                        }
+
+                                        Process {
+                                            id: idleWriteProc
+                                            running: false
+                                            onExited: {
+                                                idleTab.saving = false
+                                                idleTab.dirty = false
+                                                idleTab.statusText = "Saved & restarted hypridle"
+                                                idleReadProc.running = true
+                                            }
+                                        }
+
+                                        Connections {
+                                            target: sysSubStack
+                                            function onCurrentIndexChanged() {
+                                                if (sysSubStack.currentIndex === 4 && !idleTab.loaded && !idleReadProc.running)
+                                                    idleReadProc.running = true
+                                            }
+                                        }
+
+                                        Component.onCompleted: {
+                                            if (sysSubStack.currentIndex === 4 && !idleReadProc.running)
+                                                idleReadProc.running = true
+                                        }
+
+                                        CCSection { text: "Hypridle Sleep & Lock Timers" }
+                                        Text {
+                                            Layout.fillWidth: true
+                                            text: "Configure timeout delays from hypridle.conf (in seconds). Press Enter or click Save to apply changes and restart hypridle."
+                                            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                            font.family: Config.labelFont; font.pixelSize: 11
+                                            wrapMode: Text.WordWrap
+                                        }
+
+                                        // Screen Dimming
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Screen Dimming"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 13
+                                                Layout.preferredWidth: 120
+                                            }
+                                            Rectangle {
+                                                Layout.preferredWidth: 90; Layout.maximumWidth: 120; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: idleDimTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: idleDimTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    inputMethodHints: Qt.ImhDigitsOnly
+                                                    validator: IntValidator { bottom: 1; top: 86400 }
+                                                    onTextChanged: {
+                                                        if (idleTab.loaded) {
+                                                            idleTab.dirty = (idleDimTI.text.trim() !== idleTab.dim ||
+                                                                             idleLockTI.text.trim() !== idleTab.lock ||
+                                                                             idleOffTI.text.trim() !== idleTab.off ||
+                                                                             idleSuspendTI.text.trim() !== idleTab.suspend)
+                                                            idleTab.statusText = ""
+                                                        }
+                                                    }
+                                                    onAccepted: idleTab.save()
+                                                }
+                                            }
+                                            Text {
+                                                text: "seconds"
+                                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                            }
+                                        }
+
+                                        // Screen Lock
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Screen Lock"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 13
+                                                Layout.preferredWidth: 120
+                                            }
+                                            Rectangle {
+                                                Layout.preferredWidth: 90; Layout.maximumWidth: 120; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: idleLockTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: idleLockTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    inputMethodHints: Qt.ImhDigitsOnly
+                                                    validator: IntValidator { bottom: 1; top: 86400 }
+                                                    onTextChanged: {
+                                                        if (idleTab.loaded) {
+                                                            idleTab.dirty = (idleDimTI.text.trim() !== idleTab.dim ||
+                                                                             idleLockTI.text.trim() !== idleTab.lock ||
+                                                                             idleOffTI.text.trim() !== idleTab.off ||
+                                                                             idleSuspendTI.text.trim() !== idleTab.suspend)
+                                                            idleTab.statusText = ""
+                                                        }
+                                                    }
+                                                    onAccepted: idleTab.save()
+                                                }
+                                            }
+                                            Text {
+                                                text: "seconds"
+                                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                            }
+                                        }
+
+                                        // Screen Off
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Screen Off"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 13
+                                                Layout.preferredWidth: 120
+                                            }
+                                            Rectangle {
+                                                Layout.preferredWidth: 90; Layout.maximumWidth: 120; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: idleOffTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: idleOffTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    inputMethodHints: Qt.ImhDigitsOnly
+                                                    validator: IntValidator { bottom: 1; top: 86400 }
+                                                    onTextChanged: {
+                                                        if (idleTab.loaded) {
+                                                            idleTab.dirty = (idleDimTI.text.trim() !== idleTab.dim ||
+                                                                             idleLockTI.text.trim() !== idleTab.lock ||
+                                                                             idleOffTI.text.trim() !== idleTab.off ||
+                                                                             idleSuspendTI.text.trim() !== idleTab.suspend)
+                                                            idleTab.statusText = ""
+                                                        }
+                                                    }
+                                                    onAccepted: idleTab.save()
+                                                }
+                                            }
+                                            Text {
+                                                text: "seconds"
+                                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                            }
+                                        }
+
+                                        // Suspension
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Suspension"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont; font.pixelSize: 13
+                                                Layout.preferredWidth: 120
+                                            }
+                                            Rectangle {
+                                                Layout.preferredWidth: 90; Layout.maximumWidth: 120; height: 28; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: idleSuspendTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: idleSuspendTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    inputMethodHints: Qt.ImhDigitsOnly
+                                                    validator: IntValidator { bottom: 1; top: 86400 }
+                                                    onTextChanged: {
+                                                        if (idleTab.loaded) {
+                                                            idleTab.dirty = (idleDimTI.text.trim() !== idleTab.dim ||
+                                                                             idleLockTI.text.trim() !== idleTab.lock ||
+                                                                             idleOffTI.text.trim() !== idleTab.off ||
+                                                                             idleSuspendTI.text.trim() !== idleTab.suspend)
+                                                            idleTab.statusText = ""
+                                                        }
+                                                    }
+                                                    onAccepted: idleTab.save()
+                                                }
+                                            }
+                                            Text {
+                                                text: "seconds"
+                                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                                font.family: Config.labelFont; font.pixelSize: 12
+                                            }
+                                        }
+
+                                        Item { Layout.preferredHeight: 4 }
+
+                                        // Action buttons & Status
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            CCPillBtn {
+                                                text: "Save"
+                                                active: idleTab.dirty && !idleTab.saving
+                                                onClicked: idleTab.save()
+                                            }
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: idleTab.statusText
+                                                color: idleTab.isError
+                                                    ? Theme.cTertiary
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.85)
+                                                font.family: Config.labelFont; font.pixelSize: 11
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        Item { Layout.preferredHeight: 10 }
+                                    }
                                 }
                             }
                         }

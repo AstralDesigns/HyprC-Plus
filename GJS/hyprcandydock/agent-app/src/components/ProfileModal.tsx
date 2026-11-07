@@ -125,6 +125,13 @@ export const ProfileModal: FC = () => {
     setAuthError('');
   };
 
+  const handleClose = () => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    setStore(prev => ({ profileOpen: false, editorFocusToken: prev.editorFocusToken + 1 }));
+  };
+
   if (!store.profileOpen) return null;
 
   const user = store.githubUser;
@@ -135,7 +142,7 @@ export const ProfileModal: FC = () => {
 
   return (
     <div
-      onClick={() => setStore({ profileOpen: false })}
+      onClick={handleClose}
       style={{
         position: 'absolute',
         inset: 0,

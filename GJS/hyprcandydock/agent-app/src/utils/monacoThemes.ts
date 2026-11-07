@@ -124,8 +124,12 @@ function ensureReadable(hex: string, lightBase: string): string {
 
 // ── Theme registration ────────────────────────────────────────────────────────
 
-export function registerMatugenTheme(monaco: any): void {
+let matugenThemeRegistered = false;
+
+export function registerMatugenTheme(monaco: any, force = false): void {
   if (!monaco?.editor) return;
+  if (matugenThemeRegistered && !force) return;
+  matugenThemeRegistered = true;
 
   // Matugen palette (roles kept for text/keywords/containers).
   const primary        = readThemeVar('matugen_primary',             '--matugen-primary',             '#a0c9dc');
@@ -160,8 +164,8 @@ export function registerMatugenTheme(monaco: any): void {
 
   const cursorColor       = '#' + strip(primary);
   const lineHighlight     = withAlpha(primary, 12);
-  const selectionBg       = withAlpha(primaryCont, 40);
-  const selHighlight      = withAlpha(primary, 15);
+  const selectionBg       = withAlpha(primary, 10);
+  const selHighlight      = withAlpha(primary, 10);
   const wordHighlight     = withAlpha(primaryCont, 20);
   const wordHighlightStrg = withAlpha(primary, 20);
   const scrollbarIdle     = withAlpha(primary, 10);
@@ -223,6 +227,7 @@ export function registerMatugenTheme(monaco: any): void {
       'editorCursor.background':              '#' + strip(onSecondary),
       // Selections
       'editor.selectionBackground':           selectionBg,
+      'editor.inactiveSelectionBackground':   withAlpha(primary, 8),
       'editor.selectionHighlightBackground':  selHighlight,
       'editor.wordHighlightBackground':       wordHighlight,
       'editor.wordHighlightStrongBackground': wordHighlightStrg,
@@ -279,9 +284,16 @@ export function registerMatugenTheme(monaco: any): void {
       'scrollbarSlider.activeBackground':     scrollbarHover,
       // Minimap
       'minimap.background':                   editorBg,
+      'minimap.selectionHighlight':           withAlpha(primary, 10),
+      'minimap.selectionOccurrenceHighlight': withAlpha(primary, 10),
       'minimapSlider.background':             scrollbarIdle,
       'minimapSlider.hoverBackground':        scrollbarHover,
       'minimapSlider.activeBackground':       scrollbarHover,
+      // Find/replace widget input options (match case, whole word, regex, preserve case)
+      'inputOption.activeBorder':             '#' + strip(primary),
+      'inputOption.activeBackground':         withAlpha(primary, 18),
+      'inputOption.activeForeground':         '#' + strip(primary),
+      'inputOption.hoverBackground':          withAlpha(primary, 12),
       // Right-click context menu & Action list
       'menu.background':                      '#' + strip(onSecondary),
       'menu.foreground':                      '#' + strip(primary),
@@ -300,6 +312,7 @@ export function registerMatugenTheme(monaco: any): void {
       'editorWidget.border':                  '#' + strip(surfaceVariant),
       'editorOverviewRuler.border':           '#' + strip(surfaceVariant),
       'editorOverviewRuler.findMatchForeground': '#' + strip(primary),
+      'editorOverviewRuler.selectionHighlightForeground': withAlpha(primary, 20),
       // Peek view
       'peekView.border':                      '#' + strip(primary),
       'peekViewEditor.background':            '#' + strip(onSecondary),
@@ -321,10 +334,10 @@ export function registerMatugenTheme(monaco: any): void {
 
 export function applyMatugenThemeNow(monaco: any): void {
   if (!monaco?.editor) return;
-  registerMatugenTheme(monaco);
+  registerMatugenTheme(monaco, true);
 }
 
 export function registerMonacoThemes(monaco: any) {
   if (!monaco?.editor) return;
-  registerMatugenTheme(monaco);
+  registerMatugenTheme(monaco, false);
 }

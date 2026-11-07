@@ -27,30 +27,58 @@ import { bridge } from '../bridge';
 
 // ── Wallust → xterm theme helper ─────────────────────────────────────────────
 function buildXtermTheme(cssVars: Record<string, string>) {
-  const w = (n: number) => cssVars[`wallust_color${n}`] || undefined;
-  const m = (k: string) => cssVars[`matugen_${k}`] || undefined;
+  const m = (k: string) => {
+    const clean = k.replace(/-/g, '_');
+    const hyphen = k.replace(/_/g, '-');
+    return (
+      cssVars[`matugen_${clean}`] ||
+      cssVars[`matugen_${hyphen}`] ||
+      cssVars[clean] ||
+      cssVars[hyphen] ||
+      (typeof document !== 'undefined'
+        ? getComputedStyle(document.documentElement).getPropertyValue(`--matugen-${hyphen}`).trim()
+        : '') ||
+      undefined
+    );
+  };
+  const w = (n: number) => {
+    return (
+      cssVars[`wallust_color${n}`] ||
+      cssVars[`color${n}`] ||
+      (typeof document !== 'undefined'
+        ? getComputedStyle(document.documentElement).getPropertyValue(`--wallust-color${n}`).trim()
+        : '') ||
+      undefined
+    );
+  };
+
+  const surface = m('surface');
+  const surfaceTint = m('surface_tint');
+  const primaryFixedDim = m('primary_fixed_dim');
+  const background = m('background');
+
   return {
-    background:   m('background') || m('surface') || '#0d1117',
-    foreground:   m('on_surface') || w(7) || '#e4eef3',
-    cursor:       m('primary_fixed_dim') || w(6) || '#a9c5cf',
-    cursorAccent: m('background') || '#0d1117',
-    selectionBackground: (m('primary_fixed_dim') || w(4) || '#4fa3c0') + '44',
-    black:        w(0)  || '#0d1117',
-    red:          w(1)  || '#f28b82',
-    green:        w(2)  || '#81c995',
-    yellow:       w(3)  || '#fdd663',
-    blue:         w(4)  || '#8ab4f8',
-    magenta:      w(5)  || '#c58af9',
-    cyan:         w(6)  || '#78dce8',
-    white:        w(7)  || '#e4eef3',
-    brightBlack:  w(8)  || '#444c56',
-    brightRed:    w(9)  || '#ff9391',
-    brightGreen:  w(10) || '#a8e6ba',
-    brightYellow: w(11) || '#fee89f',
-    brightBlue:   w(12) || '#b0c9ff',
-    brightMagenta:w(13) || '#d9aaff',
-    brightCyan:   w(14) || '#9fe9f7',
-    brightWhite:  w(15) || '#ffffff',
+    background:   surface,
+    foreground:   surfaceTint || m('on_surface') || w(7),
+    cursor:       surfaceTint || primaryFixedDim || w(6),
+    cursorAccent: surface,
+    selectionBackground: primaryFixedDim ? `${primaryFixedDim}44` : (w(4) ? `${w(4)}44` : undefined),
+    black:        background || w(0),
+    red:          w(1),
+    green:        w(2),
+    yellow:       w(3),
+    blue:         w(4),
+    magenta:      w(5),
+    cyan:         w(6),
+    white:        surfaceTint || w(7),
+    brightBlack:  surfaceTint || w(8),
+    brightRed:    w(9),
+    brightGreen:  w(10),
+    brightYellow: w(11),
+    brightBlue:   w(12),
+    brightMagenta:w(13),
+    brightCyan:   w(14),
+    brightWhite:  w(15),
   };
 }
 
@@ -89,6 +117,27 @@ export const TerminalPanel: React.FC = () => {
         scrollback: 2000,
         convertEol: true,
       });
+
+      // Intercept Ctrl+3 (toggle terminal), Ctrl+1 (toggle sidebar), and Ctrl+2 (toggle chat)
+      // inside xterm so keystrokes aren't swallowed by the PTY slave.
+      term.attachCustomKeyEventHandler((ev: KeyboardEvent) => {
+        if (ev.type === 'keydown' && (ev.ctrlKey || ev.metaKey)) {
+          if (ev.key === '3' || ev.code === 'Digit3') {
+            storeActions.toggleTerminal();
+            return false;
+          }
+          if (ev.key === '1' || ev.code === 'Digit1') {
+            storeActions.toggleSidebar();
+            return false;
+          }
+          if (ev.key === '2' || ev.code === 'Digit2') {
+            storeActions.toggleChat();
+            return false;
+          }
+        }
+        return true;
+      });
+
       const fit = new FitAddon();
       term.loadAddon(fit);
 
@@ -114,16 +163,10 @@ export const TerminalPanel: React.FC = () => {
       requestAnimationFrame(() => {
         try {
           fit.fit();
+          term.scrollToBottom();
           term.focus();
         } catch (_) {}
       });
-
-      // Live-retheme when matugen changes
-      const onTheme = () => {
-        const vars = getThemeVars();
-        term.options.theme = buildXtermTheme(vars);
-      };
-      window.addEventListener('matugen_theme_changed', onTheme);
 
       // Spawn server-side PTY
       let sessionId: string;
@@ -147,12 +190,19 @@ export const TerminalPanel: React.FC = () => {
       const sse = new EventSource(streamUrl);
       sseRef.current = sse;
 
+      let initialBurst = true;
+      const initialBurstTimer = setTimeout(() => { initialBurst = false; }, 3500);
+
       sse.onmessage = (ev) => {
         try {
           const bytes = atob(ev.data);
           const u8 = new Uint8Array(bytes.length);
           for (let i = 0; i < bytes.length; i++) u8[i] = bytes.charCodeAt(i);
-          term.write(u8);
+          term.write(u8, () => {
+            if (initialBurst) {
+              term.scrollToBottom();
+            }
+          });
         } catch { /* malformed chunk — ignore */ }
       };
 
@@ -203,16 +253,43 @@ export const TerminalPanel: React.FC = () => {
       if (!sessionRef.current) {
         spawnSession();
       } else {
-        // Refit and focus when unhidden
+        // Refit, refresh theme, and focus when unhidden
         requestAnimationFrame(() => {
           try {
+            if (termRef.current) {
+              const vars = getThemeVars();
+              termRef.current.options.theme = buildXtermTheme(vars);
+            }
             fitRef.current?.fit();
+            termRef.current?.scrollToBottom();
             termRef.current?.focus();
           } catch (_) {}
         });
       }
+    } else {
+      try {
+        termRef.current?.blur();
+        const ae = document.activeElement as HTMLElement | null;
+        if (ae && (containerRef.current?.contains(ae) || ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT')) {
+          ae.blur();
+        }
+      } catch (_) {}
     }
   }, [store.terminalVisible, spawnSession]);
+
+  // Live theme listener across component lifecycle
+  useEffect(() => {
+    const onTheme = (ev?: any) => {
+      if (termRef.current) {
+        const vars = (ev?.detail as Record<string, string>) || getThemeVars();
+        termRef.current.options.theme = buildXtermTheme(vars);
+      }
+    };
+    window.addEventListener('matugen_theme_changed', onTheme);
+    return () => {
+      window.removeEventListener('matugen_theme_changed', onTheme);
+    };
+  }, []);
 
   // Dispose on unmount
   useEffect(() => {
@@ -227,6 +304,7 @@ export const TerminalPanel: React.FC = () => {
       if (fitRef.current && termRef.current) {
         try {
           fitRef.current.fit();
+          termRef.current.scrollToBottom();
           if (sessionRef.current) {
             bridge.ptyResize(sessionRef.current, termRef.current.cols, termRef.current.rows).catch(() => {});
           }
@@ -275,7 +353,7 @@ export const TerminalPanel: React.FC = () => {
 
   return (
     <div
-      className={`terminal-panel ${store.terminalVisible ? '' : 'terminal-hidden'}`}
+      className={`terminal-panel ${store.terminalVisible ? 'terminal-visible' : 'terminal-hidden'}`}
       style={{ height: `${store.terminalHeight}px` }}
     >
       {/* Resize handle */}
@@ -288,7 +366,7 @@ export const TerminalPanel: React.FC = () => {
 
       {/* Header bar */}
       <div className="terminal-header">
-        <TerminalSquare size={13} style={{ color: 'var(--accent-cyan)', flexShrink: 0 }} />
+        <TerminalSquare size={13} style={{ color: 'var(--matugen-surface-tint)', flexShrink: 0 }} />
         <span className="terminal-header-title">Terminal</span>
         <div className="terminal-header-actions">
           <button

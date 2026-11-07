@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { storeActions } from '../store';
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  RenameDialog.tsx — in-app "rename" prompt shared by the Explorer tree
@@ -48,18 +49,30 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
   const trimmed = value.trim();
   const valid = trimmed.length > 0 && trimmed !== initialName && !trimmed.includes('/');
 
+  const handleCancel = () => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    onCancel();
+    storeActions.focusEditor();
+  };
+
   const submit = () => {
     if (!valid) return;
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     onSubmit(trimmed);
+    storeActions.focusEditor();
   };
 
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') { e.preventDefault(); submit(); }
-    else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+    else if (e.key === 'Escape') { e.preventDefault(); handleCancel(); }
   };
 
   return createPortal(
-    <div className="agent-dialog-overlay" onPointerDown={onCancel}>
+    <div className="agent-dialog-overlay" onPointerDown={handleCancel}>
       <div className="agent-dialog" onPointerDown={(e) => e.stopPropagation()}>
         <div className="agent-dialog-title">{title}</div>
         <div className="agent-dialog-body">
@@ -76,7 +89,7 @@ export const RenameDialog: React.FC<RenameDialogProps> = ({
           )}
         </div>
         <div className="agent-dialog-actions">
-          <button type="button" className="agent-dialog-btn" onClick={onCancel}>Cancel</button>
+          <button type="button" className="agent-dialog-btn" onClick={handleCancel}>Cancel</button>
           <button type="button" className="agent-dialog-btn" disabled={!valid} onClick={submit}>Rename</button>
         </div>
       </div>

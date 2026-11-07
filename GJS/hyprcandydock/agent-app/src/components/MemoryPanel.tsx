@@ -67,16 +67,23 @@ export const MemoryPanel: FC = () => {
     }
   };
 
+  const handleClose = () => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    setStore(prev => ({ memoryPanelOpen: false, editorFocusToken: prev.editorFocusToken + 1 }));
+  };
+
   const openMemory = (path: string) => {
     void storeActions.openFileByPath(path);
-    setStore({ memoryPanelOpen: false });
+    handleClose();
   };
 
   if (!store.memoryPanelOpen) return null;
 
   return (
     <div
-      onClick={() => setStore({ memoryPanelOpen: false })}
+      onClick={handleClose}
       className="memory-overlay"
       style={{
         position: 'absolute',

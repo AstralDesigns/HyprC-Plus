@@ -95,6 +95,20 @@ export function registerCustomLanguages(monaco: any): void {
       ts.javascriptDefaults.setCompilerOptions(compilerOpts);
     }
   } catch { /* worker API drift — leave defaults in place */ }
+  // GTK 3/4 and Waybar stylesheets use non-standard @define-color and @variable syntax.
+  // Standard W3C CSS validation flags every GTK token with false-positive errors;
+  // disable CSS validation so valid desktop stylesheets aren't flooded with errors.
+  try {
+    const css = monaco.languages.css;
+    if (css?.cssDefaults) {
+      css.cssDefaults.setDiagnosticsOptions({
+        validate: false,
+        lint: {
+          unknownAtRules: 'ignore',
+        },
+      });
+    }
+  } catch { /* worker API drift — leave defaults in place */ }
   registerQml(monaco);
   registerToml(monaco);
   registerRasi(monaco);

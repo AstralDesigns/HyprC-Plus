@@ -78,6 +78,8 @@ export const Sidebar: React.FC = () => {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const sidebarPanelRef = useRef<HTMLDivElement>(null);
   const projectTreeRef = useRef<HTMLDivElement>(null);
+  const fileSearchInputRef = useRef<HTMLInputElement>(null);
+  const projectSearchInputRef = useRef<HTMLInputElement>(null);
   // Last-seen mtime per watched directory, for the explorer auto-refresh poll.
   const dirMtimeRef = useRef<Record<string, number>>({});
   // Breadcrumb row slides horizontally on vertical wheel (it overflows, not scrolls).
@@ -129,12 +131,36 @@ export const Sidebar: React.FC = () => {
     storeActions.refreshDirectory();
   }, [store.currentPath]);
 
+  // When superuser authentication succeeds for a protected folder, refresh the active path
+  useEffect(() => {
+    const onUnlocked = (e: any) => {
+      const path = e.detail?.path;
+      if (store.currentPath === path) {
+        void storeActions.refreshDirectory();
+      } else if (path && folderChildren[path]) {
+        void listFolder(path).then(entries => {
+          if (entries.length > 0) applyFolderEntries(path, entries);
+        });
+      }
+    };
+    window.addEventListener('agent_sudo_unlocked', onUnlocked);
+    return () => window.removeEventListener('agent_sudo_unlocked', onUnlocked);
+  }, [store.currentPath, folderChildren]);
+
   // List a folder into sorted tree entries (dirs first, case-insensitive name).
   const listFolder = async (folderPath: string): Promise<ProjectEntry[]> => {
-    const items = await bridge.listDirectory(folderPath);
-    return items
-      .map(i => ({ name: i.name, isDir: i.isDir, size: i.size, path: `${folderPath.replace(/\/$/, '')}/${i.name}` }))
-      .sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
+    try {
+      const items = await bridge.listDirectory(folderPath);
+      return items
+        .map(i => ({ name: i.name, isDir: i.isDir, size: i.size, path: `${folderPath.replace(/\/$/, '')}/${i.name}` }))
+        .sort((a, b) => Number(b.isDir) - Number(a.isDir) || a.name.localeCompare(b.name));
+    } catch (e: any) {
+      const msg = String(e?.message || e || '');
+      if (msg.includes('PERMISSION_DENIED') || msg.includes('Permission denied') || msg.includes('EACCES')) {
+        storeActions.openPasswordPrompt(folderPath, undefined, 'directory', 'sidebar');
+      }
+      return [];
+    }
   };
 
   // Push freshly-listed entries into the right bucket: project root goes to
@@ -518,7 +544,76 @@ export const Sidebar: React.FC = () => {
     }
   }, [selectedPath]);
 
+  // When sidebar is opened or mode changes, auto-focus the active sub-tab's search input
+  // and ensure keyboard navigation is ready right from the start.
+  useEffect(() => {
+    if (!store.sidebarVisible) {
+      // Explicitly blur any input inside sidebar when sidebar is hidden so focus releases
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae && (sidebarPanelRef.current?.contains(ae) || ae.tagName === 'INPUT')) {
+        ae.blur();
+      }
+      return;
+    }
+    const timer = setTimeout(() => {
+      const input = store.sidebarMode === 'project' ? projectSearchInputRef.current : fileSearchInputRef.current;
+      if (input) {
+        input.focus();
+      }
+      if (navigableItems.length > 0) {
+        setSelectedPath(prev => (prev && navigableItems.some(it => it.id === prev) ? prev : navigableItems[0].id));
+      }
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [store.sidebarVisible, store.sidebarMode, navigableItems.length]);
+
+  // Restore focus to the sidebar when requested (e.g. after PasswordPromptDialog closes on a sidebar action)
+  useEffect(() => {
+    if (store.sidebarFocusToken > 0 && store.sidebarVisible) {
+      const activeInput = store.sidebarMode === 'project' ? projectSearchInputRef.current : fileSearchInputRef.current;
+      if (activeInput) {
+        activeInput.focus();
+      } else if (sidebarPanelRef.current) {
+        sidebarPanelRef.current.focus();
+      }
+    }
+  }, [store.sidebarFocusToken, store.sidebarVisible, store.sidebarMode]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const isModifier = e.ctrlKey || e.metaKey || e.altKey;
+    const isTargetInput = (e.target as HTMLElement)?.tagName === 'INPUT';
+
+    // If typing a regular character or backspace while inside sidebar (even when input not focused),
+    // focus the active sub-tab's search input so text begins showing immediately.
+    if (!isModifier && !isTargetInput) {
+      if (e.key.length === 1) {
+        e.preventDefault();
+        const activeInput = store.sidebarMode === 'project' ? projectSearchInputRef.current : fileSearchInputRef.current;
+        if (activeInput) {
+          activeInput.focus();
+          if (store.sidebarMode === 'project') {
+            setProjectSearch(prev => prev + e.key);
+          } else {
+            setFilterSearch(prev => prev + e.key);
+          }
+        }
+        return;
+      }
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        const activeInput = store.sidebarMode === 'project' ? projectSearchInputRef.current : fileSearchInputRef.current;
+        if (activeInput) {
+          activeInput.focus();
+          if (store.sidebarMode === 'project') {
+            setProjectSearch(prev => prev.slice(0, -1));
+          } else {
+            setFilterSearch(prev => prev.slice(0, -1));
+          }
+        }
+        return;
+      }
+    }
+
     if (e.key === 'Escape') {
       if (filterSearch || projectSearch) {
         e.preventDefault();
@@ -543,11 +638,10 @@ export const Sidebar: React.FC = () => {
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const currIdx = selectedPath ? navigableItems.findIndex(it => it.id === selectedPath) : -1;
-      const isInput = (e.target as HTMLElement)?.tagName === 'INPUT';
-      if (currIdx === 0 && isInput) {
-        setSelectedPath(null);
+      if (currIdx <= 0) {
+        setSelectedPath(navigableItems[0].id);
       } else {
-        const prevIdx = currIdx < 0 ? 0 : Math.max(currIdx - 1, 0);
+        const prevIdx = Math.max(currIdx - 1, 0);
         setSelectedPath(navigableItems[prevIdx].id);
       }
     } else if (e.key === 'Enter') {
@@ -774,6 +868,7 @@ export const Sidebar: React.FC = () => {
           <div className="sidebar-search-bar">
             <Search size={12} className="sidebar-search-icon" />
             <input
+              ref={fileSearchInputRef}
               type="text"
               placeholder="Search files..."
               value={filterSearch}
@@ -879,6 +974,7 @@ export const Sidebar: React.FC = () => {
           <div className="sidebar-search-bar">
             <Search size={12} className="sidebar-search-icon" />
             <input
+              ref={projectSearchInputRef}
               type="text"
               placeholder="Search project..."
               value={projectSearch}
@@ -942,7 +1038,7 @@ export const Sidebar: React.FC = () => {
         document.body,
       )}
       {pendingDelete && createPortal(
-        <div className="agent-dialog-overlay" onPointerDown={() => setPendingDelete(null)}>
+        <div className="agent-dialog-overlay" onPointerDown={() => { setPendingDelete(null); storeActions.focusEditor(); }}>
           <div className="agent-dialog" onPointerDown={(event) => event.stopPropagation()}>
             <div className="agent-dialog-title">Delete {pendingDelete.isDir ? 'folder' : 'file'}?</div>
             <div className="agent-dialog-body">
@@ -951,8 +1047,8 @@ export const Sidebar: React.FC = () => {
               {pendingDelete.isDir && <span className="agent-dialog-hint">This recursively removes the folder and everything in it.</span>}
             </div>
             <div className="agent-dialog-actions">
-              <button type="button" className="agent-dialog-btn" onClick={() => setPendingDelete(null)}>Cancel</button>
-              <button type="button" className="agent-dialog-btn danger" onClick={() => void confirmDelete()}>Delete</button>
+              <button type="button" className="agent-dialog-btn" onClick={() => { setPendingDelete(null); storeActions.focusEditor(); }}>Cancel</button>
+              <button type="button" className="agent-dialog-btn danger" onClick={() => { void confirmDelete(); storeActions.focusEditor(); }}>Delete</button>
             </div>
           </div>
         </div>,
