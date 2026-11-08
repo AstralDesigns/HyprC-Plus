@@ -42,7 +42,7 @@ PROVIDERS = {
         "key_hint": "sk-or-v1-...",
         "api_key_url": "https://openrouter.ai/keys",
         "models": [
-            {"id": "openrouter/free",                       "name": "OpenRouter Free (Auto)",  "desc": "Auto-cycles best available free models. NVIDIA Nemotron, Gemma 4, and other free-tier models.", "context": "128k tokens"},
+            {"id": "openrouter/free",                       "name": "OpenRouter Free (Auto)",  "desc": "Auto-cycles best available free models. NVIDIA Nemotron, Gemma 4, and other free-tier models.", "context": "128k tokens", "is_free": True, "price_tag": "Free"},
             {"id": "anthropic/claude-fable-5-1",            "name": "Claude Fable 5.1",         "desc": "Anthropic flagship (Sep 2026). Best-in-class reasoning & long-horizon agentic work.",           "context": "1M tokens"},
             {"id": "anthropic/claude-sonnet-5",             "name": "Claude Sonnet 5",          "desc": "Best balance of speed & intelligence for production agentic coding.",                           "context": "1M tokens"},
             {"id": "openai/gpt-6-astra",                    "name": "GPT-6 Astra",              "desc": "OpenAI flagship (Sep 2026). Frontier reasoning, computer use & advanced agents.",                "context": "128k tokens"},
@@ -194,12 +194,34 @@ async def fetch_remote_models(provider: str, api_key: str | None = None) -> list
                         ctx_str = f"{ctx_len // 1000}k tokens" if ctx_len >= 1000 else f"{ctx_len} tokens"
                         params = m.get("supported_parameters") or []
                         has_tools = "tools" in params or "tool_choice" in params
+                        pricing = m.get("pricing") or {}
+                        try:
+                            prompt_p = float(pricing.get("prompt") or 0)
+                            compl_p = float(pricing.get("completion") or 0)
+                        except (TypeError, ValueError):
+                            prompt_p, compl_p = 0.0, 0.0
+
+                        is_free = (prompt_p == 0.0 and compl_p == 0.0) or mid.endswith(":free") or "/free" in mid.lower()
+                        if is_free:
+                            price_tag = "Free"
+                        else:
+                            p_1m = prompt_p * 1_000_000
+                            c_1m = compl_p * 1_000_000
+                            if p_1m < 0.01 and c_1m < 0.01:
+                                price_tag = "<$0.01/M"
+                            elif abs(p_1m - c_1m) < 0.001:
+                                price_tag = f"${p_1m:.2f}/M"
+                            else:
+                                price_tag = f"${p_1m:.2f}/${c_1m:.2f}/M"
+
                         models.append({
                             "id": mid,
                             "name": mname,
                             "desc": mdesc,
                             "context": ctx_str,
                             "has_tools": has_tools,
+                            "is_free": is_free,
+                            "price_tag": price_tag,
                         })
                     priority_prefixes = ("anthropic/", "openai/", "google/", "meta-llama/", "deepseek/", "x-ai/", "qwen/", "mistralai/")
                     def model_sort_key(item):

@@ -565,12 +565,12 @@ Item {
         }
     }
     // netEthProc — enumerate saved/available wired profiles so they appear in
-    // the same list as the Wi-Fi APs. `con show` prints NAME:TYPE:DEVICE; the
-    // DEVICE column is populated only for the profile that is currently up, so
-    // that one is marked active. connectNetwork's `nmcli connection up` path
-    // already activates these by name, so no extra plumbing is needed there.
+    // the same list as the Wi-Fi APs, ONLY when a physical wired link (carrier)
+    // is present on an ethernet device.
     Process { id: netEthProc
-        command:["bash","-c","nmcli --escape no -t -f NAME,TYPE,DEVICE con show 2>/dev/null"]
+        command:["bash","-c",
+            "eth=$(nmcli -t -f DEVICE,TYPE,STATE dev 2>/dev/null | awk -F: '$2==\"ethernet\" && $3!=\"unavailable\" && $3!=\"unmanaged\" && $1!~/^veth/ {print $1; exit}'); " +
+            "[ -n \"$eth\" ] && nmcli --escape no -t -f NAME,TYPE,DEVICE con show 2>/dev/null || true"]
         property string token: ":802-3-ethernet:"
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
             const idxT = l.indexOf(netEthProc.token)

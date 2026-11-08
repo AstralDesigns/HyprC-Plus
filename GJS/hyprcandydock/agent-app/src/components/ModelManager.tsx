@@ -140,9 +140,32 @@ export const XAIIcon: FC<{ size?: number }> = ({ size = 16 }) => (
   </svg>
 );
 
+export interface ProviderModel {
+  id: string;
+  name: string;
+  desc?: string;
+  ctx?: string;
+  context?: string;
+  has_tools?: boolean;
+  is_free?: boolean;
+  price_tag?: string;
+}
+
+export interface BYOKProviderDef {
+  id: string;
+  name: string;
+  IconComponent: FC<{ size?: number }>;
+  keyHint: string;
+  apiKeyUrl: string;
+  keyLabel: string;
+  hasSearch?: boolean;
+  defaultModel: string;
+  models: ProviderModel[];
+}
+
 // ── BYOK provider definitions ─────────────────────────────────────────────────
 // Order: AI/ML API, OpenRouter, Groq, Google, Anthropic, OpenAI, Grok
-export const BYOK_PROVIDERS = [
+export const BYOK_PROVIDERS: BYOKProviderDef[] = [
   {
     id: 'aimlapi',
     name: 'AI/ML API',
@@ -175,7 +198,7 @@ export const BYOK_PROVIDERS = [
     hasSearch: true,
     defaultModel: 'openrouter/free',
     models: [
-      { id: 'openrouter/free', name: 'OpenRouter Free (Auto)', ctx: '128k tokens', desc: 'Auto-cycles best available free models. NVIDIA Nemotron, Gemma 4, and other current free-tier models.' },
+      { id: 'openrouter/free', name: 'OpenRouter Free (Auto)', ctx: '128k tokens', desc: 'Auto-cycles best available free models. NVIDIA Nemotron, Gemma 4, and other current free-tier models.', is_free: true, price_tag: 'Free' },
       { id: 'anthropic/claude-fable-5-1', name: 'Claude Fable 5.1', ctx: '1M tokens', desc: 'Anthropic flagship (Sep 2026). Best-in-class reasoning & long-horizon agentic work.' },
       { id: 'anthropic/claude-sonnet-5', name: 'Claude Sonnet 5', ctx: '1M tokens', desc: 'Best balance of speed & intelligence for production agentic coding.' },
       { id: 'openai/gpt-6-astra', name: 'GPT-6 Astra', ctx: '128k tokens', desc: 'OpenAI flagship (Sep 2026). Frontier reasoning, computer use & advanced agents.' },
@@ -282,12 +305,13 @@ export const BYOK_PROVIDERS = [
       { id: 'grok-3', name: 'Grok 3', ctx: '131k tokens', desc: 'Previous generation flagship. Stable, reliable general-purpose intelligence.' },
     ],
   },
-] as const;
+];
 
-export const getVisibleProviders = () =>
-  BYOK_PROVIDERS.filter(
-    p => !HIDE_PROVIDERS.map(h => h.trim().toLowerCase()).includes(p.id.toLowerCase())
-  );
+export const VISIBLE_PROVIDERS = BYOK_PROVIDERS.filter(
+  p => !HIDE_PROVIDERS.map(h => h.trim().toLowerCase()).includes(p.id.toLowerCase())
+);
+
+export const getVisibleProviders = () => VISIBLE_PROVIDERS;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SHARED PRIMITIVES
@@ -398,7 +422,7 @@ const CloudTab: FC = () => {
   const [licenseError, setLicenseError] = useState('');
   const [showLicense, setShowLicense] = useState(false);
 
-  const visibleProviders = getVisibleProviders();
+  const visibleProviders = VISIBLE_PROVIDERS;
 
   // Selected provider in the scrollable tab bar — resumes whichever provider
   // was actually last active (if keys are stored); otherwise defaults to
@@ -422,7 +446,7 @@ const CloudTab: FC = () => {
   const [providerErrors, setProvErrors] = useState<Record<string, string>>({});
 
   // ── Dynamic models per provider ─────────────────────────────────────────────
-  const [fetchedModels, setFetchedModels] = useState<Record<string, Array<{ id: string; name: string; desc: string; context?: string; ctx?: string; has_tools?: boolean }>>>({});
+  const [fetchedModels, setFetchedModels] = useState<Record<string, Array<{ id: string; name: string; desc: string; context?: string; ctx?: string; has_tools?: boolean; is_free?: boolean; price_tag?: string }>>>({});
   const [loadingModels, setLoadingModels] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState<Record<string, string>>({});
   const [modelsLive, setModelsLive] = useState<Record<string, boolean>>({});
@@ -721,17 +745,19 @@ const CloudTab: FC = () => {
   // the locked and unlocked renders — a conditional hook below caused React
   // #310 ("rendered more hooks than during the previous render") whenever the
   // Gumroad license was activated or revoked.
+  const lastScrolledQueryRef = useRef<Record<string, string>>({});
   useEffect(() => {
     if (!store.byokLicenseKey) return;
+    const q = (searchQuery[selectedProviderId] || '').trim().toLowerCase();
+    if (!q || q === (lastScrolledQueryRef.current[selectedProviderId] || '')) return;
+    lastScrolledQueryRef.current[selectedProviderId] = q;
     const provider = visibleProviders.find(p => p.id === selectedProviderId) || visibleProviders[0] || BYOK_PROVIDERS[0];
     const raw = fetchedModels[provider.id] || (provider.models as any) || [];
-    const q = (searchQuery[provider.id] || '').trim().toLowerCase();
-    if (!q) return;
     const first = (raw as Array<{ id: string; name: string; desc?: string }>).find(m =>
       m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || (m.desc && m.desc.toLowerCase().includes(q)));
     const el = first ? cardRefs.current[first.id] : null;
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [store.byokLicenseKey, selectedProviderId, searchQuery, fetchedModels, visibleProviders]);
+  }, [store.byokLicenseKey, selectedProviderId, searchQuery[selectedProviderId]]);
 
   // ── Agents gate — no Gumroad license ──────────────────────────────────────
   if (!store.byokLicenseKey) {
@@ -830,7 +856,8 @@ const CloudTab: FC = () => {
     ? availableModels.filter(m =>
       m.id.toLowerCase().includes(currentQuery) ||
       m.name.toLowerCase().includes(currentQuery) ||
-      (m.desc && m.desc.toLowerCase().includes(currentQuery))
+      (m.desc && m.desc.toLowerCase().includes(currentQuery)) ||
+      (currentQuery === 'free' && ((m as any).is_free || (m as any).price_tag === 'Free' || m.id.endsWith(':free') || m.id === 'openrouter/free'))
     )
     : availableModels;
 
@@ -1274,7 +1301,7 @@ const CloudTab: FC = () => {
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{model.name}</span>
                           {selected && (
                             <span style={{
@@ -1290,6 +1317,33 @@ const CloudTab: FC = () => {
                               Active
                             </span>
                           )}
+                          {((model as any).is_free || (model as any).price_tag === 'Free' || model.id.endsWith(':free') || model.id === 'openrouter/free') ? (
+                            <span style={{
+                              fontSize: '9px',
+                              padding: '1px 6px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'color-mix(in srgb, var(--accent-green, #4ade80) 18%, transparent)',
+                              border: '1px solid color-mix(in srgb, var(--accent-green, #4ade80) 45%, transparent)',
+                              color: 'var(--accent-green, #4ade80)',
+                              fontWeight: 700,
+                              lineHeight: '12px',
+                            }}>
+                              Free
+                            </span>
+                          ) : (model as any).price_tag ? (
+                            <span style={{
+                              fontSize: '9px',
+                              padding: '1px 5px',
+                              borderRadius: 'var(--radius-full)',
+                              background: 'color-mix(in srgb, var(--text-muted) 12%, transparent)',
+                              border: '1px solid color-mix(in srgb, var(--text-muted) 28%, transparent)',
+                              color: 'var(--text-muted)',
+                              fontWeight: 600,
+                              lineHeight: '12px',
+                            }}>
+                              {(model as any).price_tag}
+                            </span>
+                          ) : null}
                         </div>
                         {ctxText && (
                           <span style={{ fontSize: '10px', color: PRIMARY, flexShrink: 0 }}>{ctxText}</span>
@@ -1313,7 +1367,7 @@ const CloudTab: FC = () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 // COMPLETIONS TAB — Inline ghost-text providers (never Gumroad-gated)
 // ═══════════════════════════════════════════════════════════════════════════════
-type CompletionModel = { id: string; name: string; desc: string; context?: string; ctx?: string };
+type CompletionModel = { id: string; name: string; desc: string; context?: string; ctx?: string; is_free?: boolean; price_tag?: string };
 
 const CompletionsTab: FC = () => {
   const [store] = useStore();
@@ -1470,7 +1524,12 @@ const CompletionsTab: FC = () => {
   })();
   const q = (searchQuery[provider.id] || '').trim().toLowerCase();
   const filteredModels = q
-    ? availableModels.filter(m => m.id.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || (m.desc && m.desc.toLowerCase().includes(q)))
+    ? availableModels.filter(m =>
+        m.id.toLowerCase().includes(q) ||
+        m.name.toLowerCase().includes(q) ||
+        (m.desc && m.desc.toLowerCase().includes(q)) ||
+        (q === 'free' && ((m as any).is_free || (m as any).price_tag === 'Free' || m.id.endsWith(':free') || m.id === 'openrouter/free'))
+      )
     : availableModels;
 
   const savedKey = store.byokKeys[provider.id] || '';
@@ -1670,7 +1729,36 @@ const CompletionsTab: FC = () => {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
-                      <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{model.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-primary)' }}>{model.name}</span>
+                        {((model as any).is_free || (model as any).price_tag === 'Free' || model.id.endsWith(':free') || model.id === 'openrouter/free') ? (
+                          <span style={{
+                            fontSize: '9px',
+                            padding: '1px 6px',
+                            borderRadius: 'var(--radius-full)',
+                            background: 'color-mix(in srgb, var(--accent-green, #4ade80) 18%, transparent)',
+                            border: '1px solid color-mix(in srgb, var(--accent-green, #4ade80) 45%, transparent)',
+                            color: 'var(--accent-green, #4ade80)',
+                            fontWeight: 700,
+                            lineHeight: '12px',
+                          }}>
+                            Free
+                          </span>
+                        ) : (model as any).price_tag ? (
+                          <span style={{
+                            fontSize: '9px',
+                            padding: '1px 5px',
+                            borderRadius: 'var(--radius-full)',
+                            background: 'color-mix(in srgb, var(--text-muted) 12%, transparent)',
+                            border: '1px solid color-mix(in srgb, var(--text-muted) 28%, transparent)',
+                            color: 'var(--text-muted)',
+                            fontWeight: 600,
+                            lineHeight: '12px',
+                          }}>
+                            {(model as any).price_tag}
+                          </span>
+                        ) : null}
+                      </div>
                       {ctxText && <span style={{ fontSize: '10px', color: PRIMARY, flexShrink: 0 }}>{ctxText}</span>}
                     </div>
                     <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>{model.desc}</div>
