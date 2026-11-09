@@ -89,15 +89,16 @@
 // Two knobs that cut 10 idle threads from this process with no functional
 // change:
 //
-//  QSG_RENDER_LOOP=basic — each visible QQuickWindow normally owns a
-//  QSGRenderThread (bar + 4 shell reservations + 2 shell islands + desktop
-//  layer + dock + launcher = 10). The basic loop renders on the GUI thread
-//  instead. Our surfaces are small and mostly idle; if any animation ever
-//  measurably stutters, delete this one line to go back to threaded.
+//  QSG_RENDER_LOOP=basic is explicitly DISABLED: in QtQuick on Wayland,
+//  the basic render loop starves inactive or secondary layer surfaces
+//  (shell mode left & right islands, dock), causing dynamic width changes
+//  (module padding, workspace additions, updates scan, launched apps)
+//  to freeze until mouse pointer hover delivers an event. Threaded render
+//  loop (Qt default) commits frames smoothly across all layer surfaces.
 //
 //  GALLIUM_THREADPOOL=0 — caps Mesa's llvmpipe worker pool (no hardware DRI
 //  driver is mapped in this process). Chromium's own GPU pipeline is
-//  untouched.
+//  untouched. - currently disabled. 
 //
 //  NOT possible: QT_QUICK_BACKEND=software — it kills QtWebEngine rendering
 //  (blank web/agent tabs; the web view compositor requires the accelerated
@@ -106,8 +107,7 @@
 //  ~23 "qs:gdrv0" threads are Mesa per-context threaded drivers — one per
 //  live QQuickWindow's EGL context — and are the price of the GL backend
 //  unless the launcher is split into a separate qs process.
-//@ pragma Env QSG_RENDER_LOOP=basic
-//@ pragma Env GALLIUM_THREADPOOL=0
+// //@ pragma Env GALLIUM_THREADPOOL=0
 
 pragma ComponentBehavior: Bound
 

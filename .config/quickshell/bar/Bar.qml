@@ -425,32 +425,18 @@ PanelWindow {
             intersection: Intersection.Subtract
         }
 
-        // Add back input region for Left Island when visible
-        Region {
-            x:      shellLeftPW.x || 0
-            y:      shellLeftPW.y || 0
-            width:  shellLeftPW.visible ? shellLeftPW.width : 0
-            height: shellLeftPW.visible ? shellLeftPW.height : 0
-        }
-
         // Add back input region for Shell Center Protrusion when visible.
         // shellCenter.x/y are relative to barLayout (which sits inside barBg),
         // so we must add barBg's own position within the bar PanelWindow to get
         // window-root coordinates — critical for bottom-positioned shell mode
         // where barBg.y = bar.height - _shellActiveThickness (not 0).
+        // (Note: shellLeftPW and shellRightPW live on their own WlrLayer.Top
+        // PanelWindows, so their input regions are handled by their own surfaces).
         Region {
             x:      barBg.x + shellCenter.x
             y:      barBg.y + shellCenter.y
             width:  shellCenter.visible ? shellCenter.width : 0
             height: shellCenter.visible ? shellCenter.height : 0
-        }
-
-        // Add back input region for Right Island when visible
-        Region {
-            x:      shellRightPW.x || 0
-            y:      shellRightPW.y || 0
-            width:  shellRightPW.visible ? shellRightPW.width : 0
-            height: shellRightPW.visible ? shellRightPW.height : 0
         }
     }
 

@@ -48,13 +48,18 @@ PanelWindow {
 
     // Screen-space origin of the compact island, derived from the same
     // centring math as the margins below (PanelWindow.x/y are not reliably
-    // populated for auto-positioned surfaces in this qs build).
+    // populated for auto-positioned surfaces in this qs build). Keyed off
+    // dock._len and contentThickness directly so margins/origin never lag
+    // behind during dynamic surface length changes.
+    readonly property real _currW: isHorizontal ? dock._len : dock.contentThickness
+    readonly property real _currH: isHorizontal ? dock.contentThickness : dock._len
+
     readonly property real originX: isLeft ? Config.dockMargin
-        : isRight ? dock.scrW - dock.width - Config.dockMargin
-        : Math.round((dock.scrW - dock.width) / 2)
+        : isRight ? dock.scrW - dock._currW - Config.dockMargin
+        : Math.round((dock.scrW - dock._currW) / 2)
     readonly property real originY: isTop ? Config.dockMargin
-        : isBottom ? dock.scrH - dock.height - Config.dockMargin
-        : Math.round((dock.scrH - dock.height) / 2)
+        : isBottom ? dock.scrH - dock._currH - Config.dockMargin
+        : Math.round((dock.scrH - dock._currH) / 2)
 
     anchors {
         top:    isTop    || isLeft || isRight
@@ -64,10 +69,10 @@ PanelWindow {
     }
     margins {
         top:    isTop    ? Config.dockMargin
-                          : Math.round((dock.scrH - dock.height) / 2)
+                          : Math.round((dock.scrH - dock._currH) / 2)
         bottom: isBottom ? Config.dockMargin : 0
         left:   isLeft   ? Config.dockMargin
-                          : Math.round((dock.scrW - dock.width) / 2)
+                          : Math.round((dock.scrW - dock._currW) / 2)
         right:  isRight  ? Config.dockMargin : 0
     }
 
