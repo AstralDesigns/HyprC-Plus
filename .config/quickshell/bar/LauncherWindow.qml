@@ -45,7 +45,7 @@ Item {
             color: "transparent"
 
             WlrLayershell.namespace: "hyprcandy-launcher"
-            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.layer: WlrLayer.Top //Overlay
             // OnDemand (not Exclusive): QtWebEngine renders HTML select dropdowns as
             // separate transient popup surfaces that must grab keyboard focus to stay open.
             // Exclusive focus is held here, so the compositor denies the popup and it
