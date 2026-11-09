@@ -5,15 +5,16 @@ import {
   ChevronDown, ChevronRight, CheckCircle, Clock, Sparkles,
   Folder, Copy, Check, Edit2, RotateCcw,
   Brain, Zap, Eye, ListChecks,
-  X,
+  X, Lock,
 } from 'lucide-react';
-import { useStore, getStore, Message, ToolCallData, storeActions, setStore, type PlanTask, type SuggestionsData, type SuggestionOption } from '../store';
+import { useStore, getStore, Message, ToolCallData, storeActions, setStore, type PlanTask, type SuggestionsData, type SuggestionOption, type MessageBlock } from '../store';
 import { bridge } from '../bridge';
 import { FileIcon } from '../utils/fileIcons';
 import { DiffWidget } from './DiffWidget';
 import { CommandWidget } from './CommandWidget';
 import { SelectionChip } from './SelectionChip';
 import { agentEngine } from '../engine/agent-engine';
+import { ImageLightboxModal } from './ImageLightboxModal';
 
 /* ── Empty chat screen ──────────────────────────────────────────────── */
 const EmptyChatScreen: React.FC = () => (
@@ -85,6 +86,26 @@ function isElevatedTool(name: string) {
   return ELEVATED_TOOLS.includes(name) || name === 'task_complete';
 }
 
+function isPrivilegeEscalationTool(tool: ToolCallData): boolean {
+  if (!tool) return false;
+  const cmd = String((tool.arguments as any)?.command || (tool.arguments as any)?.cmd || '');
+  if (/\bsudo\b/.test(cmd) || (tool.arguments as any)?.sudo || (tool.arguments as any)?.elevated) {
+    return true;
+  }
+  const status = tool.status;
+  const error = String((tool as any).error || (typeof tool.result === 'string' ? tool.result : ''));
+  if (status === 'error' && (
+    error.includes('PERMISSION_DENIED') ||
+    error.includes('Permission denied') ||
+    error.includes('EACCES') ||
+    error.includes('password') ||
+    error.includes('sudo')
+  )) {
+    return true;
+  }
+  return false;
+}
+
 const AMBIENT_META: Record<string, { icon: React.ReactNode; label: (a: any) => string }> = {
   web_search:     { icon: <Globe size={12} />, label: a => `Searched: "${a?.query || a?.q || ''}"` },
   fetch_url:      { icon: <Globe size={12} />, label: a => `Fetched ${a?.url || ''}` },
@@ -110,27 +131,13 @@ function ambientLabel(tool: ToolCallData): { icon: React.ReactNode; text: string
    purely a "this wrapped to more than one line" hint, shown only when the
    text actually doesn't fit on one line at the panel's current width. */
 const InterstitialLine: React.FC<{ text: string }> = ({ text }) => {
-  const textRef = useRef<HTMLSpanElement>(null);
-  const [wrapped, setWrapped] = useState(false);
   const trimmed = text.trim();
-
-  useEffect(() => {
-    const el = textRef.current;
-    if (!el) return;
-    const measure = () => setWrapped(el.scrollWidth > el.clientWidth + 1);
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [trimmed]);
-
   if (!trimmed) return null;
   return (
-    <div className="agent-interstitial">
-      <span ref={textRef} className={`agent-interstitial-text ${wrapped ? 'agent-interstitial-text-wrap' : ''}`}>
+    <div className="agent-interstitial animate-fade-in">
+      <span className="agent-interstitial-text">
         {trimmed}
       </span>
-      {wrapped && <ChevronRight size={12} className="agent-interstitial-chevron" />}
     </div>
   );
 };
@@ -302,8 +309,7 @@ const ReasoningSection: React.FC<{ content: string; live: boolean }> = ({ conten
 /* ── Steering marker: an instruction the user injected mid-run ─────── */
 const SteerMarker: React.FC<{ content: string }> = ({ content }) => (
   <div className="steer-marker animate-fade-in">
-    <Zap size={11} />
-    <span className="steer-marker-label">Steered</span>
+    <Zap size={10} style={{ opacity: 0.8, flexShrink: 0 }} />
     <span className="steer-marker-text">{content}</span>
   </div>
 );
@@ -463,8 +469,8 @@ const SpecCard: React.FC<{ markdown: string; status: 'drafting' | 'ready'; actio
             </div>
           ) : (
             <>
-              <button className="spec-btn spec-btn-primary" onClick={() => act(() => agentEngine.approve('approve'))} disabled={busy}><CheckCircle size={13} /> Approve &amp; execute</button>
-              <button className="spec-btn" onClick={() => setRevising(true)} disabled={busy}><Edit2 size={12} /> Revise</button>
+              <button className="spec-btn spec-btn-primary" onClick={() => act(() => agentEngine.approve('approve'))} disabled={busy}><CheckCircle size={13} /> Build</button>
+              <button className="spec-btn" onClick={() => setRevising(true)} disabled={busy}><Edit2 size={12} /> Edit</button>
               <button className="spec-btn spec-btn-ghost" onClick={() => act(() => agentEngine.approve('cancel'))} disabled={busy}><X size={12} /> Cancel</button>
             </>
           )}
@@ -638,6 +644,28 @@ const MessageBlock: React.FC<{
   );
 };
 
+const renderMarkdown = (content: string, extraClass = '') => (
+  <div className={`markdown-body ${extraClass}`}>
+    <ReactMarkdown
+      components={{
+        code({ node, className, children, ...props }: any) {
+          const isInline = !className;
+          if (isInline) {
+            return <code {...props}>{children}</code>;
+          }
+          return (
+            <pre>
+              <code className={className} {...props}>{children}</code>
+            </pre>
+          );
+        }
+      }}
+    >
+      {content}
+    </ReactMarkdown>
+  </div>
+);
+
 /* ── User bubble ────────────────────────────────────────────────────── */
 const UserBubble: React.FC<{
   sessionId: string;
@@ -648,11 +676,24 @@ const UserBubble: React.FC<{
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(message.content);
   const [copied, setCopied] = useState(false);
+  const [activeLightbox, setActiveLightbox] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editContainerRef = useRef<HTMLDivElement>(null);
 
   const ts = message.timestamp
     ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
+
+  useEffect(() => {
+    if (!isEditing) return;
+    const handlePointerDownOutside = (e: MouseEvent | TouchEvent) => {
+      if (editContainerRef.current && !editContainerRef.current.contains(e.target as Node)) {
+        setIsEditing(false);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDownOutside);
+    return () => document.removeEventListener('pointerdown', handlePointerDownOutside);
+  }, [isEditing]);
 
   const handleEdit = () => {
     setEditValue(message.content);
@@ -715,13 +756,25 @@ const UserBubble: React.FC<{
             const src = att.path.startsWith('data:') ? att.path : `file://${att.path}`;
             if (att.kind === 'image') {
               return (
-                <div key={att.path} className="bubble-image-thumb">
+                <div
+                  key={att.path}
+                  className="bubble-image-thumb"
+                  onClick={() => setActiveLightbox(src)}
+                  style={{ cursor: 'pointer' }}
+                  data-tip="Click to view and zoom image"
+                >
                   <img src={src} alt={att.name} />
                 </div>
               );
             }
             return (
-              <span key={att.path} className="bubble-file-chip">
+              <span
+                key={att.path}
+                className="bubble-file-chip bubble-file-clickable"
+                onClick={() => storeActions.openFileByPath(att.path)}
+                style={{ cursor: 'pointer' }}
+                data-tip={`Open ${att.name}`}
+              >
                 <FileIcon name={att.name} size={11} /> {att.name}
               </span>
             );
@@ -738,11 +791,13 @@ const UserBubble: React.FC<{
       )}
 
       {!isEditing ? (
-        <div className="user-bubble">
-          <p className="user-bubble-text">{message.content}</p>
+        <div className="user-bubble" onClick={handleEdit} style={{ cursor: 'pointer' }} data-tip="Click to edit prompt">
+          <div className="user-bubble-markdown markdown-body">
+            {renderMarkdown(message.content)}
+          </div>
         </div>
       ) : (
-        <div className="user-bubble-edit">
+        <div className="user-bubble-edit" ref={editContainerRef}>
           <textarea
             ref={textareaRef}
             className="user-bubble-edit-textarea"
@@ -761,6 +816,83 @@ const UserBubble: React.FC<{
               Resend
             </button>
           </div>
+        </div>
+      )}
+      {activeLightbox && (
+        <ImageLightboxModal src={activeLightbox} onClose={() => setActiveLightbox(null)} />
+      )}
+    </div>
+  );
+};
+
+/* ── Parent Agent Steps Container with Dynamic Gradient Handler ─────── */
+function getStepSummary(blocks: MessageBlock[]): string {
+  if (!blocks.length) return 'Agent steps';
+  const last = blocks[blocks.length - 1];
+  if (last.type === 'reasoning') return 'Thinking…';
+  if (last.type === 'command') {
+    const cmd = (last.tool.arguments as any)?.command || last.tool.name || 'command';
+    return `Running: ${cmd.length > 42 ? cmd.slice(0, 39) + '…' : cmd}`;
+  }
+  if (last.type === 'activity') {
+    const lastTool = last.tools[last.tools.length - 1];
+    if (!lastTool) return 'Processing…';
+    const name = lastTool.name;
+    const args = lastTool.arguments || {};
+    if (name === 'read_file') return `Reading ${(args.path || '').split('/').pop() || 'file'}`;
+    if (name === 'write_file') return `Editing ${(args.path || '').split('/').pop() || 'file'}`;
+    if (name === 'search_files') return `Searching for "${args.pattern || args.query || ''}"`;
+    if (name === 'list_directory') return `Listing ${(args.path || '').split('/').pop() || 'directory'}`;
+    if (name === 'grep_search') return `Searching workspace…`;
+    if (name.startsWith('todo_')) return 'Updating tasks…';
+    return `Executing ${name.replace(/_/g, ' ')}`;
+  }
+  return 'Processing steps…';
+}
+
+const StepsContainer: React.FC<{
+  blocks: MessageBlock[];
+  running: boolean;
+  sessionId: string;
+  messageId: string;
+}> = ({ blocks, running, sessionId, messageId }) => {
+  const [collapsed, setCollapsed] = useState(true);
+  const summary = getStepSummary(blocks);
+
+  return (
+    <div className="agent-steps-container">
+      <button
+        type="button"
+        className={`agent-steps-gradient-handler ${collapsed ? 'collapsed' : 'expanded'}`}
+        onClick={() => setCollapsed(!collapsed)}
+        data-tip={collapsed ? 'Click to expand steps' : 'Click to collapse steps'}
+      >
+        <span className="steps-handler-icon">
+          {collapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />}
+        </span>
+        <span className="steps-handler-summary">{summary}</span>
+        {running && <span className="steps-handler-pulse" />}
+      </button>
+
+      {!collapsed && (
+        <div className="agent-steps-body animate-fade-in">
+          {blocks.map((block, idx) => {
+            const isLast = running && idx === blocks.length - 1;
+            if (block.type === 'reasoning') {
+              return <ReasoningSection key={block.id} content={block.content} live={isLast} />;
+            }
+            if (block.type === 'activity') {
+              return <AgentActivity key={block.id} tools={block.tools} running={isLast} />;
+            }
+            if (block.type === 'command') {
+              return (
+                <div key={block.id} className="agent-tools-flow">
+                  <ToolCard tool={block.tool} />
+                </div>
+              );
+            }
+            return null;
+          })}
         </div>
       )}
     </div>
@@ -819,28 +951,6 @@ const AgentTurn: React.FC<{
     (tool.name === 'exec_command' || tool.name === 'run_command') || (tool.status === 'error' && isElevatedTool(tool.name))
   ) || []) : [];
 
-  const renderMarkdown = (content: string) => (
-    <div className="markdown-body agent-turn-content">
-      <ReactMarkdown
-        components={{
-          code({ node, className, children, ...props }: any) {
-            const isInline = !className;
-            if (isInline) {
-              return <code {...props}>{children}</code>;
-            }
-            return (
-              <pre>
-                <code className={className} {...props}>{children}</code>
-              </pre>
-            );
-          }
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
-
   return (
     <div className="agent-turn-flow animate-fade-in">
       <div className="agent-turn-body">
@@ -871,31 +981,65 @@ const AgentTurn: React.FC<{
             activity timelines, elevated command cards, and diffs can all
             appear and reappear as the turn progresses, instead of every
             widget being bunched before all of the response text. */}
-        {message.blocks && message.blocks.length > 0 ? (
-          message.blocks.map((block, i) => {
-            const isFinalPosition = i === message.blocks!.length - 1;
-            const isLastBlock = running && isFinalPosition;
+        {/* Partition blocks: consecutive step blocks (reasoning, activity, command)
+            grouped into StepsContainer blocks of up to 100 items each, while
+            spec, diff, text, suggestions, verification, and steer pop up outside. */}
+        {message.blocks && message.blocks.length > 0 ? (() => {
+          type RenderItem =
+            | { type: 'steps'; id: string; blocks: MessageBlock[] }
+            | { type: 'block'; block: MessageBlock; isFinalPosition: boolean; isLastBlock: boolean };
+
+          const renderItems: RenderItem[] = [];
+          let stepBatch: MessageBlock[] = [];
+          const total = message.blocks.length;
+
+          for (let i = 0; i < total; i++) {
+            const b = message.blocks[i];
+            // Freely executed terminal commands stay inside the steps container;
+            // only privilege escalation requests (sudo, permission denied, elevated auth) pop up outside.
+            const isStep = b.type === 'reasoning' ||
+              (b.type === 'activity' && !b.tools.some(t => isPrivilegeEscalationTool(t))) ||
+              (b.type === 'command' && !isPrivilegeEscalationTool(b.tool));
+            if (isStep) {
+              stepBatch.push(b);
+              if (stepBatch.length >= 100) {
+                renderItems.push({ type: 'steps', id: `steps_${stepBatch[0].id}`, blocks: stepBatch });
+                stepBatch = [];
+              }
+            } else {
+              if (stepBatch.length > 0) {
+                renderItems.push({ type: 'steps', id: `steps_${stepBatch[0].id}`, blocks: stepBatch });
+                stepBatch = [];
+              }
+              renderItems.push({
+                type: 'block',
+                block: b,
+                isFinalPosition: i === total - 1,
+                isLastBlock: running && i === total - 1,
+              });
+            }
+          }
+          if (stepBatch.length > 0) {
+            renderItems.push({ type: 'steps', id: `steps_${stepBatch[0].id}`, blocks: stepBatch });
+          }
+
+          return renderItems.map(item => {
+            if (item.type === 'steps') {
+              return (
+                <StepsContainer
+                  key={item.id}
+                  blocks={item.blocks}
+                  running={running}
+                  sessionId={sessionId}
+                  messageId={message.id}
+                />
+              );
+            }
+            const { block, isFinalPosition, isLastBlock } = item;
             if (block.type === 'text') {
-              // Only the very last block of a turn is ever the "real" answer
-              // — a model's own tool-use narration always happens between
-              // tool calls, so any earlier text block is by definition
-              // transitional commentary ("Let me check the config first…").
-              // Render those as thin gradient separators instead of full
-              // response bubbles, matching how step-by-step agent traces
-              // usually show this kind of narration.
               return isFinalPosition
                 ? <React.Fragment key={block.id}>{renderMarkdown(block.content)}</React.Fragment>
                 : <InterstitialLine key={block.id} text={block.content} />;
-            }
-            if (block.type === 'activity') {
-              return <AgentActivity key={block.id} tools={block.tools} running={isLastBlock} />;
-            }
-            if (block.type === 'command') {
-              return (
-                <div key={block.id} className="agent-tools-flow">
-                  <ToolCard tool={block.tool} />
-                </div>
-              );
             }
             if (block.type === 'diff') {
               return (
@@ -904,8 +1048,19 @@ const AgentTurn: React.FC<{
                 </div>
               );
             }
-            if (block.type === 'reasoning') {
-              return <ReasoningSection key={block.id} content={block.content} live={running && isFinalPosition} />;
+            if (block.type === 'command') {
+              return (
+                <div key={block.id} className="agent-tools-flow" style={{ marginTop: '4px' }}>
+                  <ToolCard tool={block.tool} />
+                </div>
+              );
+            }
+            if (block.type === 'activity') {
+              return (
+                <div key={block.id} className="agent-tools-flow" style={{ marginTop: '4px' }}>
+                  <AgentActivity tools={block.tools} running={isLastBlock} />
+                </div>
+              );
             }
             if (block.type === 'steer') {
               return <SteerMarker key={block.id} content={block.content} />;
@@ -936,8 +1091,8 @@ const AgentTurn: React.FC<{
               );
             }
             return null;
-          })
-        ) : (
+          });
+        })() : (
           <>
             {message.tools && message.tools.length > 0 && <AgentActivity tools={message.tools} running={running} />}
             {legacyElevatedCommandCards.length > 0 && (
@@ -1009,23 +1164,44 @@ const TOOL_META: Record<string, { icon: React.ReactNode; color: string; label: (
 };
 
 const ToolCard: React.FC<{ tool: ToolCallData }> = ({ tool }) => {
-  const [collapsed, setCollapsed] = useState(true);
+  const isElevated = isPrivilegeEscalationTool(tool);
+  const [collapsed, setCollapsed] = useState(!isElevated);
   const meta = TOOL_META[tool.name] || {
     icon: <FileText size={13} />, color: 'var(--matugen-secondary, #b2cbd6)',
     label: () => tool.name,
   };
 
   return (
-    <div className="tool-card">
+    <div className={`tool-card ${isElevated ? 'tool-card-elevated' : ''}`}>
       <div className="tool-card-header" onClick={() => setCollapsed(!collapsed)}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: meta.color, flex: 1, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: isElevated ? 'var(--matugen-error, #ef4444)' : meta.color, flex: 1, overflow: 'hidden' }}>
           {collapsed
             ? <ChevronRight size={12} color="var(--matugen-secondary, #b2cbd6)" />
             : <ChevronDown size={12} color="var(--matugen-secondary, #b2cbd6)" />}
-          {meta.icon}
+          {isElevated ? <Lock size={13} color="var(--matugen-error, #ef4444)" /> : meta.icon}
           <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {meta.label(tool.arguments)}
           </span>
+          {isElevated && (
+            <span style={{
+              fontSize: '9.5px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              padding: '1px 6px',
+              borderRadius: '4px',
+              background: 'color-mix(in srgb, var(--matugen-error, #ef4444) 16%, transparent)',
+              color: 'var(--matugen-error, #ef4444)',
+              border: '1px solid color-mix(in srgb, var(--matugen-error, #ef4444) 35%, transparent)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              flexShrink: 0
+            }}>
+              <Lock size={9} />
+              Elevated
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flexShrink: 0 }}>
           {tool.status === 'completed'
@@ -1049,6 +1225,33 @@ const ToolCard: React.FC<{ tool: ToolCallData }> = ({ tool }) => {
             <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: tool.status === 'error' ? '#ef4444' : 'var(--text-secondary)' }}>
               {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
             </pre>
+          )}
+          {isElevated && tool.status === 'error' && (
+            <button
+              type="button"
+              style={{
+                background: 'var(--matugen-primary, #a0c9dc)',
+                color: 'var(--matugen-on-primary, #003544)',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '4px 9px',
+                fontSize: '11px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                marginTop: '8px'
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                const path = (tool.arguments as any)?.path || '';
+                storeActions.openPasswordPrompt(path, undefined, 'file', 'canvas');
+              }}
+            >
+              <Lock size={11} />
+              Authenticate Superuser
+            </button>
           )}
         </div>
       )}

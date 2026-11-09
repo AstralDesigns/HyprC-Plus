@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Send, Square, Paperclip, ListChecks } from 'lucide-react';
 import { useStore, setStore, storeActions, type AttachmentData } from '../store';
 import { agentEngine } from '../engine/agent-engine';
@@ -25,6 +25,24 @@ export const Composer: React.FC = () => {
   // the chip DOM nodes, so large snippets never round-trip through React state.
   const selStore = useRef<Map<string, SelectionRef>>(new Map());
 
+  // Prompt history navigation state (Up/Down arrow traversal)
+  const historyIndexRef = useRef<number>(-1);
+  const draftRef = useRef<string>('');
+
+  const userPrompts = useMemo(() => {
+    const currentSession = store.sessions.find(s => s.id === store.activeSessionId);
+    if (!currentSession) return [];
+    return currentSession.messages
+      .filter(m => m.role === 'user' && m.content && m.content.trim())
+      .map(m => m.content);
+  }, [store.sessions, store.activeSessionId]);
+
+  // Reset history index when switching sessions
+  useEffect(() => {
+    historyIndexRef.current = -1;
+    draftRef.current = '';
+  }, [store.activeSessionId]);
+
   const updateHasContent = useCallback(() => {
     const ed = editorRef.current;
     if (!ed) return;
@@ -47,6 +65,31 @@ export const Composer: React.FC = () => {
     if (text) ed.appendChild(document.createTextNode(text));
     updateHasContent();
   }, [updateHasContent]);
+
+  const isCaretAtStart = useCallback((): boolean => {
+    const ed = editorRef.current;
+    if (!ed || !ed.textContent?.trim()) return true;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return true;
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return false;
+    const preRange = range.cloneRange();
+    preRange.selectNodeContents(ed);
+    preRange.setEnd(range.startContainer, range.startOffset);
+    return preRange.toString().length === 0;
+  }, []);
+
+  const moveCaretToEnd = useCallback(() => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    ed.focus();
+    const range = document.createRange();
+    const sel = window.getSelection();
+    range.selectNodeContents(ed);
+    range.collapse(false);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }, []);
 
   // Walk the editor in document order, rebuilding the prompt with each chip
   // replaced inline by its <selection> block, plus a compact display form
@@ -169,8 +212,22 @@ export const Composer: React.FC = () => {
     const currentSession = store.sessions.find(s => s.id === store.activeSessionId);
     if (!currentSession) return;
 
+    // Merge explicit attachments and context bar items
+    const allAttachments: AttachmentData[] = [...attachments];
+    store.contextFiles.forEach(cf => {
+      if (!allAttachments.some(a => a.path === cf.path)) {
+        allAttachments.push({ path: cf.path, name: cf.name, kind: 'text' });
+      }
+    });
+    store.contextImages.forEach(ci => {
+      if (!allAttachments.some(a => a.path === ci.path)) {
+        allAttachments.push({ path: ci.path, name: ci.path.split('/').pop() || 'image', kind: 'image' });
+      }
+    });
+
     const userMsg = {
       id: 'msg_' + Date.now(), role: 'user' as const, content: text, timestamp: Date.now(),
+      ...(allAttachments.length ? { attachments: allAttachments } : {}),
       ...(refs.length ? { selectionRefs: refs } : {}),
     };
     storeActions.addMessage(store.activeSessionId, userMsg);
@@ -182,7 +239,7 @@ export const Composer: React.FC = () => {
 
     try {
       if (store.modelStatus !== 'ready') await agentEngine.loadModel(store.activeModel);
-      const attachmentContext = (await Promise.all(attachments
+      const attachmentContext = (await Promise.all(allAttachments
         .filter((attachment) => attachment.kind === 'text')
         .map(async (attachment) => `\n\n[Attached file: ${attachment.name}]\n${await bridge.readFile(attachment.path)}\n[End attached file]`))).join('');
       const priorHistory = currentSession.messages.map(m => ({ role: m.role, content: m.content }));
@@ -194,17 +251,86 @@ export const Composer: React.FC = () => {
     } catch (e: any) {
       console.error('Inference error:', e);
     } finally {
+      historyIndexRef.current = -1;
+      draftRef.current = '';
       setAttachments([]);
+      setStore({ contextFiles: [], contextImages: [] });
     }
   };
 
   const handleStop = () => agentEngine.cancel();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // Ctrl+Up / Ctrl+Down (Cmd on macOS) traverses user prompt history
+    const isCtrlUp = (e.ctrlKey || e.metaKey) && e.key === 'ArrowUp';
+    const isCtrlDown = (e.ctrlKey || e.metaKey) && e.key === 'ArrowDown';
+
+    if (isCtrlUp) {
+      if (userPrompts.length > 0) {
+        e.preventDefault();
+        if (historyIndexRef.current === -1) {
+          draftRef.current = collectPrompt().display || editorRef.current?.textContent || '';
+          const nextIndex = userPrompts.length - 1;
+          historyIndexRef.current = nextIndex;
+          setEditorText(userPrompts[nextIndex]);
+          setTimeout(moveCaretToEnd, 0);
+        } else if (historyIndexRef.current > 0) {
+          const nextIndex = historyIndexRef.current - 1;
+          historyIndexRef.current = nextIndex;
+          setEditorText(userPrompts[nextIndex]);
+          setTimeout(moveCaretToEnd, 0);
+        }
+        return;
+      }
+    } else if (isCtrlDown) {
+      if (historyIndexRef.current >= 0) {
+        e.preventDefault();
+        const nextIndex = historyIndexRef.current + 1;
+        if (nextIndex < userPrompts.length) {
+          historyIndexRef.current = nextIndex;
+          setEditorText(userPrompts[nextIndex]);
+          setTimeout(moveCaretToEnd, 0);
+        } else {
+          historyIndexRef.current = -1;
+          setEditorText(draftRef.current);
+          setTimeout(moveCaretToEnd, 0);
+        }
+        return;
+      }
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      document.execCommand('insertText', false, '  ');
+      updateHasContent();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void handleSend();
     } else if (e.key === 'Enter' && e.shiftKey) {
+      // Auto-markdown list continuation on Shift+Enter or new line
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const node = range.startContainer;
+        const textBefore = (node.textContent || '').slice(0, range.startOffset);
+        const bulletMatch = textBefore.match(/^(\s*)([-*]|\d+\.)\s+(.*)$/);
+        if (bulletMatch) {
+          e.preventDefault();
+          const [ , indent, marker, content] = bulletMatch;
+          if (!content.trim()) {
+            // Empty bullet -> delete list marker and wrap
+            document.execCommand('delete', false);
+            updateHasContent();
+            return;
+          }
+          const nextMarker = /^\d+\./.test(marker) ? `${parseInt(marker, 10) + 1}. ` : `${marker} `;
+          document.execCommand('insertLineBreak');
+          document.execCommand('insertText', false, `${indent}${nextMarker}`);
+          updateHasContent();
+          return;
+        }
+      }
       // Force a plain <br> so WebKit doesn't wrap lines in block <div>s.
       e.preventDefault();
       const ed = editorRef.current;
@@ -271,18 +397,20 @@ export const Composer: React.FC = () => {
     try {
       const picked = await bridge.openFileDialog({ directory: false, currentFolder: store.projectPath });
       if (picked) {
-        const fileName = picked.split('/').pop();
-        const extension = fileName?.split('.').pop()?.toLowerCase() || '';
-        const kind = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension)
-          ? 'image' : ['mp4', 'webm', 'mov', 'mkv'].includes(extension)
-            ? 'video' : ['txt', 'md', 'js', 'ts', 'tsx', 'jsx', 'json', 'css', 'html', 'py', 'sh'].includes(extension)
-              ? 'text' : 'file';
-        const attachment: AttachmentData = { path: picked, name: fileName || picked, kind };
-        setAttachments(prev => [...prev, attachment]);
-        if (kind === 'image') {
-          storeActions.addContextImage({ path: picked, data: `file://${picked}` });
-        } else if (kind === 'text') {
-          storeActions.addContextFile({ path: picked, name: fileName || picked });
+        const paths = picked.split(/[|\n]/).map(s => s.trim()).filter(Boolean);
+        for (const p of paths) {
+          const fileName = p.split('/').pop() || p;
+          const extension = fileName.split('.').pop()?.toLowerCase() || '';
+          const isImg = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(extension);
+          const isVid = ['mp4', 'webm', 'mov', 'mkv'].includes(extension);
+          const kind = isImg ? 'image' : isVid ? 'video' : 'text';
+          const attachment: AttachmentData = { path: p, name: fileName, kind };
+          setAttachments(prev => prev.some(a => a.path === p) ? prev : [...prev, attachment]);
+          if (isImg) {
+            storeActions.addContextImage({ path: p, data: `file://${p}` });
+          } else {
+            storeActions.addContextFile({ path: p, name: fileName });
+          }
         }
       }
     } catch (e) { console.warn('File attach cancelled:', e); }
@@ -382,7 +510,7 @@ export const Composer: React.FC = () => {
             <button
               className="chat-attach-btn"
               onClick={handleAttachFile}
-              title="Attach File Context"
+              data-tip="Attach File Context"
             >
               <Paperclip size={12} />
               <span>Attach</span>
@@ -392,7 +520,7 @@ export const Composer: React.FC = () => {
               className={`chat-attach-btn composer-spec-toggle ${store.specMode ? 'active' : ''}`}
               onClick={() => setStore({ specMode: !store.specMode })}
               disabled={store.agentRunning}
-              title="Spec-driven: draft a plan for your approval before executing"
+              data-tip="Spec-driven: draft a plan for your approval before executing"
             >
               <ListChecks size={12} />
               <span>Spec</span>
@@ -401,15 +529,15 @@ export const Composer: React.FC = () => {
 
           {store.agentRunning ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <button className="composer-action-btn composer-stop-btn" onClick={handleStop} title="Stop agent (Esc)" aria-label="Stop agent">
+              <button className="composer-action-btn composer-stop-btn" onClick={handleStop} data-tip="Stop agent (Esc)" aria-label="Stop agent">
                 <Square size={13} fill="var(--matugen-on-secondary, #1d343c)" color="var(--matugen-on-secondary, #1d343c)" />
               </button>
-              <button className="composer-action-btn" onClick={handleSend} disabled={!canSend} title="Steer the agent (Enter)" aria-label="Steer agent">
+              <button className="composer-action-btn" onClick={handleSend} disabled={!canSend} data-tip="Steer the agent (Enter)" aria-label="Steer agent">
                 <Send size={14} color="var(--matugen-on-secondary, #1d343c)" />
               </button>
             </div>
           ) : (
-            <button className="composer-action-btn" onClick={handleSend} disabled={!canSend} title="Send (Enter)" aria-label="Send message">
+            <button className="composer-action-btn" onClick={handleSend} disabled={!canSend} data-tip="Send (Enter)" aria-label="Send message">
               <Send size={14} color="var(--matugen-on-secondary, #1d343c)" />
             </button>
           )}
@@ -419,7 +547,7 @@ export const Composer: React.FC = () => {
       {/* Hint row */}
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '6px' }}>
         <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-          Enter to send · Shift+Enter for new line · Paste a copied selection to reference it · Esc to stop
+          Enter to send · Shift+Enter for new line · Ctrl+↑/↓ prompt history · Esc to stop
         </span>
       </div>
     </div>

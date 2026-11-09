@@ -813,6 +813,9 @@ let lastToggleChatTime = 0;
 let lastToggleTerminalTime = 0;
 
 /* Store Actions */
+// Suppression window for local saves so inotify / statPoll echo does not flag externalChanged
+const localWriteSuppressions = new Map<string, number>();
+
 export const storeActions = {
   focusEditor: () => {
     setStore(prev => ({ editorFocusToken: prev.editorFocusToken + 1 }));
@@ -1584,6 +1587,12 @@ export const storeActions = {
   saveFile: async (paneId: string) => {
     const pane = currentState.panes.find(p => p.id === paneId);
     if (!pane || !pane.path) return;
+    // Suppress inotify / statPoll echo for 3.5s so our own write doesn't trigger externalChanged
+    localWriteSuppressions.set(pane.path, Date.now() + 3500);
+    // Optimistically clear isUnsaved & externalChanged immediately so UI reflects saved state instantly
+    setStore(prev => ({
+      panes: prev.panes.map(p => p.id === paneId ? { ...p, isUnsaved: false, externalChanged: false } : p),
+    }));
     try {
       const res = await bridge.writeFile(pane.path, pane.content, pane.sudoPassword);
       if (res && res.success !== false) {
@@ -1595,6 +1604,11 @@ export const storeActions = {
         storeActions.refreshGitStatus();
       }
     } catch (e: any) {
+      localWriteSuppressions.delete(pane.path);
+      // Revert unsaved status on write error
+      setStore(prev => ({
+        panes: prev.panes.map(p => p.id === paneId ? { ...p, isUnsaved: true } : p),
+      }));
       const msg = String(e?.message || e || '');
       if (msg.includes('PERMISSION_DENIED') || msg.includes('Permission denied') || msg.includes('EACCES')) {
         storeActions.openPasswordPrompt(pane.path, undefined, 'file', 'canvas');
@@ -1699,9 +1713,14 @@ export const storeActions = {
       try {
         const paths = Array.from(new Set(editable.map(p => p.path!)));
         const res = await bridge.statFiles(paths, []);
+        const now = Date.now();
         for (const p of editable) {
           const m = res[p.path!];
           if (m === undefined || m === 0) continue;
+          if (localWriteSuppressions.has(p.path!) && localWriteSuppressions.get(p.path!)! > now) {
+            setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, diskMtime: m } : x) }));
+            continue;
+          }
           if (p.diskMtime === undefined) {
             setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, diskMtime: m } : x) }));
             continue;
@@ -1735,8 +1754,12 @@ export const storeActions = {
     if (!paths || !paths.length) return;
     const changed = new Set(paths);
     const st = getStore();
+    const now = Date.now();
     for (const p of st.panes) {
       if (!p.path || !changed.has(p.path)) continue;
+      if (localWriteSuppressions.has(p.path) && localWriteSuppressions.get(p.path)! > now) {
+        continue;
+      }
       if (p.type !== 'code' && p.type !== 'markdown') continue;
       if (p.isUnsaved) {
         setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, externalChanged: true } : x) }));

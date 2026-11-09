@@ -490,20 +490,6 @@ export const Canvas: React.FC = () => {
   // drop back to the normal editor the moment it's kept/undone.
   useEffect(() => { if (!pendingEdit) setDiffView(false); }, [pendingEdit]);
 
-  // Keyboard shortcut Ctrl+S to save
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (store.activePaneId) {
-          storeActions.saveFile(store.activePaneId);
-        }
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [store.activePaneId]);
-
   // Re-apply the matugen Monaco theme whenever GJS pushes new wallpaper
   // colors. Registered once for Canvas's whole lifetime (not per tab
   // switch) — bundling this with the keydown effect above meant every tab
@@ -799,6 +785,16 @@ export const Canvas: React.FC = () => {
                       } catch (_) {
                         try { monaco.editor.setTheme(targetTheme); } catch (_) {}
                       }
+                      // Bind Ctrl+S inside Monaco directly to trigger saveFile immediately
+                      try {
+                        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+                          const currentVal = editor.getModel()?.getValue();
+                          if (currentVal !== undefined && pane.id) {
+                            storeActions.updatePaneContent(pane.id, currentVal);
+                          }
+                          if (pane.id) void storeActions.saveFile(pane.id);
+                        });
+                      } catch (_) {}
                       // Live syntax markers for languages without a Monaco worker
                       // (Lua via luaparse, QML structural check); JSON/CSS/HTML/TS
                       // are validated by their own workers.

@@ -595,7 +595,7 @@ const CloudTab: FC = () => {
 
       const providerDef = BYOK_PROVIDERS.find(p => p.id === providerId);
       const providerModels = fetchedModels[providerId] || providerDef?.models || [];
-      const currentModelMatches = providerModels.some(m => m.id === store.byokModel || m.id.endsWith('/' + store.byokModel) || store.byokModel.endsWith('/' + m.id));
+      const currentModelMatches = providerModels.some(m => m.id === store.byokModel);
       const chosenModel = (store.byokProvider === providerId && store.byokModel)
         || (currentModelMatches ? store.byokModel : null)
         || (providerDef as any)?.defaultModel
@@ -693,7 +693,7 @@ const CloudTab: FC = () => {
 
         const providerDef = BYOK_PROVIDERS.find(p => p.id === providerId);
         const providerModelsList = fetchedModels[providerId] || [...(providerDef?.models || [])] || [];
-        const currentModelMatches = providerModelsList.some(m => m.id === store.byokModel || m.id.endsWith('/' + store.byokModel) || store.byokModel.endsWith('/' + m.id));
+        const currentModelMatches = providerModelsList.some(m => m.id === store.byokModel);
         const selectedModel = overrideModel
           || (store.byokProvider === providerId && store.byokModel)
           || (currentModelMatches ? store.byokModel : null)
@@ -730,13 +730,22 @@ const CloudTab: FC = () => {
     const hasTypedKey = !!keyInputs[currentProvider.id]?.trim();
 
     if (!isCurrentActive) {
-      if (isCurrentConfigured || hasTypedKey) {
+      if (isCurrentConfigured || hasTypedKey || currentProvider.id === 'openrouter') {
         await handleToggleProvider(currentProvider.id, true, modelId);
       } else {
-        setStore({ byokModel: modelId, activeModel: modelId });
+        setStore({
+          inferenceMode: 'byok',
+          byokProvider: currentProvider.id,
+          byokModel: modelId,
+          activeModel: modelId,
+          modelStatus: 'ready',
+        });
       }
     } else {
       setStore({ byokModel: modelId, activeModel: modelId });
+      try {
+        await bridge.runtimeRequest(`/api/byok/activate/${currentProvider.id}`);
+      } catch { /* noop */ }
     }
   };
 
@@ -1266,11 +1275,12 @@ const CloudTab: FC = () => {
               </div>
             ) : (
               filteredModels.map((model, idx) => {
-                const selected = isCurrentActive && (
-                  store.byokModel === model.id ||
-                  model.id.endsWith('/' + store.byokModel) ||
-                  store.byokModel.endsWith('/' + model.id)
+                const isExact = store.byokModel === model.id;
+                const isPrefixed = !isExact && (
+                  store.byokModel === `${currentProvider.id}/${model.id}` ||
+                  model.id === `${currentProvider.id}/${store.byokModel}`
                 );
+                const selected = isCurrentActive && (isExact || isPrefixed);
                 const isFirstMatch = !!currentQuery && idx === 0;
                 const ctxText = (model as any).ctx || (model as any).context || '';
 

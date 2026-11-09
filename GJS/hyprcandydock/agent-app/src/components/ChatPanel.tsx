@@ -15,6 +15,7 @@ import { useStore, storeActions, setStore } from '../store';
 import { FileIcon } from '../utils/fileIcons';
 import { ChatStream } from './ChatStream';
 import { Composer } from './Composer';
+import { ImageLightboxModal } from './ImageLightboxModal';
 import { getMediaUrl } from '../utils/media';
 import { bridge } from '../bridge';
 
@@ -314,13 +315,22 @@ export const ChatPanel: React.FC = () => {
       {(store.contextFiles.length > 0 || store.contextImages.length > 0) && <div className="chat-context-chips-bar">
           <span className="context-chips-label">CONTEXT</span>
           {store.contextFiles.map(cf => (
-            <span key={cf.path} className="context-chip">
+            <span
+              key={cf.path}
+              className="context-chip clickable"
+              onClick={() => storeActions.openFileByPath(cf.path)}
+              title={`Open ${cf.name} in canvas`}
+              style={{ cursor: 'pointer' }}
+            >
               <FileIcon name={cf.name} size={11} />
               <span className="context-chip-name">{cf.name}</span>
               <button
                 type="button"
                 className="context-chip-remove"
-                onClick={() => storeActions.removeContextFile(cf.path)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  storeActions.removeContextFile(cf.path);
+                }}
                 title="Remove from context"
               >
                 <X size={10} />
@@ -328,16 +338,19 @@ export const ChatPanel: React.FC = () => {
             </span>
           ))}
           {store.contextImages.map(ci => (
-            <span key={ci.path} className="context-chip context-image-chip">
-              <span className="context-image-hover-target" onMouseEnter={() => setHoveredImage(imageSource(ci))} onMouseLeave={() => setHoveredImage(null)}>
+            <span key={ci.path} className="context-chip context-image-chip" style={{ cursor: 'pointer' }}>
+              <span
+                className="context-image-hover-target"
+                onClick={() => setHoveredImage(imageSource(ci))}
+                onMouseEnter={() => setHoveredImage(imageSource(ci))}
+              >
                 <img src={imageSource(ci)} alt={ci.path.split('/').pop() || 'Context image'} className="context-image-thumb" />
                 <span className="context-chip-name">{ci.path.split('/').pop()}</span>
               </span>
               <button
                 type="button"
                 className="context-chip-remove"
-                onMouseEnter={() => setHoveredImage(null)}
-                onClick={() => { setHoveredImage(null); storeActions.removeContextImage(ci.path); }}
+                onClick={(e) => { e.stopPropagation(); setHoveredImage(null); storeActions.removeContextImage(ci.path); }}
                 title="Remove from context"
               >
                 <X size={10} />
@@ -345,9 +358,11 @@ export const ChatPanel: React.FC = () => {
             </span>
           ))}
       </div>}
-      {hoveredImage && createPortal(
-        <div className="context-image-lightbox" aria-hidden="true"><img src={hoveredImage} alt="Context image preview" /></div>,
-        document.body,
+      {hoveredImage && (
+        <ImageLightboxModal
+          src={hoveredImage}
+          onClose={() => setHoveredImage(null)}
+        />
       )}
 
       {/* Composer at bottom */}

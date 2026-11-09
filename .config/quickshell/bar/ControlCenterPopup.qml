@@ -1145,7 +1145,7 @@ PanelWindow {
                         // When not activated, scrolling is locked to tab 6 (activation tab)
                         if (!LicenseState.activated) return
 
-                        const tabs = [1, 0, 2, 3, 4, 5, 7, 8, 9]
+                        const tabs = [1, 0, 2, 3, 4, 5, 11, 7, 8, 9]
                         let currIdx = tabs.indexOf(ccTabSettings.activeTab)
                         if (currIdx === -1) currIdx = 0
 

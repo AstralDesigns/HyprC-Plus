@@ -42,6 +42,13 @@ SYSTEM_PROMPT = """You are the HyprCandy Agent — an intelligent, autonomous AI
 - For multi-step coding, file editing, or agentic tasks, use the todo list and tool calls to work step by step.
 - Never invent file contents or project facts — always inspect with tools first.
 
+## Specialized Knowledge Modules
+Modular guides and operational runbooks are located in `instructions/` (use `read_file` to review as needed):
+- `instructions/code_editing.md` — Code editing discipline, surgical diffs, TypeScript/React/CSS conventions, and zero-regression patterns.
+- `instructions/system_ops.md` — Linux, Hyprland, Wayland, systemctl, permissions, sudo/privileged executions, and Quickshell/GJS mechanics.
+- `instructions/debugging.md` — Systematic root-cause diagnosis, event loop tracing, race conditions, inotify debugging, and state synchronization.
+- `instructions/spec_driven.md` — Spec-driven planning, architecture proposals, user alignment, and structured rollouts.
+
 ## Tools Available
 You have access to these tools (call them as JSON tool_calls):
 
@@ -103,7 +110,7 @@ When calling `task_complete` and presenting your response, ALWAYS include a numb
 
 ## Critical Rules
 - **task_complete is the final signal** — call it ONLY when the entire task is fully done and verified, not as a progress update.
-- **Memory** — you have durable, topic-scoped markdown memories that persist across sessions. At the start of a substantive task, glance at `list_memories` and `read_memory` any relevant topic before re-discovering facts. **Maintain memory proactively — never wait to be asked.** As you work, and especially right before you call `task_complete` at the end of the turn, briefly reflect on what you did and, whenever you judge it worthwhile, `save_memory` any durable fact (a stable project convention, an architecture / tech-stack fact, a reusable gotcha or decision, or a user preference) and `update` or `delete_memory` any that went stale. Use your own judgment about what deserves persisting — skip trivia and one-off details that won't help future sessions. Never store secrets (API keys, passwords, tokens) in memory.
+- **Memory** — you have durable, topic-scoped markdown memories that persist across sessions. At the start of a substantive task, glance at `list_memories` and `read_memory` any relevant topic before re-discovering facts. **Maintain memory proactively — never wait to be asked.** As you work, and especially right before you call `task_complete` at the end of the turn, briefly reflect on what you did and, whenever you judge it worthwhile, `save_memory` any durable fact and `update` or `delete_memory` any that went stale. Never store secrets (API keys, passwords, tokens) in memory.
 - **suggest_options** — when you need the user to make a choice before you can proceed, call it with `mode: "clarify"` and 2-4 concrete options; the turn will pause for their pick. For several decisions at once, pass `questions` (1-4) — each question shows its options plus a free-text "Other" field and the turn pauses until the user submits. Use `mode: "next-step"` to offer optional follow-ups after an answer. Never fabricate choices you can't act on.
 - **Normal answers don't need task_complete** — for conversational responses, just reply in Markdown and stop.
 - **Don't repeat failing tools** — if a tool fails 3 times with the same args, report the limitation and stop.
@@ -120,7 +127,7 @@ When you see one, the user is asking you to change THAT region. `read_file` the 
 ## Context
 You are running on a Hyprland Wayland compositor. The user's project files are provided in context. Use list_directory and read_file to explore when needed."""
 
-MAX_ITERATIONS = 20
+MAX_ITERATIONS: Optional[int] = None  # Unlimited iterations: runs until task_done, steer, or user stop
 MAX_FIX_ROUNDS = 3
 
 # ── Spec-driven mode: instruction that constrains the first phase to planning ─
@@ -429,7 +436,7 @@ async def run_agentic_turn(
     fix_round = 0
 
     iteration = 0
-    budget = MAX_ITERATIONS
+    budget = float("inf") if MAX_ITERATIONS is None else float(MAX_ITERATIONS)
     while iteration < budget:
         if task_done:
             break
@@ -443,7 +450,8 @@ async def run_agentic_turn(
             for s in steers:
                 working.append({"role": "user", "content": f"[User steering] {s}"})
                 yield {"type": "steer_ack", "data": {"text": s}}
-                budget += 1
+                if budget != float("inf"):
+                    budget += 1
 
         # ── LLM call ─────────────────────────────────────────────────────────
         assistant_text = ""
@@ -673,7 +681,7 @@ async def run_agentic_turn(
                     f"stopping for your review (`{verify_cmd}` exited {exit_code})."
                 )
 
-        if not task_done and iteration < budget - 1:
+        if not task_done:
             # Provide todo status in continuation prompt so the model stays on track
             todo_status = todo.format() if todo.tasks else ""
             continue_msg = "Continue the task. Call task_complete only when it is fully done."
@@ -685,5 +693,8 @@ async def run_agentic_turn(
             })
 
         iteration += 1
+
+    if not task_done and budget != float("inf") and iteration >= budget:
+        full_response = (full_response or "") + "\n\n⚠️ Step budget reached. Reply 'continue' to keep going."
 
     yield {"type": "done", "data": {"content": full_response}}

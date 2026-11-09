@@ -254,7 +254,9 @@ async def chat_start(req: ChatRequest):
     byok_key = req.byok_key or _byok_keys.get(byok_provider or "", "")
     byok_model = req.byok_model
 
-    if inference_mode == "cloud" or (not (byok_provider and byok_key) and (req.license_key or _cached_license_key)):
+    if inference_mode == "byok" or (byok_provider and (byok_key or byok_provider == "openrouter")):
+        endpoint = "byok"
+    elif inference_mode == "cloud" or (req.license_key or _cached_license_key):
         endpoint = "cloud"
     else:
         endpoint = "byok"
