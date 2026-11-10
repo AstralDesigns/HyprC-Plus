@@ -384,6 +384,19 @@ export const App: React.FC = () => {
             <Canvas />
           </main>
 
+          {/* Shared transparent click-away backdrop — appears behind both panels
+              (z-index 49) but above the canvas (z-index 0). Clicking it closes
+              whichever of Sidebar / ChatPanel are open, same UX as ModelManager. */}
+          {(store.sidebarVisible || store.chatVisible) && (
+            <div
+              className="panels-backdrop"
+              onClick={() => {
+                if (store.sidebarVisible) storeActions.setSidebarVisible(false);
+                if (store.chatVisible) storeActions.setChatVisible(false);
+              }}
+            />
+          )}
+
           <aside
             className={`sidebar-panel ${store.sidebarVisible ? 'sidebar-visible' : ''}`}
             style={{ width: `${store.sidebarWidth}px` }}

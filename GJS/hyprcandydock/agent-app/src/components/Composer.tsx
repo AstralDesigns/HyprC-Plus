@@ -241,7 +241,14 @@ export const Composer: React.FC = () => {
       if (store.modelStatus !== 'ready') await agentEngine.loadModel(store.activeModel);
       const attachmentContext = (await Promise.all(allAttachments
         .filter((attachment) => attachment.kind === 'text')
-        .map(async (attachment) => `\n\n[Attached file: ${attachment.name}]\n${await bridge.readFile(attachment.path)}\n[End attached file]`))).join('');
+        .map(async (attachment) => {
+          const raw = await bridge.readFile(attachment.path);
+          const isTruncated = raw.length > 20000;
+          const content = isTruncated
+            ? raw.slice(0, 20000) + `\n\n[... Note: Attached file "${attachment.name}" is truncated at 20,000 characters to conserve context budget. If you need the rest or full content, use tool: read_file("${attachment.path}", offset, limit) ...]`
+            : raw;
+          return `\n\n[Attached file: ${attachment.name} (full path: ${attachment.path})]\n${content}\n[End attached file]`;
+        }))).join('');
       const priorHistory = currentSession.messages.map(m => ({ role: m.role, content: m.content }));
       await agentEngine.runConversation(
         store.activeSessionId,

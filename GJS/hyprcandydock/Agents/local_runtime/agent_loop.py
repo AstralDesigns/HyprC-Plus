@@ -304,6 +304,31 @@ def _strip_tool_call_text(text: str) -> str:
     return _TOOL_CALL_RE.sub("", text).strip()
 
 
+def _prune_working_memory(messages: list[dict]) -> list[dict]:
+    """Compacts older tool messages in working memory to prevent TPM blowout.
+    
+    Preserves all roles and tool_call_id pairs so OpenAI / OpenRouter schema validation
+    remains strictly valid. Only truncates the large content of older tool calls
+    (keeping the most recent tool call batch in full fidelity).
+    """
+    tool_indices = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+    if len(tool_indices) <= 2:
+        return messages
+
+    recent_tool_cutoff = set(tool_indices[-2:])
+    pruned = []
+    for i, m in enumerate(messages):
+        if m.get("role") == "tool" and i not in recent_tool_cutoff:
+            content = m.get("content") or ""
+            if len(content) > 600:
+                m_copy = dict(m)
+                m_copy["content"] = content[:400] + "\n... [prior tool output condensed to conserve context] ..."
+                pruned.append(m_copy)
+                continue
+        pruned.append(m)
+    return pruned
+
+
 # ── Main agentic loop ─────────────────────────────────────────────────────────
 async def run_agentic_turn(
     user_message: str,
@@ -457,7 +482,7 @@ async def run_agentic_turn(
         assistant_text = ""
         pending_calls: list[dict] = []
 
-        async for event in backend_fn(working):
+        async for event in backend_fn(_prune_working_memory(working)):
             if event["type"] == "token":
                 token = event["content"]
                 assistant_text += token

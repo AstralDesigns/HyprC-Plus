@@ -69,6 +69,89 @@ const AMBIENT_TOOL_NAMES = new Set([
   'list_memories', 'read_memory', 'save_memory', 'delete_memory',
 ]);
 
+export interface HistoryMessage {
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content: string;
+}
+
+/**
+ * Smartly prunes multi-turn conversation history before dispatching to the runtime API.
+ * 
+ * OpenRouter & compatible providers are stateless: clients must send prior messages for
+ * continuity. But unpruned history burns Tokens-Per-Minute (TPM) limits on free/small models
+ * and blows past context limits during model switches.
+ * 
+ * Pruning policy:
+ * 1. Always retain Message 0 (the initial anchor goal of the session).
+ * 2. Retain the last 6 messages (3 turns) in full fidelity for recent context.
+ * 3. For intermediate turns: truncate long assistant messages to ~600 chars with an excerpt notice.
+ * 4. Enforce a hard ceiling (~24,000 characters ≈ 6,000 tokens) on total history, smoothly
+ *    dropping the oldest middle turns when conversation history gets excessively long.
+ */
+export function pruneConversationHistory(
+  history: HistoryMessage[],
+  maxChars = 24000
+): HistoryMessage[] {
+  if (!history || history.length <= 4) {
+    // Short history: just clamp individually huge assistant outputs (>4000 chars)
+    return history.map(m => {
+      if (m.role === 'assistant' && m.content && m.content.length > 4000) {
+        return {
+          role: m.role,
+          content: m.content.slice(0, 3000) + '\n\n[... response excerpt truncated for context budget ...]',
+        };
+      }
+      return m;
+    });
+  }
+
+  // Anchor turn: Message 0
+  const anchor = history[0];
+
+  // Recent active window: keep the last 6 messages intact
+  const recentCount = Math.min(6, history.length - 1);
+  const recent = history.slice(history.length - recentCount);
+
+  // Middle messages to condense
+  const middle = history.slice(1, history.length - recentCount);
+
+  const prunedMiddle: HistoryMessage[] = middle.map(m => {
+    if (m.role === 'assistant' && m.content && m.content.length > 800) {
+      return {
+        role: m.role,
+        content: m.content.slice(0, 600) + '\n\n[... earlier assistant response condensed ...]',
+      };
+    }
+    return m;
+  });
+
+  // Assemble candidate list: anchor + prunedMiddle + recent
+  let candidate = [anchor, ...prunedMiddle, ...recent];
+
+  // Check total character budget
+  let totalChars = candidate.reduce((sum, m) => sum + (m.content ? m.content.length : 0), 0);
+  if (totalChars > maxChars) {
+    const preservedAnchor = anchor;
+    const workingMiddle = [...prunedMiddle];
+    while (workingMiddle.length > 0 && totalChars > maxChars) {
+      const dropped = workingMiddle.shift();
+      if (dropped && dropped.content) {
+        totalChars -= dropped.content.length;
+      }
+    }
+    candidate = [
+      preservedAnchor,
+      ...(workingMiddle.length < prunedMiddle.length
+        ? [{ role: 'system' as const, content: '[... older conversation turns condensed for token limit ...]' }]
+        : []),
+      ...workingMiddle,
+      ...recent,
+    ];
+  }
+
+  return candidate;
+}
+
 export class AgentEngine {
   private abortController: AbortController | null = null;
   private currentModelId: string | null = null;
@@ -310,7 +393,12 @@ export class AgentEngine {
         (liveStore.contextFiles || []).slice(0, contextMode === 'full' ? 12 : 6).map(async (file) => {
           try {
             const content = await bridge.readFile(file.path);
-            return `[Explicit context file: ${file.path}]\n${content.slice(0, contextMode === 'full' ? 20000 : 8000)}\n[End explicit context file]`;
+            const limit = contextMode === 'full' ? 20000 : 8000;
+            const isTruncated = content.length > limit;
+            const body = isTruncated
+              ? content.slice(0, limit) + `\n\n[... Note: File "${file.path}" truncated to ${limit} characters to conserve context. Use tool read_file("${file.path}", offset, limit) to read full content or other sections ...]`
+              : content;
+            return `[Explicit context file: ${file.path}]\n${body}\n[End explicit context file]`;
           } catch (error: any) {
             return `[Explicit context file unavailable: ${file.path}] ${error?.message || String(error)}`;
           }
@@ -343,9 +431,10 @@ export class AgentEngine {
         '[End HyprCandy project context]',
       ].join('\n');
 
+      const prunedHistory = pruneConversationHistory(history);
       const payload: any = {
         messages: [
-          ...history.map(m => ({ role: m.role, content: m.content })),
+          ...prunedHistory.map(m => ({ role: m.role, content: m.content })),
           { role: 'user', content: userPrompt },
         ],
         project_context: projectContext,

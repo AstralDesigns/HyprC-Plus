@@ -45,7 +45,7 @@ Item {
             color: "transparent"
 
             WlrLayershell.namespace: "hyprcandy-launcher"
-            WlrLayershell.layer: WlrLayer.Top //Overlay
+            WlrLayershell.layer: WlrLayer.Top // Overlay
             // OnDemand (not Exclusive): QtWebEngine renders HTML select dropdowns as
             // separate transient popup surfaces that must grab keyboard focus to stay open.
             // Exclusive focus is held here, so the compositor denies the popup and it
@@ -59,19 +59,104 @@ Item {
             readonly property real dockThick: (Config.dockIconSize + 2 * Config.dockPadding)
                                               + 2 * Config.dockInnerPadding
             readonly property real edgeMargin: dockThick + Config.dockMargin + 3
-            readonly property real cardW: isVert ? Config.launcherFrameWidthVert
-                                                 : Config.launcherFrameWidth
-            readonly property real cardH: isVert ? Config.launcherFrameHeightVert
-                                                 : Config.launcherFrameHeight
 
             // ── Drag-resize (kept in sync with Control Center ▸ Menus  Window Size) ──
             // The card is anchored to the dock edge and centred on the other axis,
             // so a grabbed edge must track the cursor 2:1 on the centred axis and
             // 1:1 on the anchored axis. Ranges mirror the CC sliders exactly.
             readonly property real minCardW: isVert ? 240 : 320
-            readonly property real maxCardW: 2000
             readonly property real minCardH: 300
-            readonly property real maxCardH: 2000
+
+            // Dock & bar edge orientation helpers
+            readonly property bool dockTop:    DockState.position === "top"
+            readonly property bool dockBottom: DockState.position === "bottom"
+            readonly property bool dockLeft:   DockState.position === "left"
+            readonly property bool dockRight:  DockState.position === "right"
+            readonly property bool barTop:     Config.barPosition === "top"
+            readonly property bool barBottom:  Config.barPosition === "bottom"
+
+            // ── Dynamic max width/height limits per bar mode & dock position ──
+            // Width:
+            //   When dock is in L/R pos (isVert): launcher single width expands across
+            //   towards the opposite edge. Needs to worry about shell arm in shell mode,
+            //   or screen edge in other modes.
+            //   When dock is in T/B pos: launcher is centered horizontally, so it bounds
+            //   against both left & right shell arms in shell mode, or screen edge in other modes.
+            readonly property real maxCardW: {
+                const scrW = win.screen.width
+                const arm = Math.max(2, Config.shellArmThickness)
+
+                if (isVert) {
+                    if (Config.barMode === "shell") {
+                        return Math.max(minCardW, scrW - win.edgeMargin - arm - 4)
+                    }
+                    return Math.max(minCardW, scrW - win.edgeMargin - 4)
+                }
+
+                if (Config.barMode === "shell") {
+                    return Math.max(minCardW, scrW - 2 * (arm + 2))
+                }
+                return Math.max(minCardW, scrW - 4)
+            }
+
+            // Height:
+            //   1. When dock is in L/R pos and bar is in either T/B pos:
+            //      Launcher is centered vertically ((win.height - height) / 2).
+            //      Height respects bar/islands on the end where bar is located,
+            //      while the other side only caters for screen edge or shell arm.
+            //   2. When both dock and bar are in the same pos (T/T or B/B):
+            //      Launcher expands towards the opposite edge where there is NO bar,
+            //      so height only needs to worry about screen edge (or shell arm in shell mode).
+            //   3. When bar and dock are on opposite ends (one at T, other at B):
+            //      Launcher is anchored to dock at one end and must not exceed the bar/islands
+            //      at the other end (barHeight in bar/island, 3 islands in tri, left/right islands in shell).
+            readonly property real maxCardH: {
+                const scrH = win.screen.height
+                const topMargin = barTop ? Config.outerMarginTop : Config.outerMarginBottom
+                const arm = Math.max(2, Config.shellArmThickness)
+                const dockMargin = win.edgeMargin
+
+                // Reach of the bar/islands on the bar's edge:
+                //   Shell mode: specifically left & right islands (shellArm + topMargin + barHeight)
+                //   Bar / island / tri mode (3 main islands): barHeight + topMargin
+                const barReach = Config.barMode === "shell"
+                    ? (arm + topMargin + Config.barHeight)
+                    : (Config.barHeight + topMargin)
+
+                // Scenario 1: Dock is in L/R pos and bar is in T/B pos:
+                if (isVert) {
+                    return Math.max(minCardH, scrH - 2 * barReach - 2)
+                }
+
+                // Dock is in T/B pos:
+                const sameSide = (dockTop && barTop) || (dockBottom && barBottom)
+
+                // Scenario 2: Both dock and bar in same pos (T/T or B/B):
+                // Card expands towards the opposite edge with no bar, so only worry about
+                // screen edge or shell arm.
+                if (sameSide) {
+                    if (Config.barMode === "shell") {
+                        return Math.max(minCardH, scrH - dockMargin - arm - 2)
+                    }
+                    return Math.max(minCardH, scrH - dockMargin - 2)
+                }
+
+                // Scenario 3: Bar and dock on opposite ends (one at T, other at B):
+                if (Config.barMode === "shell") {
+                    const dockSide = arm + dockMargin
+                    return Math.max(minCardH, scrH - barReach - dockSide - 2)
+                }
+                return Math.max(minCardH, scrH - barReach - dockMargin - 2)
+            }
+
+            // cardW / cardH: clamped to maxCardW and maxCardH so the launcher
+            // never exceeds the defined boundaries on open or resize.
+            readonly property real cardW: Math.min(
+                isVert ? Config.launcherFrameWidthVert : Config.launcherFrameWidth,
+                maxCardW)
+            readonly property real cardH: Math.min(
+                isVert ? Config.launcherFrameHeightVert : Config.launcherFrameHeight,
+                maxCardH)
             readonly property real wGrowFactor: isVert ? 1 : 2
             readonly property real hGrowFactor: isVert ? 2 : 1
             readonly property real curW: isVert ? Config.launcherFrameWidthVert
@@ -83,10 +168,6 @@ Item {
             function setH(v) { v = Math.max(minCardH, Math.min(maxCardH, Math.round(v / 5) * 5))
                 if (isVert) Config.launcherFrameHeightVert = v; else Config.launcherFrameHeight = v }
             // Free (resizable) edges = everything except the dock-anchored side.
-            readonly property bool dockTop:    DockState.position === "top"
-            readonly property bool dockBottom: DockState.position === "bottom"
-            readonly property bool dockLeft:   DockState.position === "left"
-            readonly property bool dockRight:  DockState.position === "right"
             readonly property bool wFreeLeft:   !isVert || dockRight
             readonly property bool wFreeRight:  !isVert || dockLeft
             readonly property bool hFreeTop:     isVert || dockBottom
