@@ -8,8 +8,18 @@ import { selectionRangeLabel, type SelectionRef } from '../utils/editorClipboard
  * in the composer (pending send) and inside a sent user bubble. Font is kept a
  * hair under chat text so the chip height matches a single line of text.
  */
-export const SelectionChip: React.FC<{ sel: SelectionRef; onRemove?: () => void }> = ({ sel, onRemove }) => (
-  <span className="selection-chip" title={`${sel.path} · ${selectionRangeLabel(sel)}`}>
+export const SelectionChip: React.FC<{
+  sel: SelectionRef;
+  onRemove?: () => void;
+  onClick?: (e: React.MouseEvent) => void;
+  className?: string;
+}> = ({ sel, onRemove, onClick, className = '' }) => (
+  <span
+    className={`selection-chip ${className}`}
+    title={`${sel.path} · ${selectionRangeLabel(sel)}`}
+    onClick={onClick}
+    style={onClick ? { cursor: 'pointer' } : undefined}
+  >
     <Code size={11} className="selection-chip-icon" />
     <span className="selection-chip-name">{sel.name}</span>
     <span className="selection-chip-range">{selectionRangeLabel(sel)}</span>

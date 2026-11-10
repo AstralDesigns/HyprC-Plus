@@ -232,6 +232,10 @@ export const Composer: React.FC = () => {
     };
     storeActions.addMessage(store.activeSessionId, userMsg);
 
+    // Immediately clear staged attachments & context UI upon prompt send so next prompt starts fresh
+    setAttachments([]);
+    setStore({ contextFiles: [], contextImages: [] });
+
     // Naming is left to the agent (storeActions.autoNameSession, called once
     // the first turn completes in agent-engine.ts) rather than truncating
     // the raw first prompt, which is often not a good topic summary on its
@@ -260,17 +264,16 @@ export const Composer: React.FC = () => {
     } finally {
       historyIndexRef.current = -1;
       draftRef.current = '';
-      setAttachments([]);
-      setStore({ contextFiles: [], contextImages: [] });
     }
   };
 
   const handleStop = () => agentEngine.cancel();
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    // Ctrl+Up / Ctrl+Down (Cmd on macOS) traverses user prompt history
-    const isCtrlUp = (e.ctrlKey || e.metaKey) && e.key === 'ArrowUp';
-    const isCtrlDown = (e.ctrlKey || e.metaKey) && e.key === 'ArrowDown';
+    // Ctrl+Shift+Up / Ctrl+Shift+Down (Cmd+Shift on macOS) traverses user prompt history
+    // Standard Ctrl+Up / Ctrl+Down remains native for text paragraph navigation
+    const isCtrlUp = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'ArrowUp';
+    const isCtrlDown = (e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'ArrowDown';
 
     if (isCtrlUp) {
       if (userPrompts.length > 0) {
@@ -465,6 +468,21 @@ export const Composer: React.FC = () => {
     window.addEventListener('agent_user_prompt', onUserPrompt);
     return () => window.removeEventListener('agent_user_prompt', onUserPrompt);
   }, [store.activeSessionId, store.agentRunning, store.sessions, clearEditor, setEditorText]);
+
+  // Listen for text insertion from suggestions to populate the chat input field for review/editing
+  useEffect(() => {
+    const onSetText = (e: any) => {
+      const text = typeof e.detail === 'string' ? e.detail : (e.detail?.text ?? '');
+      if (text) {
+        setEditorText(text);
+        if (editorRef.current) {
+          editorRef.current.focus();
+        }
+      }
+    };
+    window.addEventListener('composer_set_text', onSetText);
+    return () => window.removeEventListener('composer_set_text', onSetText);
+  }, [setEditorText]);
 
   const canSend = hasContent || attachments.length > 0;
   const placeholder = store.specApprovalPending

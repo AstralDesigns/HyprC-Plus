@@ -1,27 +1,25 @@
 /**
- * TerminalPanel — embedded xterm.js PTY terminal.
+ * TerminalPanel — embedded xterm.js PTY terminal with multi-tab support.
  *
  * Mounts at the bottom of the workspace-container.
  * Styled with Kitty / Wallust palette and CaskaydiaCove Nerd Font Mono so it
  * blends with the host terminal experience.
  *
  * Architecture:
- *   • A PTY session is spawned via bridge.ptySpawn() on first reveal.
- *   • stdout is received over SSE (/pty/stream?id=…&token=…) as base64
- *     chunks, decoded and written directly to the xterm Terminal instance.
- *   • Keyboard input goes back through bridge.ptyWrite().
- *   • Kept mounted in DOM (display: none when hidden) so shell processes and
- *     output history persist across toggling with Ctrl + 3.
- *   • ResizeObserver keeps dimensions synced and notifies the kernel via SIGWINCH.
- *   • The top drag handle lets the user resize the panel height.
+ *   • Supports multiple concurrent terminal tabs, each running its own PTY session.
+ *   • Left header starts directly with the tab chips (no redundant icon/title).
+ *   • Tab chips show a close button only when >1 tab exists.
+ *   • Right header includes '+' toggle to spawn a new tab with auto-focus,
+ *     along with clear, restart, and panel toggle controls.
+ *   • Output and processes persist across hiding/showing (display: none).
  */
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { ImageAddon } from '@xterm/addon-image';
 import '@xterm/xterm/css/xterm.css';
-import { X, RotateCcw, Trash2, TerminalSquare } from 'lucide-react';
+import { X, RotateCcw, Trash2, Plus, Terminal as TerminalIcon } from 'lucide-react';
 import { useStore, storeActions } from '../store';
 import { bridge } from '../bridge';
 
@@ -86,25 +84,80 @@ function getThemeVars(): Record<string, string> {
   return (window as any).__hyprcandyThemeVars || {};
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+interface TerminalTab {
+  id: string;
+  name: string;
+}
+
+interface TerminalInstance {
+  term: Terminal;
+  fit: FitAddon;
+  sessionRef: string | null;
+  sseRef: EventSource | null;
+}
+
 export const TerminalPanel: React.FC = () => {
   const [store] = useStore();
-  const containerRef = useRef<HTMLDivElement>(null);
-  const termRef      = useRef<Terminal | null>(null);
-  const fitRef       = useRef<FitAddon | null>(null);
-  const sessionRef   = useRef<string | null>(null);
-  const sseRef       = useRef<EventSource | null>(null);
-  const startingRef  = useRef(false);
-  const resizingRef  = useRef(false);
-  const startYRef    = useRef(0);
-  const startHRef    = useRef(0);
+  const [tabs, setTabs] = useState<TerminalTab[]>([
+    { id: 'term_1', name: 'Terminal 1' }
+  ]);
+  const [activeTabId, setActiveTabId] = useState<string>('term_1');
+  const nextNumRef = useRef(2);
 
-  // ── Spawn / attach PTY ────────────────────────────────────────────────────
-  const spawnSession = useCallback(async () => {
-    if (sessionRef.current || startingRef.current) return;
-    startingRef.current = true;
+  const panelRef        = useRef<HTMLDivElement>(null);
+  const instancesRef    = useRef<Record<string, TerminalInstance>>({});
+  const startingTabsRef = useRef<Record<string, boolean>>({});
+  const resizingRef     = useRef(false);
+  const startYRef       = useRef(0);
+  const startHRef       = useRef(0);
+
+  // ── Hover-to-focus listener ───────────────────────────────────────────────
+  // Moving the mouse back into the terminal area transfers cursor focus into
+  // the active terminal session, matching the Monaco editor's hover-to-focus behavior.
+  const handleHoverFocus = useCallback(() => {
+    if (!store.terminalVisible) return;
+    try {
+      const ae = document.activeElement as HTMLElement | null;
+      const panel = panelRef.current;
+      if (panel && ae && panel.contains(ae)) return;
+
+      // If focus is in Monaco editor or non-input elements, transfer focus to terminal
+      if (ae?.closest('.monaco-editor')) {
+        ae.blur();
+      } else if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
+        // If user is actively typing in chat composer or sidebar, do not yank focus
+        const isHidden = ae.closest('.sidebar-panel:not(.sidebar-visible)') ||
+                         ae.closest('.chat-panel:not(.chat-visible)') ||
+                         (ae.offsetWidth === 0 && ae.offsetHeight === 0);
+        if (!isHidden) return;
+        ae.blur();
+      }
+
+      const inst = instancesRef.current[activeTabId];
+      if (inst) {
+        inst.term.focus();
+        const ta = panel?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement | null;
+        if (ta) ta.focus({ preventScroll: true });
+      }
+    } catch { /* noop */ }
+  }, [store.terminalVisible, activeTabId]);
+
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    panel.addEventListener('mouseenter', handleHoverFocus);
+    return () => panel.removeEventListener('mouseenter', handleHoverFocus);
+  }, [handleHoverFocus]);
+
+  // ── Spawn a tab session ───────────────────────────────────────────────────
+  const spawnTabSession = useCallback(async (tabId: string) => {
+    if (instancesRef.current[tabId] || startingTabsRef.current[tabId]) return;
+    startingTabsRef.current[tabId] = true;
 
     try {
+      const mountEl = document.getElementById(`terminal-mount-${tabId}`) as HTMLDivElement | null;
+      if (!mountEl) return;
+
       const themeVars = getThemeVars();
       const term = new Terminal({
         fontFamily: 'CaskaydiaCove Nerd Font Mono, JetBrains Mono, Fira Code, monospace',
@@ -118,8 +171,7 @@ export const TerminalPanel: React.FC = () => {
         convertEol: true,
       });
 
-      // Intercept Ctrl+3 (toggle terminal), Ctrl+1 (toggle sidebar), and Ctrl+2 (toggle chat)
-      // inside xterm so keystrokes aren't swallowed by the PTY slave.
+      // Intercept Ctrl+3, Ctrl+1, Ctrl+2 inside xterm so keystrokes aren't swallowed
       term.attachCustomKeyEventHandler((ev: KeyboardEvent) => {
         if (ev.type === 'keydown' && (ev.ctrlKey || ev.metaKey)) {
           if (ev.key === '3' || ev.code === 'Digit3') {
@@ -151,15 +203,18 @@ export const TerminalPanel: React.FC = () => {
       });
       term.loadAddon(imageAddon);
 
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
-        term.open(containerRef.current);
-      }
+      mountEl.innerHTML = '';
+      term.open(mountEl);
 
-      termRef.current = term;
-      fitRef.current  = fit;
+      const inst: TerminalInstance = {
+        term,
+        fit,
+        sessionRef: null,
+        sseRef: null,
+      };
+      instancesRef.current[tabId] = inst;
 
-      // Allow DOM to settle before measuring
+      // Allow DOM to settle before measuring & focus
       requestAnimationFrame(() => {
         try {
           fit.fit();
@@ -183,12 +238,12 @@ export const TerminalPanel: React.FC = () => {
         term.writeln(`\x1b[31mFailed to start terminal: ${e?.message || e}\x1b[0m`);
         return;
       }
-      sessionRef.current = sessionId;
+      inst.sessionRef = sessionId;
 
       // SSE stdout stream
       const streamUrl = bridge.getPtyStreamUrl(sessionId);
       const sse = new EventSource(streamUrl);
-      sseRef.current = sse;
+      inst.sseRef = sse;
 
       let initialBurst = true;
       const initialBurstTimer = setTimeout(() => { initialBurst = false; }, 3500);
@@ -207,83 +262,92 @@ export const TerminalPanel: React.FC = () => {
       };
 
       sse.onerror = (err) => {
-        console.warn('[TerminalPanel] SSE stream error:', err);
+        console.warn(`[TerminalPanel] SSE stream error for ${tabId}:`, err);
       };
 
       sse.addEventListener('close', () => {
+        clearTimeout(initialBurstTimer);
         term.writeln('\r\n\x1b[33m[session closed]\x1b[0m');
-        if (sseRef.current) {
-          sseRef.current.close();
-          sseRef.current = null;
+        if (inst.sseRef) {
+          inst.sseRef.close();
+          inst.sseRef = null;
         }
-        sessionRef.current = null;
+        inst.sessionRef = null;
       });
 
       // Keyboard → PTY write
       term.onData((data) => {
-        if (sessionRef.current) {
-          bridge.ptyWrite(sessionRef.current, data).catch(() => {});
+        if (inst.sessionRef) {
+          bridge.ptyWrite(inst.sessionRef, data).catch(() => {});
         }
       });
     } finally {
-      startingRef.current = false;
+      startingTabsRef.current[tabId] = false;
     }
   }, []);
 
-  // ── Kill session ─────────────────────────────────────────────────────────
-  const killSession = useCallback(() => {
-    if (sseRef.current) {
-      try { sseRef.current.close(); } catch (_) {}
-      sseRef.current = null;
-    }
-    if (sessionRef.current) {
-      bridge.ptyKill(sessionRef.current).catch(() => {});
-      sessionRef.current = null;
-    }
-    if (termRef.current) {
-      try { termRef.current.dispose(); } catch (_) {}
-      termRef.current = null;
-    }
-    fitRef.current = null;
-  }, []);
-
-  // ── Open / hide lifecycle ────────────────────────────────────────────────
-  useEffect(() => {
-    if (store.terminalVisible) {
-      if (!sessionRef.current) {
-        spawnSession();
-      } else {
-        // Refit, refresh theme, and focus when unhidden
-        requestAnimationFrame(() => {
-          try {
-            if (termRef.current) {
-              const vars = getThemeVars();
-              termRef.current.options.theme = buildXtermTheme(vars);
-            }
-            fitRef.current?.fit();
-            termRef.current?.scrollToBottom();
-            termRef.current?.focus();
-          } catch (_) {}
-        });
+  // ── Kill single tab instance ──────────────────────────────────────────────
+  const killTabInstance = useCallback((tabId: string) => {
+    const inst = instancesRef.current[tabId];
+    if (inst) {
+      if (inst.sseRef) {
+        try { inst.sseRef.close(); } catch (_) {}
+        inst.sseRef = null;
       }
-    } else {
-      try {
-        termRef.current?.blur();
-        const ae = document.activeElement as HTMLElement | null;
-        if (ae && (containerRef.current?.contains(ae) || ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT')) {
-          ae.blur();
-        }
-      } catch (_) {}
+      if (inst.sessionRef) {
+        bridge.ptyKill(inst.sessionRef).catch(() => {});
+        inst.sessionRef = null;
+      }
+      try { inst.term.dispose(); } catch (_) {}
+      delete instancesRef.current[tabId];
     }
-  }, [store.terminalVisible, spawnSession]);
+    delete startingTabsRef.current[tabId];
+  }, []);
 
-  // Live theme listener across component lifecycle
+  // ── Kill all instances ────────────────────────────────────────────────────
+  const killAllSessions = useCallback(() => {
+    Object.keys(instancesRef.current).forEach(killTabInstance);
+  }, [killTabInstance]);
+
+  // ── Active tab lifecycle & focus ──────────────────────────────────────────
+  useEffect(() => {
+    if (!store.terminalVisible) {
+      try {
+        const activeInst = instancesRef.current[activeTabId];
+        activeInst?.term.blur();
+      } catch (_) {}
+      return;
+    }
+
+    // If active tab session doesn't exist yet, spawn it
+    if (!instancesRef.current[activeTabId]) {
+      requestAnimationFrame(() => {
+        spawnTabSession(activeTabId);
+      });
+    } else {
+      requestAnimationFrame(() => {
+        try {
+          const inst = instancesRef.current[activeTabId];
+          if (inst) {
+            const vars = getThemeVars();
+            inst.term.options.theme = buildXtermTheme(vars);
+            inst.fit.fit();
+            inst.term.scrollToBottom();
+            inst.term.focus();
+          }
+        } catch (_) {}
+      });
+    }
+  }, [store.terminalVisible, activeTabId, spawnTabSession]);
+
+  // ── Live theme listener across all open terminals ────────────────────────
   useEffect(() => {
     const onTheme = (ev?: any) => {
-      if (termRef.current) {
-        const vars = (ev?.detail as Record<string, string>) || getThemeVars();
-        termRef.current.options.theme = buildXtermTheme(vars);
-      }
+      const vars = (ev?.detail as Record<string, string>) || getThemeVars();
+      const theme = buildXtermTheme(vars);
+      Object.values(instancesRef.current).forEach(inst => {
+        inst.term.options.theme = theme;
+      });
     };
     window.addEventListener('matugen_theme_changed', onTheme);
     return () => {
@@ -291,29 +355,32 @@ export const TerminalPanel: React.FC = () => {
     };
   }, []);
 
-  // Dispose on unmount
+  // Dispose all terminals on unmount
   useEffect(() => {
-    return () => { killSession(); };
-  }, [killSession]);
+    return () => { killAllSessions(); };
+  }, [killAllSessions]);
 
-  // ── Resize observer ───────────────────────────────────────────────────────
+  // ── Resize observer on container ──────────────────────────────────────────
   useEffect(() => {
-    if (!containerRef.current) return;
+    const activeMount = document.getElementById(`terminal-mount-${activeTabId}`);
+    if (!activeMount) return;
+
     const ro = new ResizeObserver(() => {
       if (!store.terminalVisible) return;
-      if (fitRef.current && termRef.current) {
+      const inst = instancesRef.current[activeTabId];
+      if (inst) {
         try {
-          fitRef.current.fit();
-          termRef.current.scrollToBottom();
-          if (sessionRef.current) {
-            bridge.ptyResize(sessionRef.current, termRef.current.cols, termRef.current.rows).catch(() => {});
+          inst.fit.fit();
+          inst.term.scrollToBottom();
+          if (inst.sessionRef) {
+            bridge.ptyResize(inst.sessionRef, inst.term.cols, inst.term.rows).catch(() => {});
           }
         } catch { /* noop */ }
       }
     });
-    ro.observe(containerRef.current);
+    ro.observe(activeMount);
     return () => ro.disconnect();
-  }, [store.terminalVisible]);
+  }, [store.terminalVisible, activeTabId]);
 
   // ── Drag-to-resize handle ─────────────────────────────────────────────────
   const onHandlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -334,29 +401,54 @@ export const TerminalPanel: React.FC = () => {
     resizingRef.current = false;
   }, []);
 
-  // ── Restart ───────────────────────────────────────────────────────────────
-  const handleRestart = useCallback(async () => {
-    killSession();
-    await new Promise(r => setTimeout(r, 100));
-    await spawnSession();
-  }, [killSession, spawnSession]);
-
-  // ── Clear ─────────────────────────────────────────────────────────────────
-  const handleClear = useCallback(() => {
-    termRef.current?.clear();
+  // ── Tab Management Actions ────────────────────────────────────────────────
+  const handleNewTab = useCallback(() => {
+    const num = nextNumRef.current++;
+    const newId = `term_${Date.now()}_${num}`;
+    const newName = `Terminal ${num}`;
+    setTabs(prev => [...prev, { id: newId, name: newName }]);
+    setActiveTabId(newId);
   }, []);
 
-  // ── Close ────────────────────────────────────────────────────────────────
+  const handleCloseTab = useCallback((e: React.MouseEvent, tabId: string) => {
+    e.stopPropagation();
+    if (tabs.length <= 1) return;
+
+    killTabInstance(tabId);
+    const remaining = tabs.filter(t => t.id !== tabId);
+    setTabs(remaining);
+
+    if (activeTabId === tabId) {
+      const idx = tabs.findIndex(t => t.id === tabId);
+      const nextTab = remaining[Math.max(0, idx - 1)] || remaining[0];
+      if (nextTab) {
+        setActiveTabId(nextTab.id);
+      }
+    }
+  }, [tabs, activeTabId, killTabInstance]);
+
+  const handleRestart = useCallback(async () => {
+    killTabInstance(activeTabId);
+    await new Promise(r => setTimeout(r, 80));
+    await spawnTabSession(activeTabId);
+  }, [activeTabId, killTabInstance, spawnTabSession]);
+
+  const handleClear = useCallback(() => {
+    instancesRef.current[activeTabId]?.term.clear();
+  }, [activeTabId]);
+
   const handleClose = useCallback(() => {
     storeActions.toggleTerminal();
   }, []);
 
   return (
     <div
+      ref={panelRef}
       className={`terminal-panel ${store.terminalVisible ? 'terminal-visible' : 'terminal-hidden'}`}
       style={{ height: `${store.terminalHeight}px` }}
+      onMouseEnter={handleHoverFocus}
     >
-      {/* Resize handle */}
+      {/* Top drag handle to resize */}
       <div
         className="terminal-resize-handle"
         onPointerDown={onHandlePointerDown}
@@ -364,16 +456,49 @@ export const TerminalPanel: React.FC = () => {
         onPointerUp={onHandlePointerUp}
       />
 
-      {/* Header bar */}
+      {/* Header bar: tabs start at the left, '+' toggle & controls on the right */}
       <div className="terminal-header">
-        <TerminalSquare size={13} style={{ color: 'var(--matugen-surface-tint)', flexShrink: 0 }} />
-        <span className="terminal-header-title">Terminal</span>
+        <div className="terminal-tabs-row">
+          {tabs.map((tab) => {
+            const isActive = tab.id === activeTabId;
+            return (
+              <div
+                key={tab.id}
+                className={`terminal-tab-chip ${isActive ? 'active' : ''}`}
+                onClick={() => setActiveTabId(tab.id)}
+                title={tab.name}
+              >
+                <TerminalIcon size={11} className="terminal-tab-icon" />
+                <span className="terminal-tab-title">{tab.name}</span>
+                {tabs.length > 1 && (
+                  <button
+                    type="button"
+                    className="terminal-tab-close"
+                    onClick={(e) => handleCloseTab(e, tab.id)}
+                    title={`Close ${tab.name}`}
+                  >
+                    <X size={10} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
         <div className="terminal-header-actions">
+          <button
+            type="button"
+            className="terminal-header-btn terminal-header-btn-new"
+            onClick={handleNewTab}
+            title="New terminal tab"
+          >
+            <Plus size={13} />
+          </button>
           <button
             type="button"
             className="terminal-header-btn"
             onClick={handleClear}
-            title="Clear terminal"
+            title="Clear active terminal"
           >
             <Trash2 size={12} />
           </button>
@@ -396,12 +521,22 @@ export const TerminalPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* xterm.js mount point */}
-      <div
-        className="terminal-xterm-container"
-        ref={containerRef}
-        onClick={() => termRef.current?.focus()}
-      />
+      {/* xterm.js mount points for all tabs */}
+      <div className="terminal-xterm-wrapper" style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {tabs.map((tab) => (
+          <div
+            key={tab.id}
+            id={`terminal-mount-${tab.id}`}
+            className="terminal-xterm-container"
+            style={{
+              display: tab.id === activeTabId ? 'block' : 'none',
+              width: '100%',
+              height: '100%',
+            }}
+            onClick={() => instancesRef.current[tab.id]?.term.focus()}
+          />
+        ))}
+      </div>
     </div>
   );
 };

@@ -436,8 +436,8 @@ ShellRoot {
         function setDockPosition(pos: string) { DockState.setPosition(pos) }
         function cycleDockPosition()   { DockState.cyclePosition() }
         function toggleLauncher()      { if (LicenseState.activated) HCCLauncherState.toggle() }
-        // No tab arg -> toggle (hyprviz.lua SUPER+A); with a tab -> open it.
-        function openLauncher(tab: string) { if (!LicenseState.activated) return; tab ? HCCLauncherState.open(tab) : HCCLauncherState.toggle() }
+        // Toggle launcher visibility (custom.lua SUPER+A)
+        function openLauncher() { if (!LicenseState.activated) return; HCCLauncherState.toggle() }
         function closeLauncher()       { HCCLauncherState.close() }
 
         // ── Launcher sub-tab toggles (hyprviz.lua keybinds) ────────────────

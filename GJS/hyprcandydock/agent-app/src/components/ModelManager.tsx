@@ -1705,6 +1705,21 @@ const CompletionsTab: FC = () => {
             onChange={e => setSearchQuery(p => ({ ...p, [provider.id]: e.target.value }))}
             placeholder={`Search ${provider.name} models (e.g. coder, llama, qwen)...`}
             style={{ width: '100%', padding: '7px 30px 7px 30px', boxSizing: 'border-box', background: 'var(--bg-input)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)', color: 'var(--text-primary)', fontSize: '11.5px', outline: 'none' }} />
+          {searchQuery[provider.id] && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery(p => ({ ...p, [provider.id]: '' }))}
+              title="Clear search"
+              style={{
+                position: 'absolute', right: '8px',
+                background: 'transparent', border: 'none',
+                color: 'var(--text-muted)', cursor: 'pointer',
+                display: 'flex', padding: '2px',
+              }}
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
 
         <div>

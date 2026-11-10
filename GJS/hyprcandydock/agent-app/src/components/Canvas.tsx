@@ -994,7 +994,9 @@ export const Canvas: React.FC = () => {
                         try {
                           const ae = document.activeElement as HTMLElement | null;
                           if (editorNode && ae && editorNode.contains(ae)) return;
-                          if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
+                          if (ae?.closest('.terminal-panel') || ae?.classList.contains('xterm-helper-textarea')) {
+                            ae.blur();
+                          } else if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
                             const isHidden = ae.closest('.sidebar-panel:not(.sidebar-visible)') ||
                                              ae.closest('.chat-panel:not(.chat-visible)') ||
                                              (ae.offsetWidth === 0 && ae.offsetHeight === 0);

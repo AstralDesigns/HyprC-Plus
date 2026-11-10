@@ -432,9 +432,16 @@ def _resolve_player_desktop_entry(player_name: str) -> "tuple[str, str]":
 
 
 def _poll_mpris(notif_service):
-    """Background thread: poll playerctl every 3 s, emit Playing notification on track change."""
+    """Background thread: poll playerctl every 3 s, emit Playing notification on track change.
+
+    _last_media_key is intentionally NOT cleared on transient subprocess errors
+    (e.g. playerctl briefly returning non-zero while the player is still active).
+    It is only cleared when all players are confirmed Paused/Stopped/absent so
+    that the same track re-notifies when playback resumes after a real pause.
+    """
     global _last_media_key
     _player_cache: dict = {}
+    _consecutive_errors = 0
     while True:
         time.sleep(3)
         try:
@@ -444,16 +451,34 @@ def _poll_mpris(notif_service):
                 capture_output=True, text=True, timeout=3
             )
             if result.returncode != 0:
-                _last_media_key = ""
+                # Transient error (playerctl not found, brief glitch).
+                # Only forget the last track after several consecutive failures
+                # so a momentary non-zero exit doesn't cause a re-notification.
+                _consecutive_errors += 1
+                if _consecutive_errors >= 3:
+                    _last_media_key = ""
                 continue
+            _consecutive_errors = 0
+
+            lines = result.stdout.strip().splitlines()
             # Take the first Playing line
             playing_line = ""
-            for line in result.stdout.strip().splitlines():
+            for line in lines:
                 if line.startswith("Playing\t"):
                     playing_line = line
                     break
+
             if not playing_line:
-                _last_media_key = ""
+                # No player is actively Playing right now. If every line is
+                # Paused/Stopped we clear the key so the next resume triggers
+                # a fresh notification. If there are no lines at all (no
+                # players), also clear.
+                if not lines or all(
+                    ln.startswith("Paused\t") or ln.startswith("Stopped\t")
+                    for ln in lines if ln.strip()
+                ):
+                    _last_media_key = ""
+                # Otherwise (e.g. empty metadata mid-track), preserve the key.
                 continue
             parts = playing_line.split("\t")
             if len(parts) < 5:

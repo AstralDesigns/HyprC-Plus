@@ -1527,16 +1527,18 @@ ShellRoot {
 
                                             // Title
                                             Text {
-                                                Layout.fillWidth:true
+                                                Layout.fillWidth: true
+                                                Layout.maximumWidth: mediaControlsRow.implicitWidth
                                                 text: root.mediaTitle; color: root.cOnSurf
                                                 font.pixelSize:13; font.weight:Font.DemiBold
-                                                elide:Text.ElideRight
+                                                elide: Text.ElideRight
                                             }
                                             // Artist
                                             Text {
-                                                Layout.fillWidth:true
+                                                Layout.fillWidth: true
+                                                Layout.maximumWidth: mediaControlsRow.implicitWidth
                                                 text: root.mediaArtist; color: root.cOnSurf
-                                                font.pixelSize:11; elide:Text.ElideRight
+                                                font.pixelSize:11; elide: Text.ElideRight
                                                 visible: text !== ""
                                             }
 

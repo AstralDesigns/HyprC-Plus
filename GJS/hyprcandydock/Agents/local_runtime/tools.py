@@ -290,6 +290,11 @@ TOOLS_SCHEMA = [
                 "properties": {
                     "summary": {"type": "string", "description": "Concise completion summary of what was accomplished."},
                     "remaining": {"type": "string", "description": "Optional: any remaining limitations or follow-up items."},
+                    "suggestions": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Optional: 1 to 4 brief next step suggestions the user might want to run next.",
+                    },
                 },
                 "required": ["summary"],
             },
@@ -677,8 +682,8 @@ async def capture_preview(region: Optional[str] = None) -> dict:
     }
 
 
-async def task_complete(summary: str, remaining: str = "") -> dict:
-    return {"summary": summary, "remaining": remaining, "completed": True}
+async def task_complete(summary: str, remaining: str = "", suggestions: Optional[list] = None) -> dict:
+    return {"summary": summary, "remaining": remaining, "suggestions": suggestions or [], "completed": True}
 
 
 # ── Agent memory (durable topic notes) ───────────────────────────────────────

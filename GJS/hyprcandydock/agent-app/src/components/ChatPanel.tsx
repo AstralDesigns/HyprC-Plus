@@ -338,14 +338,22 @@ export const ChatPanel: React.FC = () => {
             </span>
           ))}
           {store.contextImages.map(ci => (
-            <span key={ci.path} className="context-chip context-image-chip" style={{ cursor: 'pointer' }}>
+            <span key={ci.path} className="context-chip context-image-chip">
               <span
                 className="context-image-hover-target"
                 onClick={() => setHoveredImage(imageSource(ci))}
-                onMouseEnter={() => setHoveredImage(imageSource(ci))}
+                title="Click to view full image in lightbox"
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
               >
                 <img src={imageSource(ci)} alt={ci.path.split('/').pop() || 'Context image'} className="context-image-thumb" />
-                <span className="context-chip-name">{ci.path.split('/').pop()}</span>
+              </span>
+              <span
+                className="context-chip-name"
+                onClick={() => storeActions.openFileByPath(ci.path)}
+                title={`Open ${ci.path.split('/').pop()} in canvas`}
+                style={{ cursor: 'pointer' }}
+              >
+                {ci.path.split('/').pop()}
               </span>
               <button
                 type="button"

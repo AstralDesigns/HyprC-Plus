@@ -2,10 +2,10 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import {
   Globe, FileText, Terminal, FileDiff,
-  ChevronDown, ChevronRight, CheckCircle, Clock, Sparkles,
+  ChevronDown, ChevronRight, ChevronUp, CheckCircle, Clock, Sparkles,
   Folder, Copy, Check, Edit2, RotateCcw,
   Brain, Zap, Eye, ListChecks,
-  X, Lock,
+  X, Lock, Code,
 } from 'lucide-react';
 import { useStore, getStore, Message, ToolCallData, storeActions, setStore, type PlanTask, type SuggestionsData, type SuggestionOption, type MessageBlock } from '../store';
 import { bridge } from '../bridge';
@@ -13,6 +13,7 @@ import { FileIcon } from '../utils/fileIcons';
 import { DiffWidget } from './DiffWidget';
 import { CommandWidget } from './CommandWidget';
 import { SelectionChip } from './SelectionChip';
+import { selectionRangeLabel, type SelectionRef } from '../utils/editorClipboard';
 import { agentEngine } from '../engine/agent-engine';
 import { ImageLightboxModal } from './ImageLightboxModal';
 
@@ -270,24 +271,175 @@ const AgentActivity: React.FC<{ tools: ToolCallData[]; running: boolean }> = ({ 
   );
 };
 
+function isExplicitFile(text: string): boolean {
+  if (!text) return false;
+  const clean = text.trim();
+  if (clean.endsWith('/') || clean.endsWith('\\')) return false;
 
-const TaskCompleteWidget: React.FC<{ summary: string; remaining?: string }> = ({ summary, remaining }) => (
-  <div style={{
-    margin: '7px 0',
-    padding: '10px 12px',
-    border: '1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 38%, transparent)',
-    borderRadius: 'var(--radius-sm)',
-    background: 'color-mix(in srgb, var(--matugen-primary, #a0c9dc) 9%, transparent)'
-  }}>
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--matugen-primary, #a0c9dc)', fontSize: '11px', fontWeight: 600, marginBottom: '5px' }}>
-      <CheckCircle size={13} color="#22c55e" /> Task complete
+  const fileName = clean.split('/').pop() || '';
+  if (!fileName) return false;
+
+  if (fileName === '.' || fileName === '..') return false;
+  if (fileName.startsWith('.') && !fileName.slice(1).includes('.')) return false;
+
+  const knownFiles = new Set(['dockerfile', 'makefile', 'gemfile', 'procfile', 'licence', 'license', 'readme']);
+  if (knownFiles.has(fileName.toLowerCase())) return true;
+
+  return /\.[a-zA-Z0-9_-]{1,8}$/.test(fileName);
+}
+
+const renderMarkdown = (content: string, extraClass = '', selectionRefs?: SelectionRef[]) => {
+  let processed = content;
+  if (selectionRefs && selectionRefs.length > 0) {
+    let refIdx = 0;
+    processed = content.replace(/⟦([^⟧]+)⟧/g, (match, p1) => {
+      const trimmed = p1.trim();
+      const foundIdx = selectionRefs.findIndex((r) => {
+        const label = `${r.name} ${selectionRangeLabel(r)}`;
+        return label === trimmed || trimmed.includes(r.name);
+      });
+      const useIdx = foundIdx !== -1 ? foundIdx : refIdx;
+      refIdx++;
+      return `[${trimmed}](selection://${useIdx})`;
+    });
+  }
+
+  return (
+    <div className={`markdown-body ${extraClass}`}>
+      <ReactMarkdown
+        components={{
+          a({ node, href, children, ...props }: any) {
+            if (href && href.startsWith('selection://')) {
+              const idx = parseInt(href.replace('selection://', ''), 10);
+              const ref = selectionRefs?.[idx];
+              if (ref) {
+                return (
+                  <SelectionChip
+                    sel={ref}
+                    className="selection-chip-inline"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      storeActions.openFileByPath(ref.path);
+                    }}
+                  />
+                );
+              }
+            }
+            const cleanPath = (href || '').replace(/^file:\/\//, '');
+            if (cleanPath && isExplicitFile(cleanPath)) {
+              const fileName = cleanPath.split('/').pop() || cleanPath;
+              return (
+                <a
+                  href={href}
+                  className="interactive-file-mention"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    storeActions.openFileByPath(cleanPath);
+                  }}
+                  title={`Open ${cleanPath}`}
+                  {...props}
+                >
+                  <FileIcon name={fileName} size={11} />
+                  <span>{fileName}</span>
+                </a>
+              );
+            }
+            return (
+              <a href={href} target="_blank" rel="noreferrer" {...props}>
+                {children}
+              </a>
+            );
+          },
+          code({ node, className, children, ...props }: any) {
+            const isInline = !className;
+            if (isInline) {
+              const text = String(children || '').trim();
+              if (!text.includes('\n') && !text.includes(' ') && isExplicitFile(text)) {
+                const fileName = text.split('/').pop() || text;
+                return (
+                  <code
+                    className="interactive-file-mention"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      storeActions.openFileByPath(text);
+                    }}
+                    title={`Open ${text}`}
+                    {...props}
+                  >
+                    <FileIcon name={fileName} size={11} />
+                    <span>{fileName}</span>
+                  </code>
+                );
+              }
+              return <code {...props}>{children}</code>;
+            }
+            return (
+              <pre>
+                <code className={className} {...props}>{children}</code>
+              </pre>
+            );
+          }
+        }}
+      >
+        {processed}
+      </ReactMarkdown>
     </div>
-    <div className="markdown-body" style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
-      <ReactMarkdown>{summary}</ReactMarkdown>
+  );
+};
+
+const TaskCompleteWidget: React.FC<{
+  summary: string;
+  remaining?: string;
+  suggestions?: string[];
+}> = ({ summary, remaining, suggestions }) => {
+  const handleSuggestionClick = (suggestion: string) => {
+    window.dispatchEvent(new CustomEvent('composer_set_text', { detail: suggestion }));
+  };
+
+  return (
+    <div style={{
+      margin: '7px 0',
+      padding: '10px 12px',
+      border: '1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 38%, transparent)',
+      borderRadius: 'var(--radius-sm)',
+      background: 'color-mix(in srgb, var(--matugen-primary, #a0c9dc) 9%, transparent)'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--matugen-primary, #a0c9dc)', fontSize: '11px', fontWeight: 600, marginBottom: '5px' }}>
+        <CheckCircle size={13} color="#22c55e" /> Task complete
+      </div>
+      <div className="markdown-body" style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
+        {renderMarkdown(summary)}
+      </div>
+      {remaining ? <div style={{ marginTop: '5px', color: 'var(--text-muted)', fontSize: '10px' }}>Remaining: {remaining}</div> : null}
+
+      {suggestions && suggestions.length > 0 && (
+        <div className="task-suggestions-section">
+          <div className="task-suggestions-label">
+            <Sparkles size={11} color="var(--matugen-primary, #a0c9dc)" />
+            <span>Suggested next steps</span>
+          </div>
+          <div className="task-suggestions-chips">
+            {suggestions.map((sug, i) => (
+              <button
+                key={i}
+                type="button"
+                className="task-suggestion-chip"
+                onClick={() => handleSuggestionClick(sug)}
+                title="Click to populate chat input for review & editing"
+              >
+                <Sparkles size={10} style={{ opacity: 0.8 }} />
+                <span>{sug}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
-    {remaining ? <div style={{ marginTop: '5px', color: 'var(--text-muted)', fontSize: '10px' }}>Remaining: {remaining}</div> : null}
-  </div>
-);
+  );
+};
 
 /* ── Main stream ────────────────────────────────────────────────────── */
 /* ── Visible reasoning: collapsible, dimmed chain-of-thought ─────── */
@@ -644,28 +796,6 @@ const MessageBlock: React.FC<{
   );
 };
 
-const renderMarkdown = (content: string, extraClass = '') => (
-  <div className={`markdown-body ${extraClass}`}>
-    <ReactMarkdown
-      components={{
-        code({ node, className, children, ...props }: any) {
-          const isInline = !className;
-          if (isInline) {
-            return <code {...props}>{children}</code>;
-          }
-          return (
-            <pre>
-              <code className={className} {...props}>{children}</code>
-            </pre>
-          );
-        }
-      }}
-    >
-      {content}
-    </ReactMarkdown>
-  </div>
-);
-
 /* ── User bubble ────────────────────────────────────────────────────── */
 const UserBubble: React.FC<{
   sessionId: string;
@@ -738,18 +868,7 @@ const UserBubble: React.FC<{
 
   return (
     <div className="user-bubble-wrap animate-fade-in">
-      <div className="user-bubble-meta">
-        {ts && <span className="bubble-timestamp">{ts}</span>}
-        <div className="bubble-actions">
-          <button className="bubble-action-btn" onClick={handleCopy} title="Copy">
-            {copied ? <Check size={11} color="var(--accent-green)" /> : <Copy size={11} />}
-          </button>
-          <button className="bubble-action-btn" onClick={handleEdit} title="Edit & resend">
-            <Edit2 size={11} />
-          </button>
-        </div>
-      </div>
-
+      {/* Context attachments (images, files) stay outside the bubble as context */}
       {message.attachments && message.attachments.length > 0 && (
         <div className="user-bubble-attachments">
           {message.attachments.map(att => {
@@ -782,22 +901,22 @@ const UserBubble: React.FC<{
         </div>
       )}
 
-      {message.selectionRefs && message.selectionRefs.length > 0 && (
-        <div className="selection-chip-row user-bubble-selections">
-          {message.selectionRefs.map((r, i) => (
-            <SelectionChip key={`${r.path}:${r.startLine}:${r.endLine}:${i}`} sel={r} />
-          ))}
-        </div>
-      )}
-
+      {/* User prompt bubble containing code section selection pills directly inline in markdown */}
       {!isEditing ? (
         <div className="user-bubble" onClick={handleEdit} style={{ cursor: 'pointer' }} data-tip="Click to edit prompt">
           <div className="user-bubble-markdown markdown-body">
-            {renderMarkdown(message.content)}
+            {renderMarkdown(message.content, '', message.selectionRefs)}
           </div>
         </div>
       ) : (
         <div className="user-bubble-edit" ref={editContainerRef}>
+          {message.selectionRefs && message.selectionRefs.length > 0 && (
+            <div className="selection-chip-row user-bubble-selections" style={{ marginBottom: '6px' }}>
+              {message.selectionRefs.map((r, i) => (
+                <SelectionChip key={`${r.path}:${r.startLine}:${r.endLine}:${i}`} sel={r} />
+              ))}
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             className="user-bubble-edit-textarea"
@@ -818,6 +937,20 @@ const UserBubble: React.FC<{
           </div>
         </div>
       )}
+
+      {/* Meta (timestamp + copy + edit) placed always BELOW the user bubble */}
+      <div className="user-bubble-meta" style={{ marginTop: '2px' }}>
+        {ts && <span className="bubble-timestamp">{ts}</span>}
+        <div className="bubble-actions">
+          <button className="bubble-action-btn" onClick={handleCopy} title="Copy">
+            {copied ? <Check size={11} color="var(--accent-green)" /> : <Copy size={11} />}
+          </button>
+          <button className="bubble-action-btn" onClick={handleEdit} title="Edit & resend">
+            <Edit2 size={11} />
+          </button>
+        </div>
+      </div>
+
       {activeLightbox && (
         <ImageLightboxModal src={activeLightbox} onClose={() => setActiveLightbox(null)} />
       )}
@@ -857,7 +990,14 @@ const StepsContainer: React.FC<{
   messageId: string;
 }> = ({ blocks, running, sessionId, messageId }) => {
   const [collapsed, setCollapsed] = useState(true);
+  const stepsBottomRef = useRef<HTMLDivElement>(null);
   const summary = getStepSummary(blocks);
+
+  useEffect(() => {
+    if (!collapsed && stepsBottomRef.current) {
+      stepsBottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [collapsed]);
 
   return (
     <div className="agent-steps-container">
@@ -893,6 +1033,19 @@ const StepsContainer: React.FC<{
             }
             return null;
           })}
+
+          <div className="agent-steps-collapse-footer">
+            <button
+              type="button"
+              className="agent-steps-collapse-btn"
+              onClick={() => setCollapsed(true)}
+              data-tip="Collapse steps"
+            >
+              <ChevronUp size={12} />
+              <span>Collapse steps</span>
+            </button>
+          </div>
+          <div ref={stepsBottomRef} />
         </div>
       )}
     </div>
@@ -913,18 +1066,28 @@ const AgentTurn: React.FC<{
     ? new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
 
+  const taskComplete = message.tools?.find(tool => tool.name === 'task_complete' && tool.status === 'completed');
+  const taskResult = taskComplete?.result as { summary?: string; remaining?: string; suggestions?: string[] } | undefined;
+  const suggestions: string[] = taskResult?.suggestions || (taskComplete?.arguments as any)?.suggestions || [];
+  const running = isLast && agentRunning;
+
+  // Deduplicate summary: if task complete summary exists, don't show identical markdown twice
+  const isDuplicateSummary = (text: string) => {
+    if (!taskResult?.summary) return false;
+    const t = text.trim();
+    const s = taskResult.summary.trim();
+    return t === s || s.includes(t) || t.includes(s);
+  };
+
   const handleCopy = async () => {
     // Route through the host (wl-copy): navigator.clipboard is silently blocked
     // in the embedded QtWebEngine view.
-    if (await bridge.copyToClipboard(message.content || '')) {
+    const textToCopy = message.content || taskResult?.summary || '';
+    if (await bridge.copyToClipboard(textToCopy)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     }
   };
-
-  const taskComplete = message.tools?.find(tool => tool.name === 'task_complete' && tool.status === 'completed');
-  const taskResult = taskComplete?.result as { summary?: string; remaining?: string } | undefined;
-  const running = isLast && agentRunning;
 
   // Per-turn revert (P3 §3.7): only offered when this turn actually wrote
   // files (has diffs) and carries a turnId the runtime ledger can roll back.
@@ -954,29 +1117,6 @@ const AgentTurn: React.FC<{
   return (
     <div className="agent-turn-flow animate-fade-in">
       <div className="agent-turn-body">
-        {/* Timestamp + copy — minimal meta row, only when there's content */}
-        {(message.content || taskComplete) && (
-          <div className="agent-turn-meta">
-            {ts && <span className="bubble-timestamp" style={{ marginLeft: 0 }}>{ts}</span>}
-            {message.content && (
-              <button className="bubble-action-btn" onClick={handleCopy} title="Copy response">
-                {copied ? <Check size={10} color="#22c55e" /> : <Copy size={10} />}
-              </button>
-            )}
-            {canRevert && (
-              <button
-                className="bubble-action-btn agent-turn-revert"
-                onClick={handleRevert}
-                disabled={reverting}
-                title="Revert this turn's file changes"
-              >
-                <RotateCcw size={10} />
-                <span>{reverting ? 'Reverting…' : 'Revert turn'}</span>
-              </button>
-            )}
-          </div>
-        )}
-
         {/* Blocks render in the order events actually happened: text,
             activity timelines, elevated command cards, and diffs can all
             appear and reappear as the turn progresses, instead of every
@@ -1037,6 +1177,10 @@ const AgentTurn: React.FC<{
             }
             const { block, isFinalPosition, isLastBlock } = item;
             if (block.type === 'text') {
+              // Deduplicate if task complete card is showing this summary
+              if (taskComplete && isDuplicateSummary(block.content)) {
+                return null;
+              }
               return isFinalPosition
                 ? <React.Fragment key={block.id}>{renderMarkdown(block.content)}</React.Fragment>
                 : <InterstitialLine key={block.id} text={block.content} />;
@@ -1107,12 +1251,18 @@ const AgentTurn: React.FC<{
                 ))}
               </div>
             )}
-            {message.content && renderMarkdown(message.content)}
+            {(!taskComplete || !isDuplicateSummary(message.content || '')) && message.content && renderMarkdown(message.content)}
           </>
         )}
 
         {/* Task complete: end-of-turn summary/suggestions, after every block */}
-        {taskComplete && taskResult?.summary && <TaskCompleteWidget summary={taskResult.summary} remaining={taskResult?.remaining} />}
+        {taskComplete && taskResult?.summary && (
+          <TaskCompleteWidget
+            summary={taskResult.summary}
+            remaining={taskResult?.remaining}
+            suggestions={suggestions}
+          />
+        )}
 
         {/* Attachments from assistant */}
         {message.attachments && message.attachments.length > 0 && (
@@ -1139,6 +1289,29 @@ const AgentTurn: React.FC<{
         {message.command && (
           <div style={{ marginTop: '10px' }}>
             <CommandWidget sessionId={sessionId} messageId={message.id} command={message.command} />
+          </div>
+        )}
+
+        {/* Meta controls (timestamp + copy + revert) moved always BELOW the agent loop output */}
+        {(message.content || taskComplete) && (
+          <div className="agent-turn-meta" style={{ marginTop: '6px' }}>
+            {ts && <span className="bubble-timestamp" style={{ marginLeft: 0 }}>{ts}</span>}
+            {(message.content || taskResult?.summary) && (
+              <button className="bubble-action-btn" onClick={handleCopy} title="Copy response">
+                {copied ? <Check size={10} color="#22c55e" /> : <Copy size={10} />}
+              </button>
+            )}
+            {canRevert && (
+              <button
+                className="bubble-action-btn agent-turn-revert"
+                onClick={handleRevert}
+                disabled={reverting}
+                title="Revert this turn's file changes"
+              >
+                <RotateCcw size={10} />
+                <span>{reverting ? 'Reverting…' : 'Revert turn'}</span>
+              </button>
+            )}
           </div>
         )}
       </div>

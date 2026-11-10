@@ -97,6 +97,23 @@ export const Header: React.FC = () => {
       case 'copy-relative': if (pane?.path) void bridge.copyToClipboard(relativeToProject(pane.path)); break;
       case 'save-as': void storeActions.saveFileAs(id); break;
       case 'rename': if (pane?.path) setRenamePane(pane); break;
+      case 'toggle-context': {
+        if (!pane?.path) break;
+        const ext = pane.name.split('.').pop()?.toLowerCase() || '';
+        const isImg = ['png', 'jpg', 'jpeg', 'webp', 'svg', 'gif'].includes(ext);
+        const inContext = isImg
+          ? store.contextImages.some(i => i.path === pane.path)
+          : store.contextFiles.some(f => f.path === pane.path);
+
+        if (inContext) {
+          if (isImg) storeActions.removeContextImage(pane.path);
+          else storeActions.removeContextFile(pane.path);
+        } else {
+          if (isImg) storeActions.addContextImage({ path: pane.path, data: `file://${pane.path}` });
+          else storeActions.addContextFile({ path: pane.path, name: pane.name });
+        }
+        break;
+      }
     }
   };
 
@@ -143,6 +160,21 @@ export const Header: React.FC = () => {
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
   }, []);
+
+  // Auto-scroll the tabs container to the active tab chip whenever activePaneId changes
+  useEffect(() => {
+    const activeId = store.activePaneId;
+    if (!activeId) return;
+    const scrollTab = () => {
+      const el = tabRefs.current[activeId];
+      if (el && tabsContainerRef.current) {
+        el.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+      }
+    };
+    scrollTab();
+    const raf = requestAnimationFrame(scrollTab);
+    return () => cancelAnimationFrame(raf);
+  }, [store.activePaneId, store.panes.length]);
 
   // Manual pointer-based tab reordering (see onPointerDown above for why
   // this isn't native HTML5 drag-and-drop). A small movement threshold
@@ -575,6 +607,10 @@ export const Header: React.FC = () => {
           const hasRight = idx < store.panes.length - 1;
           const hasOthers = store.panes.length > 1;
           const anySaved = store.panes.some(p => !p.isUnsaved);
+          const inContext = pane.path && (
+            store.contextFiles.some(f => f.path === pane.path) ||
+            store.contextImages.some(i => i.path === pane.path)
+          );
           // Keep the menu inside the viewport.
           const left = Math.min(tabMenu.x, window.innerWidth - 210);
           const top = Math.min(tabMenu.y, window.innerHeight - 280);
@@ -593,6 +629,9 @@ export const Header: React.FC = () => {
               <div className="menu-separator" />
               <button onClick={() => runTabAction('save-as')}><Save size={13} /> Save As<span className="menu-accel">Ctrl+Shift+S</span></button>
               <button disabled={!pane.path} onClick={() => runTabAction('rename')}><PenLine size={13} /> Rename…</button>
+              <button disabled={!pane.path} onClick={() => runTabAction('toggle-context')}>
+                <FileText size={13} /> {inContext ? 'Remove from Context' : 'Add to Context'}
+              </button>
               <div className="menu-separator" />
               <button disabled={!pane.path} onClick={() => runTabAction('copy-path')}><Copy size={13} /> Copy Path<span className="menu-accel">Ctrl+Alt+C</span></button>
               <button disabled={!pane.path} onClick={() => runTabAction('copy-relative')}><Copy size={13} /> Copy Relative Path</button>
