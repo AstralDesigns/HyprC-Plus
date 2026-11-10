@@ -488,8 +488,8 @@ export const Composer: React.FC = () => {
   const placeholder = store.specApprovalPending
     ? 'Review the plan above — Approve or Revise…'
     : store.agentRunning
-      ? 'Steer the agent… (Enter)'
-      : 'Ask the agent… paste a copied selection to reference it (Enter to send)';
+      ? 'Steer the agent…'
+      : 'Ask anything… (you can also paste screenshots from the clipboard)';
 
   return (
     <div style={{ padding: '10px 12px 14px', background: 'transparent', flexShrink: 0 }}>
