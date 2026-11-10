@@ -2459,7 +2459,7 @@ PanelWindow {
                                         CCToggle { label:"Smooth Curve"; value:Config.cavaWaveSmooth; onToggled:function(v){Config.cavaWaveSmooth=v} }
 
                                         CCSection { text: "Dimensions & Behavior" }
-                                        CCSlider { label:"Bar Count";   from:5;to:200;stepSize:1;   value:Config.cavaWidth;      onMoved:function(v){Config.cavaWidth=v} }
+                                        CCSlider { label:"Cava Width";   from:5;to:200;stepSize:1;   value:Config.cavaWidth;      onMoved:function(v){Config.cavaWidth=v} }
                                         CCSlider { label:"Bar Spacing"; from:0;to:6;stepSize:0.5;decimals:1; value:Config.cavaBarSpacing; onMoved:function(v){Config.cavaBarSpacing=v} }
                                         CCSlider { label:"Active Opacity";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.cavaActiveOpacity;  onMoved:function(v){Config.cavaActiveOpacity=v} }
                                         CCSlider { label:"Inactive Opacity";from:0;to:1;stepSize:0.05;decimals:2; value:Config.cavaInactiveOpacity;onMoved:function(v){Config.cavaInactiveOpacity=v} }
