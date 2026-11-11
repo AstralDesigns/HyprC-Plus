@@ -3953,6 +3953,20 @@ body,
   word-break: break-word;
 }
 
+/* Inline backtick code inside user bubbles */
+.user-bubble-text code {
+  background: var(--matugen-on-secondary, #1d343c);
+  color: var(--matugen-primary, #a0c9dc);
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 25%, transparent);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
 /* Edit mode */
 .user-bubble-edit {
   width: 85%;
@@ -5189,6 +5203,46 @@ body,
   width: 100%;
 }
 
+/* ── Task-complete summary: Monaco-themed code blocks ─────────────────
+   Scoped to .task-complete-summary so agent summary code snippets get
+   a minimal dark editor surface without affecting global markdown pre. */
+.task-complete-summary pre {
+  position: relative;
+  background: var(--bg-editor, #1e2a30);
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 22%, transparent);
+  border-radius: var(--radius-sm, 6px);
+  padding: 10px 14px;
+  margin: 6px 0;
+  overflow-x: auto;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+
+.task-complete-summary pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--matugen-primary, #a0c9dc);
+  font-family: var(--font-mono);
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* Language label pill top-right corner */
+.task-complete-summary pre[data-lang]::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
 /* ── Persistent Files Changed Widget ── */
 .files-changed-widget {
   margin-top: 8px;
@@ -5236,6 +5290,7 @@ body,
   cursor: pointer;
   transition: background 0.1s ease;
   color: var(--text-secondary);
+  overflow: hidden;
 }
 
 .files-changed-row:hover {
@@ -5247,20 +5302,26 @@ body,
   font-family: var(--font-mono);
   font-weight: 500;
   color: var(--text-primary);
+  flex-shrink: 0;
 }
 
 .files-changed-dir {
   color: var(--text-muted);
   font-size: 10px;
   font-family: var(--font-mono);
-  max-width: 150px;
+  /* Grows to fill available room, compresses with ellipsis only when
+     stats badges push the row past its container width */
+  flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-right: 4px;
 }
 
 .files-changed-spacer {
-  flex: 1;
+  /* Spacer retired — dir now absorbs remaining space */
+  display: none;
 }
 
 .files-changed-widget .stat-add {

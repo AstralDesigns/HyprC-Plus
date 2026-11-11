@@ -272,7 +272,7 @@ const AgentActivity: React.FC<{ tools: ToolCallData[]; running: boolean }> = ({ 
   );
 };
 
-function resolveMentionPath(rawPath: string): { fullPath: string; displayName: string } {
+function resolveMentionPath(rawPath: string): { fullPath: string; displayName: string; confident: boolean } {
   let clean = rawPath.trim().replace(/^file:\/\//, "");
   const home = (window as any).__hyprcandyHome || "/home/king";
   if (clean.startsWith("~/")) {
@@ -282,8 +282,10 @@ function resolveMentionPath(rawPath: string): { fullPath: string; displayName: s
   }
 
   const fileName = clean.split("/").pop() || clean;
+
+  // Already absolute — high confidence (agent explicitly wrote the full path)
   if (clean.startsWith("/")) {
-    return { fullPath: clean, displayName: fileName };
+    return { fullPath: clean, displayName: fileName, confident: true };
   }
 
   // Check known modified diff paths in store to match partial mentions like 'candylock/shell.qml'
@@ -299,7 +301,7 @@ function resolveMentionPath(rawPath: string): { fullPath: string; displayName: s
     });
     const matched = allDiffs.find(p => p.endsWith('/' + clean) || p.endsWith(clean));
     if (matched) {
-      return { fullPath: matched, displayName: fileName };
+      return { fullPath: matched, displayName: fileName, confident: true };
     }
 
     // Also check tool call arguments (read_file, write_file, etc.) across the current session
@@ -309,28 +311,29 @@ function resolveMentionPath(rawPath: string): { fullPath: string; displayName: s
         for (const tool of ((msg as any).tools || [])) {
           const toolPath: string = (tool.arguments as any)?.path || '';
           if (toolPath && (toolPath.endsWith('/' + clean) || toolPath.endsWith(clean) || toolPath.includes(clean))) {
-            return { fullPath: toolPath, displayName: fileName };
+            return { fullPath: toolPath, displayName: fileName, confident: true };
           }
         }
       }
     }
   } catch {}
 
-  // Try known project root prefixes before generic fallback
+  // Try known project root prefixes — only confident when subdir pattern matches
+  const home2 = (window as any).__hyprcandyHome || "/home/king";
   const knownPrefixes = [
-    `${home}/.HyprC-Plus/`,
-    `${home}/.hyprcandy/`,
+    `${home2}/.HyprC-Plus/`,
+    `${home2}/.hyprcandy/`,
     `/mnt/`,
   ];
   for (const prefix of knownPrefixes) {
     const candidate = prefix + clean;
-    // Use the prefix path if the partial path contains characteristic subdirectory patterns
     if (clean.includes('.config/') || clean.includes('.local/') || clean.includes('lockscreens/') || clean.includes('quickshell/')) {
-      return { fullPath: candidate, displayName: fileName };
+      return { fullPath: candidate, displayName: fileName, confident: true };
     }
   }
 
-  return { fullPath: home + (clean.startsWith('.') ? '/' + clean : '/.hyprcandy/' + clean), displayName: fileName };
+  // Generic fallback — not confident; caller can render as plain text instead
+  return { fullPath: home + (clean.startsWith('.') ? '/' + clean : '/.hyprcandy/' + clean), displayName: fileName, confident: false };
 }
 
 function isExplicitFile(text: string): boolean {
@@ -350,7 +353,10 @@ function isExplicitFile(text: string): boolean {
   return /\.[a-zA-Z0-9_-]{1,8}$/.test(fileName);
 }
 
-const renderMarkdown = (content: string, extraClass = '', selectionRefs?: SelectionRef[]) => {
+const renderMarkdown = (content: string, summaryMode?: boolean | string, selectionRefs?: SelectionRef[]) => {
+  // summaryMode can be true (summary code style) or a legacy string (extra CSS class)
+  const isSummary = summaryMode === true;
+  const extraClass = typeof summaryMode === 'string' ? summaryMode : '';
   let processed = content;
   if (selectionRefs && selectionRefs.length > 0) {
     let refIdx = 0;
@@ -367,10 +373,28 @@ const renderMarkdown = (content: string, extraClass = '', selectionRefs?: Select
   }
 
   return (
-    <div className={`markdown-body ${extraClass}`}>
+    <div className="markdown-body">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          ...(isSummary ? {
+            // In summary mode render fenced code blocks with Monaco-like theming.
+            // Inject data-lang so the CSS ::before rule can show the language label.
+            pre({ node, children, ...props }: any) {
+              // Extract language from child code element's className (language-xxx)
+              let lang = '';
+              const childEl = (node?.children || []).find((c: any) => c.tagName === 'code');
+              if (childEl) {
+                const cls: string = childEl.properties?.className?.[0] || '';
+                lang = cls.replace('language-', '');
+              }
+              return (
+                <pre data-lang={lang || undefined} {...props}>
+                  {children}
+                </pre>
+              );
+            },
+          } : {}),
           a({ node, href, children, ...props }: any) {
             if (href && href.startsWith('selection://')) {
               const idx = parseInt(href.replace('selection://', ''), 10);
@@ -391,21 +415,29 @@ const renderMarkdown = (content: string, extraClass = '', selectionRefs?: Select
             }
             const cleanPath = (href || '').replace(/^file:\/\//, '');
             if (cleanPath && isExplicitFile(cleanPath)) {
-              const { fullPath, displayName } = resolveMentionPath(cleanPath);
+              const { fullPath, displayName, confident } = resolveMentionPath(cleanPath);
+              if (confident) {
+                return (
+                  <a
+                    href={href}
+                    className="interactive-file-mention"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      storeActions.openFileByPath(fullPath);
+                    }}
+                    title={`Open ${fullPath}`}
+                    {...props}
+                  >
+                    <FileIcon name={displayName} size={11} />
+                    <span>{displayName}</span>
+                  </a>
+                );
+              }
+              // Not confident — render as a plain styled link (non-interactive chip)
               return (
-                <a
-                  href={href}
-                  className="interactive-file-mention"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    storeActions.openFileByPath(fullPath);
-                  }}
-                  title={`Open ${fullPath}`}
-                  {...props}
-                >
-                  <FileIcon name={displayName} size={11} />
-                  <span>{displayName}</span>
+                <a href={href} target="_blank" rel="noreferrer" {...props}>
+                  {children}
                 </a>
               );
             }
@@ -420,22 +452,26 @@ const renderMarkdown = (content: string, extraClass = '', selectionRefs?: Select
             if (isInline) {
               const text = String(children || '').trim();
               if (!text.includes('\n') && !text.includes(' ') && isExplicitFile(text)) {
-                const { fullPath, displayName } = resolveMentionPath(text);
-                return (
-                  <code
-                    className="interactive-file-mention"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      storeActions.openFileByPath(fullPath);
-                    }}
-                    title={`Open ${fullPath}`}
-                    {...props}
-                  >
-                    <FileIcon name={displayName} size={11} />
-                    <span>{displayName}</span>
-                  </code>
-                );
+                const { fullPath, displayName, confident } = resolveMentionPath(text);
+                if (confident) {
+                  return (
+                    <code
+                      className="interactive-file-mention"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        storeActions.openFileByPath(fullPath);
+                      }}
+                      title={`Open ${fullPath}`}
+                      {...props}
+                    >
+                      <FileIcon name={displayName} size={11} />
+                      <span>{displayName}</span>
+                    </code>
+                  );
+                }
+                // Not confident — plain inline code, no chip
+                return <code {...props}>{children}</code>;
               }
               return <code {...props}>{children}</code>;
             }
@@ -472,8 +508,8 @@ const TaskCompleteWidget: React.FC<{
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--matugen-primary, #a0c9dc)', fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>
         <CheckCircle size={13} color="#22c55e" /> Task complete
       </div>
-      <div className="markdown-body" style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
-        {renderMarkdown(summary)}
+      <div className="markdown-body task-complete-summary" style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
+        {renderMarkdown(summary, true)}
       </div>
       {remaining ? <div style={{ marginTop: '5px', color: 'var(--text-muted)', fontSize: '10px' }}>Remaining: {remaining}</div> : null}
 
@@ -904,7 +940,6 @@ export const ChatStream: React.FC = () => {
   // Live phase from the last assistant message
   const lastMsg = messages[messages.length - 1];
   const currentPhase = store.agentRunning ? deriveAgentPhase(lastMsg?.tools) : null;
-  const livePlan = deriveLivePlan(messages);
 
   return (
     <>
@@ -917,9 +952,6 @@ export const ChatStream: React.FC = () => {
         flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 14px',
         display: 'flex', flexDirection: 'column', gap: '4px',
       }}>
-        {livePlan.length > 0 && (
-          <PlanChecklistCard tasks={livePlan} running={store.agentRunning} />
-        )}
         {messages.map((msg, idx) => (
         <MessageBlock
           key={msg.id || idx}
@@ -968,6 +1000,7 @@ const MessageBlock: React.FC<{
       message={message}
       isLast={isLast}
       agentRunning={agentRunning}
+      previousMessages={previousMessages}
     />
   );
 };
@@ -1246,7 +1279,8 @@ const AgentTurn: React.FC<{
   message: Message;
   isLast: boolean;
   agentRunning: boolean;
-}> = ({ sessionId, message, isLast, agentRunning }) => {
+  previousMessages?: Message[];
+}> = ({ sessionId, message, isLast, agentRunning, previousMessages = [] }) => {
   const [copied, setCopied] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -1440,6 +1474,12 @@ const AgentTurn: React.FC<{
             {(!taskComplete || !isDuplicateSummary(message.content || '')) && message.content && renderMarkdown(message.content)}
           </>
         )}
+
+        {/* Quest plan: shown below steps/text blocks while agent is working, hidden on task complete */}
+        {running && !taskComplete && (() => {
+          const plan = deriveLivePlan([message]);
+          return plan.length > 0 ? <PlanChecklistCard tasks={plan} running={running} /> : null;
+        })()}
 
         {/* Task complete: end-of-turn summary/suggestions, after every block */}
         {taskComplete && taskResult?.summary && (
