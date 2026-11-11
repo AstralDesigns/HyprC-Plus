@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Folder,
@@ -28,12 +28,161 @@ import {
   Trash2,
   Move,
   PenLine,
+  HardDrive,
+  Usb,
+  LogOut,
 } from 'lucide-react';
-import { useStore, setStore, storeActions, FileSystemItem } from '../store';
+import { useStore, setStore, getStore, storeActions, FileSystemItem } from '../store';
 import { bridge } from '../bridge';
 import { fileStatusClass, fileStatusLetter, buildFolderStatus } from '../utils/gitStatus';
 import { FileIcon } from '../utils/fileIcons';
 import { RenameDialog } from './RenameDialog';
+
+// ── Storage device types ──────────────────────────────────────────────────────
+interface StorageDevice {
+  name: string;       // kernel name e.g. "sdb1"
+  label: string;      // human label or fallback to name
+  fstype: string;
+  mountpoint: string | null;
+  size: string;
+  hotplug: boolean;   // true = external/USB
+  path: string;       // /dev/xxx
+}
+
+// ── StorageStrip — mounted/attached drives row in the Files header ────────────
+const StorageStrip: React.FC<{ onNavigate: (mp: string) => void }> = ({ onNavigate }) => {
+  const [devices, setDevices] = useState<StorageDevice[]>([]);
+  const [contextMenu, setContextMenu] = useState<{ device: StorageDevice; x: number; y: number } | null>(null);
+  const [mounting, setMounting] = useState<string | null>(null);
+
+  const fetchDevices = useCallback(async () => {
+    try {
+      const res = await bridge.runtimeRequest('/api/storage/list', {}, 'GET');
+      setDevices((res?.devices || []) as StorageDevice[]);
+    } catch { /* runtime offline */ }
+  }, []);
+
+  useEffect(() => {
+    fetchDevices();
+    // Poll every 4 s — cheap enough and catches auto-mount events
+    const id = setInterval(fetchDevices, 4000);
+    return () => clearInterval(id);
+  }, [fetchDevices]);
+
+  // Close context menu on outside press, blur, or Escape (matching tab-context-menu)
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('blur', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('blur', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [contextMenu]);
+
+  const handleClick = async (dev: StorageDevice) => {
+    if (dev.mountpoint) {
+      onNavigate(dev.mountpoint);
+      return;
+    }
+    if (!dev.hotplug) return; // internal unmounted — user mounts via gnome-disks
+    setMounting(dev.name);
+    try {
+      const res = await bridge.runtimeRequest('/api/storage/mount', { device: dev.name });
+      if (res?.mountpoint) {
+        onNavigate(res.mountpoint);
+        await fetchDevices();
+      }
+    } catch (e: any) {
+      console.warn('[StorageStrip] Mount failed:', e?.message);
+    } finally {
+      setMounting(null);
+    }
+  };
+
+  const handleUnmount = async (dev: StorageDevice) => {
+    setContextMenu(null);
+    const unmountingMountpoint = dev.mountpoint;
+    try {
+      await bridge.runtimeRequest('/api/storage/unmount', { device: dev.name });
+      await fetchDevices();
+      const cur = getStore().currentPath;
+      if (unmountingMountpoint && (cur === unmountingMountpoint || cur.startsWith(unmountingMountpoint + '/'))) {
+        await storeActions.refreshDirectory();
+      }
+    } catch (e: any) {
+      console.warn('[StorageStrip] Unmount failed:', e?.message);
+    }
+  };
+
+  if (devices.length === 0) return null;
+
+  return (
+    <div className="storage-strip">
+      {devices.map(dev => {
+        const isMounted  = !!dev.mountpoint;
+        const isExternal = dev.hotplug;
+        const isBusy     = mounting === dev.name;
+        const Icon       = isExternal ? Usb : HardDrive;
+        const label      = dev.label || dev.name;
+        const tip        = `${label} (${dev.size})${isMounted ? ` → ${dev.mountpoint}` : ' — click to mount'}`;
+
+        return (
+          <button
+            key={dev.name}
+            type="button"
+            className={`storage-chip ${isMounted ? 'mounted' : 'unmounted'} ${isExternal ? 'external' : 'internal'}`}
+            title={tip}
+            disabled={isBusy || (!isMounted && !isExternal)}
+            onClick={() => handleClick(dev)}
+            onContextMenu={e => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (isMounted && isExternal) {
+                setContextMenu({ device: dev, x: e.clientX, y: e.clientY });
+              }
+            }}
+          >
+            {isBusy
+              ? <RefreshCw size={11} className="spin" />
+              : <Icon size={11} />
+            }
+            <span className="storage-chip-label">{label}</span>
+            {!isMounted && <span className="storage-chip-dot unmounted-dot" />}
+          </button>
+        );
+      })}
+
+      {contextMenu && createPortal(
+        <div
+          className="agent-context-menu tab-context-menu"
+          style={{
+            position: 'fixed',
+            left: Math.min(contextMenu.x, window.innerWidth - 220),
+            top: Math.min(contextMenu.y, window.innerHeight - 80),
+            zIndex: 9999,
+          }}
+          onPointerDown={e => e.stopPropagation()}
+          onContextMenu={e => e.preventDefault()}
+        >
+          <button
+            type="button"
+            className="danger"
+            onClick={() => handleUnmount(contextMenu.device)}
+          >
+            <LogOut size={13} />
+            <span>Unmount "{contextMenu.device.label || contextMenu.device.name}"</span>
+          </button>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+};
 
 function getFileIcon(name: string, isDir: boolean) {
   // Centralized VSCode-style per-format glyphs (see utils/fileIcons); colors
@@ -846,6 +995,9 @@ export const Sidebar: React.FC = () => {
               {store.showDotfiles ? <Eye size={13} /> : <EyeOff size={13} />}
             </button>
           </div>
+
+          {/* Storage / drives strip — scrollable row of mounted and external devices */}
+          <StorageStrip onNavigate={(mp) => storeActions.navigateTo(mp)} />
 
           {/* Breadcrumbs path */}
           <div className="sidebar-breadcrumbs" ref={breadcrumbsRef}>

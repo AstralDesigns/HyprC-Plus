@@ -75,26 +75,62 @@ export interface HistoryMessage {
 }
 
 /**
+ * Fetches the list of available durable memory topic titles from the local runtime.
+ * Returns an empty array on any error (best-effort; never blocks a turn).
+ * Results are intentionally NOT cached so the agent always sees an up-to-date index.
+ */
+async function fetchMemoryTitles(): Promise<string[]> {
+  try {
+    const res = await bridge.runtimeRequest('/api/memories', {}, 'GET');
+    const memories: Array<{ topic?: string }> = res?.memories || [];
+    return memories.map(m => m.topic).filter((t): t is string => !!t);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Smartly prunes multi-turn conversation history before dispatching to the runtime API.
- * 
+ *
  * OpenRouter & compatible providers are stateless: clients must send prior messages for
  * continuity. But unpruned history burns Tokens-Per-Minute (TPM) limits on free/small models
  * and blows past context limits during model switches.
- * 
- * Pruning policy:
- * 1. Always retain Message 0 (the initial anchor goal of the session).
- * 2. Retain the last 6 messages (3 turns) in full fidelity for recent context.
- * 3. For intermediate turns: truncate long assistant messages to ~600 chars with an excerpt notice.
- * 4. Enforce a hard ceiling (~24,000 characters ≈ 6,000 tokens) on total history, smoothly
- *    dropping the oldest middle turns when conversation history gets excessively long.
+ *
+ * Pruning policy (v2 — rolling window + memory index):
+ * 1. Drop the very first message (the session's original anchor prompt). Over long
+ *    sessions the user's goals shift, so the opening prompt adds noise rather than signal.
+ * 2. Retain the last 6 messages in full fidelity for recent context.
+ * 3. For any intermediate turns that fall between the dropped anchor and the recent window:
+ *    truncate long assistant messages to ~600 chars with an excerpt notice.
+ * 4. Enforce a hard ceiling (~24,000 characters ≈ 6,000 tokens) on total history, dropping
+ *    the oldest middle turns first when the conversation grows very long.
+ * 5. When `memoryTitles` are provided, prepend a compact system note listing available
+ *    memory topics — the agent can optionally load any of them via read_memory(topic)
+ *    if it judges them relevant to the current user prompt.
  */
 export function pruneConversationHistory(
   history: HistoryMessage[],
-  maxChars = 24000
+  maxChars = 24000,
+  memoryTitles: string[] = [],
 ): HistoryMessage[] {
-  if (!history || history.length <= 4) {
-    // Short history: just clamp individually huge assistant outputs (>4000 chars)
-    return history.map(m => {
+  // Build the memory hint (always prepended so the agent sees it even on short histories)
+  const memHint: HistoryMessage | null = memoryTitles.length > 0
+    ? {
+        role: 'system',
+        content:
+          `[Available memory topics — use read_memory(topic) for any that seem relevant to the ` +
+          `current task: ${memoryTitles.join(', ')}]`,
+      }
+    : null;
+
+  const wrap = (msgs: HistoryMessage[]): HistoryMessage[] =>
+    memHint ? [memHint, ...msgs] : msgs;
+
+  if (!history || history.length === 0) return wrap([]);
+
+  // Short history (≤4 messages): keep all, just clamp huge assistant outputs
+  if (history.length <= 4) {
+    const clamped = history.map(m => {
       if (m.role === 'assistant' && m.content && m.content.length > 4000) {
         return {
           role: m.role,
@@ -103,16 +139,15 @@ export function pruneConversationHistory(
       }
       return m;
     });
+    return wrap(clamped);
   }
 
-  // Anchor turn: Message 0
-  const anchor = history[0];
-
-  // Recent active window: keep the last 6 messages intact
+  // Drop history[0] (the session's original opening prompt — goals shift over time)
+  // Keep the last 6 messages as the recent active window
   const recentCount = Math.min(6, history.length - 1);
   const recent = history.slice(history.length - recentCount);
 
-  // Middle messages to condense
+  // Middle messages between the dropped anchor and the recent window
   const middle = history.slice(1, history.length - recentCount);
 
   const prunedMiddle: HistoryMessage[] = middle.map(m => {
@@ -125,31 +160,49 @@ export function pruneConversationHistory(
     return m;
   });
 
-  // Assemble candidate list: anchor + prunedMiddle + recent
-  let candidate = [anchor, ...prunedMiddle, ...recent];
+  // Assemble candidate list (no anchor): condensed-middle + recent
+  let candidate: HistoryMessage[] = [...prunedMiddle, ...recent];
 
-  // Check total character budget
+  // Check total character budget; drop oldest middle turns first
   let totalChars = candidate.reduce((sum, m) => sum + (m.content ? m.content.length : 0), 0);
+  if (memHint) totalChars += memHint.content.length;
+
   if (totalChars > maxChars) {
-    const preservedAnchor = anchor;
     const workingMiddle = [...prunedMiddle];
+    const droppedMiddle: HistoryMessage[] = [];
     while (workingMiddle.length > 0 && totalChars > maxChars) {
       const dropped = workingMiddle.shift();
-      if (dropped && dropped.content) {
-        totalChars -= dropped.content.length;
+      if (dropped) {
+        droppedMiddle.push(dropped);
+        if (dropped.content) totalChars -= dropped.content.length;
       }
     }
+
+    const ragDigest = droppedMiddle.length > 0
+      ? droppedMiddle
+          .map(m => {
+            const roleLabel = m.role === 'user' ? 'User asked' : 'Agent';
+            const snippet = (m.content || '').split('\n').find(l => l.trim().length > 0) || '';
+            const clean = snippet.replace(/[#*`_>~]/g, '').slice(0, 120).trim();
+            return clean ? `- ${roleLabel}: ${clean}` : '';
+          })
+          .filter(Boolean)
+          .join('\n')
+      : '';
+
     candidate = [
-      preservedAnchor,
-      ...(workingMiddle.length < prunedMiddle.length
-        ? [{ role: 'system' as const, content: '[... older conversation turns condensed for token limit ...]' }]
+      ...(ragDigest
+        ? [{
+            role: 'system' as const,
+            content: `[Compact history digest of earlier turns in this session — use read_memory for deeper facts if needed:\n${ragDigest}]`,
+          }]
         : []),
       ...workingMiddle,
       ...recent,
     ];
   }
 
-  return candidate;
+  return wrap(candidate);
 }
 
 export class AgentEngine {
@@ -431,7 +484,7 @@ export class AgentEngine {
         '[End HyprCandy project context]',
       ].join('\n');
 
-      const prunedHistory = pruneConversationHistory(history);
+      const prunedHistory = pruneConversationHistory(history, 24000, await fetchMemoryTitles());
       const payload: any = {
         messages: [
           ...prunedHistory.map(m => ({ role: m.role, content: m.content })),

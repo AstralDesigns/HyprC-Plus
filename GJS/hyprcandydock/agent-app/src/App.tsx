@@ -1,4 +1,4 @@
-import React, { Component, useEffect, useRef, ReactNode } from 'react';
+import React, { Component, useEffect, useRef, useState, ReactNode } from 'react';
 import { useStore, setStore, getStore, storeActions, PRESET_MODELS, persistStoreNow } from './store';
 import { bridge } from './bridge';
 import { Header } from './components/Header';
@@ -92,6 +92,33 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
 export const App: React.FC = () => {
   const [store] = useStore();
   const appRootRef = useRef<HTMLDivElement>(null);
+  // ── FOUC gate ────────────────────────────────────────────────────────────
+  // Hold the app invisible until the durable store state is present.
+  // When agent_loopback_server pre-injects __hyprcandyPendingStoreState,
+  // settled is true immediately without any flash or delay.
+  // Otherwise, await the agent_store_state event (with a 1000ms safety timeout).
+  const [settled, setSettled] = useState(() => {
+    return !!(window as any).__hyprcandyPendingStoreState;
+  });
+  useEffect(() => {
+    if (settled) return;
+    if ((window as any).__hyprcandyPendingStoreState != null) {
+      setSettled(true);
+      return;
+    }
+    let done = false;
+    const markSettled = () => {
+      if (done) return;
+      done = true;
+      setSettled(true);
+    };
+    window.addEventListener('agent_store_state', markSettled, { once: true });
+    const timer = setTimeout(markSettled, 1000);
+    return () => {
+      window.removeEventListener('agent_store_state', markSettled);
+      clearTimeout(timer);
+    };
+  }, [settled]);
 
   useEffect(() => {
     storeActions.refreshPendingFiles();
@@ -376,7 +403,12 @@ export const App: React.FC = () => {
 
   return (
     <AppErrorBoundary>
-      <div className="app-container" ref={appRootRef} tabIndex={-1}>
+      <div
+        className="app-container"
+        ref={appRootRef}
+        tabIndex={-1}
+        style={{ opacity: settled ? 1 : 0, transition: 'opacity 0.15s ease' }}
+      >
         <Header />
 
         <div className="workspace-container" ref={workspaceRef}>

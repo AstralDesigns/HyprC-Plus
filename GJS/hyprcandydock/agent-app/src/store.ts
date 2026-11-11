@@ -533,12 +533,18 @@ function persistedSnapshot() {
 
 function readPersistedBlob(): any | null {
   try {
+    // 1. Authoritative durable mirror pre-injected into HTML by agent_loopback_server
+    const pending = typeof window !== 'undefined' ? (window as any).__hyprcandyPendingStoreState : null;
+    if (pending && Array.isArray(pending.sessions) && pending.sessions.length > 0) {
+      return pending;
+    }
+    // 2. Fallback to localStorage
     const saved = localStorage.getItem(STORAGE_KEY) || localStorage.getItem('hyprcandy_agent_state_v1');
     if (!saved) return null;
     const parsed = JSON.parse(saved);
     if (parsed && Array.isArray(parsed.sessions) && parsed.sessions.length > 0) return parsed;
   } catch (e) {
-    console.warn('Failed to parse localStorage state:', e);
+    console.warn('Failed to parse persisted state:', e);
   }
   return null;
 }

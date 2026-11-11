@@ -982,11 +982,19 @@ class Handler(BaseHTTPRequestHandler):
         # <script> so it is installed at document-start, ahead of the bundle.
         # The per-session token global is emitted immediately BEFORE the shim
         # so the shim's own fetches (and the bootstrap pull) can present it.
+        # Store state and theme vars are pre-injected synchronously so React
+        # mounts with the exact durable state on frame 0, preventing any FOUC.
         try:
             with open(fp, "rb") as f:
                 html = f.read().decode("utf-8", "replace")
-            inject = ("<script>window.__HC_BRIDGE_TOKEN='%s';</script>"
-                      % BRIDGE_TOKEN) + BRIDGE_SHIM
+            store_state = read_store_state()
+            store_json = json.dumps(store_state) if store_state else "null"
+            store_json = store_json.replace("</script>", "<\\/script>").replace("<!--", "<\\!--")
+            theme_map = read_theme_map()
+            theme_json = json.dumps(theme_map) if theme_map else "null"
+            theme_json = theme_json.replace("</script>", "<\\/script>").replace("<!--", "<\\!--")
+            inject = ("<script>window.__HC_BRIDGE_TOKEN='%s';window.__hyprcandyPendingStoreState=%s;window.__hyprcandyThemeVars=%s;</script>"
+                      % (BRIDGE_TOKEN, store_json, theme_json)) + BRIDGE_SHIM
             if "<head" in html:
                 idx = html.lower().index("<head")
                 close = html.find(">", idx)

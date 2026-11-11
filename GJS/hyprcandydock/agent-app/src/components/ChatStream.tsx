@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
-  Globe, FileText, Terminal, FileDiff,
+  Globe, FileText, Terminal, FileDiff, FileCode,
   ChevronDown, ChevronRight, ChevronUp, CheckCircle, Clock, Sparkles,
   Folder, Copy, Check, Edit2, RotateCcw,
   Brain, Zap, Eye, ListChecks,
   X, Lock, Code,
 } from 'lucide-react';
-import { useStore, getStore, Message, ToolCallData, storeActions, setStore, type PlanTask, type SuggestionsData, type SuggestionOption, type MessageBlock } from '../store';
+import { useStore, getStore, Message, ToolCallData, storeActions, setStore, type PlanTask, type SuggestionsData, type SuggestionOption, type MessageBlock, type DiffData } from '../store';
 import { bridge } from '../bridge';
 import { FileIcon } from '../utils/fileIcons';
 import { DiffWidget } from './DiffWidget';
@@ -307,6 +308,7 @@ const renderMarkdown = (content: string, extraClass = '', selectionRefs?: Select
   return (
     <div className={`markdown-body ${extraClass}`}>
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
           a({ node, href, children, ...props }: any) {
             if (href && href.startsWith('selection://')) {
@@ -394,26 +396,49 @@ const TaskCompleteWidget: React.FC<{
   summary: string;
   remaining?: string;
   suggestions?: string[];
-}> = ({ summary, remaining, suggestions }) => {
+  screenshots?: Array<{ path: string; caption?: string } | string>;
+  onOpenImage?: (src: string) => void;
+}> = ({ summary, remaining, suggestions, screenshots, onOpenImage }) => {
   const handleSuggestionClick = (suggestion: string) => {
     window.dispatchEvent(new CustomEvent('composer_set_text', { detail: suggestion }));
   };
 
   return (
     <div style={{
-      margin: '7px 0',
-      padding: '10px 12px',
-      border: '1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 38%, transparent)',
-      borderRadius: 'var(--radius-sm)',
-      background: 'color-mix(in srgb, var(--matugen-primary, #a0c9dc) 9%, transparent)'
+      margin: '6px 0',
+      padding: '0',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--matugen-primary, #a0c9dc)', fontSize: '11px', fontWeight: 600, marginBottom: '5px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--matugen-primary, #a0c9dc)', fontSize: '11px', fontWeight: 600, marginBottom: '6px' }}>
         <CheckCircle size={13} color="#22c55e" /> Task complete
       </div>
       <div className="markdown-body" style={{ color: 'var(--text-primary)', fontSize: '12px' }}>
         {renderMarkdown(summary)}
       </div>
       {remaining ? <div style={{ marginTop: '5px', color: 'var(--text-muted)', fontSize: '10px' }}>Remaining: {remaining}</div> : null}
+
+      {/* Verification screenshots */}
+      {screenshots && screenshots.length > 0 && (
+        <div className="task-verification-list">
+          {screenshots.map((s, idx) => {
+            const p = typeof s === 'string' ? s : s.path;
+            const caption = typeof s === 'object' ? s.caption : undefined;
+            const src = p.startsWith('file://') ? p : `file://${p}`;
+            return (
+              <div key={idx} className="task-verification-card">
+                <button
+                  type="button"
+                  className="task-verification-thumb"
+                  onClick={() => onOpenImage?.(src)}
+                  title="Click to view verification screenshot in lightbox"
+                >
+                  <img src={src} alt={caption || 'Verification screenshot'} />
+                </button>
+                {caption && <div className="task-verification-caption">{caption}</div>}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {suggestions && suggestions.length > 0 && (
         <div className="task-suggestions-section">
@@ -435,6 +460,63 @@ const TaskCompleteWidget: React.FC<{
               </button>
             ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ── Persistent Files Changed Widget ───────────────────────────────── */
+const FilesChangedWidget: React.FC<{
+  diffs: DiffData[];
+}> = ({ diffs }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!diffs || diffs.length === 0) return null;
+
+  const totalAdd = diffs.reduce((n, d) => n + (d.additions || 0), 0);
+  const totalDel = diffs.reduce((n, d) => n + (d.deletions || 0), 0);
+
+  return (
+    <div className="files-changed-widget">
+      <div
+        className="files-changed-header"
+        onClick={() => setExpanded(e => !e)}
+        title="Click to toggle changed files list"
+      >
+        <div className="files-changed-title">
+          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <FileCode size={12} color="var(--matugen-primary, #a0c9dc)" />
+          <strong>{diffs.length} file{diffs.length === 1 ? '' : 's'} changed</strong>
+          {totalAdd > 0 && <span className="stat-add">+{totalAdd}</span>}
+          {totalDel > 0 && <span className="stat-del">-{totalDel}</span>}
+        </div>
+      </div>
+      {expanded && (
+        <div className="files-changed-list">
+          {diffs.map(d => {
+            const parts = d.filePath.split('/');
+            const fileName = parts.pop() || d.filePath;
+            const dirPath = parts.slice(-2).join('/');
+            return (
+              <div
+                key={d.filePath}
+                className="files-changed-row"
+                onClick={() => storeActions.openFileByPath(d.filePath)}
+                title={`Open ${d.filePath} in canvas`}
+              >
+                <FileIcon name={fileName} isDir={false} size={13} />
+                <span className="files-changed-name">{fileName}</span>
+                {dirPath && <span className="files-changed-dir">…/{dirPath}</span>}
+                <span className="files-changed-spacer" />
+                {d.additions != null && d.additions > 0 && (
+                  <span className="stat-add">+{d.additions}</span>
+                )}
+                {d.deletions != null && d.deletions > 0 && (
+                  <span className="stat-del">-{d.deletions}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -1067,9 +1149,17 @@ const AgentTurn: React.FC<{
     : '';
 
   const taskComplete = message.tools?.find(tool => tool.name === 'task_complete' && tool.status === 'completed');
-  const taskResult = taskComplete?.result as { summary?: string; remaining?: string; suggestions?: string[] } | undefined;
+  const taskResult = taskComplete?.result as { summary?: string; remaining?: string; suggestions?: string[]; screenshots?: any[] } | undefined;
   const suggestions: string[] = taskResult?.suggestions || (taskComplete?.arguments as any)?.suggestions || [];
+  const screenshots: any[] = taskResult?.screenshots || (taskComplete?.arguments as any)?.screenshots || [];
   const running = isLast && agentRunning;
+
+  // Filter out scratch/temporary files so FilesChangedWidget only lists durable project edits
+  const validDiffs = (message.diffs || []).filter(d => {
+    if (!d.filePath) return false;
+    if (d.filePath.startsWith('/tmp/') || d.filePath.endsWith('.tmp') || d.filePath.endsWith('.bak')) return false;
+    return true;
+  });
 
   // Deduplicate summary: if task complete summary exists, don't show identical markdown twice
   const isDuplicateSummary = (text: string) => {
@@ -1186,11 +1276,8 @@ const AgentTurn: React.FC<{
                 : <InterstitialLine key={block.id} text={block.content} />;
             }
             if (block.type === 'diff') {
-              return (
-                <div key={block.id} style={{ marginTop: '4px' }}>
-                  <DiffWidget sessionId={sessionId} messageId={message.id} diff={block.diff} />
-                </div>
-              );
+              // File diffs are reviewed directly on the canvas and summarized in FilesChangedWidget
+              return null;
             }
             if (block.type === 'command') {
               return (
@@ -1244,13 +1331,6 @@ const AgentTurn: React.FC<{
                 {legacyElevatedCommandCards.map(tool => <ToolCard key={tool.id} tool={tool} />)}
               </div>
             )}
-            {message.diffs && message.diffs.length > 0 && (
-              <div style={{ marginTop: '4px' }}>
-                {message.diffs.map(diff => (
-                  <DiffWidget key={diff.filePath} sessionId={sessionId} messageId={message.id} diff={diff} />
-                ))}
-              </div>
-            )}
             {(!taskComplete || !isDuplicateSummary(message.content || '')) && message.content && renderMarkdown(message.content)}
           </>
         )}
@@ -1261,7 +1341,14 @@ const AgentTurn: React.FC<{
             summary={taskResult.summary}
             remaining={taskResult?.remaining}
             suggestions={suggestions}
+            screenshots={screenshots}
+            onOpenImage={setLightbox}
           />
+        )}
+
+        {/* Files changed widget: persistent record of modified files in this turn */}
+        {validDiffs.length > 0 && (
+          <FilesChangedWidget diffs={validDiffs} />
         )}
 
         {/* Attachments from assistant */}

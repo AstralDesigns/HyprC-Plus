@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import subprocess
 import time
 import uuid
 from pathlib import Path
@@ -660,6 +661,108 @@ async def license_status():
 @app.get("/api/cloud/models")
 async def cloud_models():
     return {"models": CLOUD_MODELS}
+
+
+# ── Storage / block-device API ────────────────────────────────────────────────
+
+class StorageMountRequest(BaseModel):
+    device: str  # e.g. "sdc1"
+
+
+def _lsblk_devices() -> list[dict]:
+    """Return relevant block-device partitions from lsblk JSON output.
+
+    Filters out loop, swap, and system-only partitions (/boot, /home, /,
+    [SWAP]) so only user-facing drives appear in the UI.
+    """
+    try:
+        result = subprocess.run(
+            ["lsblk", "-J", "-o", "NAME,LABEL,FSTYPE,MOUNTPOINT,SIZE,TYPE,HOTPLUG,PATH"],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0:
+            return []
+        data = json.loads(result.stdout)
+    except Exception:
+        return []
+
+    SYSTEM_MOUNTS = {"/", "/boot", "/home", "/boot/efi", "[SWAP]"}
+
+    devices: list[dict] = []
+    for disk in data.get("blockdevices", []):
+        if disk.get("type") == "loop":
+            continue
+        partitions = disk.get("children") or []
+        # Bare disk with no partitions — treat as one entry if it has a filesystem
+        if not partitions and disk.get("fstype"):
+            partitions = [disk]
+        for part in partitions:
+            if part.get("type") == "loop":
+                continue
+            fstype = part.get("fstype") or ""
+            mountpoint = part.get("mountpoint") or ""
+            if fstype == "swap" or (mountpoint and mountpoint in SYSTEM_MOUNTS):
+                continue
+            # Skip partitions with no filesystem (unformatted/extended)
+            if not fstype:
+                continue
+            pname = part.get("name", "")
+            devices.append({
+                "name":       pname,
+                "label":      part.get("label") or pname,
+                "fstype":     fstype,
+                "mountpoint": mountpoint or None,
+                "size":       part.get("size", ""),
+                "hotplug":    bool(disk.get("hotplug") or part.get("hotplug")),
+                "path":       part.get("path") or f"/dev/{pname}",
+            })
+    return devices
+
+
+@app.get("/api/storage/list")
+async def storage_list():
+    """List user-visible mounted and unmounted storage partitions."""
+    return {"devices": _lsblk_devices()}
+
+
+@app.post("/api/storage/mount")
+async def storage_mount(req: StorageMountRequest):
+    """Mount an unmounted partition via udisksctl (no sudo required)."""
+    dev_path = f"/dev/{req.device}" if not req.device.startswith("/dev/") else req.device
+    try:
+        result = subprocess.run(
+            ["udisksctl", "mount", "-b", dev_path, "--no-user-interaction"],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=result.stderr.strip() or "Mount failed")
+        # Re-query so we return the new mountpoint
+        devices = _lsblk_devices()
+        name = req.device.lstrip("/dev/").split("/")[-1]
+        mounted = next((d for d in devices if d["name"] == name), None)
+        return {"ok": True, "mountpoint": mounted["mountpoint"] if mounted else None}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/storage/unmount")
+async def storage_unmount(req: StorageMountRequest):
+    """Unmount a partition via udisksctl."""
+    dev_path = f"/dev/{req.device}" if not req.device.startswith("/dev/") else req.device
+    try:
+        result = subprocess.run(
+            ["udisksctl", "unmount", "-b", dev_path, "--no-user-interaction"],
+            capture_output=True, text=True, timeout=15
+        )
+        if result.returncode != 0:
+            raise HTTPException(status_code=500, detail=result.stderr.strip() or "Unmount failed")
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── Secret store relay ────────────────────────────────────────────────────────

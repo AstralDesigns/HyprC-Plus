@@ -179,6 +179,11 @@ body,
   position: relative;
   overflow: hidden;
   border-radius: 8px;
+  /* FOUC gate: hold the shell invisible until React applies the settled
+     inline style (opacity:1). The inline style always wins over this rule,
+     so once React settles the transition kicks in and this has no effect. */
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
 /* ── Full-Width Header ────────────────────────────────────────────────── */
@@ -1291,6 +1296,68 @@ body,
   color: var(--accent-cyan);
   background: var(--accent-cyan-dim);
 }
+
+/* ── Storage strip — drives/partitions row in Files header ──────────── */
+.storage-strip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+  min-height: 28px;
+}
+.storage-strip::-webkit-scrollbar { display: none; }
+
+.storage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--matugen-outline, #546e7a) 35%, transparent);
+  background: color-mix(in srgb, var(--matugen-surface-variant, #2a3c46) 40%, transparent);
+  color: var(--text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.storage-chip:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 18%, transparent);
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 55%, transparent);
+}
+.storage-chip.mounted {
+  color: var(--matugen-primary, #a0c9dc);
+  border-color: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 40%, transparent);
+}
+.storage-chip.unmounted {
+  opacity: 0.65;
+}
+.storage-chip:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.storage-chip-label {
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.storage-chip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.storage-chip-dot.unmounted-dot {
+  background: color-mix(in srgb, var(--matugen-error, #ffb4ab) 70%, transparent);
+}
+@keyframes storage-spin { to { transform: rotate(360deg); } }
+.spin { animation: storage-spin 0.8s linear infinite; }
 
 .sidebar-breadcrumbs {
   display: flex;
@@ -2840,6 +2907,45 @@ body,
   color: var(--text-code);
   font-size: 12px;
   line-height: 1.6;
+}
+
+/* ── Markdown tables (GFM) — matugen themed ──────────────────────────── */
+.markdown-body table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 10px 0;
+  font-size: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--matugen-outline, #546e7a) 30%, transparent);
+}
+.markdown-body th {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 18%, transparent);
+  color: var(--matugen-on-surface, #e4eef3);
+  font-weight: 600;
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 35%, transparent);
+  white-space: nowrap;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+}
+.markdown-body td {
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--matugen-outline, #546e7a) 18%, transparent);
+  color: var(--matugen-on-surface-variant, #cdd8de);
+  vertical-align: top;
+  line-height: 1.5;
+}
+.markdown-body tr:last-child td {
+  border-bottom: none;
+}
+.markdown-body tr:nth-child(even) td {
+  background: color-mix(in srgb, var(--matugen-surface-variant, #2a3c46) 28%, transparent);
+}
+.markdown-body tr:hover td {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 10%, transparent);
+  transition: background 0.1s ease;
 }
 
 /* ── Tool cards ──────────────────────────────────────────────────────── */
@@ -5034,4 +5140,141 @@ body,
   border-color: var(--matugen-primary, #a0c9dc);
   color: #fff;
   transform: translateY(-1px);
+}
+
+/* ── Task Completion Verification Screenshots ── */
+.task-verification-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.task-verification-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: 100%;
+}
+
+.task-verification-thumb {
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  cursor: zoom-in;
+  max-width: 100%;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.task-verification-thumb:hover {
+  border-color: var(--matugen-primary, #a0c9dc);
+  transform: scale(1.01);
+}
+
+.task-verification-thumb img {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+}
+
+.task-verification-caption {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
+}
+
+/* ── Persistent Files Changed Widget ── */
+.files-changed-widget {
+  margin-top: 8px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--matugen-surface-variant, #2a3c46) 30%, transparent);
+  overflow: hidden;
+  font-size: 11px;
+}
+
+.files-changed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s ease;
+}
+
+.files-changed-header:hover {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 10%, transparent);
+}
+
+.files-changed-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.files-changed-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-subtle);
+  padding: 2px 0;
+}
+
+.files-changed-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+  color: var(--text-secondary);
+}
+
+.files-changed-row:hover {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 14%, transparent);
+  color: var(--text-primary);
+}
+
+.files-changed-name {
+  font-family: var(--font-mono);
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.files-changed-dir {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.files-changed-spacer {
+  flex: 1;
+}
+
+.files-changed-widget .stat-add {
+  color: #4ade80;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  margin-left: 4px;
+}
+
+.files-changed-widget .stat-del {
+  color: #f87171;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  margin-left: 2px;
 }

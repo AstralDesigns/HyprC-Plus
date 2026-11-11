@@ -32,13 +32,24 @@ fi
 
 # ── Start server ────────────────────────────────────────────────────────────
 cd "$SCRIPT_DIR"
-nohup "$VENV/bin/uvicorn" runtime_server:app \
-    --host 127.0.0.1 \
-    --port 17900 \
-    --log-level warning \
-    --no-access-log \
-    >> "$LOG" 2>&1 &
-PID=$!
-disown $PID
+if command -v systemd-run >/dev/null 2>&1 && systemctl --user is-system-running >/dev/null 2>&1; then
+    systemctl --user stop hyprcandy-runtime.service 2>/dev/null || true
+    systemd-run --user --unit=hyprcandy-runtime \
+        "$VENV/bin/uvicorn" runtime_server:app \
+        --app-dir "$SCRIPT_DIR" \
+        --host 127.0.0.1 \
+        --port 17900 \
+        --log-level warning
+    PID=$(systemctl --user show -p MainPID --value hyprcandy-runtime.service 2>/dev/null || echo "")
+else
+    nohup "$VENV/bin/uvicorn" runtime_server:app \
+        --host 127.0.0.1 \
+        --port 17900 \
+        --log-level warning \
+        --no-access-log \
+        >> "$LOG" 2>&1 &
+    PID=$!
+    disown $PID
+fi
 echo $PID > "$PIDFILE"
 echo "[runtime] Server started (PID $PID) on http://127.0.0.1:17900"

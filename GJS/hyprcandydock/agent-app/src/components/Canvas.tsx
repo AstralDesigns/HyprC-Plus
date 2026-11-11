@@ -648,7 +648,7 @@ export const Canvas: React.FC = () => {
         <div className="canvas-empty-icon-wrap">
           <Sparkles size={36} color="var(--accent-cyan)" />
         </div>
-        <h3 className="canvas-empty-title">HyprCandy Agent Workspace</h3>
+        <h3 className="canvas-empty-title">HyprCandy Workspace</h3>
         <p className="canvas-empty-subtitle">
           Open a file or directory from the explorer, ask the agent to edit code, or create a new file to get started.
         </p>

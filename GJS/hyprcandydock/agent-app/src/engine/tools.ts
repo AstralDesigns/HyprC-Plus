@@ -162,6 +162,22 @@ export const AGENT_TOOLS: ToolDefinition[] = [
         properties: {
           summary: { type: 'string', description: 'A concise completion summary for the user.' },
           remaining: { type: 'string', description: 'Optional remaining limitation or empty string.' },
+          suggestions: {
+            type: 'array',
+            items: { type: 'string' } as any,
+            description: 'Optional 1-4 brief next-step suggestions.'
+          },
+          screenshots: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                path: { type: 'string' },
+                caption: { type: 'string' }
+              }
+            } as any,
+            description: 'Optional verification screenshot paths with captions.'
+          }
         },
         required: ['summary'],
       },

@@ -295,6 +295,18 @@ TOOLS_SCHEMA = [
                         "items": {"type": "string"},
                         "description": "Optional: 1 to 4 brief next step suggestions the user might want to run next.",
                     },
+                    "screenshots": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "path": {"type": "string", "description": "Absolute path to a screenshot image (e.g. from capture_preview or grim)."},
+                                "caption": {"type": "string", "description": "Optional concise caption for the verification image."}
+                            },
+                            "required": ["path"]
+                        },
+                        "description": "Optional verification screenshot(s) to attach to the summary (e.g. captured via capture_preview or grim).",
+                    },
                 },
                 "required": ["summary"],
             },
@@ -682,8 +694,8 @@ async def capture_preview(region: Optional[str] = None) -> dict:
     }
 
 
-async def task_complete(summary: str, remaining: str = "", suggestions: Optional[list] = None) -> dict:
-    return {"summary": summary, "remaining": remaining, "suggestions": suggestions or [], "completed": True}
+async def task_complete(summary: str, remaining: str = "", suggestions: Optional[list] = None, screenshots: Optional[list] = None) -> dict:
+    return {"summary": summary, "remaining": remaining, "suggestions": suggestions or [], "screenshots": screenshots or [], "completed": True}
 
 
 # ── Agent memory (durable topic notes) ───────────────────────────────────────
