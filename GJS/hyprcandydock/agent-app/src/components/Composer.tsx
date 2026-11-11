@@ -212,18 +212,38 @@ export const Composer: React.FC = () => {
     const currentSession = store.sessions.find(s => s.id === store.activeSessionId);
     if (!currentSession) return;
 
-    // Merge explicit attachments and context bar items
-    const allAttachments: AttachmentData[] = [...attachments];
-    store.contextFiles.forEach(cf => {
-      if (!allAttachments.some(a => a.path === cf.path)) {
+    // Merge explicit attachments and context bar items (deduplicated by path)
+    const allAttachments: AttachmentData[] = [];
+    const seenPaths = new Set<string>();
+
+    for (const a of attachments) {
+      if (a.path && !seenPaths.has(a.path)) {
+        seenPaths.add(a.path);
+        allAttachments.push(a);
+      }
+    }
+    for (const cf of store.contextFiles) {
+      if (cf.path && !seenPaths.has(cf.path)) {
+        seenPaths.add(cf.path);
         allAttachments.push({ path: cf.path, name: cf.name, kind: 'text' });
       }
-    });
-    store.contextImages.forEach(ci => {
-      if (!allAttachments.some(a => a.path === ci.path)) {
-        allAttachments.push({ path: ci.path, name: ci.path.split('/').pop() || 'image', kind: 'image' });
-      }
-    });
+    }
+    for (const ci of store.contextImages) {
+      if (!ci.path) continue;
+      // Pasted-blob chips have path = plain filename (e.g. "pasted-image-123.png") and
+      // data = the base64 URL. The local `attachments` list already carries the same image
+      // with path = base64 URL. Skip the chip here to avoid double-sending.
+      const isBlobName = !ci.path.startsWith('/') && !ci.path.startsWith('data:') && !ci.path.startsWith('http');
+      if (isBlobName && ci.data && seenPaths.has(ci.data)) continue;
+      // For file-based images, use path as the dedup key (same as attachments list).
+      const dedupeKey = isBlobName ? (ci.data || ci.path) : ci.path;
+      if (seenPaths.has(dedupeKey)) continue;
+      seenPaths.add(dedupeKey);
+      // Use the data URL as the attachment path for blob images so the user bubble renders correctly.
+      const attPath = isBlobName ? (ci.data || ci.path) : ci.path;
+      const attName = isBlobName ? ci.path : (ci.path.split('/').pop() || 'image');
+      allAttachments.push({ path: attPath, name: attName, kind: 'image' });
+    }
 
     const userMsg = {
       id: 'msg_' + Date.now(), role: 'user' as const, content: text, timestamp: Date.now(),
@@ -235,6 +255,10 @@ export const Composer: React.FC = () => {
     // Immediately clear staged attachments & context UI upon prompt send so next prompt starts fresh
     setAttachments([]);
     setStore({ contextFiles: [], contextImages: [] });
+
+    // Scroll chat so new user prompt bubble is immediately fully in view above composer
+    setTimeout(() => window.dispatchEvent(new CustomEvent('chat_scroll_to_bottom')), 60);
+    setTimeout(() => window.dispatchEvent(new CustomEvent('chat_scroll_to_bottom')), 200);
 
     // Naming is left to the agent (storeActions.autoNameSession, called once
     // the first turn completes in agent-engine.ts) rather than truncating
@@ -320,6 +344,38 @@ export const Composer: React.FC = () => {
     } else if (e.key === 'Enter' && e.shiftKey) {
       // Auto-markdown list continuation on Shift+Enter or new line
       const sel = window.getSelection();
+      const ed = editorRef.current;
+
+      // Scroll the composer's caret into view after inserting a line break.
+      // We use double-rAF so the browser has fully re-laid-out the new content
+      // before we try to scroll — a single rAF fires before WebKit reflows.
+      // We insert a zero-width span at the caret, scroll it into view, then remove it.
+      const scrollCaretIntoView = () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (!ed) return;
+            const s = window.getSelection();
+            if (s && s.rangeCount > 0) {
+              const r = s.getRangeAt(0).cloneRange();
+              r.collapse(true);
+              const marker = document.createElement('span');
+              marker.setAttribute('aria-hidden', 'true');
+              r.insertNode(marker);
+              marker.scrollIntoView({ block: 'nearest', behavior: 'instant' } as ScrollIntoViewOptions);
+              marker.parentNode?.removeChild(marker);
+              // Restore selection after the temporary node removal
+              const sel2 = window.getSelection();
+              if (sel2 && sel2.rangeCount > 0) {
+                // selection usually survives; if not, place at end
+              }
+            } else {
+              // Fallback: scroll textarea to bottom
+              ed.scrollTop = ed.scrollHeight;
+            }
+          });
+        });
+      };
+
       if (sel && sel.rangeCount > 0) {
         const range = sel.getRangeAt(0);
         const node = range.startContainer;
@@ -332,19 +388,24 @@ export const Composer: React.FC = () => {
             // Empty bullet -> delete list marker and wrap
             document.execCommand('delete', false);
             updateHasContent();
+            scrollCaretIntoView();
             return;
           }
           const nextMarker = /^\d+\./.test(marker) ? `${parseInt(marker, 10) + 1}. ` : `${marker} `;
           document.execCommand('insertLineBreak');
           document.execCommand('insertText', false, `${indent}${nextMarker}`);
           updateHasContent();
+          scrollCaretIntoView();
           return;
         }
       }
       // Force a plain <br> so WebKit doesn't wrap lines in block <div>s.
       e.preventDefault();
-      const ed = editorRef.current;
-      if (ed) { ed.focus(); try { document.execCommand('insertLineBreak'); } catch { /* noop */ } }
+      if (ed) {
+        ed.focus();
+        try { document.execCommand('insertLineBreak'); } catch { /* noop */ }
+        scrollCaretIntoView();
+      }
       updateHasContent();
     }
   };
@@ -366,7 +427,11 @@ export const Composer: React.FC = () => {
       const data = typeof reader.result === 'string' ? reader.result : '';
       if (!data) return;
       const name = `pasted-image-${Date.now()}.${blob.type.split('/')[1] || 'png'}`;
+      // Add to local attachments using the data URL as path so dedup in handleSend works.
       setAttachments(prev => [...prev, { path: data, name, kind: 'image' }]);
+      // Also show a chip in the context bar above the composer.
+      // We use 'name' as the path here (plain filename) for display; the dedup in
+      // handleSend uses ci.data to avoid double-sending the image.
       setStore(prev => ({
         contextImages: prev.contextImages.some(image => image.path === name)
           ? prev.contextImages

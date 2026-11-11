@@ -68,10 +68,7 @@ Item {
     }
     function clearHistory() { overlay.history = [] }
 
-    function _groupKey(n) {
-        if ((n.category || "") === "media.playing") return "media.playing"
-        return (n.appName || "") + "|" + (n.summary || "")
-    }
+    function _groupKey(n) { return (n.appName || "") + "|" + (n.summary || "") }
 
     Process {
         id: actionInvokerProc
@@ -142,23 +139,10 @@ Item {
             const q = overlay.notifications.slice()
             const ei = q.findIndex(function(x) { return x.groupKey === n.groupKey && !x.isPrompt })
             if (ei >= 0 && !n.isPrompt) {
-                if (n.groupKey === "media.playing") {
-                    // For media: update in-place so the toast doesn't jump/re-animate
-                    q[ei] = Object.assign({}, q[ei], {
-                        summary:   n.summary,
-                        body:      n.body,
-                        iconPath:  n.iconPath || q[ei].iconPath,
-                        appName:   n.appName,
-                        timestamp: n.timestamp
-                    })
-                } else {
-                    n.count = (q[ei].count || 1) + 1
-                    q.splice(ei, 1)
-                    q.unshift(n)
-                }
-            } else {
-                q.unshift(n)
+                n.count = (q[ei].count || 1) + 1
+                q.splice(ei, 1)
             }
+            q.unshift(n)
             if (q.length > 6) q.pop()
             overlay.notifications = q
         }
@@ -251,8 +235,6 @@ Item {
             const now = Date.now()
             const rem = overlay.notifications.filter(function(n) {
                 if (n.isPrompt || n.urgency >= 2) return true
-                // Media toasts stay until playback stops (daemon clears via _last_media_key reset)
-                if (n.category === "media.playing") return true
                 return (now - n.timestamp) < 5000
             })
             if (rem.length !== overlay.notifications.length)

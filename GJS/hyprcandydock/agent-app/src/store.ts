@@ -1804,6 +1804,41 @@ export const storeActions = {
   },
 
   openFileByPath: async (filePath: string) => {
+    // Normalize path: resolve ~ to user home
+    let targetPath = filePath.trim();
+    if (targetPath.startsWith("~/")) {
+      const home = (window as any).__hyprcandyHome || "/home/king";
+      targetPath = home + targetPath.slice(1);
+    } else if (targetPath === "~") {
+      targetPath = (window as any).__hyprcandyHome || "/home/king";
+    }
+
+    // If relative path, try resolving against open project paths, diffs, or recent files
+    if (!targetPath.startsWith("/") && !targetPath.startsWith("http")) {
+      const diffPaths: string[] = [];
+      currentState.sessions.forEach(s => {
+        s.messages.forEach(m => {
+          (m.diffs || []).forEach(d => {
+            if (d.filePath) diffPaths.push(d.filePath);
+          });
+        });
+      });
+      const recentCandidates = [
+        ...diffPaths,
+        ...Object.keys(currentState.pendingFiles || {}),
+        ...currentState.openFiles,
+        ...currentState.panes.map(p => p.id),
+      ];
+      const match = recentCandidates.find(c => c.endsWith("/" + targetPath) || c === targetPath);
+      if (match) {
+        targetPath = match;
+      } else {
+        const home = (window as any).__hyprcandyHome || "/home/king";
+        targetPath = `${home}/.hyprcandy/${targetPath}`;
+      }
+    }
+    filePath = targetPath;
+
     // If the file is already open in a pane, switch directly to it
     const existing = currentState.panes.find(p => p.id === filePath);
     if (existing) {

@@ -119,6 +119,7 @@ When calling `task_complete` and presenting your response, ALWAYS include a numb
 - **Normal answers don't need task_complete** — for conversational responses, just reply in Markdown and stop.
 - **Don't repeat failing tools** — if a tool fails 3 times with the same args, report the limitation and stop.
 - **exec_command safety** — avoid destructive commands (rm -rf, sudo dd, etc.) without clear user intent.
+- **Prefer write_file for file edits** — when editing files, use `write_file` (not `python -c` or `sed -i` via `exec_command`) so that the Files Changed / Pending Files widgets are reliably populated. Only use `exec_command` for shell operations that cannot be done with `write_file` (e.g. build commands, git operations, service restarts).
 - **capture_preview** — use during the verification phase of UI/visual tasks to confirm layout and design quality.
 
 ## Inline Selection Edits
@@ -538,9 +539,30 @@ async def run_agentic_turn(
             working.append({"role": "assistant", "content": assistant_text})
 
         if not unique_calls:
-            # No tool calls — final conversational answer
+            # If this is a conversational exchange (no prior tool use and no pending tasks)
+            # treat it as a final answer. Otherwise the model forgot to call task_complete —
+            # inject a steering nudge so the loop continues rather than closing prematurely.
+            had_tool_use = any(
+                m.get("role") == "assistant" and m.get("tool_calls")
+                for m in working
+            )
+            if not had_tool_use:
+                # Pure Q&A turn — no tools were ever called, fine to end here
+                full_response = _strip_tool_call_text(assistant_text)
+                break
+            # Agentic turn that forgot to call task_complete — remind and continue
             full_response = _strip_tool_call_text(assistant_text)
-            break
+            todo_status = todo.format() if todo.tasks else ""
+            nudge = (
+                "You responded with text but did not call task_complete. "
+                "If the task is fully done and verified, call task_complete(summary=...) now. "
+                "If you need to do more work first, continue using tools."
+            )
+            if todo_status:
+                nudge += f"\n\nCurrent todo list:\n{todo_status}"
+            working.append({"role": "user", "content": nudge})
+            iteration += 1
+            continue
 
         # ── Execute tools ─────────────────────────────────────────────────────
         tool_messages: list[dict] = []

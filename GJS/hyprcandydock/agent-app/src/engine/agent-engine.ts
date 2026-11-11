@@ -69,6 +69,12 @@ const AMBIENT_TOOL_NAMES = new Set([
   'list_memories', 'read_memory', 'save_memory', 'delete_memory',
 ]);
 
+// All tool names (raw from LLM) that execute shell commands and may return
+// modified_files in their result. Aliases like 'bash' and 'run_command' are
+// kept raw because agent_loop.py yields tool_start/tool_result with the
+// original (un-canonicalised) name from the model.
+const EXEC_TOOL_NAMES = new Set(['exec_command', 'run_command', 'bash', 'sh', 'shell', 'run_terminal']);
+
 export interface HistoryMessage {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
@@ -586,7 +592,7 @@ export class AgentEngine {
                 // former becomes a diff block once the write actually lands
                 // (near-instant), the latter is rendered separately as the
                 // end-of-turn summary once it completes.
-                if (tc.name === 'exec_command' || tc.name === 'run_command') {
+                if (EXEC_TOOL_NAMES.has(tc.name)) {
                   startCommandTool(tc);
                 } else if (AMBIENT_TOOL_NAMES.has(tc.name)) {
                   startAmbientTool(tc);
@@ -626,6 +632,25 @@ export class AgentEngine {
                   });
                   storeActions.appendDiff(sessionId, assistantMsgId, diff);
                   blocks = [...blocks, { type: 'diff', id: nextBlockId(), diff }];
+                } else if (EXEC_TOOL_NAMES.has(matched?.name ?? '') && data.result && typeof data.result === 'object' && Array.isArray(data.result.modified_files)) {
+                  for (const mf of data.result.modified_files) {
+                    const diff: DiffData = {
+                      filePath: mf.path,
+                      originalCode: mf.old_content || '',
+                      modifiedCode: mf.new_content || '',
+                      status: 'pending',
+                      additions: mf.additions || 0,
+                      deletions: mf.deletions || 0,
+                      isNew: !!mf.is_new,
+                    };
+                    storeActions.registerPendingFile({
+                      path: mf.path, additions: diff.additions!, deletions: diff.deletions!,
+                      isNew: diff.isNew!, oldContent: diff.originalCode, newContent: diff.modifiedCode,
+                      timestamp: Date.now(),
+                    });
+                    storeActions.appendDiff(sessionId, assistantMsgId, diff);
+                    blocks = [...blocks, { type: 'diff', id: nextBlockId(), diff }];
+                  }
                 }
                 streamUi.schedule(fullText, currentTools, blocks);
 
@@ -730,6 +755,13 @@ export class AgentEngine {
             }
 
             if (resp.done) {
+              // Safeguard: if the runtime closed without a task_complete event
+              // (e.g. max-iteration exit or unhandled Python exception), close
+              // the stream cleanly without adding a spurious error message.
+              const sawTaskComplete = currentTools.some(t => t.name === 'task_complete');
+              if (!sawTaskComplete) {
+                console.warn('[agent-engine] resp.done without task_complete — runtime may have exited early');
+              }
               streamUi.flush();
               setStore({ agentRunning: false });
               this.abortController = null;

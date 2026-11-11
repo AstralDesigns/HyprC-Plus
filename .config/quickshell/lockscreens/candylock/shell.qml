@@ -237,7 +237,19 @@ ShellRoot {
         root.clockMonthName = Qt.formatDate(new Date(),"MMMM")
     }}
     // Seconds tick drives the clock coverflow indicator (front slot = current second).
-    Timer { interval:1000; repeat:true; running:true; onTriggered: root.clockSec = new Date().getSeconds() }
+    // Self-correcting seconds tick — re-syncs to real wall-clock boundary on
+    // every trigger so event-loop jitter never accumulates into 2-second skips.
+    Timer {
+        id: clockSecTimer
+        interval: Math.max(25, 1000 - (Date.now() % 1000))
+        repeat: false
+        running: true
+        onTriggered: {
+            root.clockSec = new Date().getSeconds()
+            interval = Math.max(25, 1000 - (Date.now() % 1000))
+            restart()
+        }
+    }
 
     // ── Weather ───────────────────────────────────────────────────────────────
     // Logic mirrors WeatherPopupState exactly:

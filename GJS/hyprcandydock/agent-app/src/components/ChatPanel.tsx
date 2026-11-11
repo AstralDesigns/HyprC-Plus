@@ -173,7 +173,14 @@ export const ChatPanel: React.FC = () => {
   const imageSource = (image: { path: string; data: string }) => {
     if (image.data?.startsWith('data:') || image.data?.startsWith('http:') || image.data?.startsWith('https:')) return image.data;
     if (image.data?.startsWith('file://')) return getMediaUrl(image.data.slice('file://'.length));
-    return getMediaUrl(image.path);
+    // Only use path as a media URL if it looks like an absolute file path
+    if (image.path?.startsWith('/')) return getMediaUrl(image.path);
+    return '';
+  };
+  /** Returns true only when imageSource would yield a loadable URL */
+  const hasValidImageSrc = (image: { path: string; data: string }) => {
+    const src = imageSource(image);
+    return !!src;
   };
 
   return (
@@ -337,21 +344,31 @@ export const ChatPanel: React.FC = () => {
               </button>
             </span>
           ))}
-          {store.contextImages.map(ci => (
-            <span key={ci.path} className="context-chip context-image-chip">
+          {store.contextImages.filter(ci => !!(ci.data || ci.path)).map(ci => (
+            <span key={ci.path} className="context-chip context-image-chip" onClick={() => setHoveredImage(imageSource(ci))} style={{ cursor: 'pointer' }}>
               <span
                 className="context-image-hover-target"
-                onClick={() => setHoveredImage(imageSource(ci))}
                 title="Click to view full image in lightbox"
-                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                style={{ display: 'flex', alignItems: 'center' }}
               >
-                <img src={imageSource(ci)} alt={ci.path.split('/').pop() || 'Context image'} className="context-image-thumb" />
+                {hasValidImageSrc(ci) && (
+                  <img
+                    src={imageSource(ci)}
+                    alt={ci.path.split('/').pop() || 'Context image'}
+                    className="context-image-thumb"
+                    onError={(e) => {
+                      const el = e.currentTarget as HTMLImageElement;
+                      el.style.display = 'none';
+                      // Also hide the parent hover-target span to avoid phantom spacing
+                      const parent = el.parentElement as HTMLElement | null;
+                      if (parent) parent.style.display = 'none';
+                    }}
+                  />
+                )}
               </span>
               <span
                 className="context-chip-name"
-                onClick={() => storeActions.openFileByPath(ci.path)}
-                title={`Open ${ci.path.split('/').pop()} in canvas`}
-                style={{ cursor: 'pointer' }}
+                title={`Click to view ${ci.path.split('/').pop()} in lightbox`}
               >
                 {ci.path.split('/').pop()}
               </span>

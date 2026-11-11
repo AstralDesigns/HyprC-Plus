@@ -609,6 +609,54 @@ async def write_file(path: str, content: str) -> dict:
 
 async def exec_command(command: str, cwd: Optional[str] = None) -> dict:
     work_dir = Path(cwd).expanduser() if cwd else Path.home()
+
+    # Pre-scan files that might be targeted by the command to capture pre-edit content
+    raw_candidates = set()
+    # 1. Quoted string literals that contain slashes or extensions
+    for q in re.findall(r'[\'"]([^\'"\n\r]+)[\'"]', command):
+        q = q.strip()
+        if '/' in q or ('.' in q and not q.startswith('.')):
+            raw_candidates.add(q)
+
+    # 2. String concatenation prefixes like 'dir/' + var
+    for pre in re.findall(r'[\'"]([^\'"\n\r]*/(?:[^\'"\n\r]*/)*)[\'"]\s*\+\s*[a-zA-Z0-9_]+', command):
+        raw_candidates.add(pre.strip())
+
+    # 3. Path-like unquoted tokens
+    pattern = r'(?:[\s"\'(=,\[\]]|^)((?:~?/|/|[a-zA-Z0-9_\-.]+/)[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9_\-]+)'
+    for m in re.finditer(pattern, command):
+        cand = m.group(1).strip("\"'[](),")
+        raw_candidates.add(cand)
+
+    candidates = set()
+    for cand in raw_candidates:
+        if cand.startswith(('http://', 'https://', 'ftp://')):
+            continue
+        p = Path(cand).expanduser()
+        if not p.is_absolute():
+            p = (work_dir / p).resolve()
+        if p.is_file():
+            candidates.add(p)
+        elif p.is_dir():
+            try:
+                for root_dir, _, files in os.walk(p):
+                    for f in files:
+                        candidates.add(Path(root_dir) / f)
+            except Exception:
+                pass
+        else:
+            candidates.add(p)
+
+    pre_snapshots = {}
+    for p in candidates:
+        if p.is_file():
+            try:
+                pre_snapshots[p] = (p.read_text(errors="replace"), p.stat().st_mtime)
+            except Exception:
+                pass
+        else:
+            pre_snapshots[p] = (None, None)
+
     try:
         result = subprocess.run(
             ["/bin/bash", "-c", command],
@@ -617,11 +665,93 @@ async def exec_command(command: str, cwd: Optional[str] = None) -> dict:
             cwd=str(work_dir),
             timeout=60,
         )
-        return {
+
+        # Post-run discovery: scan stdout/stderr AND the command string itself for
+        # file paths not captured in the pre-scan (e.g. python -c writing files via
+        # variables). Also resolve relative open() paths against cwd.
+        output_text = (result.stdout or '') + (result.stderr or '') + '\n' + command
+        post_path_pattern = r'(?:^|[\s\'"(=,\[])(/(?:[^\s\'")\],]+/)*[^\s\'")\],]+\.[a-zA-Z0-9_-]{1,8})'
+        for pm in re.finditer(post_path_pattern, output_text, re.MULTILINE):
+            cand_str = pm.group(1).strip("\"'(),")
+            if cand_str.startswith(('http://', 'https://')):
+                continue
+            cand_p = Path(cand_str)
+            if cand_p not in pre_snapshots and cand_p.is_file():
+                try:
+                    mtime = cand_p.stat().st_mtime
+                    if mtime >= (time.time() - 15):  # written in last 15s
+                        pre_snapshots[cand_p] = (None, None)  # treat as new
+                except Exception:
+                    pass
+        # Also scan for open() calls with relative paths written in cwd
+        # (catches `python -c "open('rel/file.py','w').write(...)"` patterns)
+        rel_open_pattern = r'(?:open|with open)\s*\(\s*[\'"]([^\'"]+\.[a-zA-Z0-9_-]{1,8})[\'"]'
+        for rm in re.finditer(rel_open_pattern, command):
+            rel_str = rm.group(1)
+            cand_p = (work_dir / rel_str).resolve()
+            if cand_p not in pre_snapshots and cand_p.is_file():
+                try:
+                    mtime = cand_p.stat().st_mtime
+                    if mtime >= (time.time() - 15):
+                        pre_snapshots[cand_p] = (None, None)
+                except Exception:
+                    pass
+
+
+        # ── cwd mtime sweep ────────────────────────────────────────────────────
+        # Catch files written via bare filenames (tee file.py, echo > conf,
+        # heredocs like `cat > config.yml << EOF`) that the regex pre-scan can't
+        # see because they have no path separator.  We do a shallow scan of
+        # work_dir (not recursive — keeps it cheap) and add any file whose mtime
+        # changed in the last 30 s and that isn't already tracked.
+        cmd_end_time = time.time()
+        try:
+            for entry in work_dir.iterdir():
+                if not entry.is_file() or entry in pre_snapshots:
+                    continue
+                try:
+                    if entry.stat().st_mtime >= (cmd_end_time - 30):
+                        pre_snapshots[entry] = (None, None)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Post-scan modified files
+        modified_files = []
+        for p, (old_text, old_mtime) in pre_snapshots.items():
+            try:
+                if p.is_file():
+                    mtime = p.stat().st_mtime
+                    if old_mtime is None or mtime != old_mtime:
+                        new_text = p.read_text(errors="replace")
+                        if old_text is None or new_text != old_text:
+                            is_new = (old_text is None)
+                            old_c = old_text or ""
+                            add, rem = _diff_counts(old_c, new_text)
+                            _register_turn_edit(str(p), old_c, is_new, new_text)
+                            rec = {
+                                "path": str(p),
+                                "old_content": old_c,
+                                "new_content": new_text,
+                                "is_new": is_new,
+                                "additions": add,
+                                "deletions": rem,
+                            }
+                            PENDING_EDITS[str(p)] = rec
+                            rec['timestamp'] = time.time()
+                            modified_files.append(rec)
+            except Exception:
+                pass
+
+        res_payload = {
             "exitCode": result.returncode,
             "stdout": result.stdout[:20_000],
             "stderr": result.stderr[:5_000],
         }
+        if modified_files:
+            res_payload["modified_files"] = modified_files
+        return res_payload
     except subprocess.TimeoutExpired:
         return {"exitCode": -1, "stdout": "", "stderr": "Command timed out after 60 seconds"}
 

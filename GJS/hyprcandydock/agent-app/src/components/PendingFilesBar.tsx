@@ -5,7 +5,17 @@ import { useStore, storeActions } from '../store';
 export const PendingFilesBar: React.FC = () => {
   const [store] = useStore();
   const [expanded, setExpanded] = useState(false);
-  const files = Object.values(store.pendingFiles).sort((a, b) => a.timestamp - b.timestamp);
+
+  // Filter out temporary/scratch files the agent generates during a task and then
+  // deletes — only show durable project edits (same filter as FilesChangedWidget).
+  const isTempPath = (p: string) =>
+    p.startsWith('/tmp/') || p.startsWith('/dev/shm/') || p.startsWith('/run/user/') ||
+    p.includes('/.cache/') || /\.(tmp|bak|swp|orig)$/.test(p) ||
+    /\/scratch\//.test(p);
+
+  const files = Object.values(store.pendingFiles)
+    .filter(f => !isTempPath(f.path))
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   if (files.length === 0) return null;
 

@@ -272,6 +272,67 @@ const AgentActivity: React.FC<{ tools: ToolCallData[]; running: boolean }> = ({ 
   );
 };
 
+function resolveMentionPath(rawPath: string): { fullPath: string; displayName: string } {
+  let clean = rawPath.trim().replace(/^file:\/\//, "");
+  const home = (window as any).__hyprcandyHome || "/home/king";
+  if (clean.startsWith("~/")) {
+    clean = home + clean.slice(1);
+  } else if (clean === "~") {
+    clean = home;
+  }
+
+  const fileName = clean.split("/").pop() || clean;
+  if (clean.startsWith("/")) {
+    return { fullPath: clean, displayName: fileName };
+  }
+
+  // Check known modified diff paths in store to match partial mentions like 'candylock/shell.qml'
+  try {
+    const st = getStore();
+    const allDiffs: string[] = [];
+    st.sessions.forEach(s => {
+      s.messages.forEach(m => {
+        (m.diffs || []).forEach(d => {
+          if (d.filePath) allDiffs.push(d.filePath);
+        });
+      });
+    });
+    const matched = allDiffs.find(p => p.endsWith('/' + clean) || p.endsWith(clean));
+    if (matched) {
+      return { fullPath: matched, displayName: fileName };
+    }
+
+    // Also check tool call arguments (read_file, write_file, etc.) across the current session
+    const session = st.sessions.find(s => s.id === st.activeSessionId);
+    if (session) {
+      for (const msg of session.messages) {
+        for (const tool of ((msg as any).tools || [])) {
+          const toolPath: string = (tool.arguments as any)?.path || '';
+          if (toolPath && (toolPath.endsWith('/' + clean) || toolPath.endsWith(clean) || toolPath.includes(clean))) {
+            return { fullPath: toolPath, displayName: fileName };
+          }
+        }
+      }
+    }
+  } catch {}
+
+  // Try known project root prefixes before generic fallback
+  const knownPrefixes = [
+    `${home}/.HyprC-Plus/`,
+    `${home}/.hyprcandy/`,
+    `/mnt/`,
+  ];
+  for (const prefix of knownPrefixes) {
+    const candidate = prefix + clean;
+    // Use the prefix path if the partial path contains characteristic subdirectory patterns
+    if (clean.includes('.config/') || clean.includes('.local/') || clean.includes('lockscreens/') || clean.includes('quickshell/')) {
+      return { fullPath: candidate, displayName: fileName };
+    }
+  }
+
+  return { fullPath: home + (clean.startsWith('.') ? '/' + clean : '/.hyprcandy/' + clean), displayName: fileName };
+}
+
 function isExplicitFile(text: string): boolean {
   if (!text) return false;
   const clean = text.trim();
@@ -330,7 +391,7 @@ const renderMarkdown = (content: string, extraClass = '', selectionRefs?: Select
             }
             const cleanPath = (href || '').replace(/^file:\/\//, '');
             if (cleanPath && isExplicitFile(cleanPath)) {
-              const fileName = cleanPath.split('/').pop() || cleanPath;
+              const { fullPath, displayName } = resolveMentionPath(cleanPath);
               return (
                 <a
                   href={href}
@@ -338,13 +399,13 @@ const renderMarkdown = (content: string, extraClass = '', selectionRefs?: Select
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    storeActions.openFileByPath(cleanPath);
+                    storeActions.openFileByPath(fullPath);
                   }}
-                  title={`Open ${cleanPath}`}
+                  title={`Open ${fullPath}`}
                   {...props}
                 >
-                  <FileIcon name={fileName} size={11} />
-                  <span>{fileName}</span>
+                  <FileIcon name={displayName} size={11} />
+                  <span>{displayName}</span>
                 </a>
               );
             }
@@ -359,20 +420,20 @@ const renderMarkdown = (content: string, extraClass = '', selectionRefs?: Select
             if (isInline) {
               const text = String(children || '').trim();
               if (!text.includes('\n') && !text.includes(' ') && isExplicitFile(text)) {
-                const fileName = text.split('/').pop() || text;
+                const { fullPath, displayName } = resolveMentionPath(text);
                 return (
                   <code
                     className="interactive-file-mention"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      storeActions.openFileByPath(text);
+                      storeActions.openFileByPath(fullPath);
                     }}
-                    title={`Open ${text}`}
+                    title={`Open ${fullPath}`}
                     {...props}
                   >
-                    <FileIcon name={fileName} size={11} />
-                    <span>{fileName}</span>
+                    <FileIcon name={displayName} size={11} />
+                    <span>{displayName}</span>
                   </code>
                 );
               }
@@ -746,13 +807,22 @@ export const ChatStream: React.FC = () => {
   const activeSession = store.sessions.find(s => s.id === store.activeSessionId);
   const messages = activeSession?.messages || [];
 
+  const prevMsgCountRef = useRef(messages.length);
   useEffect(() => {
     if (!store.chatVisible) return;
     const node = containerRef.current || bottomRef.current?.parentElement;
     if (!node) return;
+    const isNewMessage = messages.length > prevMsgCountRef.current;
+    prevMsgCountRef.current = messages.length;
     const nearBottom = node.scrollHeight - node.scrollTop - node.clientHeight < 160;
-    if (nearBottom) {
-      node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+    if (isNewMessage || nearBottom) {
+      // Immediate scroll followed by animation frames to ensure newly added bubble is fully in view above composer
+      node.scrollTo({ top: node.scrollHeight, behavior: isNewMessage ? 'auto' : 'smooth' });
+      if (isNewMessage) {
+        requestAnimationFrame(() => {
+          node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+        });
+      }
     }
   }, [messages, store.agentRunning, store.chatVisible]);
 
@@ -803,6 +873,30 @@ export const ChatStream: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const onScrollBottom = () => {
+      const node = containerRef.current || bottomRef.current?.parentElement;
+      if (node) {
+        node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+      }
+      requestAnimationFrame(() => {
+        if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+      });
+      setTimeout(() => {
+        if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+      }, 60);
+      setTimeout(() => {
+        if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+      }, 180);
+      // Extra settle after DOM has fully painted new user bubble
+      setTimeout(() => {
+        if (node) node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
+      }, 350);
+    };
+    window.addEventListener('chat_scroll_to_bottom', onScrollBottom);
+    return () => window.removeEventListener('chat_scroll_to_bottom', onScrollBottom);
+  }, []);
+
   if (messages.length === 0) {
     return <EmptyChatScreen />;
   }
@@ -843,7 +937,7 @@ export const ChatStream: React.FC = () => {
           <AgentPhaseIndicator phase={currentPhase} />
         </div>
       )}
-      <div ref={bottomRef} style={{ height: '4px' }} />
+      <div ref={bottomRef} style={{ height: '16px', flexShrink: 0 }} />
       </div>
     </>
   );
@@ -954,8 +1048,13 @@ const UserBubble: React.FC<{
       {message.attachments && message.attachments.length > 0 && (
         <div className="user-bubble-attachments">
           {message.attachments.map(att => {
-            const src = att.path.startsWith('data:') ? att.path : `file://${att.path}`;
-            if (att.kind === 'image') {
+            if (!att || !att.path) return null;
+            const isImg = att.kind === 'image' || /\.(png|jpe?g|gif|webp|svg)$/i.test(att.name || att.path);
+            let src = att.path;
+            if (isImg && !src.startsWith('data:')) {
+              src = src.startsWith('file://') ? src : `file://${src}`;
+            }
+            if (isImg) {
               return (
                 <div
                   key={att.path}
@@ -964,7 +1063,14 @@ const UserBubble: React.FC<{
                   style={{ cursor: 'pointer' }}
                   data-tip="Click to view and zoom image"
                 >
-                  <img src={src} alt={att.name} />
+                  <img
+                    src={src}
+                    alt={att.name || 'image'}
+                    onError={(e) => {
+                      const parent = (e.currentTarget.parentElement as HTMLElement);
+                      if (parent) parent.style.display = 'none';
+                    }}
+                  />
                 </div>
               );
             }
