@@ -310,27 +310,72 @@ def _strip_tool_call_text(text: str) -> str:
 
 
 def _prune_working_memory(messages: list[dict]) -> list[dict]:
-    """Compacts older tool messages in working memory to prevent TPM blowout.
-    
-    Preserves all roles and tool_call_id pairs so OpenAI / OpenRouter schema validation
-    remains strictly valid. Only truncates the large content of older tool calls
-    (keeping the most recent tool call batch in full fidelity).
-    """
-    tool_indices = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
-    if len(tool_indices) <= 2:
-        return messages
+    """Compacts older tool messages in working memory to prevent TPM blowout and OOM kills.
 
-    recent_tool_cutoff = set(tool_indices[-2:])
+    Strategy (applied in order):
+    1. Keep the system prompt and the first user message intact (task anchor).
+    2. Keep the last N complete tool-call exchanges (assistant+tool pairs) at full fidelity.
+    3. Truncate all earlier tool outputs aggressively (older file-reads, command outputs etc.).
+    4. Cap any single assistant message at MAX_ASSISTANT_CHARS to prevent reasoning blowout.
+    5. If the total estimated payload is still above HARD_CAP_CHARS, drop the oldest
+       non-system non-anchor messages wholesale until it fits.
+
+    Preserves all roles and tool_call_id pairs so OpenAI / OpenRouter schema validation
+    remains strictly valid.
+    """
+    RECENT_FULL_EXCHANGES = 3   # keep last 3 tool calls at full fidelity
+    OLDER_TOOL_CAP       = 300  # chars kept for older tool outputs (was 400)
+    MAX_ASSISTANT_CHARS  = 2000 # cap individual assistant messages (thinking tokens etc.)
+    HARD_CAP_CHARS       = 80_000  # ~20k tokens — if total exceeds this, drop old turns
+
+    tool_indices = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+    recent_tool_cutoff = set(tool_indices[-RECENT_FULL_EXCHANGES:]) if tool_indices else set()
+
     pruned = []
     for i, m in enumerate(messages):
-        if m.get("role") == "tool" and i not in recent_tool_cutoff:
+        role = m.get("role", "")
+
+        # Tool messages: cap older ones
+        if role == "tool" and i not in recent_tool_cutoff:
             content = m.get("content") or ""
-            if len(content) > 600:
+            if len(content) > OLDER_TOOL_CAP:
                 m_copy = dict(m)
-                m_copy["content"] = content[:400] + "\n... [prior tool output condensed to conserve context] ..."
+                m_copy["content"] = content[:OLDER_TOOL_CAP] + "\n... [condensed] ..."
                 pruned.append(m_copy)
                 continue
+
+        # Assistant messages: cap very long content (long reasoning / text responses)
+        elif role == "assistant":
+            content = m.get("content") or ""
+            if isinstance(content, str) and len(content) > MAX_ASSISTANT_CHARS:
+                m_copy = dict(m)
+                m_copy["content"] = content[:MAX_ASSISTANT_CHARS] + "\n... [condensed] ..."
+                pruned.append(m_copy)
+                continue
+
         pruned.append(m)
+
+    # Hard cap: if total chars still huge, drop oldest non-anchor exchange blocks
+    # to avoid breaking tool_calls / tool message pairing, we drop full "blocks":
+    # an assistant turn (possibly with tool_calls) + all its subsequent tool results.
+    # Anchor = index 0 (system) and index 1 (first user message / task description).
+    total = sum(len(str(m.get("content") or "")) for m in pruned)
+    if total > HARD_CAP_CHARS and len(pruned) > 6:
+        anchor = pruned[:2]
+        tail = pruned[2:]
+        # Find assistant-turn boundaries and drop whole exchange blocks
+        while total > HARD_CAP_CHARS and len(tail) > 4:
+            # Identify and drop the first complete exchange (assistant + its tool results)
+            drop_end = 1  # always drop at least the first message
+            if tail[0].get("role") == "assistant" and tail[0].get("tool_calls"):
+                # Drop through all consecutive tool messages that follow
+                while drop_end < len(tail) and tail[drop_end].get("role") == "tool":
+                    drop_end += 1
+            for m in tail[:drop_end]:
+                total -= len(str(m.get("content") or ""))
+            tail = tail[drop_end:]
+        pruned = anchor + tail
+
     return pruned
 
 
@@ -467,6 +512,12 @@ async def run_agentic_turn(
 
     iteration = 0
     budget = float("inf") if MAX_ITERATIONS is None else float(MAX_ITERATIONS)
+    # Persistent flag: set True the first time any tool call is dispatched so the
+    # "no tool calls" branch can correctly distinguish a pure Q&A turn (never called
+    # any tools) from an agentic turn where the model forgot to call task_complete.
+    # Covers both native tool_calls format AND inline-XML tool calls (which are
+    # committed to `working` as plain assistant content, not as tool_calls messages).
+    had_tool_use = False
     while iteration < budget:
         if task_done:
             break
@@ -542,10 +593,17 @@ async def run_agentic_turn(
             # If this is a conversational exchange (no prior tool use and no pending tasks)
             # treat it as a final answer. Otherwise the model forgot to call task_complete —
             # inject a steering nudge so the loop continues rather than closing prematurely.
-            had_tool_use = any(
-                m.get("role") == "assistant" and m.get("tool_calls")
-                for m in working
-            )
+            #
+            # NOTE: We check both native tool_calls messages AND tool-result messages
+            # (role="tool") so that inline-XML tool calls — which are committed to working
+            # as plain assistant content without a tool_calls key — are still detected.
+            # We also track the flag persistently across iterations via `had_tool_use`.
+            if not had_tool_use:
+                had_tool_use = any(
+                    (m.get("role") == "assistant" and m.get("tool_calls")) or
+                    m.get("role") == "tool"
+                    for m in working
+                )
             if not had_tool_use:
                 # Pure Q&A turn — no tools were ever called, fine to end here
                 full_response = _strip_tool_call_text(assistant_text)
@@ -566,6 +624,7 @@ async def run_agentic_turn(
 
         # ── Execute tools ─────────────────────────────────────────────────────
         tool_messages: list[dict] = []
+        had_tool_use = True  # proactively set — tools are being dispatched this iteration
 
         for call in unique_calls:
             name = call["name"]
@@ -585,6 +644,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": err_content,
                 })
                 if repeat_count >= 5:
@@ -602,6 +662,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": json.dumps(result),
                 })
                 continue
@@ -614,6 +675,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": json.dumps(result),
                 })
                 continue
@@ -626,6 +688,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": json.dumps(result),
                 })
                 continue
@@ -638,6 +701,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": json.dumps(result),
                 })
                 continue
@@ -649,6 +713,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": json.dumps(result),
                 })
                 continue
@@ -665,6 +730,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": json.dumps(result),
                 })
                 # A multi-question form is always a pause; a single-row clarify
@@ -684,6 +750,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": result_str[:12_000],
                 })
                 if name == "task_complete":
@@ -695,6 +762,7 @@ async def run_agentic_turn(
                 tool_messages.append({
                     "role": "tool",
                     "tool_call_id": call["id"],
+                    "name": name,
                     "content": f"Tool error: {err_msg}",
                 })
 

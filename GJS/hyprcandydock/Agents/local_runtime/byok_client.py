@@ -13,7 +13,7 @@ All providers yield the same event dict format as stream_cloud in cloud_client.p
 from __future__ import annotations
 
 import json
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import httpx
 
@@ -418,6 +418,17 @@ async def _stream_google(
     # Convert OpenAI-style messages → Gemini contents format
     system_text = ""
     contents = []
+
+    # Map tool_call_id -> fn_name across the conversation
+    tool_id_to_name: dict[str, str] = {}
+    for m in messages:
+        if m.get("role") == "assistant" and m.get("tool_calls"):
+            for tc in m["tool_calls"]:
+                tid = tc.get("id")
+                tfn = tc.get("function", {}).get("name")
+                if tid and tfn:
+                    tool_id_to_name[tid] = tfn
+
     for m in messages:
         role = m.get("role", "user")
         content = m.get("content") or ""
@@ -429,15 +440,39 @@ async def _stream_google(
         elif role == "assistant":
             g_role = "model"
         elif role == "tool":
-            # Tool response — wrap as user turn with function response
+            # Tool response — functionResponse must match function declaration name
             tool_call_id = m.get("tool_call_id", "")
-            contents.append({
-                "role": "user",
-                "parts": [{"functionResponse": {
-                    "name": tool_call_id,
-                    "response": {"result": content},
-                }}],
-            })
+            fn_name = m.get("name") or tool_id_to_name.get(tool_call_id, "")
+            if not fn_name and tool_call_id.startswith("google_"):
+                # Recover name from google_<name>_<idx>
+                parts_id = tool_call_id.split("_")
+                if len(parts_id) >= 3:
+                    fn_name = "_".join(parts_id[1:-1])
+            fn_name = fn_name or tool_call_id or "tool"
+
+            # Parse response if JSON string so Gemini receives structured data
+            resp_data = {"result": content}
+            if isinstance(content, str):
+                try:
+                    parsed = json.loads(content)
+                    if isinstance(parsed, dict):
+                        resp_data = parsed
+                except Exception:
+                    pass
+
+            part = {"functionResponse": {
+                "name": fn_name,
+                "response": resp_data,
+            }}
+
+            # Gemini requires strictly alternating roles: merge adjacent user turns
+            if contents and contents[-1]["role"] == "user":
+                contents[-1]["parts"].append(part)
+            else:
+                contents.append({
+                    "role": "user",
+                    "parts": [part],
+                })
             continue
         else:
             continue
@@ -458,11 +493,18 @@ async def _stream_google(
                     "name": fn.get("name", ""),
                     "args": args_dict,
                 }})
-            contents.append({"role": "model", "parts": parts})
+            if contents and contents[-1]["role"] == "model":
+                contents[-1]["parts"].extend(parts)
+            else:
+                contents.append({"role": "model", "parts": parts})
             continue
 
         if content:
-            contents.append({"role": g_role, "parts": [{"text": content}]})
+            part = {"text": content}
+            if contents and contents[-1]["role"] == g_role:
+                contents[-1]["parts"].append(part)
+            else:
+                contents.append({"role": g_role, "parts": [part]})
 
     # Build function declarations from tools schema (Tinker-style)
     function_declarations = []
@@ -572,7 +614,7 @@ async def _stream_google(
     yield {"type": "done"}
 
 
-# ── OpenAI-compatible streaming (OpenAI, xAI) ─────────────────────────────────
+# ── OpenAI-compatible streaming (OpenAI, xAI, OpenRouter, Groq, Cerebras, AIMLAPI) ─
 async def _stream_openai_compat(
     messages: list[dict],
     model: str,
@@ -582,9 +624,31 @@ async def _stream_openai_compat(
     extra_headers: dict | None = None,
 ) -> AsyncIterator[dict]:
     """Stream from OpenAI-compatible API."""
+    # Sanitize messages to strictly comply with the OpenAI Chat Completion schema.
+    # Discards provider-specific internal tags (e.g. 'name' on tool messages)
+    # that cause 400 errors on strict Pydantic parsers like Groq and Cerebras.
+    clean_messages: list[dict] = []
+    for m in messages:
+        role = m.get("role", "user")
+        if role == "tool":
+            clean_messages.append({
+                "role": "tool",
+                "tool_call_id": m.get("tool_call_id", ""),
+                "content": str(m.get("content") or ""),
+            })
+        elif role == "assistant":
+            msg: dict[str, Any] = {"role": "assistant", "content": m.get("content")}
+            if m.get("tool_calls"):
+                msg["tool_calls"] = m["tool_calls"]
+            clean_messages.append(msg)
+        elif role == "system":
+            clean_messages.append({"role": "system", "content": str(m.get("content") or "")})
+        else:  # user
+            clean_messages.append({"role": "user", "content": str(m.get("content") or "")})
+
     payload = {
         "model": model,
-        "messages": messages,
+        "messages": clean_messages,
         "stream": True,
         "temperature": 0.2,
         "max_tokens": 8192,
@@ -681,14 +745,47 @@ async def _stream_anthropic(
     tools_schema: list[dict],
 ) -> AsyncIterator[dict]:
     """Stream from Anthropic Messages API."""
-    # Extract system message
+    # Extract system message and format messages for Anthropic Messages API
     system_text = ""
-    filtered = []
+    filtered: list[dict] = []
     for m in messages:
-        if m.get("role") == "system":
-            system_text = m.get("content", "")
-        else:
-            filtered.append({"role": m["role"], "content": m.get("content") or ""})
+        role = m.get("role", "user")
+        content = m.get("content") or ""
+        if role == "system":
+            system_text = str(content)
+            continue
+        elif role == "tool":
+            tid = m.get("tool_call_id") or ""
+            part = {"type": "tool_result", "tool_use_id": tid, "content": str(content)}
+            if filtered and filtered[-1]["role"] == "user" and isinstance(filtered[-1]["content"], list):
+                filtered[-1]["content"].append(part)
+            else:
+                filtered.append({"role": "user", "content": [part]})
+        elif role == "assistant" and m.get("tool_calls"):
+            parts: list[dict] = []
+            if content:
+                parts.append({"type": "text", "text": str(content)})
+            for tc in m["tool_calls"]:
+                fn = tc.get("function", {})
+                args = fn.get("arguments", "{}")
+                try:
+                    args_dict = json.loads(args) if isinstance(args, str) else args
+                except Exception:
+                    args_dict = {}
+                parts.append({
+                    "type": "tool_use",
+                    "id": tc.get("id", f"call_{len(parts)}"),
+                    "name": fn.get("name", ""),
+                    "input": args_dict,
+                })
+            filtered.append({"role": "assistant", "content": parts})
+        elif role == "assistant":
+            filtered.append({"role": "assistant", "content": str(content)})
+        else:  # user
+            if filtered and filtered[-1]["role"] == "user" and isinstance(filtered[-1]["content"], list):
+                filtered[-1]["content"].append({"type": "text", "text": str(content)})
+            else:
+                filtered.append({"role": "user", "content": str(content)})
 
     # Convert tool schemas to Anthropic format
     anthropic_tools = []

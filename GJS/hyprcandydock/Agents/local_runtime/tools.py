@@ -744,13 +744,27 @@ async def exec_command(command: str, cwd: Optional[str] = None) -> dict:
             except Exception:
                 pass
 
+        # Cap content fields to keep the JSON payload (and working memory) bounded.
+        # The agent-loop already caps tool_message content at 12k chars, but we also
+        # need to prevent the in-process objects from ballooning when many files are
+        # modified (each with full old+new text). UI diff blocks get content from the
+        # live event yield (tool_result), not the working-memory copy, so the truncation
+        # only affects what the LLM sees in its next turn's context.
+        FILE_CONTENT_CAP = 4_000  # chars kept per old/new content in modified_files
+        capped_modified = []
+        for mf in modified_files:
+            capped_modified.append({
+                **mf,
+                "old_content": (mf["old_content"] or "")[:FILE_CONTENT_CAP],
+                "new_content": (mf["new_content"] or "")[:FILE_CONTENT_CAP],
+            })
         res_payload = {
             "exitCode": result.returncode,
-            "stdout": result.stdout[:20_000],
-            "stderr": result.stderr[:5_000],
+            "stdout": result.stdout[:8_000],
+            "stderr": result.stderr[:2_000],
         }
-        if modified_files:
-            res_payload["modified_files"] = modified_files
+        if capped_modified:
+            res_payload["modified_files"] = capped_modified
         return res_payload
     except subprocess.TimeoutExpired:
         return {"exitCode": -1, "stdout": "", "stderr": "Command timed out after 60 seconds"}
