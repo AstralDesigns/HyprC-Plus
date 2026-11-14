@@ -52,8 +52,8 @@
 // (its lifecycle is tied to the websearch toggle in LauncherWindow.qml
 // -- see proxyOptIn; run `hcproxy disable` to strip the flag and stop the
 // launcher managing it).
-//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--enable-gpu-rasterization --ignore-gpu-blocklist --num-raster-threads=1 --renderer-process-limit=1 --disable-site-isolation-trials --disk-cache-size=1 --media-cache-size=1 --disable-gpu-shader-disk-cache --disable-background-newtworking --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --proxy-server=http://127.0.0.1:8888 
-// --use-gl=angle --use-angle=gl
+//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS= --renderer-process-limit=1 --enable-gpu-rasterization --ignore-gpu-blocklist --disk-cache-size=1 --media-cache-size=1 --disable-gpu-shader-disk-cache --disable-background-newtworking --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --proxy-server=http://127.0.0.1:8888 
+// --use-gl=angle --use-angle=gl --num-raster-threads=1
 // (If CDP forensics are ever needed again: re-add
 //  //@ pragma Env QTWEBENGINE_REMOTE_DEBUGGING=9223 and use bar/scripts/webtest/.)
 

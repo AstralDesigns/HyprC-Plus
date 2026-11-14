@@ -96,7 +96,7 @@ Item {
                             radius: width / 2
                             color: "transparent"
                             border.width: 1
-                            border.color: Config.barBorderColor
+                            border.color: Theme.cInversePrimary
                         }
                 	opacity: discMa.containsMouse ? 0.7 : 1.0
                 	Behavior on opacity { NumberAnimation { duration: 80 } }
