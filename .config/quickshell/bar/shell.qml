@@ -24,7 +24,7 @@
 // --use-gl/--use-angle flags (absent here = Chromium's own default). Kept at
 // opengl (no spaces -- "KEY = val" would set a malformed var and do nothing).
 //@ pragma Env QT_QUICK_BACKEND=opengl
-//@ pragma Env QSG_RHI_BACKEND=opengl
+// //@ pragma Env QSG_RHI_BACKEND=vulkan
 //
 // Flags: gpu-rasterization + ignore-gpu-blocklist keep the hardware path;
 // zero-copy shares GPU buffers (the very DMA-BUF path that failed under ANGLE-
@@ -52,7 +52,8 @@
 // (its lifecycle is tied to the websearch toggle in LauncherWindow.qml
 // -- see proxyOptIn; run `hcproxy disable` to strip the flag and stop the
 // launcher managing it).
-//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--enable-gpu-rasterization --ignore-gpu-blocklist --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --renderer-process-limit=2 --proxy-server=http://127.0.0.1:8888
+//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS=--enable-gpu-rasterization --ignore-gpu-blocklist --num-raster-threads=1 --renderer-process-limit=1 --disable-site-isolation-trials --disk-cache-size=1 --media-cache-size=1 --disable-gpu-shader-disk-cache --disable-background-newtworking --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --proxy-server=http://127.0.0.1:8888 
+// --use-gl=angle --use-angle=gl
 // (If CDP forensics are ever needed again: re-add
 //  //@ pragma Env QTWEBENGINE_REMOTE_DEBUGGING=9223 and use bar/scripts/webtest/.)
 
@@ -67,23 +68,6 @@
 // straight from Mesa to stderr (not a Qt category) so QT_LOGGING_RULES cannot
 // filter them; they are harmless and unrelated to the GL compositing path.
 //@ pragma Env QT_LOGGING_RULES=*.debug=false;qt.svg.enabled=false;qt.qpa.services.enabled=false;scene.enabled=false
-
-// VA-API video-decode driver. This Ivy Bridge iGPU is only driven by the
-// classic "i965" backend; without a hint Chromium/VA-API probes the newer
-// iHD driver first, which fails to init on Gen7 and spams
-// "libva error: /usr/lib/dri/iHD_drv_video.so init failed". Pinning i965
-// (confirmed present via vainfo) selects the working driver and silences it.
-// //@ pragma Env LIBVA_DRIVER_NAME=i965
-
-// ── glibc heap-arena cap (RSS / thread-count trim) ──────────────────────────
-// A long-lived, many-threaded process gets one malloc arena per competing thread
-// up to 8 * CPU-cores; each arena reserves its own heap, so idle arenas show up
-// as resident memory and as kernel-side per-arena bookkeeping. Capping arenas at
-// 4 makes glibc funnel allocations onto fewer heaps that are reused instead of
-// growing, lowering steady-state RSS of this process (Qt/QML + quickshell; the
-// Chromium child processes manage their own allocators). Pure allocator tuning --
-// no functional or rendering change.
-//@ pragma Env MALLOC_ARENA_MAX=4
 
 // ── Thread-count trim (QML scene graph + Mesa) ─────────────────────────────
 // Two knobs that cut 10 idle threads from this process with no functional
@@ -107,7 +91,6 @@
 //  ~23 "qs:gdrv0" threads are Mesa per-context threaded drivers — one per
 //  live QQuickWindow's EGL context — and are the price of the GL backend
 //  unless the launcher is split into a separate qs process.
-// //@ pragma Env GALLIUM_THREADPOOL=0
 
 pragma ComponentBehavior: Bound
 
