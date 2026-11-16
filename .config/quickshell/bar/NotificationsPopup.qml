@@ -243,7 +243,7 @@ Item {
                                 width:22;height:22;radius:6
                                 color: toastLinkH.containsMouse ? Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.25) : "transparent"
                                 Behavior on color { ColorAnimation{duration:80} }
-                                Text { anchors.centerIn:parent; text:"󰑋"; font.pixelSize:11; font.family:Config.fontFamily
+                                Text { anchors.centerIn:parent; text:"󰖟"; font.pixelSize:11; font.family:Config.fontFamily
                                     color: toastLinkH.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar }
                                 MouseArea { id:toastLinkH; anchors.fill:parent; hoverEnabled:true; cursorShape:Qt.PointingHandCursor
                                     onClicked: NotificationsState.openUrl(notif) }
@@ -701,7 +701,7 @@ Item {
                                         width:18;height:18;radius:5; Layout.alignment: Qt.AlignVCenter
                                         color: hcLinkH.containsMouse ? Qt.rgba(Theme.cPrimary.r,Theme.cPrimary.g,Theme.cPrimary.b,0.25) : "transparent"
                                         Behavior on color { ColorAnimation { duration: 80 } }
-                                        Text { anchors.centerIn: parent; text: "󰑋"; font.pixelSize: 9; font.family: Config.fontFamily
+                                        Text { anchors.centerIn: parent; text: "󰖟"; font.pixelSize: 9; font.family: Config.fontFamily
                                             color: hcLinkH.containsMouse ? Theme.cPrimary : Theme.cOnSurfVar; opacity: 0.8 }
                                         MouseArea { id:hcLinkH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
                                             onClicked: NotificationsState.openUrl(notif) } }
