@@ -489,7 +489,7 @@ Item {
         }
     }
     Timer {
-        interval: 5000; repeat: true; running: true; triggeredOnStart: true
+        interval: 1000; repeat: true; running: true; triggeredOnStart: true
         onTriggered: { if (!candylockLockProbe.running) candylockLockProbe.running = true }
     }
 
@@ -504,21 +504,26 @@ Item {
         Component.onCompleted: { if (ns._mayRunNotifDaemon()) running = true }
         onRunningChanged: {
             if (running) return
+            if (!candylockLockProbe.running) candylockLockProbe.running = true
             if (!ns._mayRunNotifDaemon()) return
             notifDaemonRestartTimer.restart()
         }
     }
     Timer { id: notifDaemonRestartTimer; interval: 3000; repeat: false
         onTriggered: {
+            if (!candylockLockProbe.running) candylockLockProbe.running = true
             if (!notifDaemonProc.running && ns._mayRunNotifDaemon())
                 notifDaemonProc.running = true
         }
     }
     on_CandylockNotifLockChanged: {
-        if (ns._candylockNotifLock && notifDaemonProc.running)
-            notifDaemonProc.running = false
-        else if (!ns._candylockNotifLock && !notifDaemonProc.running)
+        if (ns._candylockNotifLock) {
+            notifDaemonRestartTimer.stop()
+            if (notifDaemonProc.running)
+                notifDaemonProc.running = false
+        } else if (!ns._candylockNotifLock && !notifDaemonProc.running) {
             notifDaemonRestartTimer.restart()
+        }
     }
 
     // Volume OSD — pactl subscribe; grouped toast + history badge like notify-send.

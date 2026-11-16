@@ -442,6 +442,7 @@ def _poll_mpris(notif_service):
     global _last_media_key
     _player_cache: dict = {}
     _consecutive_errors = 0
+    _consecutive_not_playing = 0
     while True:
         time.sleep(3)
         try:
@@ -469,17 +470,17 @@ def _poll_mpris(notif_service):
                     break
 
             if not playing_line:
-                # No player is actively Playing right now. If every line is
-                # Paused/Stopped we clear the key so the next resume triggers
-                # a fresh notification. If there are no lines at all (no
-                # players), also clear.
-                if not lines or all(
-                    ln.startswith("Paused\t") or ln.startswith("Stopped\t")
-                    for ln in lines if ln.strip()
-                ):
-                    _last_media_key = ""
-                # Otherwise (e.g. empty metadata mid-track), preserve the key.
+                _consecutive_not_playing += 1
+                # Require at least 2 consecutive non-playing polls (6s) before clearing
+                # to prevent momentary playerctl hiccups/track switching gaps from re-toasting.
+                if _consecutive_not_playing >= 2:
+                    if not lines or all(
+                        ln.startswith("Paused\t") or ln.startswith("Stopped\t")
+                        for ln in lines if ln.strip()
+                    ):
+                        _last_media_key = ""
                 continue
+            _consecutive_not_playing = 0
             parts = playing_line.split("\t")
             if len(parts) < 5:
                 continue

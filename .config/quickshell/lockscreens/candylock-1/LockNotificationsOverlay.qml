@@ -56,6 +56,7 @@ Item {
     property var notifications: []
     property var history: []
     property int _nextId: 1
+    property string _lastMediaToastKey: ""
 
     z: 15
 
@@ -69,7 +70,12 @@ Item {
     }
     function clearHistory() { overlay.history = [] }
 
-    function _groupKey(n) { return (n.appName || "") + "|" + (n.summary || "") }
+    function _groupKey(n) {
+        const cat = n.category || ""
+        if (cat === "system.volume") return "system.volume"
+        if (cat === "media.playing") return "media.playing"
+        return (n.appName || "") + "|" + (n.summary || "")
+    }
 
     Process {
         id: actionInvokerProc
@@ -136,16 +142,25 @@ Item {
         }, obj)
         n.groupKey = overlay._groupKey(n)
 
+        const isMedia = n.category === "media.playing"
+        const mediaKey = isMedia ? ((n.appName || "") + "|" + (n.summary || "") + "|" + (n.body || "")) : ""
+
         if (!overlay.dndEnabled || n.isPrompt || n.urgency >= 2) {
-            const q = overlay.notifications.slice()
-            const ei = q.findIndex(function(x) { return x.groupKey === n.groupKey && !x.isPrompt })
-            if (ei >= 0 && !n.isPrompt) {
-                n.count = (q[ei].count || 1) + 1
-                q.splice(ei, 1)
+            const shouldToast = !isMedia || (mediaKey !== overlay._lastMediaToastKey)
+            if (shouldToast) {
+                if (isMedia) {
+                    overlay._lastMediaToastKey = mediaKey
+                }
+                const q = overlay.notifications.slice()
+                const ei = q.findIndex(function(x) { return x.groupKey === n.groupKey && !x.isPrompt })
+                if (ei >= 0 && !n.isPrompt) {
+                    n.count = (q[ei].count || 1) + 1
+                    q.splice(ei, 1)
+                }
+                q.unshift(n)
+                if (q.length > 6) q.pop()
+                overlay.notifications = q
             }
-            q.unshift(n)
-            if (q.length > 6) q.pop()
-            overlay.notifications = q
         }
 
         if (!n.isPrompt) {
@@ -204,7 +219,7 @@ Item {
             "touch /tmp/candylock-notif.lock 2>/dev/null; " +
             "pkill -f notify-daemon.py 2>/dev/null; sleep 0.3"]
         running: false
-        onExited: { if (!notifDaemonProc.running) notifDaemonProc.running = true }
+        onExited: { if (!overlay.previewMode && !notifDaemonProc.running) notifDaemonProc.running = true }
     }
 
     Process {
@@ -219,12 +234,12 @@ Item {
             }
         }
         Component.onCompleted: if (!overlay.previewMode) notifHandoffProc.running = true
-        onRunningChanged: if (!running) notifDaemonRestart.restart()
+        onRunningChanged: if (!running && !overlay.previewMode) notifDaemonRestart.restart()
     }
     Timer {
         id: notifDaemonRestart
         interval: 3000; repeat: false
-        onTriggered: { if (!notifDaemonProc.running) notifDaemonProc.running = true }
+        onTriggered: { if (!overlay.previewMode && !notifDaemonProc.running) notifDaemonProc.running = true }
     }
 
     Timer {

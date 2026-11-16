@@ -199,7 +199,8 @@ ShellRoot {
         id: monitorReaper
         running: true
         command: ["bash", "-c",
-            "while [ -e /proc/" + Quickshell.processId + " ]; do sleep 2; done; " +
+            "while [ -e /proc/" + Quickshell.processId + " ]; do sleep 1; done; " +
+            "rm -f /tmp/candylock-notif.lock 2>/dev/null; " +
             "kill -TERM -" + Quickshell.processId + " 2>/dev/null"]
     }
 
@@ -1010,6 +1011,7 @@ ShellRoot {
 
                 LockNotificationsOverlay {
                     id: lockNotif
+                    previewMode: root._preview
                     anchors.fill: parent
                     wallpaperPath: root.wallpaperPath
                     cOnSecondary: root.cOnSecondary
