@@ -846,10 +846,6 @@ QtObject {
     readonly property int mediaFontSize: mediaInfoFontSize
 
     // ── Palette colors ───────────────────────────────────────────────────
-    //  glyphColor  → all NF glyphs (ws dots, cava, generic icons)
-    //  textColor   → info text (time, date, weather value, battery %)
-    //  activeColor → active workspace, accent highlights
-    //  dimColor    → empty workspaces, secondary info
     readonly property color glyphColor:  Theme.cWc10 // Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 1.00)
     readonly property color textColor:   Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
     readonly property color activeColor: Config.glyphColor
@@ -971,7 +967,7 @@ QtObject {
     property bool   wsSeparators  // show glyph separator between buttons
     property string wsSeparatorGlyph
     property real   wsSeparatorOpacity
-    readonly property color wsSeparatorColor: Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, wsSeparatorOpacity)
+    readonly property color wsSeparatorColor: Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, wsSeparatorOpacity)
     property int    wsSeparatorSize    // px — font size of the separator glyph
     property int    wsSeparatorPadLeft     // px — space between left ws button and separator
     property int    wsSeparatorPadRight     // px — space between separator and right ws button

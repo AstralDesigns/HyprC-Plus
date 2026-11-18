@@ -29,7 +29,7 @@ Item {
     }
 
     readonly property color _color: {
-        if (_dnd)           return Config.dimColor
+        if (_dnd)           return Theme.cSurfaceTint
         if (_count > 0)     return Config.glyphColor
         return Config.glyphColor
     }
