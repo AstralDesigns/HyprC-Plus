@@ -673,11 +673,11 @@ def _lsblk_devices() -> list[dict]:
     """Return relevant block-device partitions from lsblk JSON output.
 
     Filters out loop, swap, and system-only partitions (/boot, /home, /,
-    [SWAP]) so only user-facing drives appear in the UI.
+    [SWAP], /var/tmp, etc.) so only user-facing drives appear in the UI.
     """
     try:
         result = subprocess.run(
-            ["lsblk", "-J", "-o", "NAME,LABEL,FSTYPE,MOUNTPOINT,SIZE,TYPE,HOTPLUG,PATH"],
+            ["lsblk", "-J", "-o", "NAME,LABEL,FSTYPE,MOUNTPOINTS,MOUNTPOINT,SIZE,TYPE,HOTPLUG,PATH"],
             capture_output=True, text=True, timeout=5
         )
         if result.returncode != 0:
@@ -686,7 +686,10 @@ def _lsblk_devices() -> list[dict]:
     except Exception:
         return []
 
-    SYSTEM_MOUNTS = {"/", "/boot", "/home", "/boot/efi", "[SWAP]"}
+    SYSTEM_MOUNTS = {
+        "/", "/boot", "/home", "/boot/efi", "/root", "/srv",
+        "/var", "/var/tmp", "/var/log", "/var/cache", "/tmp", "[SWAP]"
+    }
 
     devices: list[dict] = []
     for disk in data.get("blockdevices", []):
@@ -700,8 +703,14 @@ def _lsblk_devices() -> list[dict]:
             if part.get("type") == "loop":
                 continue
             fstype = part.get("fstype") or ""
-            mountpoint = part.get("mountpoint") or ""
-            if fstype == "swap" or (mountpoint and mountpoint in SYSTEM_MOUNTS):
+            # Gather all mountpoints (lsblk returns array in mountpoints, or string in mountpoint)
+            raw_mps = part.get("mountpoints") or []
+            if not raw_mps and part.get("mountpoint"):
+                raw_mps = [part.get("mountpoint")]
+            mps = [str(m).strip() for m in raw_mps if m and str(m).strip()]
+
+            # Skip partitions that have swap or are mounted to system paths (or subvolumes of /var)
+            if fstype == "swap" or any(m in SYSTEM_MOUNTS or m.startswith("/var/") for m in mps):
                 continue
             # Skip partitions with no filesystem (unformatted/extended)
             if not fstype:
@@ -711,7 +720,7 @@ def _lsblk_devices() -> list[dict]:
                 "name":       pname,
                 "label":      part.get("label") or pname,
                 "fstype":     fstype,
-                "mountpoint": mountpoint or None,
+                "mountpoint": mps[0] if mps else None,
                 "size":       part.get("size", ""),
                 "hotplug":    bool(disk.get("hotplug") or part.get("hotplug")),
                 "path":       part.get("path") or f"/dev/{pname}",

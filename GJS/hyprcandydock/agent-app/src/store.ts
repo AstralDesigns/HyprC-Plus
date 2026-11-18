@@ -617,6 +617,9 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     byokLicenseKey: typeof parsed.byokLicenseKey === 'string' ? parsed.byokLicenseKey : '',
     byokLicenseInstanceId: typeof parsed.byokLicenseInstanceId === 'string' ? parsed.byokLicenseInstanceId : '',
     licenseLastActiveAt: typeof parsed.licenseLastActiveAt === 'number' ? parsed.licenseLastActiveAt : 0,
+    currentPath: (parsed.currentPath && parsed.currentPath !== '/var/tmp' && !parsed.currentPath.startsWith('/var/tmp/'))
+      ? parsed.currentPath
+      : defaultState.currentPath,
   };
 }
 
@@ -1991,9 +1994,13 @@ export const storeActions = {
     try {
       const path = currentState.currentPath;
       const items = await bridge.listDirectory(path);
-      const filtered = currentState.showDotfiles
+      const filtered = (currentState.showDotfiles
         ? items
-        : items.filter(i => !i.name.startsWith('.'));
+        : items.filter(i => !i.name.startsWith('.'))
+      ).filter(i => {
+        if (path === '/var' && i.name === 'tmp') return false;
+        return true;
+      });
       const sorted: FileSystemItem[] = filtered.map(i => ({
         name: i.name,
         path: `${path.replace(/\/$/, '')}/${i.name}`,

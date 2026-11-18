@@ -54,6 +54,7 @@ const StorageStrip: React.FC<{ onNavigate: (mp: string) => void }> = ({ onNaviga
   const [devices, setDevices] = useState<StorageDevice[]>([]);
   const [contextMenu, setContextMenu] = useState<{ device: StorageDevice; x: number; y: number } | null>(null);
   const [mounting, setMounting] = useState<string | null>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
 
   const fetchDevices = useCallback(async () => {
     try {
@@ -68,6 +69,43 @@ const StorageStrip: React.FC<{ onNavigate: (mp: string) => void }> = ({ onNaviga
     const id = setInterval(fetchDevices, 4000);
     return () => clearInterval(id);
   }, [fetchDevices]);
+
+  // Filter out system partitions and internal subvolumes like /var/tmp or /
+  const visibleDevices = useMemo(() => {
+    return devices.filter(dev => {
+      const mp = (dev.mountpoint || '').replace(/\/+$/, '');
+      if (
+        mp === '/var/tmp' ||
+        mp === '/tmp' ||
+        mp.startsWith('/var/tmp/') ||
+        mp.startsWith('/var/') ||
+        mp === '/home' ||
+        mp === '/boot' ||
+        mp === '/boot/efi' ||
+        mp === '/root' ||
+        mp === '/srv' ||
+        (mp === '' && (dev.name === 'sda2' || dev.path?.includes('sda2')))
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [devices]);
+
+  // Enable smooth horizontal scrolling via vertical mouse wheel
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth) return;
+      const delta = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (!delta) return;
+      e.preventDefault();
+      el.scrollLeft += delta;
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [visibleDevices]);
 
   // Close context menu on outside press, blur, or Escape (matching tab-context-menu)
   useEffect(() => {
@@ -119,11 +157,11 @@ const StorageStrip: React.FC<{ onNavigate: (mp: string) => void }> = ({ onNaviga
     }
   };
 
-  if (devices.length === 0) return null;
+  if (visibleDevices.length === 0) return null;
 
   return (
-    <div className="storage-strip">
-      {devices.map(dev => {
+    <div className="storage-strip" ref={stripRef}>
+      {visibleDevices.map(dev => {
         const isMounted  = !!dev.mountpoint;
         const isExternal = dev.hotplug;
         const isBusy     = mounting === dev.name;
@@ -602,6 +640,8 @@ export const Sidebar: React.FC = () => {
 
   // Filtered files for Files mode
   const filteredFiles = store.directoryContent.filter(item => {
+    // Filter out /var/tmp in Files mode
+    if (item.path === '/var/tmp' || (store.currentPath === '/var' && item.name === 'tmp')) return false;
     if (!filterSearch.trim()) return true;
     return item.name.toLowerCase().includes(filterSearch.toLowerCase());
   });

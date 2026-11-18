@@ -1048,6 +1048,17 @@ ShellRoot {
                     width:520
                     height:panelCol.implicitHeight+45
 
+                    readonly property point scenePos: {
+                        let ix = 0, iy = 0;
+                        let it = centerPanel;
+                        while (it && it !== uiRoot) {
+                            ix += it.x;
+                            iy += it.y;
+                            it = it.parent;
+                        }
+                        return Qt.point(ix, iy);
+                    }
+
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         maskEnabled:      true
@@ -1069,7 +1080,7 @@ ShellRoot {
                         layer.effect: MultiEffect { blurEnabled:true; blur:1.0; blurMax:64 }
                         layer.smooth: true
                         AnimatedImage {
-                            x: -centerPanel.x; y: -centerPanel.y
+                            x: -centerPanel.scenePos.x; y: -centerPanel.scenePos.y
                             width: uiRoot.width; height: uiRoot.height
                             source: root.wallpaperPath?"file://"+root.wallpaperPath:""
                             fillMode:Image.PreserveAspectCrop; smooth:true; playing:true; cache:true
@@ -1907,7 +1918,7 @@ ShellRoot {
                     anchors.left: parent.left
                     anchors.margins: 24
                     width: 48; height: 48
-                    z: 20
+                    z: 31
 
                     Rectangle {
                         id: notifMask
@@ -1978,7 +1989,7 @@ ShellRoot {
                     anchors.right: parent.right
                     anchors.margins: 24
                     width: 48; height: 48
-                    z: 20
+                    z: 31
 
                     Rectangle {
                         id: batMask
@@ -2036,6 +2047,16 @@ ShellRoot {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.dialsVisible = !root.dialsVisible
                     }
+                }
+
+                // ── Click away backdrop to close system monitor popup ─────────
+                MouseArea {
+                    id: dialsClickAway
+                    anchors.fill: parent
+                    z: 29
+                    visible: root.dialsVisible
+                    enabled: root.dialsVisible
+                    onClicked: root.dialsVisible = false
                 }
 
                 // ── Dials popup — blurred card toggled from top-right button ─

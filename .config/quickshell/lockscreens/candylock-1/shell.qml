@@ -1057,40 +1057,6 @@ ShellRoot {
                     width: panelCol.implicitWidth
                     height:panelCol.implicitHeight+34
 
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        maskEnabled:      true
-                        maskSource:       roundMask
-                        maskThresholdMin: 0.5
-                        maskSpreadAtMin:  1.0
-                    }
-
-                    Rectangle {
-                        id: roundMask
-                        anchors.fill: parent
-                        radius: 32; color: "white"; opacity: 0
-                        layer.enabled: true
-                    }
-
-                    Item {
-                        anchors.fill:parent
-                        visible: false
-                        layer.enabled: wallImg.visible
-                        layer.effect: MultiEffect { blurEnabled:true; blur:1.0; blurMax:64 }
-                        AnimatedImage {
-                            x: -centerPanel.x; y: -centerPanel.y
-                            width: uiRoot.width; height: uiRoot.height
-                            source: root.wallpaperPath?"file://"+root.wallpaperPath:""
-                            fillMode:Image.PreserveAspectCrop; smooth:true; playing:true; cache:true
-                            visible: root.wallpaperPath!==""
-                        }
-                    }
-
-                    Rectangle {
-                        anchors.fill:parent; radius:32; color: "transparent"
-                        border.width:0; border.color: "transparent"
-                    }
-
                     ColumnLayout {
                         id:panelCol
                         anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; margins:24 }
@@ -1326,13 +1292,14 @@ ShellRoot {
                                     Item {
                                         id: weatherForm
                                         Layout.alignment: Qt.AlignHCenter
-                                        Layout.preferredWidth: weatherContentRow.implicitWidth + 48
-                                        Layout.preferredHeight: weatherContentRow.implicitHeight + 48
+                                        Layout.preferredWidth: weatherCard.width + 20
+                                        Layout.preferredHeight: weatherCard.height + 20
                                         GlassForm { anchors.fill: parent; radius: 30; wallpaper: root.wallpaperPath; tintColor: root.cInvPrimary; bg: uiRoot }
                                         Rectangle {
                                             id: weatherCard
-                                            anchors.fill: parent
-                                            anchors.margins: 10
+                                            anchors.centerIn: parent
+                                            width: weatherContentRow.implicitWidth + 28
+                                            height: weatherContentRow.implicitHeight + 28
                                             radius: 20
                                             color: root.cCardWarm
                                             border.width: 1
@@ -1340,8 +1307,7 @@ ShellRoot {
 
                                     RowLayout {
                                         id: weatherContentRow
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.centerIn: parent
                                         spacing: 6
 
                                         ColumnLayout {
@@ -1440,34 +1406,16 @@ ShellRoot {
                                 Layout.preferredWidth: mediaCard.width + 20
                                 Layout.preferredHeight: mediaCard.height + 20
                                 GlassForm { anchors.fill: parent; radius: 30; wallpaper: root.wallpaperPath; tintColor: root.cInvPrimary; bg: uiRoot }
-                                Item {
+                                Rectangle {
                                     id: mediaCard
                                     anchors.centerIn: parent
                                     width: mediaCardRow.implicitWidth + 28
                                     height: mediaCardRow.implicitHeight + 28
-
-                                    layer.enabled: true
-                                    layer.effect: MultiEffect {
-                                        maskEnabled:      true
-                                        maskSource:       mediaCardMask
-                                        maskThresholdMin: 0.5
-                                        maskSpreadAtMin:  1.0
-                                    }
-
-                                    Rectangle {
-                                        id: mediaCardMask
-                                        anchors.fill: parent
-                                        radius: 20
-                                        color: "white"
-                                        opacity: 0
-                                        layer.enabled: true
-                                    }
-
-                                    // Base card background
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        radius: 20; color: root.cCardWarm
-                                    }
+                                    radius: 20
+                                    color: root.cCardWarm
+                                    border.width: 1
+                                    border.color: Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b, 0.42)
+                                    clip: true
 
                                     // Blurred album art background + 0.15 InversePrimary tint (margins 10, radius 16)
                                     Item {
@@ -1519,13 +1467,6 @@ ShellRoot {
                                             radius: 16
                                             color: Qt.rgba(root.cInvPrimary.r, root.cInvPrimary.g, root.cInvPrimary.b, 0.3)
                                         }
-                                    }
-
-                                    // Card border
-                                    Rectangle {
-                                        anchors.fill: parent
-                                        radius: 20; color: "transparent"
-                                        border.width: 1; border.color: Qt.rgba(root.cOutline.r, root.cOutline.g, root.cOutline.b,0.42)
                                     }
 
                                     // ── LEFT: info + progress + controls ───────────────
@@ -1894,7 +1835,7 @@ ShellRoot {
                     anchors.left: parent.left
                     anchors.margins: 24
                     width: 48; height: 48
-                    z: 20
+                    z: 31
 
                     Rectangle {
                         id: notifMask
@@ -1965,7 +1906,7 @@ ShellRoot {
                     anchors.right: parent.right
                     anchors.margins: 24
                     width: 48; height: 48
-                    z: 20
+                    z: 31
 
                     Rectangle {
                         id: batMask
@@ -2023,6 +1964,16 @@ ShellRoot {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.dialsVisible = !root.dialsVisible
                     }
+                }
+
+                // ── Click away backdrop to close system monitor popup ─────────
+                MouseArea {
+                    id: dialsClickAway
+                    anchors.fill: parent
+                    z: 29
+                    visible: root.dialsVisible
+                    enabled: root.dialsVisible
+                    onClicked: root.dialsVisible = false
                 }
 
                 // ── Dials popup — blurred card toggled from top-right button ─

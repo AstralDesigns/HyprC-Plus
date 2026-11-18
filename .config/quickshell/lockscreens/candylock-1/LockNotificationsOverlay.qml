@@ -650,6 +650,16 @@ Item {
         }
     }
 
+    // ── Click away to close notification history ─────────────────────────────
+    MouseArea {
+        id: histClickAway
+        anchors.fill: parent
+        z: 1
+        visible: overlay.historyVisible
+        enabled: overlay.historyVisible
+        onClicked: overlay.historyVisible = false
+    }
+
     // ── History panel ───────────────────────────────────────────────────────
     Item {
         id: histHost

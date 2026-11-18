@@ -514,8 +514,8 @@ Pane {
                     }
 
                     // Password field — minimal sugar-candy sizing; text/dots
-                    // centred across the field with the key icon pinned left and
-                    // the reveal toggle right.
+                    // centred across the field with the reveal toggle pinned left and
+                    // the circular submit arrow button pinned right.
                     Rectangle {
                         Layout.alignment: Qt.AlignHCenter
                         Layout.preferredWidth: 240
@@ -527,7 +527,7 @@ Pane {
 
                         TextInput {
                             id: pwdField
-                            anchors { fill: parent; leftMargin: 26; rightMargin: 26 }
+                            anchors { fill: parent; leftMargin: 32; rightMargin: 32 }
                             horizontalAlignment: TextInput.AlignHCenter
                             verticalAlignment: TextInput.AlignVCenter
                             color: root.colText
@@ -538,19 +538,13 @@ Pane {
                             selectedTextColor: theme.cOnPrimary
                             onAccepted: root.doLogin()
                         }
-                        Text {
-                            anchors { left: parent.left; leftMargin: 9; verticalCenter: parent.verticalCenter }
-                            text: "\u{F030B}"
-                            font.family: root.iconFont
-                            font.pixelSize: 13
-                            color: theme.cWc5
-                            opacity: 0.85
-                        }
+
+                        // Password reveal toggle on the left (replaces key icon)
                         Rectangle {
                             id: revealBtn
                             property bool on: false
-                            anchors { right: parent.right; rightMargin: 5; verticalCenter: parent.verticalCenter }
-                            width: 22; height: 22; radius: 11
+                            anchors { left: parent.left; leftMargin: 5; verticalCenter: parent.verticalCenter }
+                            width: 24; height: 24; radius: 12
                             color: revealHov.containsMouse ? theme.hoverTint : "transparent"
                             Text {
                                 anchors.centerIn: parent
@@ -567,6 +561,37 @@ Pane {
                                 onClicked: revealBtn.on = !revealBtn.on
                             }
                         }
+
+                        // Circular login button on the right
+                        Rectangle {
+                            id: loginBtn
+                            anchors { right: parent.right; rightMargin: 4; verticalCenter: parent.verticalCenter }
+                            width: 26; height: 26; radius: 13
+                            readonly property bool enabledLogin:
+                                config.AllowEmptyPassword === "true" || pwdField.text.length > 0
+                            color: Qt.rgba(theme.cOnPrimary.r, theme.cOnPrimary.g, theme.cOnPrimary.b,
+                                           enabledLogin ? (loginHov.containsMouse ? 0.85 : 0.5) : 0.35)
+                            border.width: 1
+                            border.color: theme.outlineSoft
+                            Behavior on color { ColorAnimation { duration: 120 } }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "\u{F0054}"
+                                color: theme.cSurfaceTint
+                                font.family: root.iconFont
+                                font.pixelSize: 13
+                                opacity: loginBtn.enabledLogin ? 1.0 : 0.5
+                            }
+                            MouseArea {
+                                id: loginHov
+                                anchors.fill: parent; hoverEnabled: true
+                                enabled: loginBtn.enabledLogin
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: root.doLogin()
+                            }
+                        }
+
                         Text {
                             anchors.centerIn: pwdField
                             visible: !pwdField.text && !pwdField.activeFocus
@@ -598,40 +623,6 @@ Pane {
                             font.family: root.labelFont
                             font.pixelSize: 12
                             opacity: 0.9
-                        }
-                    }
-
-                    // Login button — pill (radius 99), dark OnPrimary backdrop whose
-                    // alpha rises 0.35→0.5→0.85 (empty / typed / hover); SurfaceTint label.
-                    Rectangle {
-                        id: loginBtn
-                        Layout.alignment: Qt.AlignHCenter
-                        Layout.preferredWidth: 120
-                        Layout.topMargin: 2
-                        height: 30
-                        radius: 99
-                        readonly property bool enabledLogin:
-                            config.AllowEmptyPassword === "true" || pwdField.text.length > 0
-                        color: Qt.rgba(theme.cOnPrimary.r, theme.cOnPrimary.g, theme.cOnPrimary.b,
-                                       enabledLogin ? (loginHov.containsMouse ? 0.85 : 0.5) : 0.35)
-                        border.width: 1
-                        border.color: theme.outlineSoft
-                        Behavior on color { ColorAnimation { duration: 120 } }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "Login"
-                            color: theme.cSurfaceTint
-                            font.family: root.labelFont
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                        }
-                        MouseArea {
-                            id: loginHov
-                            anchors.fill: parent; hoverEnabled: true
-                            enabled: loginBtn.enabledLogin
-                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                            onClicked: root.doLogin()
                         }
                     }
 

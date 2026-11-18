@@ -1,10 +1,10 @@
-// GlassForm.qml — a reusable frosted-glass panel for the candylock-1 lockscreen.
+// GlassForm.qml — a reusable frosted-glass panel for the candylock lockscreens.
 //
 // Renders a rounded rect that blurs the wallpaper region behind it (offset to the
 // item's scene position) and tints it with the theme's inverse-primary, matching
 // the frosted look the single centerPanel used to provide — but now per card.
 //
-// Usage:  GlassForm { anchors.fill: parent; radius: 30; wallpaper: root.wallpaperPath; tintColor: root.cInvPrimary }
+// Usage:  GlassForm { anchors.fill: parent; radius: 30; wallpaper: root.wallpaperPath; tintColor: root.cInvPrimary; bg: uiRoot }
 import QtQuick
 import QtQuick.Effects
 import Quickshell
@@ -22,6 +22,18 @@ Item {
     readonly property size _screen: Quickshell.primaryScreen
         ? Qt.size(Quickshell.primaryScreen.geometry.width, Quickshell.primaryScreen.geometry.height)
         : Qt.size(1280, 800)
+
+    // Reactive scene offset relative to `bg` (uiRoot)
+    readonly property point scenePos: {
+        let ix = 0, iy = 0;
+        let it = glass;
+        while (it && it !== bg) {
+            ix += it.x;
+            iy += it.y;
+            it = it.parent;
+        }
+        return Qt.point(ix, iy);
+    }
 
     // Clip the blurred wallpaper + tint to the rounded form.
     layer.enabled: true
@@ -46,20 +58,21 @@ Item {
     // bg-sized wallpaper Image overflows inside it, offset to the form's position
     // in `bg`, so every part of the form samples real wallpaper with no edge falloff.
     Item {
+        id: blurItem
         anchors.fill: parent
         anchors.margins: -80          // oversize so the form edges sit inside the blurred layer (no falloff)
         layer.enabled: true
         layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
         layer.smooth: true
-        Image {
-            readonly property point _o: parent.mapToItem(bg || parent, 0, 0)
-            x: -_o.x
-            y: -_o.y
+        AnimatedImage {
+            x: -(glass.scenePos.x - 80)
+            y: -(glass.scenePos.y - 80)
             width:  bg ? bg.width  : glass._screen.width
             height: bg ? bg.height : glass._screen.height
             source: glass.wallpaper !== "" ? ("file://" + glass.wallpaper) : ""
             fillMode: Image.PreserveAspectCrop
             smooth: true
+            playing: true
             cache: true
         }
     }
