@@ -35,21 +35,12 @@ Item {
         return Qt.point(ix, iy);
     }
 
-    // Clip the blurred wallpaper + tint to the rounded form.
-    layer.enabled: true
-    layer.effect: MultiEffect {
-        maskEnabled:      true
-        maskSource:       glassMask
-        maskThresholdMin: 0.5
-        maskSpreadAtMin:  1.0
-    }
-
     Rectangle {
         id: glassMask
         anchors.fill: parent
         radius: glass.radius
         color: "white"
-        opacity: 0
+        visible: false
         layer.enabled: true
     }
 
@@ -65,10 +56,10 @@ Item {
         layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
         layer.smooth: true
         AnimatedImage {
-            x: -(glass.scenePos.x - 80)
-            y: -(glass.scenePos.y - 80)
-            width:  bg ? bg.width  : glass._screen.width
-            height: bg ? bg.height : glass._screen.height
+            x: Math.min(0, -(glass.scenePos.x - 80))
+            y: Math.min(0, -(glass.scenePos.y - 80))
+            width:  (bg ? bg.width  : glass._screen.width) + 160
+            height: (bg ? bg.height : glass._screen.height) + 160
             source: glass.wallpaper !== "" ? ("file://" + glass.wallpaper) : ""
             fillMode: Image.PreserveAspectCrop
             smooth: true
@@ -82,5 +73,14 @@ Item {
         anchors.fill: parent
         radius: glass.radius
         color: Qt.rgba(glass.tintColor.r, glass.tintColor.g, glass.tintColor.b, glass.tintAlpha)
+    }
+
+    // Clip the blurred wallpaper + tint to the rounded form.
+    layer.enabled: true
+    layer.effect: MultiEffect {
+        maskEnabled:      true
+        maskSource:       glassMask
+        maskThresholdMin: 0.5
+        maskSpreadAtMin:  1.0
     }
 }

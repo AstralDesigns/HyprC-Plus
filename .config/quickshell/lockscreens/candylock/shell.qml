@@ -1059,38 +1059,40 @@ ShellRoot {
                         return Qt.point(ix, iy);
                     }
 
-                    layer.enabled: true
-                    layer.effect: MultiEffect {
-                        maskEnabled:      true
-                        maskSource:       roundMask
-                        maskThresholdMin: 0.5
-                        maskSpreadAtMin:  1.0
-                    }
-
                     Rectangle {
                         id: roundMask
                         anchors.fill: parent
-                        radius: 32; color: "white"; opacity: 0
+                        radius: 32; color: "white"; visible: false
                         layer.enabled: true
                     }
 
                     Item {
-                        anchors.fill:parent
+                        anchors.fill: parent
+                        anchors.margins: -80
                         layer.enabled: wallImg.visible
-                        layer.effect: MultiEffect { blurEnabled:true; blur:1.0; blurMax:64 }
+                        layer.effect: MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 64 }
                         layer.smooth: true
                         AnimatedImage {
-                            x: -centerPanel.scenePos.x; y: -centerPanel.scenePos.y
-                            width: uiRoot.width; height: uiRoot.height
-                            source: root.wallpaperPath?"file://"+root.wallpaperPath:""
-                            fillMode:Image.PreserveAspectCrop; smooth:true; playing:true; cache:true
-                            visible: root.wallpaperPath!==""
+                            x: Math.min(0, -(centerPanel.scenePos.x - 80))
+                            y: Math.min(0, -(centerPanel.scenePos.y - 80))
+                            width: uiRoot.width + 160; height: uiRoot.height + 160
+                            source: root.wallpaperPath ? "file://" + root.wallpaperPath : ""
+                            fillMode: Image.PreserveAspectCrop; smooth: true; playing: true; cache: true
+                            visible: root.wallpaperPath !== ""
                         }
                     }
 
                     Rectangle {
                         anchors.fill:parent; radius:32; color:root.cPanel
                         border.width:1; border.color:Qt.rgba(root.cOutVar.r,root.cOutVar.g,root.cOutVar.b,0.1)
+                    }
+
+                    layer.enabled: true
+                    layer.effect: MultiEffect {
+                        maskEnabled:      true
+                        maskSource:       roundMask
+                        maskThresholdMin: 0.5
+                        maskSpreadAtMin:  1.0
                     }
 
                     ColumnLayout {
