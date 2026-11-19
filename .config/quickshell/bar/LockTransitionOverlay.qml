@@ -50,7 +50,7 @@ Variants {
                     text: "󰳌"
                     font.family: "Symbols Nerd Font Mono"
                     font.pixelSize: 200
-                    color: Theme.cWc13
+                    color: Theme.cWc11
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
 
