@@ -967,7 +967,7 @@ QtObject {
     property bool   wsSeparators  // show glyph separator between buttons
     property string wsSeparatorGlyph
     property real   wsSeparatorOpacity
-    readonly property color wsSeparatorColor: Qt.rgba(Theme.cWc10.r, Theme.cWc10.g, Theme.cWc10.b, wsSeparatorOpacity)
+    readonly property color wsSeparatorColor: Qt.rgba(Theme.cWc13.r, Theme.cWc13.g, Theme.cWc13.b, wsSeparatorOpacity)
     property int    wsSeparatorSize    // px — font size of the separator glyph
     property int    wsSeparatorPadLeft     // px — space between left ws button and separator
     property int    wsSeparatorPadRight     // px — space between separator and right ws button
@@ -1011,13 +1011,13 @@ QtObject {
     property string cavaStyle
 
     readonly property var cavaStyleMap: ({
-        "dots":           "⣀⣄⣤⣦⣶⣷⣿⣿",
-        "bars":           "▁▂▃▄▅▆▇█",
-        "braille_fill":   "⠂⠃⠇⡇⣇⣧⣷⣿",
-        "braille_hollow": "⠂⠂⠃⠃⡃⡇⡇⣇",
-        "blocks":         "░░▒▒▓▓██",
-        "thin_bars":      "⡀⡄⡆⡇⣇⣧⣷⣿",
-        "braille_soft":   "⣀⣀⣄⣤⣦⣶⣷⣿", // smooth flowing braille ramp
+        //"dots":     "⣀⣄⣤⣦⣶⣷⣿⣿",
+        //"bars":     "▁▂▃▄▅▆▇█",
+        "+mirror.": "⠂⠃⠇⡇⣇⣧⣷⣿",
+        "-mirror.": "⠂⠂⠃⠃⡃⡇⡇⣇",
+        "blocks":   "░░▒▒▓▓██",
+        "-dots":    "⡀⡄⡆⡇⣇⣧⣷⣿",
+        "+dots":    "⣀⣀⣄⣤⣦⣶⣷⣿",
     })
 
     //  Canvas paint styles - keys are the picker labels, values the onPaint

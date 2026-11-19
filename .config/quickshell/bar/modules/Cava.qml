@@ -23,9 +23,11 @@ Item {
     readonly property bool _procShouldRun: Config.showCava && root._mediaActive
     readonly property int  _cavaFramerate: 60
 
+    readonly property int _asciiGlyphSize: Math.max(Config.glyphSize, Math.round(Config.moduleHeight * 0.76))
+
     implicitWidth: {
         if (_autoHideActive && !_mediaActive) return 0
-        return _sizer.advanceWidth + Config.modPadH * 2
+        return _sizer.advanceWidth
     }
     implicitHeight: Config.moduleHeight
 
@@ -38,11 +40,12 @@ Item {
     // (the ascii path keeps using _text). Populated every cava frame in onRead.
     property var    _bands:  []
 
-    // Value range cava emits: paint mode asks for a finer 0..200 ramp; ascii
-    // derives it from the glyph-count of the active preset (as before).
-    readonly property int _maxRange: Config.cavaIsPaint
-        ? 200
-        : Math.max(1, Math.floor((Config.cavaEffectiveBars.length - 1) * 1.5))
+    // Value range cava emits: fixed 0..200 normalized ramp for all styles.
+    // ASCII styles map 0..200 to their glyph ramps via scaling in onRead,
+    // and Canvas paint styles use v / 200 directly.
+    // Because the range is constant, cava NEVER needs to restart when changing or
+    // reapplying styles.
+    readonly property int _maxRange: 200
 
     // colour -> CSS rgba string for the Canvas 2D context (Canvas can't take a
     // QML color directly). `mul` optionally scales alpha (used for the fill).
@@ -146,24 +149,28 @@ Item {
     Timer { id: crashRestartTimer; interval: 2000; repeat: false
         onTriggered: if (root._procShouldRun && !cavaProc.running) cavaProc.running = true }
 
+
     Connections {
         target: Config
         function onCavaWidthChanged() {
+            // Changing bar count alters the cava config [general] bars count,
+            // which requires recreating the pipe/process.
             if (!cavaProc.running) return
             root._intentionalRestart = true
             cavaProc.running = false
         }
         function onCavaStyleChanged() {
-            if (!cavaProc.running) return
-            root._intentionalRestart = true
-            cavaProc.running = false
+            // Style change is purely visual (selecting ASCII glyphs or Canvas painter).
+            // Do NOT stop or restart cavaProc — keeps playback completely smooth without interruption.
+            if (waveCanvas.visible) waveCanvas.requestPaint()
         }
     }
 
+
     TextMetrics {
         id: _sizer
-        font.family:    Config.fontFamily
-        font.pixelSize: Config.glyphSize
+        font.family:        Config.fontFamily
+        font.pixelSize:     root._asciiGlyphSize
         font.letterSpacing: Config.cavaBarSpacing
         text: {
             const b  = Config.cavaEffectiveBars
@@ -205,13 +212,23 @@ Item {
 
     Item {
         id: cavaLabelRoot
-        anchors.centerIn: parent
-        width:  _sizer.advanceWidth
-        height: Config.glyphSize
+        visible: !Config.cavaIsPaint
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: -Math.round(_sizer.descent * 0.5)
+        height: _sizer.height
+
+        layer.enabled: true
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: cavaPaintMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1.0
+        }
 
         Text {
             id: cavaTop
-            visible: !Config.cavaIsPaint
             anchors.top: parent.top
             width: parent.width
             height: parent.height * Config.cavaGradientSplit
@@ -219,15 +236,15 @@ Item {
             text: cavaProc.running ? root._text : _sizer.text
             topPadding: Config.cavaStyle === "bars" ? -2 : 0
             color: root._colorTop
-            font.family:      Config.fontFamily
-            font.pixelSize:   Config.glyphSize
+            font.family:        Config.fontFamily
+            font.pixelSize:     root._asciiGlyphSize
             font.letterSpacing: Config.cavaBarSpacing
+            horizontalAlignment: Text.AlignHCenter
             Behavior on color { ColorAnimation { duration: 300 } }
         }
 
         Text {
             id: cavaBot
-            visible: !Config.cavaIsPaint
             anchors.bottom: parent.bottom
             width:  parent.width
             height: parent.height * (1.0 - Config.cavaGradientSplit)
@@ -235,9 +252,10 @@ Item {
             text:   cavaProc.running ? root._text : _sizer.text
             topPadding: -(parent.height * Config.cavaGradientSplit) + (Config.cavaStyle === "bars" ? -2 : 0)
             color: Config.cavaGradientEnabled ? root._colorBot : root._colorTop
-            font.family:      Config.fontFamily
-            font.pixelSize:   Config.glyphSize
+            font.family:        Config.fontFamily
+            font.pixelSize:     root._asciiGlyphSize
             font.letterSpacing: Config.cavaBarSpacing
+            horizontalAlignment: Text.AlignHCenter
             Behavior on color { ColorAnimation { duration: 300 } }
         }
 
@@ -266,7 +284,7 @@ Item {
         id: waveCanvas
         anchors.fill: parent
         visible: Config.cavaIsPaint
-        renderStrategy: Canvas.Cooperative
+        renderStrategy: Canvas.Immediate
         layer.enabled: visible
         layer.effect: MultiEffect {
             maskEnabled: true
@@ -287,6 +305,7 @@ Item {
             function onModuleHeightChanged()         { if (waveCanvas.visible) waveCanvas.requestPaint() }
             function onIslandRadiusChanged()        { if (waveCanvas.visible) waveCanvas.requestPaint() }
             function onCavaGradientEnabledChanged() { if (waveCanvas.visible) waveCanvas.requestPaint() }
+            function onCavaGradientSplitChanged()   { if (waveCanvas.visible) waveCanvas.requestPaint() }
             function onCavaActiveOpacityChanged()   { if (waveCanvas.visible) waveCanvas.requestPaint() }
             function onCavaInactiveOpacityChanged() { if (waveCanvas.visible) waveCanvas.requestPaint() }
         }
@@ -308,7 +327,9 @@ Item {
                        c1: root._rgba(mirrored ? root._colorTop : root._colorBot),
                        thickness: Config.cavaWaveThickness,
                        smooth: Config.cavaWaveSmooth,
-                       idle: root._bands.length === 0 })
+                       idle: root._bands.length === 0,
+                       ratio: Config.cavaGradientSplit,
+                       mirrored: mirrored })
         }
     }
 

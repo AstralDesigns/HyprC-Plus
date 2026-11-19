@@ -677,6 +677,7 @@ ShellRoot {
     function deleteWallpaper(path) {
         if (!path) return
         deleteProc._path = path
+        deleteProc._savedY = gridView.contentY
         if (deleteProc.running) deleteProc.running = false
         Qt.callLater(function() { deleteProc.running = true })
     }
@@ -684,14 +685,24 @@ ShellRoot {
     Process {
         id: deleteProc
         property string _path: ""
+        property real _savedY: 0
         command: ["bash", "-c", "rm -f -- \"$1\"", "--", _path]
         onExited: function() {
+            const savedY = deleteProc._savedY
             const i = root.allWallpapers.indexOf(_path)
             if (i >= 0) root.allWallpapers.splice(i, 1)
             root.allWallpapers = root.allWallpapers.slice()
             if (root.currentWallpaper === _path) root.currentWallpaper = ""
             if (root.lightboxPath === _path) root.lightboxPath = ""
             root.applyFilter()
+            const maxY = Math.max(0, gridView.contentHeight - gridView.height)
+            gridView.contentY = Math.min(savedY, maxY)
+            gridView.returnToBounds()
+            Qt.callLater(function() {
+                const maxY2 = Math.max(0, gridView.contentHeight - gridView.height)
+                gridView.contentY = Math.min(savedY, maxY2)
+                gridView.returnToBounds()
+            })
         }
     }
 
@@ -1748,6 +1759,23 @@ ShellRoot {
                             rightMargin: leftMargin
                             model: root.filtered.length
 
+                            ScrollBar.vertical: ScrollBar {
+                                id: localGridScroll
+                                policy: (gridView.contentHeight > gridView.height) ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                                visible: gridView.contentHeight > gridView.height
+                                width: 6
+                                padding: 1
+                                contentItem: Rectangle {
+                                    implicitWidth: 4
+                                    radius: 2
+                                    color: localGridScroll.pressed ? root.cPrimary
+                                         : (localGridScroll.hovered ? Qt.lighter(root.cPrimary, 1.2)
+                                         : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45))
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+                                background: Rectangle { color: "transparent" }
+                            }
+
                             WheelHandler {
                                 onWheel: function(e) {
                                     root.moveFocus(e.angleDelta.y > 0 ? -1 : 1)
@@ -2016,6 +2044,23 @@ ShellRoot {
                             leftMargin: Math.floor((width - (cols * cellWidth)) / 2)
                             rightMargin: leftMargin
                             model: whModel
+
+                            ScrollBar.vertical: ScrollBar {
+                                id: whGridScroll
+                                policy: (whGridView.contentHeight > whGridView.height) ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                                visible: whGridView.contentHeight > whGridView.height
+                                width: 6
+                                padding: 1
+                                contentItem: Rectangle {
+                                    implicitWidth: 4
+                                    radius: 2
+                                    color: whGridScroll.pressed ? root.cPrimary
+                                         : (whGridScroll.hovered ? Qt.lighter(root.cPrimary, 1.2)
+                                         : Qt.rgba(root.cPrimary.r, root.cPrimary.g, root.cPrimary.b, 0.45))
+                                    Behavior on color { ColorAnimation { duration: 150 } }
+                                }
+                                background: Rectangle { color: "transparent" }
+                            }
 
                             // Pre-fetch about one row before the bottom so the next
                             // page is already in place as the user starts revealing

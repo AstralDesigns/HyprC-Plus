@@ -2446,7 +2446,10 @@ PanelWindow {
                                                             MouseArea {
                                                                 anchors.fill: parent
                                                                 cursorShape: Qt.PointingHandCursor
-                                                                onClicked: Config.cavaStyle = modelData
+                                                                onClicked: {
+                                                                    if (Config.cavaStyle !== modelData)
+                                                                        Config.cavaStyle = modelData
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -2459,7 +2462,7 @@ PanelWindow {
                                         CCToggle { label:"Smooth Curve"; value:Config.cavaWaveSmooth; onToggled:function(v){Config.cavaWaveSmooth=v} }
 
                                         CCSection { text: "Dimensions & Behavior" }
-                                        CCSlider { label:"Cava Width";   from:5;to:200;stepSize:1;   value:Config.cavaWidth;      onMoved:function(v){Config.cavaWidth=v} }
+                                        CCSlider { label:"Bar Count";   from:5;to:200;stepSize:1;   value:Config.cavaWidth;      onMoved:function(v){Config.cavaWidth=v} }
                                         CCSlider { label:"Bar Spacing"; from:0;to:6;stepSize:0.5;decimals:1; value:Config.cavaBarSpacing; onMoved:function(v){Config.cavaBarSpacing=v} }
                                         CCSlider { label:"Active Opacity";  from:0;to:1;stepSize:0.05;decimals:2; value:Config.cavaActiveOpacity;  onMoved:function(v){Config.cavaActiveOpacity=v} }
                                         CCSlider { label:"Inactive Opacity";from:0;to:1;stepSize:0.05;decimals:2; value:Config.cavaInactiveOpacity;onMoved:function(v){Config.cavaInactiveOpacity=v} }
@@ -8439,9 +8442,26 @@ PanelWindow {
 
                 // Directory list
                 Flickable {
+                    id: wpSidebarFlickable
                     Layout.fillWidth: true; Layout.fillHeight: true
                     contentHeight: wpSidebarCol.implicitHeight
                     clip: true; boundsBehavior: Flickable.StopAtBounds
+                    ScrollBar.vertical: ScrollBar {
+                        id: wpSidebarScroll
+                        policy: (wpSidebarFlickable.contentHeight > wpSidebarFlickable.height) ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                        visible: wpSidebarFlickable.contentHeight > wpSidebarFlickable.height
+                        width: 6
+                        padding: 1
+                        contentItem: Rectangle {
+                            implicitWidth: 4
+                            radius: 2
+                            color: wpSidebarScroll.pressed ? Theme.cPrimary
+                                 : (wpSidebarScroll.hovered ? Qt.lighter(Theme.cPrimary, 1.2)
+                                 : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45))
+                            Behavior on color { ColorAnimation { duration: 150 } }
+                        }
+                        background: Rectangle { color: "transparent" }
+                    }
                     Column {
                         id: wpSidebarCol
                         width: parent.width; spacing: 2
@@ -8669,17 +8689,23 @@ PanelWindow {
 
                 // Thumbnail grid with clean scrollbar
                 Flickable {
+                    id: wpGridFlickable
                     Layout.fillWidth: true; Layout.fillHeight: true
                     contentWidth: width
                     contentHeight: wpGrid.implicitHeight + 12
                     clip: true; boundsBehavior: Flickable.StopAtBounds
                     ScrollBar.vertical: ScrollBar {
-                        policy: ScrollBar.AsNeeded
+                        id: wpGridScroll
+                        policy: (wpGridFlickable.contentHeight > wpGridFlickable.height) ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                        visible: wpGridFlickable.contentHeight > wpGridFlickable.height
                         width: 6
-                        padding: 4
+                        padding: 1
                         contentItem: Rectangle {
-                            implicitWidth: 3; radius: 2
-                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                            implicitWidth: 4
+                            radius: 2
+                            color: wpGridScroll.pressed ? Theme.cPrimary
+                                 : (wpGridScroll.hovered ? Qt.lighter(Theme.cPrimary, 1.2)
+                                 : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45))
                             Behavior on color { ColorAnimation { duration: 150 } }
                         }
                         background: Rectangle { color: "transparent" }
@@ -9573,12 +9599,30 @@ PanelWindow {
             }
 
             Flickable {
+                id: ccGalFlickable
                 visible: ccIconGalleryOverlay.activeTab === "folder"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                contentHeight: ccGalGrid.implicitHeight
+                contentHeight: ccGalGrid.implicitHeight + 12
                 boundsBehavior: Flickable.StopAtBounds
                 clip: true
+
+                ScrollBar.vertical: ScrollBar {
+                    id: ccGalScroll
+                    policy: (ccGalFlickable.contentHeight > ccGalFlickable.height) ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                    visible: ccGalFlickable.contentHeight > ccGalFlickable.height
+                    width: 6
+                    padding: 1
+                    contentItem: Rectangle {
+                        implicitWidth: 4
+                        radius: 2
+                        color: ccGalScroll.pressed ? Theme.cPrimary
+                             : (ccGalScroll.hovered ? Qt.lighter(Theme.cPrimary, 1.2)
+                             : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45))
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                    }
+                    background: Rectangle { color: "transparent" }
+                }
 
                 Grid {
                     id: ccGalGrid
@@ -9699,12 +9743,30 @@ PanelWindow {
 
             // ── Iconify results grid ──────────────────────────────────────
             Flickable {
+                id: ccIconFlickable
                 visible: ccIconGalleryOverlay.activeTab === "iconify"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                contentHeight: ccIconGrid.implicitHeight
+                contentHeight: ccIconGrid.implicitHeight + 12
                 boundsBehavior: Flickable.StopAtBounds
                 clip: true
+
+                ScrollBar.vertical: ScrollBar {
+                    id: ccIconScroll
+                    policy: (ccIconFlickable.contentHeight > ccIconFlickable.height) ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                    visible: ccIconFlickable.contentHeight > ccIconFlickable.height
+                    width: 6
+                    padding: 1
+                    contentItem: Rectangle {
+                        implicitWidth: 4
+                        radius: 2
+                        color: ccIconScroll.pressed ? Theme.cPrimary
+                             : (ccIconScroll.hovered ? Qt.lighter(Theme.cPrimary, 1.2)
+                             : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45))
+                        Behavior on color { ColorAnimation { duration: 150 } }
+                    }
+                    background: Rectangle { color: "transparent" }
+                }
 
                 Grid {
                     id: ccIconGrid

@@ -30,8 +30,26 @@ function test(n) {
 
 function _grad(ctx, w, o) {
     var g = ctx.createLinearGradient(0, 0, w, 0)
-    g.addColorStop(0, o.c0)
-    g.addColorStop(1, o.c1 || o.c0)
+    var c0 = o.c0
+    var c1 = o.c1 || o.c0
+    if (c0 === c1) {
+        g.addColorStop(0, c0)
+        g.addColorStop(1, c0)
+        return g
+    }
+    var r = (typeof o.ratio === "number" && !isNaN(o.ratio)) ? o.ratio : 0.5
+    r = Math.max(0.05, Math.min(0.95, r))
+    if (o.mirrored) r = 1.0 - r
+
+    // Soft transition window centered horizontally at ratio r
+    var d = 0.14
+    var p0 = Math.max(0, r - d)
+    var p1 = Math.min(1, r + d)
+
+    if (p0 > 0) g.addColorStop(0, c0)
+    g.addColorStop(p0, c0)
+    g.addColorStop(p1, c1)
+    if (p1 < 1) g.addColorStop(1, c1)
     return g
 }
 
@@ -62,11 +80,12 @@ function paint(ctx, style, bands, w, h, o) {
     var lw    = o.thickness > 0 ? o.thickness : 2
     var smooth = o.smooth !== false
 
-    var xs = [], yTop = [], yBot = []
+    var xs = [], yTop = [], yBot = [], yArea = []
     for (var i = 0; i < n; i++) {
         xs.push(i * step)
         yTop.push(mid - bands[i] * amp)
         yBot.push(mid + bands[i] * amp)
+        yArea.push(h - bands[i] * (h - lw))
     }
 
     var grad = _grad(ctx, w, o)
@@ -91,18 +110,17 @@ function paint(ctx, style, bands, w, h, o) {
             break
         }
         case "area": {
-            // filled silhouette rising from the baseline
+            // filled silhouette rising from the baseline with optional smooth curving
             ctx.beginPath()
-            ctx.moveTo(xs[0], h)
-            for (var i = 0; i < n; i++) ctx.lineTo(xs[i], h - bands[i] * (h - lw))
+            _trace(ctx, xs, yArea, smooth)
             ctx.lineTo(xs[n - 1], h)
+            ctx.lineTo(xs[0], h)
             ctx.closePath()
             ctx.globalAlpha = 0.35
             ctx.fill()
             ctx.globalAlpha = 1
             ctx.beginPath()
-            ctx.moveTo(xs[0], h - bands[0] * (h - lw))
-            for (var i = 1; i < n; i++) ctx.lineTo(xs[i], h - bands[i] * (h - lw))
+            _trace(ctx, xs, yArea, smooth)
             ctx.stroke()
             break
         }
