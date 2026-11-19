@@ -1158,7 +1158,7 @@ ShellRoot {
                                             opacity: 0.72
                                             font.capitalization: Font.AllUppercase
                                             font.letterSpacing: 2
-                                            font.family: "Symbols Nerd Font Mono"; font.pixelSize: 14
+                                            font.family: "C059"; font.pixelSize: 14
                                         }
                                         // ── separator: date above, user/PIN below ──
                                         Rectangle {

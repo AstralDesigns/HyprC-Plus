@@ -479,7 +479,7 @@ Pane {
                             Text {
                                 text: "\u{F0004}"
                                 font.family: root.iconFont
-                                font.pixelSize: 15
+                                font.pixelSize: 13
                                 color: theme.cWc3
                             }
                             Repeater {
@@ -491,7 +491,8 @@ Pane {
                                     text: name
                                     color: theme.cPrimary
                                     font.family: root.labelFont
-                                    font.pixelSize: 16
+                                    font.italic: true
+                                    font.pixelSize: 13
                                     font.weight: Font.DemiBold
                                 }
                             }
