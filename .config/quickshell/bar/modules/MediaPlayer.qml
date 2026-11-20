@@ -60,7 +60,7 @@ Item {
                             visible: MediaPlayerState.artPath === "" || artImage.status !== Image.Ready
                             anchors.centerIn: parent
                             text: "󰀥" // 󰀥 󰎆 󰎍 󰺕 󱥸 󱨧
-                            color: Theme.cWc12
+                            color: Theme.cWc13
                             opacity: 0.8
                             font.family: Config.fontFamily
                             font.pixelSize: MediaPlayerState.thumbSize - 2
@@ -165,7 +165,7 @@ Item {
                                         : (modelData.glyph || "")
                                     color: modelData.glyphplay !== undefined
                                         ? (ctlMa.containsMouse ? Config.textColor : Theme.cWc9)
-                                        : (ctlMa.containsMouse ? Config.textColor : Theme.cWc13)
+                                        : (ctlMa.containsMouse ? Config.textColor : Theme.cWc10)
                                     opacity: 0.8
                                     font.family:    Config.fontFamily
                                     font.pixelSize: Config.mediaGlyphSize
