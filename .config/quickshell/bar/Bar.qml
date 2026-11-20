@@ -539,7 +539,7 @@ PanelWindow {
     Connections {
         target: Config
         function onBarModeChanged() {
-            bar._ahEnabled = Config.barAutoHide && Config.barMode !== "tri"
+            bar._ahEnabled = Config.barAutoHide && Config.barMode !== "tri" && Config.barMode !== "shell"
             if (!bar._ahEnabled) {
                 _ahHideTimer.stop()
                 if (bar._ahHidden) { bar._ahHidden = false }
@@ -578,7 +578,7 @@ PanelWindow {
             updateBarVisibility()
         }
         function onBarAutoHideChanged() {
-            bar._ahEnabled = Config.barAutoHide && Config.barMode !== "tri"
+            bar._ahEnabled = Config.barAutoHide && Config.barMode !== "tri" && Config.barMode !== "shell"
             if (bar._ahEnabled) {
                 if (!bar._ahHidden && !bar.anyPanelOpen) _ahHideTimer.restart()
             } else {
@@ -604,7 +604,7 @@ PanelWindow {
         }
     }
     Component.onCompleted: {
-        bar._ahEnabled  = Config.barAutoHide && Config.barMode !== "tri"
+        bar._ahEnabled  = Config.barAutoHide && Config.barMode !== "tri" && Config.barMode !== "shell"
         bar._ahDelaySec = Config.barAutoHideDelay
         if (bar._ahEnabled) _ahHideTimer.restart()
         bar._shellModAhEnabled = Config.shellModuleAutoHide && Config.barMode === "shell"
