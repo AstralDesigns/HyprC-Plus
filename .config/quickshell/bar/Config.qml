@@ -846,7 +846,7 @@ QtObject {
     readonly property int mediaFontSize: mediaInfoFontSize
 
     // ── Palette colors ───────────────────────────────────────────────────
-    readonly property color glyphColor:  Theme.cWc12 // Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 1.00)
+    readonly property color glyphColor:  Qt.rgba(Theme.cSurfaceTint.r, Theme.cSurfaceTint.g, Theme.cSurfaceTint.b, 1.00) // Theme.cWc12 //
     readonly property color textColor:   Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 1.00)
     readonly property color activeColor: Config.glyphColor
     readonly property color dimColor:    Theme.cOnSurfVar
