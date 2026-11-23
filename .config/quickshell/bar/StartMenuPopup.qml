@@ -450,6 +450,7 @@ PanelWindow {
                                      + (StartMenuState.hotspotClients === 1 ? " device" : " devices")
                                      + " · click to turn off")
                                 : "Hotspot OFF — click to turn on")
+                        onTipTextChanged: if (hsH.containsMouse) BarTipState.refresh(hsBtn.tipText, hsBtn)
                         color: hsH.containsMouse ? Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.65) : Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.35)
                         border.width: 1
                         border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, StartMenuState.hotspotOn ? 0.9 : 0.55)

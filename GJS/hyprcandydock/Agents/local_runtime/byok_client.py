@@ -646,13 +646,18 @@ async def _stream_openai_compat(
         else:  # user
             clean_messages.append({"role": "user", "content": str(m.get("content") or "")})
 
-    payload = {
+    payload: dict[str, Any] = {
         "model": model,
         "messages": clean_messages,
         "stream": True,
         "temperature": 0.2,
-        "max_tokens": 8192,
+        "max_tokens": 16384,
     }
+    # OpenRouter native deep reasoning / extended thinking
+    if "openrouter" in base_url.lower():
+        payload["include_reasoning"] = True
+        payload["reasoning"] = {"effort": "high", "exclude": False}
+
     if tools_schema:
         payload["tools"] = tools_schema
         payload["tool_choice"] = "auto"
@@ -710,7 +715,8 @@ async def _stream_openai_compat(
                         # `reasoning_content`, OpenAI o-series `reasoning_summary_text`.
                         reasoning = (delta.get("reasoning")
                                      or delta.get("reasoning_content")
-                                     or delta.get("reasoning_summary_text"))
+                                     or delta.get("reasoning_summary_text")
+                                     or delta.get("thought"))
                         if reasoning:
                             yield {"type": "reasoning", "content": reasoning}
                         for tc_delta in delta.get("tool_calls") or []:

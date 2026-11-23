@@ -17,6 +17,7 @@ import { SelectionChip } from './SelectionChip';
 import { selectionRangeLabel, type SelectionRef } from '../utils/editorClipboard';
 import { agentEngine } from '../engine/agent-engine';
 import { ImageLightboxModal } from './ImageLightboxModal';
+import { PromptContextMenu } from './PromptContextMenu';
 
 /* ── Empty chat screen ──────────────────────────────────────────────── */
 const EmptyChatScreen: React.FC = () => (
@@ -948,7 +949,7 @@ export const ChatStream: React.FC = () => {
           <ChevronDown size={15} />
         </button>
       )}
-      <div ref={containerRef} className="chat-stream" style={{
+      <div ref={containerRef} className="chat-stream" onContextMenu={(e) => e.preventDefault()} style={{
         flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 14px',
         display: 'flex', flexDirection: 'column', gap: '4px',
       }}>
@@ -1015,6 +1016,7 @@ const UserBubble: React.FC<{
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(message.content);
   const [copied, setCopied] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [activeLightbox, setActiveLightbox] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editContainerRef = useRef<HTMLDivElement>(null);
@@ -1147,8 +1149,21 @@ const UserBubble: React.FC<{
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleResend(); }
               if (e.key === 'Escape') handleCancelEdit();
             }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setContextMenuPos({ x: e.clientX, y: e.clientY });
+            }}
             rows={3}
           />
+          {contextMenuPos && (
+            <PromptContextMenu
+              x={contextMenuPos.x}
+              y={contextMenuPos.y}
+              targetEl={textareaRef.current}
+              onClose={() => setContextMenuPos(null)}
+            />
+          )}
           <div className="user-bubble-edit-actions">
             <button className="bubble-edit-cancel" onClick={handleCancelEdit}>Cancel</button>
             <button className="bubble-edit-send" onClick={handleResend}>

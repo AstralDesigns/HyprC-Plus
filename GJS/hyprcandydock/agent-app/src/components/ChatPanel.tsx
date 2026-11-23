@@ -184,7 +184,7 @@ export const ChatPanel: React.FC = () => {
   };
 
   return (
-    <div className="chat-panel-inner" ref={panelRef}>
+    <div className="chat-panel-inner" ref={panelRef} onContextMenu={(e) => e.preventDefault()}>
       {/* Left resize handle */}
       <div className="resize-handle resize-handle-left" onMouseDown={startResize} />
 

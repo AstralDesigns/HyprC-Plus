@@ -437,7 +437,11 @@ Item {
         command: [sm._scriptDir + "/hotspot-toggle.sh", "count"]
         running: false
         stdout: SplitParser { splitMarker:"\n"; onRead: function(l){
-            const n = parseInt(l.trim(), 10); if (!isNaN(n)) sm.hotspotClients = n
+            const n = parseInt(l.trim(), 10);
+            if (!isNaN(n)) {
+                sm.hotspotClients = n
+                if (n > 0) sm.hotspotOn = true
+            }
         }}
     }
     Process { id: hotspotToggleProc
@@ -453,7 +457,8 @@ Item {
     // Re-query the station count (used when the hotspot tooltip is hovered so
     // the number is fresh, not just the value from the last menu open).
     function pollHotspotClients() {
-        if (sm.hotspotOn && !hotspotCountProc.running) hotspotCountProc.running = true
+        if (!hotspotStatusProc.running) hotspotStatusProc.running = true
+        if (!hotspotCountProc.running) hotspotCountProc.running = true
     }
 
     // Seamless band switch: a single-radio card cannot keep the AP up while the

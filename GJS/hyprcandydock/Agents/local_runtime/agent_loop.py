@@ -74,13 +74,14 @@ You have access to these tools (call them as JSON tool_calls):
 | task_complete     | Signal the ENTIRE task is fully done (required to end agentic loops) |
 
 ## Agentic Task Workflow (for multi-step tasks)
-1. **Plan first**: Call `todo_add` with a list of concrete subtasks. Include a mandatory **Verification** step as the final subtask before completion.
-2. **Work step by step**: For each subtask, call `todo_start`, do the work with tools, then call `todo_done`.
-3. **Read before writing**: For any task touching multiple files, spend the first step(s) reading ALL relevant files with `read_file` / `list_directory` to build a complete picture of the codebase before making any edits. Partial knowledge leads to incomplete or conflicting changes — a targeted read-first pass is almost always faster than fixing mistakes made with incomplete context.
-4. **Inspect before editing**: Always `read_file` before `write_file` on existing files.
-5. **Mandatory Verification**: Never finish a task without actively verifying your changes! (See Verification Methodology below).
-6. **Complete properly**: Only call `task_complete` once ALL subtasks are done and verified. Include a dedicated `### Verification` section in your summary.
-7. **Capture durable learnings first**: Immediately before `task_complete` (at the end of the turn), reflect on the work and, whenever you judge it worthwhile — without the user having to ask — `save_memory` any durable fact and update/`delete_memory` anything now stale (see the Memory rule below).
+1. **Uninhibited Thinking & Autonomous Flow**: Deeply think through the task, analyze documents, and reason through code changes. Do not wait for intermediate user confirmation: call tools directly alongside and following your thoughts in a continuous, uninterrupted flow.
+2. **Plan first**: Call `todo_add` with a list of concrete subtasks. Include a mandatory **Verification** step as the final subtask before completion.
+3. **Work step by step**: For each subtask, call `todo_start`, do the work with tools, then call `todo_done`.
+4. **Read before writing**: For any task touching multiple files, spend the first step(s) reading ALL relevant files with `read_file` / `list_directory` to build a complete picture of the codebase before making any edits. Partial knowledge leads to incomplete or conflicting changes — a targeted read-first pass is almost always faster than fixing mistakes made with incomplete context.
+5. **Inspect before editing**: Always `read_file` before `write_file` on existing files.
+6. **Mandatory Verification**: Never finish a task without actively verifying your changes! (See Verification Methodology below).
+7. **Complete properly**: Only call `task_complete` once ALL subtasks are done and verified. Include a dedicated `### Verification` section in your summary.
+8. **Capture durable learnings first**: Immediately before `task_complete` (at the end of the turn), reflect on the work and, whenever you judge it worthwhile — without the user having to ask — `save_memory` any durable fact and update/`delete_memory` anything now stale (see the Memory rule below).
 
 ## Verification Methodology (MANDATORY Before Calling task_complete)
 Always verify your implementation based on the project type:
@@ -537,10 +538,38 @@ async def run_agentic_turn(
         # ── LLM call ─────────────────────────────────────────────────────────
         assistant_text = ""
         pending_calls: list[dict] = []
+        in_thought_tag = False
 
         async for event in backend_fn(_prune_working_memory(working)):
             if event["type"] == "token":
                 token = event["content"]
+                
+                # Intercept inline <thought> or <thinking> tags from models that output thinking in text
+                lower_token = token.lower()
+                if not in_thought_tag:
+                    if "<thought>" in lower_token or "<thinking>" in lower_token:
+                        in_thought_tag = True
+                        parts = re.split(r"<thought>|<thinking>", token, flags=re.IGNORECASE, maxsplit=1)
+                        if parts[0]:
+                            assistant_text += parts[0]
+                            yield {"type": "token", "data": parts[0]}
+                        if len(parts) > 1 and parts[1]:
+                            yield {"type": "reasoning", "data": {"text": parts[1]}}
+                        continue
+                else:
+                    if "</thought>" in lower_token or "</thinking>" in lower_token:
+                        in_thought_tag = False
+                        parts = re.split(r"</thought>|</thinking>", token, flags=re.IGNORECASE, maxsplit=1)
+                        if parts[0]:
+                            yield {"type": "reasoning", "data": {"text": parts[0]}}
+                        if len(parts) > 1 and parts[1]:
+                            assistant_text += parts[1]
+                            yield {"type": "token", "data": parts[1]}
+                        continue
+                    else:
+                        yield {"type": "reasoning", "data": {"text": token}}
+                        continue
+
                 assistant_text += token
                 # Suppress tool_call XML from visible stream
                 open_idx = assistant_text.find("<tool_call>")
@@ -591,34 +620,33 @@ async def run_agentic_turn(
 
         if not unique_calls:
             # If this is a conversational exchange (no prior tool use and no pending tasks)
-            # treat it as a final answer. Otherwise the model forgot to call task_complete —
-            # inject a steering nudge so the loop continues rather than closing prematurely.
-            #
-            # NOTE: We check both native tool_calls messages AND tool-result messages
-            # (role="tool") so that inline-XML tool calls — which are committed to working
-            # as plain assistant content without a tool_calls key — are still detected.
-            # We also track the flag persistently across iterations via `had_tool_use`.
+            # treat it as a final answer.
             if not had_tool_use:
                 had_tool_use = any(
                     (m.get("role") == "assistant" and m.get("tool_calls")) or
                     m.get("role") == "tool"
                     for m in working
                 )
-            if not had_tool_use:
-                # Pure Q&A turn — no tools were ever called, fine to end here
+            if not had_tool_use and not todo.has_pending():
+                # Pure Q&A turn — no tools were ever called and no tasks pending, fine to end here
                 full_response = _strip_tool_call_text(assistant_text)
                 break
-            # Agentic turn that forgot to call task_complete — remind and continue
+
+            # Agentic turn that responded with text without calling tools or task_complete.
+            # Instead of injecting a synthetic 'user' message (which breaks the model's
+            # train of thought and feels like a human interruption), guide the agent
+            # via a system instruction so its internal processes continue seamlessly.
             full_response = _strip_tool_call_text(assistant_text)
             todo_status = todo.format() if todo.tasks else ""
             nudge = (
-                "You responded with text but did not call task_complete. "
-                "If the task is fully done and verified, call task_complete(summary=...) now. "
-                "If you need to do more work first, continue using tools."
+                "[Environment: Autonomous execution active. "
+                "If the task requires inspecting or modifying files, invoke the required tools. "
+                "If all planned work is finished and verified, invoke task_complete(summary=...) to finalize.]"
             )
             if todo_status:
-                nudge += f"\n\nCurrent todo list:\n{todo_status}"
-            working.append({"role": "user", "content": nudge})
+                nudge += f"\n\nCurrent todo status:\n{todo_status}"
+
+            working.append({"role": "system", "content": nudge})
             iteration += 1
             continue
 

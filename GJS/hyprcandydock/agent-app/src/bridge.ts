@@ -350,6 +350,27 @@ class AgentBridge {
     try { await navigator.clipboard?.writeText(text); return true; } catch { return false; }
   }
 
+  /**
+   * Read text from the system clipboard through the host (wl-paste).
+   * QtWebEngine blocks navigator.clipboard, so the launcher routes clipboard
+   * reads to the loopback server; falls back to navigator in the dev harness.
+   */
+  public async readFromClipboard(): Promise<string> {
+    if (this.hostReady) {
+      try {
+        const res: any = await this.postToHost('read_from_clipboard', {}, 5000);
+        return res?.text ?? '';
+      } catch (e) {
+        console.warn('[bridge] readFromClipboard failed:', e);
+      }
+    }
+    try {
+      return (await navigator.clipboard?.readText()) || '';
+    } catch {
+      return '';
+    }
+  }
+
   /** Batched mtime probe: returns { path: mtimeMs } (0 for missing paths). */
   public statFiles(paths: string[], dirs: string[] = []): Promise<Record<string, number>> {
     return this.postToHost('stat_files', { paths, dirs }, 8000);

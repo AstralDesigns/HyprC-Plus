@@ -4,6 +4,7 @@ import { useStore, setStore, storeActions, type AttachmentData } from '../store'
 import { agentEngine } from '../engine/agent-engine';
 import { bridge } from '../bridge';
 import { PendingFilesBar } from './PendingFilesBar';
+import { PromptContextMenu } from './PromptContextMenu';
 import {
   matchEditorCopy,
   serializeSelections,
@@ -20,6 +21,7 @@ export const Composer: React.FC = () => {
   const [store] = useStore();
   const [attachments, setAttachments] = useState<AttachmentData[]>([]);
   const [hasContent, setHasContent] = useState(false);
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   // SelectionRefs live here (keyed by chip id); the contenteditable holds only
   // the chip DOM nodes, so large snippets never round-trip through React state.
@@ -557,7 +559,7 @@ export const Composer: React.FC = () => {
       : 'Ask anything… (you can also paste screenshots from the clipboard)';
 
   return (
-    <div style={{ padding: '10px 12px 14px', background: 'transparent', flexShrink: 0 }}>
+    <div style={{ padding: '10px 12px 14px', background: 'transparent', flexShrink: 0 }} onContextMenu={(e) => e.preventDefault()}>
       <PendingFilesBar />
       {store.activeSuggestions && !store.activeSuggestions.questions?.length && store.activeSuggestions.options.length > 0 && (
         <div className="suggestion-block composer-suggestions">
@@ -578,7 +580,7 @@ export const Composer: React.FC = () => {
           </div>
         </div>
       )}
-      <div className="composer-wrap">
+      <div className="composer-wrap" onContextMenu={(e) => e.preventDefault()}>
         <div className="composer-input-row composer-editable-row">
           <div
             ref={editorRef}
@@ -591,6 +593,11 @@ export const Composer: React.FC = () => {
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             onBlur={updateHasContent}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setContextMenuPos({ x: e.clientX, y: e.clientY });
+            }}
           />
           {!hasContent && <div className="composer-placeholder">{placeholder}</div>}
         </div>
@@ -640,6 +647,15 @@ export const Composer: React.FC = () => {
           Enter to send · Shift+Enter for new line · Ctrl+↑/↓ prompt history · Esc to stop
         </span>
       </div>
+
+      {contextMenuPos && (
+        <PromptContextMenu
+          x={contextMenuPos.x}
+          y={contextMenuPos.y}
+          targetEl={editorRef.current}
+          onClose={() => setContextMenuPos(null)}
+        />
+      )}
     </div>
   );
 };

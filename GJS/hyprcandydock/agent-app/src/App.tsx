@@ -426,6 +426,7 @@ export const App: React.FC = () => {
                 if (store.sidebarVisible) storeActions.setSidebarVisible(false);
                 if (store.chatVisible) storeActions.setChatVisible(false);
               }}
+              onContextMenu={(e) => e.preventDefault()}
             />
           )}
 

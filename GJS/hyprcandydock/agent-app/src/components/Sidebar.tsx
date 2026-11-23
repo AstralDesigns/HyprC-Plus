@@ -263,6 +263,21 @@ export const Sidebar: React.FC = () => {
   // Folder the project tree should scroll to + flash after a search "jump to".
   const [revealPath, setRevealPath] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+
+  // Close context menu on outside press, blur, or Escape (matching StorageStrip & tab-context-menu)
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('pointerdown', close);
+    window.addEventListener('blur', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('pointerdown', close);
+      window.removeEventListener('blur', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [contextMenu]);
   const sidebarPanelRef = useRef<HTMLDivElement>(null);
   const projectTreeRef = useRef<HTMLDivElement>(null);
   const fileSearchInputRef = useRef<HTMLInputElement>(null);

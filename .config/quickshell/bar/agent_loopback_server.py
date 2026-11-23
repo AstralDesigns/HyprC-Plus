@@ -671,6 +671,21 @@ def handle_copy_to_clipboard(id_, payload):
     return {"id": id_, "type": "response", "error": "no clipboard helper (wl-copy/xclip/xsel)"}
 
 
+def handle_read_from_clipboard(id_, payload):
+    for cmd in (["wl-paste", "--no-newline"], ["xclip", "-selection", "clipboard", "-out"],
+                ["xsel", "--clipboard", "--output"]):
+        try:
+            p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=5)
+            if p.returncode == 0:
+                text = p.stdout.decode("utf-8", errors="replace")
+                return {"id": id_, "type": "response", "payload": {"text": text}}
+        except (FileNotFoundError, OSError):
+            continue
+        except Exception:  # noqa: BLE001
+            continue
+    return {"id": id_, "type": "response", "error": "no clipboard helper (wl-paste/xclip/xsel)"}
+
+
 # ── Filesystem change polling (external-edit auto-refresh) ─────────────────
 def handle_stat_files(id_, payload):
     """Return {path: mtime_ms} for every requested path (0 when missing).
@@ -904,6 +919,7 @@ ACTIONS = {
     "take_screenshot": handle_take_screenshot,
     "file_dialog": handle_file_dialog,
     "copy_to_clipboard": handle_copy_to_clipboard,
+    "read_from_clipboard": handle_read_from_clipboard,
     "stat_files": handle_stat_files,
     "search_files": handle_search_files,
     "watch_paths": handle_watch_paths,

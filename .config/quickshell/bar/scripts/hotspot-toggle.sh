@@ -31,7 +31,36 @@ fi
 CONF="$REALHOME/.config/hyprcandy/hotspot.conf"
 
 hotspot_status() {
-    [ -f "$STATE" ] && iw dev "$AP" info >/dev/null 2>&1 && echo on || echo off
+    local ap_iface=""
+    if iw dev "$AP" info >/dev/null 2>&1; then
+        ap_iface="$AP"
+    else
+        ap_iface=$(iw dev 2>/dev/null | awk '$1=="Interface"{iface=$2} $1=="type" && $2=="AP"{print iface; exit}')
+    fi
+
+    if [ -n "$ap_iface" ] || [ -f "$STATE" ]; then
+        echo on
+    else
+        echo off
+    fi
+}
+
+hotspot_count() {
+    local ap_iface=""
+    if iw dev "$AP" info >/dev/null 2>&1; then
+        ap_iface="$AP"
+    else
+        ap_iface=$(iw dev 2>/dev/null | awk '$1=="Interface"{iface=$2} $1=="type" && $2=="AP"{print iface; exit}')
+    fi
+
+    if [ -n "$ap_iface" ]; then
+        local cnt
+        cnt=$(iw dev "$ap_iface" station dump 2>/dev/null | grep -c '^Station' || true)
+        cnt=$(echo "$cnt" | head -n 1 | tr -dc '0-9')
+        echo "${cnt:-0}"
+    else
+        echo 0
+    fi
 }
 
 do_on() {
@@ -232,17 +261,10 @@ case "${1:-status}" in
         ;;
     toggle)
         [ "$(id -u)" = 0 ] || exec sudo -n "$0" toggle
-        if [ -f "$STATE" ] && iw dev "$AP" info >/dev/null 2>&1; then do_off; else do_on; fi
+        if iw dev "$AP" info >/dev/null 2>&1 || [ -f "$STATE" ]; then do_off; else do_on; fi
         ;;
     count)
-        # Number of associated stations on the AP. iw station dump needs root,
-        # so self-elevate like the mutation paths (covered by the sudo entry).
-        [ "$(id -u)" = 0 ] || exec sudo -n "$0" count
-        if [ -f "$STATE" ] && iw dev "$AP" info >/dev/null 2>&1; then
-            iw dev "$AP" station dump 2>/dev/null | grep -c '^Station'
-        else
-            echo 0
-        fi
+        hotspot_count
         ;;
     *)
         echo "usage: $0 {status|on|off|toggle|count}" >&2; exit 2
