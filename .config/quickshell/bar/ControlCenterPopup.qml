@@ -832,7 +832,7 @@ PanelWindow {
         property int activeTab: 1  // Default to Hyprland tab (index 1)
         property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
         property int activeKbSubTab:  0  // Remembered Keybinds sub-tab (0 = View, 1 = Edit)
-        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH, 3 = Keyboard, 4 = Hypridle)
+        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH, 3 = Keyboard, 4 = Hypridle, 5 = GitHub)
         property int activeGreetSubTab: 0  // Remembered Greeter sub-tab (0 = Themes, 1 = Edit)
     }
     Settings {
@@ -6144,7 +6144,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["Info", "Hotspot", "SSH", "Keyboard", "Hypridle"]
+                                    model: ["Info", "Hotspot", "SSH", "Keyboard", "Hypridle", "GitHub"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -7560,6 +7560,586 @@ PanelWindow {
                                                     ? Theme.cTertiary
                                                     : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.85)
                                                 font.family: Config.labelFont; font.pixelSize: 11
+                                                elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        Item { Layout.preferredHeight: 10 }
+                                    }
+                                }
+
+                                // ── GitHub sub-tab ──────────────────────────────────────────
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        id: gitTab
+                                        width: parent.width
+                                        spacing: 10
+
+                                        property string name: ""
+                                        property string email: ""
+                                        property string branch: ""
+                                        property string helper: ""
+                                        property string safedir: ""
+                                        property string editor: ""
+                                        property string ghUser: ""
+                                        property string rawContent: ""
+                                        property bool loaded: false
+                                        property bool dirty: false
+                                        property bool saving: false
+                                        property bool saved: false
+                                        property string statusText: ""
+                                        property bool isError: false
+                                        property bool showRaw: false
+
+                                        function save() {
+                                            gitTab.saving = true
+                                            gitTab.isError = false
+                                            gitTab.statusText = "Saving..."
+                                            gitWriteProc.command = [
+                                                "python3", ccWin.scriptDir + "/git-config.py", "set",
+                                                "--name",    gitNameTI.text.trim(),
+                                                "--email",   gitEmailTI.text.trim(),
+                                                "--branch",  gitBranchTI.text.trim(),
+                                                "--helper",  gitHelperTI.text.trim(),
+                                                "--safedir", gitSafeDirTI.text.trim(),
+                                                "--editor",  gitEditorTI.text.trim()
+                                            ]
+                                            gitWriteProc.running = true
+                                        }
+
+                                        // Reader process: parses TSV and raw ~/.gitconfig
+                                        Process {
+                                            id: gitReadProc
+                                            running: false
+                                            command: ["python3", ccWin.scriptDir + "/git-config.py", "get"]
+                                            property bool _inRaw: false
+                                            property var _rawLines: []
+                                            stdout: SplitParser {
+                                                splitMarker: "\n"
+                                                onRead: function(line) {
+                                                    if (gitReadProc._inRaw) {
+                                                        gitReadProc._rawLines.push(line)
+                                                        return
+                                                    }
+                                                    if (line === "RAW_START") {
+                                                        gitReadProc._inRaw = true
+                                                        return
+                                                    }
+                                                    if (line.startsWith("NAME\t"))       gitTab.name = line.slice(5)
+                                                    else if (line.startsWith("EMAIL\t"))  gitTab.email = line.slice(6)
+                                                    else if (line.startsWith("BRANCH\t")) gitTab.branch = line.slice(7)
+                                                    else if (line.startsWith("HELPER\t")) gitTab.helper = line.slice(7)
+                                                    else if (line.startsWith("SAFEDIR\t")) gitTab.safedir = line.slice(8)
+                                                    else if (line.startsWith("EDITOR\t")) gitTab.editor = line.slice(7)
+                                                    else if (line.startsWith("GH_USER\t")) gitTab.ghUser = line.slice(8)
+                                                }
+                                            }
+                                            onRunningChanged: {
+                                                if (running) {
+                                                    _inRaw = false
+                                                    _rawLines = []
+                                                }
+                                            }
+                                            onExited: {
+                                                gitTab.rawContent = _rawLines.join("\n")
+                                                gitNameTI.text    = gitTab.name
+                                                gitEmailTI.text   = gitTab.email
+                                                gitBranchTI.text  = gitTab.branch
+                                                gitHelperTI.text  = gitTab.helper
+                                                gitSafeDirTI.text = gitTab.safedir
+                                                gitEditorTI.text  = gitTab.editor
+                                                gitTab.loaded     = true
+                                                gitTab.dirty      = false
+                                                gitTab.statusText = ""
+                                            }
+                                        }
+
+                                        Process {
+                                            id: gitWriteProc
+                                            running: false
+                                            onExited: function(exitCode) {
+                                                gitTab.saving = false
+                                                if (exitCode === 0) {
+                                                    gitTab.saved = true
+                                                    gitTab.dirty = false
+                                                    gitTab.isError = false
+                                                    gitTab.statusText = "Saved to ~/.gitconfig"
+                                                    gitReadProc.running = true
+                                                } else {
+                                                    gitTab.isError = true
+                                                    gitTab.statusText = "Error saving git config"
+                                                }
+                                            }
+                                        }
+
+                                        Process {
+                                            id: gitEditExtProc
+                                            running: false
+                                            command: [
+                                                "setsid", "--fork", "bash", "-c",
+                                                "xdg-open \"$HOME/.gitconfig\" 2>/dev/null || kitty --class floating-installer --title '   ~/.gitconfig' -e nano \"$HOME/.gitconfig\""
+                                            ]
+                                            onExited: running = false
+                                        }
+
+                                        Process {
+                                            id: ghLoginProc
+                                            running: false
+                                            command: [
+                                                "setsid", "--fork", "kitty",
+                                                "--class", "floating-installer",
+                                                "--title", "   GitHub Login",
+                                                "-e", "gh", "auth", "login"
+                                            ]
+                                            onExited: {
+                                                running = false
+                                                gitReadProc.running = true
+                                            }
+                                        }
+
+                                        Process {
+                                            id: ghStatusProc
+                                            running: false
+                                            command: [
+                                                "setsid", "--fork", "kitty",
+                                                "--class", "floating-installer",
+                                                "--title", "   GitHub Account Manager",
+                                                "-e", Quickshell.env("HOME") + "/.config/quickshell/bar/scripts/gh-auth-menu.sh"
+                                            ]
+                                            onExited: {
+                                                running = false
+                                                gitReadProc.running = true
+                                            }
+                                        }
+
+                                        Connections {
+                                            target: sysSubStack
+                                            function onCurrentIndexChanged() {
+                                                if (sysSubStack.currentIndex === 5 && !gitTab.loaded && !gitReadProc.running)
+                                                    gitReadProc.running = true
+                                            }
+                                        }
+
+                                        Component.onCompleted: {
+                                            if (sysSubStack.currentIndex === 5 && !gitReadProc.running)
+                                                gitReadProc.running = true
+                                        }
+
+                                        // ── GitHub Account Banner ──
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 50
+                                            radius: 10
+                                            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
+                                            border.width: 1
+                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
+
+                                            RowLayout {
+                                                anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; leftMargin: 10; rightMargin: 10 }
+                                                spacing: 10
+
+                                                Text {
+                                                    Layout.alignment: Qt.AlignVCenter
+                                                    text: "\u{F09B}"
+                                                    color: Theme.cPrimary
+                                                    font.family: Config.fontFamily
+                                                    font.pixelSize: 22
+                                                }
+
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    Layout.alignment: Qt.AlignVCenter
+                                                    spacing: 2
+                                                    Text {
+                                                        text: "GitHub & Global Git Config"
+                                                        color: Theme.cPrimary
+                                                        font.family: Config.labelFont
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.DemiBold
+                                                    }
+                                                    Text {
+                                                        text: gitTab.ghUser !== ""
+                                                            ? ("Connected as @" + gitTab.ghUser + " (github.com)")
+                                                            : "Not logged in to GitHub CLI (gh)"
+                                                        color: gitTab.ghUser !== "" ? Theme.cOnSurf : Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.5)
+                                                        font.family: Config.labelFont
+                                                        font.pixelSize: 11
+                                                        elide: Text.ElideRight
+                                                    }
+                                                }
+
+                                                CCPillBtn {
+                                                    Layout.alignment: Qt.AlignVCenter
+                                                    text: gitTab.ghUser !== "" ? "Accounts" : "Login (gh)"
+                                                    active: true
+                                                    onClicked: {
+                                                        if (gitTab.ghUser !== "") ghStatusProc.running = true
+                                                        else ghLoginProc.running = true
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // ── User Identity ──
+                                        CCSection { text: "User Profile" }
+
+                                        // Name
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Name"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont
+                                                font.pixelSize: 13
+                                                Layout.preferredWidth: 100
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: gitNameTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: gitNameTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: { if (gitTab.loaded) { gitTab.dirty = true; gitTab.saved = false } }
+                                                    onAccepted: gitTab.save()
+                                                }
+                                                Text {
+                                                    visible: gitNameTI.text.length === 0 && !gitNameTI.activeFocus
+                                                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    text: "e.g. John Doe"
+                                                    color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.4)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+
+                                        // Email
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Email"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont
+                                                font.pixelSize: 13
+                                                Layout.preferredWidth: 100
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: gitEmailTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: gitEmailTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: { if (gitTab.loaded) { gitTab.dirty = true; gitTab.saved = false } }
+                                                    onAccepted: gitTab.save()
+                                                }
+                                                Text {
+                                                    visible: gitEmailTI.text.length === 0 && !gitEmailTI.activeFocus
+                                                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    text: "e.g. user@example.com"
+                                                    color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.4)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+
+                                        // ── Git Preferences ──
+                                        CCSection { text: "Git Preferences" }
+
+                                        // Default Branch
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Default Branch"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont
+                                                font.pixelSize: 13
+                                                Layout.preferredWidth: 100
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: gitBranchTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: gitBranchTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: { if (gitTab.loaded) { gitTab.dirty = true; gitTab.saved = false } }
+                                                    onAccepted: gitTab.save()
+                                                }
+                                                Text {
+                                                    visible: gitBranchTI.text.length === 0 && !gitBranchTI.activeFocus
+                                                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    text: "main (default)"
+                                                    color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.4)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+
+                                        // Credential Helper
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Credential Helper"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont
+                                                font.pixelSize: 13
+                                                Layout.preferredWidth: 100
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: gitHelperTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: gitHelperTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: { if (gitTab.loaded) { gitTab.dirty = true; gitTab.saved = false } }
+                                                    onAccepted: gitTab.save()
+                                                }
+                                                Text {
+                                                    visible: gitHelperTI.text.length === 0 && !gitHelperTI.activeFocus
+                                                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    text: "store / cache / oauth"
+                                                    color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.4)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+
+                                        // Safe Directory
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Safe Directory"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont
+                                                font.pixelSize: 13
+                                                Layout.preferredWidth: 100
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: gitSafeDirTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: gitSafeDirTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: { if (gitTab.loaded) { gitTab.dirty = true; gitTab.saved = false } }
+                                                    onAccepted: gitTab.save()
+                                                }
+                                                Text {
+                                                    visible: gitSafeDirTI.text.length === 0 && !gitSafeDirTI.activeFocus
+                                                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    text: "* (trust all) or /path"
+                                                    color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.4)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+
+                                        // Editor
+                                        RowLayout {
+                                            Layout.fillWidth: true; spacing: 8
+                                            Text {
+                                                text: "Editor"
+                                                color: Theme.cOnSurf
+                                                font.family: Config.labelFont
+                                                font.pixelSize: 13
+                                                Layout.preferredWidth: 100
+                                            }
+                                            Rectangle {
+                                                Layout.fillWidth: true; height: 30; radius: 7
+                                                color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.85)
+                                                border.width: 1
+                                                border.color: gitEditorTI.activeFocus
+                                                    ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.6)
+                                                    : Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.2)
+                                                Behavior on border.color { ColorAnimation { duration: 120 } }
+                                                TextInput {
+                                                    id: gitEditorTI
+                                                    anchors { fill: parent; margins: 6 }
+                                                    color: Theme.cPrimary
+                                                    selectionColor: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.10)
+                                                    selectedTextColor: Theme.cPrimary
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                    verticalAlignment: TextInput.AlignVCenter; clip: true
+                                                    onTextChanged: { if (gitTab.loaded) { gitTab.dirty = true; gitTab.saved = false } }
+                                                    onAccepted: gitTab.save()
+                                                }
+                                                Text {
+                                                    visible: gitEditorTI.text.length === 0 && !gitEditorTI.activeFocus
+                                                    anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                                                    text: "nano / vim / code / nvim"
+                                                    color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.4)
+                                                    font.family: Config.labelFont; font.pixelSize: 12
+                                                }
+                                            }
+                                        }
+
+                                        // ── Configuration File Preview ──
+                                        CCSection { text: "Configuration File" }
+
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: gitTab.showRaw ? 150 : 44
+                                            radius: 9
+                                            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
+                                            border.width: 1
+                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.18)
+                                            clip: true
+                                            Behavior on Layout.preferredHeight { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+
+                                            ColumnLayout {
+                                                anchors { fill: parent; leftMargin: 8; rightMargin: 8; topMargin: 7; bottomMargin: 7 }
+                                                spacing: 6
+
+                                                RowLayout {
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: 30
+                                                    spacing: 6
+
+                                                    Text {
+                                                        text: "\u{F013}"
+                                                        font.family: Config.fontFamily
+                                                        font.pixelSize: 12
+                                                        color: Theme.cPrimary
+                                                    }
+                                                    Text {
+                                                        Layout.fillWidth: true
+                                                        text: "~/.gitconfig"
+                                                        font.family: Config.fontFamily
+                                                        font.pixelSize: 11
+                                                        color: Theme.cPrimary
+                                                    }
+                                                    CCPillBtn {
+                                                        text: gitTab.showRaw ? "Collapse" : "Preview"
+                                                        onClicked: gitTab.showRaw = !gitTab.showRaw
+                                                    }
+                                                    CCPillBtn {
+                                                        text: "Open in Editor"
+                                                        onClicked: gitEditExtProc.running = true
+                                                    }
+                                                }
+
+                                                Flickable {
+                                                    id: gitRawFlick
+                                                    visible: gitTab.showRaw
+                                                    Layout.fillWidth: true
+                                                    Layout.fillHeight: true
+                                                    contentWidth: width
+                                                    contentHeight: gitRawText.implicitHeight + 10
+                                                    clip: true
+                                                    boundsBehavior: Flickable.StopAtBounds
+
+                                                    ScrollBar.vertical: ScrollBar {
+                                                        policy: (gitRawFlick.contentHeight > gitRawFlick.height) ? ScrollBar.AlwaysOn : ScrollBar.AlwaysOff
+                                                        visible: gitRawFlick.contentHeight > gitRawFlick.height
+                                                        width: 4
+                                                        padding: 1
+                                                        contentItem: Rectangle {
+                                                            implicitWidth: 3
+                                                            radius: 2
+                                                            color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.45)
+                                                        }
+                                                    }
+
+                                                    WheelHandler {
+                                                        target: null
+                                                        onWheel: function(e) {
+                                                            let maxScroll = Math.max(0, gitRawFlick.contentHeight - gitRawFlick.height)
+                                                            if (maxScroll > 0) {
+                                                                let delta = e.angleDelta.y !== 0 ? e.angleDelta.y : e.pixelDelta.y * 4
+                                                                gitRawFlick.contentY = Math.max(0, Math.min(maxScroll, gitRawFlick.contentY - delta))
+                                                            }
+                                                            e.accepted = true
+                                                        }
+                                                    }
+
+                                                    Text {
+                                                        id: gitRawText
+                                                        width: parent.width - 8
+                                                        text: gitTab.rawContent !== "" ? gitTab.rawContent : "# Empty ~/.gitconfig"
+                                                        font.family: "monospace"
+                                                        font.pixelSize: 11
+                                                        color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.85)
+                                                        wrapMode: Text.WrapAnywhere
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Item { Layout.preferredHeight: 4 }
+
+                                        // Action buttons & Status
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 8
+
+                                            CCPillBtn {
+                                                text: "Save"
+                                                active: gitTab.dirty && !gitTab.saving
+                                                onClicked: gitTab.save()
+                                            }
+
+                                            CCPillBtn {
+                                                text: "Reload"
+                                                onClicked: gitReadProc.running = true
+                                            }
+
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: gitTab.statusText !== ""
+                                                    ? gitTab.statusText
+                                                    : (gitTab.dirty ? "Unsaved changes" : "")
+                                                color: gitTab.isError
+                                                    ? Theme.cTertiary
+                                                    : (gitTab.dirty ? Theme.cPrimary : Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.65))
+                                                font.family: Config.labelFont
+                                                font.pixelSize: 11
                                                 elide: Text.ElideRight
                                             }
                                         }
