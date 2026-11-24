@@ -200,12 +200,71 @@ export const Composer: React.FC = () => {
     if (!prompt.trim() && attachments.length === 0 && refs.length === 0) return;
 
     // While a turn is running, a non-empty message steers it instead of
-    // starting a new turn. Attachments can't be steered, so ignore those here.
+    // starting a new turn. Attachments/context files/images are preserved and folded into the steer.
     if (store.agentRunning) {
-      const steerText = prompt.trim();
-      if (!steerText) return;
-      const ok = await agentEngine.steer(steerText);
-      if (ok) { clearEditor(); return; }
+      let steerText = prompt.trim();
+      const steerAttachments: AttachmentData[] = [];
+      const seenSteerPaths = new Set<string>();
+
+      for (const a of attachments) {
+        if (a.path && !seenSteerPaths.has(a.path)) {
+          seenSteerPaths.add(a.path);
+          steerAttachments.push(a);
+        }
+      }
+      for (const cf of store.contextFiles) {
+        if (cf.path && !seenSteerPaths.has(cf.path)) {
+          seenSteerPaths.add(cf.path);
+          steerAttachments.push({ path: cf.path, name: cf.name, kind: 'text' });
+        }
+      }
+      for (const ci of store.contextImages) {
+        if (!ci.path) continue;
+        const isBlobName = !ci.path.startsWith('/') && !ci.path.startsWith('data:') && !ci.path.startsWith('http');
+        if (isBlobName && ci.data && seenSteerPaths.has(ci.data)) continue;
+        const dedupeKey = isBlobName ? (ci.data || ci.path) : ci.path;
+        if (seenSteerPaths.has(dedupeKey)) continue;
+        seenSteerPaths.add(dedupeKey);
+        const attPath = isBlobName ? (ci.data || ci.path) : ci.path;
+        const attName = isBlobName ? ci.path : (ci.path.split('/').pop() || 'image');
+        steerAttachments.push({ path: attPath, name: attName, kind: 'image' });
+      }
+
+      // Read any attached text files to format inline context into the steer
+      if (steerAttachments.length > 0) {
+        const textContext = (await Promise.all(steerAttachments
+          .filter((att) => att.kind === 'text')
+          .map(async (att) => {
+            try {
+              const raw = await bridge.readFile(att.path);
+              const isTruncated = raw.length > 20000;
+              const content = isTruncated
+                ? raw.slice(0, 20000) + `\n\n[... Note: Attached file "${att.name}" is truncated at 20,000 characters ...]`
+                : raw;
+              return `\n\n[Attached file: ${att.name} (${att.path})]\n${content}\n[End attached file]`;
+            } catch (err: any) {
+              return `\n\n[Attached file: ${att.name} (${att.path}) - could not read: ${err?.message || err}]`;
+            }
+          }))).join('');
+
+        const imageList = steerAttachments
+          .filter((att) => att.kind === 'image')
+          .map((att) => att.path)
+          .join(', ');
+        const imageContext = imageList ? `\n\n[Attached images: ${imageList}]` : '';
+
+        steerText = (steerText ? steerText : 'Here is additional context:') + textContext + imageContext;
+      }
+
+      if (!steerText.trim()) return;
+
+      const ok = await agentEngine.steer(steerText.trim());
+      if (ok) {
+        clearEditor();
+        setAttachments([]);
+        setStore({ contextFiles: [], contextImages: [] });
+        return;
+      }
       // steer refused (task already finished) → fall through to a fresh send
     }
 

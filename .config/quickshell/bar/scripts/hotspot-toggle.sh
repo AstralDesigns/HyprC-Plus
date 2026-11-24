@@ -216,10 +216,13 @@ EOF
     iptables -C INPUT -i "$AP" -j ACCEPT 2>/dev/null || \
         iptables -I INPUT 1 -i "$AP" -j ACCEPT
 
-    pkill -f "dnsmasq -i $AP" 2>/dev/null
+    pkill -f "dnsmasq -i $AP" 2>/dev/null || true
     # DHCP-only (--port=0: systemd-resolved already owns :53); advertise the AP
     # as gateway + public DNS so clients resolve without a local resolver.
-    dnsmasq -i "$AP" --port=0 --no-resolv \
+    # --bind-interfaces ensures dnsmasq binds only to the AP interface/address
+    # instead of the wildcard DHCP socket (0.0.0.0:67), preventing conflicts with
+    # other services like libvirt dnsmasq (virbr0).
+    dnsmasq -i "$AP" --bind-interfaces --port=0 --no-resolv \
         --dhcp-range=10.42.0.50,10.42.0.250,12h \
         --dhcp-option=3,10.42.0.1 --dhcp-option=6,1.1.1.1,8.8.8.8 \
         --pid-file=/run/hyprcandy-hotspot.pid || {

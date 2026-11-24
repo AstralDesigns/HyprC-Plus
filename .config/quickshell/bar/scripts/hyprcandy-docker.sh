@@ -149,18 +149,8 @@ case "$ACTION" in
             exit 0
         fi
 
-        # If container exists but stopped, attempt start
-        if docker ps -a -q --filter name="$CONTAINER_NAME" 2>/dev/null | grep -q .; then
-            if docker start "$CONTAINER_NAME" >/dev/null 2>&1; then
-                sleep 0.5
-                if docker ps -q --filter name="$CONTAINER_NAME" --filter status=running 2>/dev/null | grep -q .; then
-                    echo "running"
-                    exit 0
-                fi
-            fi
-            # If docker start failed or exited, purge stale container so docker run can recreate it
-            docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-        fi
+        # Ensure container uses latest mount configuration
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
         # Launch fresh SearXNG container. The secret comes from the
         # per-install settings.yml (bind-mounted below); no committed constant.

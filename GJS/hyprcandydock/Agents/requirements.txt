@@ -4,3 +4,6 @@ motor
 pymongo
 httpx
 python-multipart
+ddgs
+curl_cffi
+trafilatura

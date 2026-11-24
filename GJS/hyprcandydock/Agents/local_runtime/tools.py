@@ -166,8 +166,8 @@ def list_pending_edits() -> list[dict]:
         for path, record in PENDING_EDITS.items()
     ]
 
-# ── SearXNG config (same instance as the GJS launcher web-search tab) ─────────
-SEARXNG_URL = os.environ.get("HYPRCANDY_SEARXNG_URL", "http://127.0.0.1:8888")
+# ── Web search & extraction config ─────────────────────────────────────────
+SEARXNG_URL = os.environ.get("HYPRCANDY_SEARXNG_URL", "http://127.0.0.1:8080")
 
 # Tool definitions in OpenAI function-calling schema (shared with React UI)
 TOOLS_SCHEMA = [
@@ -770,40 +770,127 @@ async def exec_command(command: str, cwd: Optional[str] = None) -> dict:
         return {"exitCode": -1, "stdout": "", "stderr": "Command timed out after 60 seconds"}
 
 
-async def web_search(query: str) -> list[dict]:
-    params = urlencode({"q": query, "format": "json", "categories": "general"})
+async def web_search(query: str, max_results: int = 8) -> list[dict]:
+    """
+    Search the web with a multi-tier fallback pipeline:
+    Tier 1: ddgs (DuckDuckGo Search) with native TLS fingerprinting (zero-config, local IP).
+    Tier 2: Local SearXNG instance (http://127.0.0.1:8080) if ddgs is unavailable or fails.
+    """
+    cleaned_query = (query or "").strip()
+    if not cleaned_query:
+        return []
+
+    # Tier 1: ddgs
     try:
+        from ddgs import DDGS
+        def _sync_ddgs():
+            d = DDGS()
+            return list(d.text(cleaned_query, max_results=max_results))
+        results = await asyncio.to_thread(_sync_ddgs)
+        if results:
+            formatted = []
+            for r in results:
+                title = r.get("title") or ""
+                url = r.get("href") or r.get("url") or ""
+                snippet = r.get("body") or r.get("snippet") or ""
+                if title or url:
+                    formatted.append({"title": title, "url": url, "content": snippet})
+            if formatted:
+                return formatted
+    except Exception as exc:
+        pass
+
+    # Tier 2: SearXNG fallback
+    try:
+        params = urlencode({"q": cleaned_query, "format": "json", "categories": "general"})
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.get(f"{SEARXNG_URL}/search?{params}")
-            resp.raise_for_status()
-            data = resp.json()
-            results = data.get("results", [])[:8]
-            return [
-                {
-                    "title": r.get("title", ""),
-                    "url": r.get("url", ""),
-                    "content": r.get("content", r.get("snippet", "")),
-                }
-                for r in results
-            ]
+            if resp.is_success:
+                data = resp.json()
+                results = data.get("results", [])[:max_results]
+                if results:
+                    return [
+                        {
+                            "title": r.get("title", ""),
+                            "url": r.get("url", ""),
+                            "content": r.get("content", r.get("snippet", "")),
+                        }
+                        for r in results
+                    ]
+    except Exception:
+        pass
+
+    return []
+
+
+async def fetch_url(url: str, max_chars: int = 24000) -> dict:
+    """
+    Fetch a URL and extract clean Markdown/text content with multi-tiered anti-bot resilience:
+    Tier 1: curl_cffi AsyncSession with Chrome browser TLS/JA3 impersonation + trafilatura markdown extraction.
+    Tier 2: Jina Reader (https://r.jina.ai/) headless reader for Cloudflare/WAF or JS-heavy SPAs.
+    Tier 3: Standard httpx + regex HTML-stripping fallback.
+    """
+    target_url = (url or "").strip()
+    if not target_url:
+        return {"url": "", "text": "Error: empty URL provided."}
+
+    # Tier 1: curl_cffi + trafilatura
+    try:
+        from curl_cffi.requests import AsyncSession
+        import trafilatura
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        async with AsyncSession(impersonate="chrome", timeout=12) as session:
+            resp = await session.get(target_url, headers=headers)
+            if resp.status_code == 200:
+                extracted = trafilatura.extract(
+                    resp.text,
+                    output_format="markdown",
+                    include_links=True,
+                    include_formatting=True,
+                )
+                if extracted and len(extracted.strip()) > 100:
+                    clean_md = extracted.strip()[:max_chars]
+                    return {"url": target_url, "text": clean_md}
+    except Exception:
+        pass
+
+    # Tier 2: Jina Reader fallback (r.jina.ai)
+    try:
+        from curl_cffi.requests import AsyncSession
+        jina_url = f"https://r.jina.ai/{target_url}"
+        async with AsyncSession(timeout=15) as session:
+            jina_resp = await session.get(jina_url)
+            if jina_resp.status_code == 200 and jina_resp.text:
+                clean_md = jina_resp.text.strip()[:max_chars]
+                if len(clean_md) > 100:
+                    return {"url": target_url, "text": clean_md}
+    except Exception:
+        pass
+
+    # Tier 3: Standard httpx fallback with HTML stripping
+    try:
+        async with httpx.AsyncClient(
+            timeout=15.0,
+            headers={"User-Agent": "HyprCandy-Agent/1.0"},
+            follow_redirects=True,
+        ) as client:
+            resp = await client.get(target_url)
+            if resp.is_success:
+                content_type = resp.headers.get("content-type", "")
+                if "html" in content_type:
+                    text = _strip_html(resp.text)
+                else:
+                    text = resp.text
+                return {"url": target_url, "text": text[:max_chars]}
     except Exception as e:
-        raise RuntimeError(f"SearXNG search failed: {e}")
+        return {"url": target_url, "text": f"Failed to retrieve content from {target_url}: {e}"}
 
-
-async def fetch_url(url: str) -> dict:
-    async with httpx.AsyncClient(
-        timeout=20.0,
-        headers={"User-Agent": "HyprCandy-Agent/1.0"},
-        follow_redirects=True,
-    ) as client:
-        resp = await client.get(url)
-        resp.raise_for_status()
-        content_type = resp.headers.get("content-type", "")
-        if "html" in content_type:
-            text = _strip_html(resp.text)
-        else:
-            text = resp.text
-        return {"url": url, "text": text[:30_000]}
+    return {"url": target_url, "text": f"Access restricted or empty content at {target_url}."}
 
 
 def _strip_html(html: str) -> str:

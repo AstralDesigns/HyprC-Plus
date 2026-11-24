@@ -526,6 +526,11 @@ export class AgentEngine {
       // legitimate waits stay alive; a genuinely stuck runtime still trips here.
       const IDLE_TIMEOUT_MS = 6 * 60 * 1000;
       let lastActivity = Date.now();
+      let lastActionTime = Date.now();
+      let lastWatchdogNudgeTime = 0;
+      const WATCHDOG_ACTIONLESS_MS = 30 * 1000;
+      let waitingForApproval = false;
+      let waitingForSuggestions = false;
 
       await new Promise<void>((resolve, reject) => {
         const poll = async () => {
@@ -548,13 +553,35 @@ export class AgentEngine {
             return resolve();
           }
 
+          // Active watchdog: if during an active agentic task (tools have run or todo tasks exist)
+          // there is a 30s period of no streaming tokens, running tools, or pending user gates,
+          // automatically inject a prompt to keep the agent moving toward task completion.
+          const runningTools = currentTools.some(t => t.status === 'running');
+          if (runningTools) {
+            lastActionTime = Date.now();
+          } else if (
+            hadToolUse &&
+            !waitingForApproval &&
+            !waitingForSuggestions &&
+            Date.now() - lastActionTime > WATCHDOG_ACTIONLESS_MS &&
+            Date.now() - lastWatchdogNudgeTime > WATCHDOG_ACTIONLESS_MS
+          ) {
+            lastWatchdogNudgeTime = Date.now();
+            lastActionTime = Date.now();
+            void this.steer(
+              "[System Instruction: Autonomous execution active. Resume your workflow, verify completed changes, and call task_complete(summary=...) when all tasks are complete.]"
+            );
+          }
+
           try {
             const resp = await bridge.runtimeRequest(
               `/api/chat/poll/${taskId}?since=${since}`, {}, 'GET'
             );
             const events: any[] = resp.events || [];
             since = resp.total ?? since;
-            if (events.length) lastActivity = Date.now();
+            if (events.length) {
+              lastActivity = Date.now();
+            }
 
             // Render any steering the user queued since the last poll immediately,
             // so it shows in the stream ahead of the model's next output.
@@ -577,9 +604,12 @@ export class AgentEngine {
                 fullText += token;
                 onToken?.(token);
                 appendToken(token);
+                lastActionTime = Date.now();
                 streamUi.schedule(fullText, currentTools.length ? currentTools : undefined, blocks);
 
               } else if (type === 'tool_start') {
+                hadToolUse = true;
+                lastActionTime = Date.now();
                 const tc: ToolCallData = {
                   id: data.id ?? `tool_${Date.now()}`,
                   name: data.name ?? 'unknown',
@@ -601,6 +631,7 @@ export class AgentEngine {
                 streamUi.schedule(fullText, currentTools, blocks);
 
               } else if (type === 'tool_result') {
+                lastActionTime = Date.now();
                 const matched = currentTools.find(t => t.id === data.id);
                 currentTools = currentTools.map(t =>
                   t.id === data.id ? { ...t, status: 'completed', result: data.result } : t
@@ -674,6 +705,9 @@ export class AgentEngine {
                 const hasChips = Array.isArray(sd?.options) && sd!.options.length > 0;
                 const hasForm = Array.isArray(sd?.questions) && sd!.questions.length > 0;
                 if (sd && (hasChips || hasForm)) {
+                  if (sd.mode === 'clarify' || hasForm) {
+                    waitingForSuggestions = true;
+                  }
                   blocks = [...blocks, { type: 'suggestions', id: nextBlockId(), suggestions: sd }];
                   // Mirror to the composer chip row; clarify chips stay live after
                   // the turn ends, next-step ones are refreshed by the next run.
@@ -699,6 +733,7 @@ export class AgentEngine {
                 streamUi.schedule(fullText, currentTools.length ? currentTools : undefined, blocks);
 
               } else if (type === 'awaiting_approval') {
+                waitingForApproval = true;
                 setStore({ specApprovalPending: true });
 
               } else if (type === 'verification') {
