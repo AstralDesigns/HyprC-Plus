@@ -109,6 +109,20 @@ class ChatRequest(BaseModel):
     # Client-generated id grouping this turn's file edits for "Revert this turn"
     # (plan §3.7). Falls back to the server task_id when omitted.
     turn_id: Optional[str] = None
+    ai_settings: Optional[dict] = None
+
+
+class OllamaPullRequest(BaseModel):
+    model: str
+
+
+class OllamaDeleteRequest(BaseModel):
+    model: str
+
+
+class AISettingsRequest(BaseModel):
+    openrouter: Optional[dict] = None
+    ollama: Optional[dict] = None
 
 
 class LicenseRequest(BaseModel):
@@ -160,8 +174,172 @@ async def health():
     return {"status": "ok", "server": "hyprcandy-runtime"}
 
 
-# ── Legacy local-model stubs (local inference fully removed; kept as no-ops
-#    so old frontends can't error on them) ───────────────────────────────────
+# ── AI Settings & Ollama State ───────────────────────────────────────────────
+AI_SETTINGS_FILE = os.path.expanduser("~/.config/hyprcandy/ai_settings.json")
+_DEFAULT_AI_SETTINGS: dict[str, Any] = {
+    "openrouter": {
+        "temperature": 0.2,
+        "reasoning_effort": "high",
+        "reasoning_tokens": 16384,
+        "max_tokens": 16384,
+        "top_p": 1.0,
+    },
+    "ollama": {
+        "host": "http://localhost:11434",
+        "temperature": 0.2,
+        "num_ctx": 32768,
+        "max_tokens": 8192,
+        "top_p": 0.9,
+    },
+}
+
+_ai_settings: dict[str, Any] = json.loads(json.dumps(_DEFAULT_AI_SETTINGS))
+try:
+    if os.path.isfile(AI_SETTINGS_FILE):
+        with open(AI_SETTINGS_FILE, "r", encoding="utf-8") as f:
+            loaded = json.load(f)
+            if isinstance(loaded, dict):
+                if "openrouter" in loaded and isinstance(loaded["openrouter"], dict):
+                    _ai_settings["openrouter"].update(loaded["openrouter"])
+                if "ollama" in loaded and isinstance(loaded["ollama"], dict):
+                    _ai_settings["ollama"].update(loaded["ollama"])
+except Exception as e:
+    logger.warning("Failed to load ai_settings.json: %s", e)
+
+def _save_ai_settings():
+    try:
+        os.makedirs(os.path.dirname(AI_SETTINGS_FILE), exist_ok=True)
+        with open(AI_SETTINGS_FILE, "w", encoding="utf-8") as f:
+            json.dump(_ai_settings, f, indent=2)
+    except Exception as e:
+        logger.error("Failed to save ai_settings.json: %s", e)
+
+_ollama_pull_tasks: dict[str, dict] = {}
+OLLAMA_SERVICE_SCRIPT = os.path.expanduser("~/.config/quickshell/bar/scripts/ollama-service.sh")
+
+# ── Ollama REST APIs ──────────────────────────────────────────────────────────
+
+@app.post("/api/ollama/service/{action}")
+async def ollama_service_action(action: str):
+    if action not in ("start", "stop", "toggle", "status"):
+        raise HTTPException(status_code=400, detail="Invalid action")
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            OLLAMA_SERVICE_SCRIPT, action,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        status_text = stdout.decode().strip()
+        return {"status": status_text, "returncode": proc.returncode}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.get("/api/ollama/status")
+async def ollama_status():
+    host = _ai_settings.get("ollama", {}).get("host", "http://localhost:11434")
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(f"{host.rstrip('/')}/api/version")
+            if resp.status_code == 200:
+                data = resp.json()
+                return {"online": True, "version": data.get("version", "unknown"), "host": host}
+    except Exception as e:
+        pass
+    return {"online": False, "version": None, "host": host, "error": "Ollama service is not running"}
+
+@app.get("/api/ollama/models")
+async def ollama_models():
+    host = _ai_settings.get("ollama", {}).get("host", "http://localhost:11434")
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{host.rstrip('/')}/api/tags")
+            if resp.status_code == 200:
+                data = resp.json()
+                return {"models": data.get("models", [])}
+    except Exception as e:
+        return {"models": [], "error": str(e)}
+    return {"models": []}
+
+@app.post("/api/ollama/pull")
+async def ollama_pull(req: OllamaPullRequest):
+    host = _ai_settings.get("ollama", {}).get("host", "http://localhost:11434")
+    model_name = req.model.strip()
+    if not model_name:
+        raise HTTPException(status_code=400, detail="Model name required")
+    task_id = str(uuid.uuid4())
+    _ollama_pull_tasks[task_id] = {
+        "model": model_name,
+        "done": False,
+        "percent": 0,
+        "status": "Starting download...",
+        "error": None,
+    }
+
+    async def _do_pull():
+        try:
+            async with httpx.AsyncClient(timeout=3600.0) as client:
+                async with client.stream("POST", f"{host.rstrip('/')}/api/pull", json={"model": model_name}) as resp:
+                    if not resp.is_success:
+                        _ollama_pull_tasks[task_id]["error"] = f"HTTP {resp.status_code}"
+                        _ollama_pull_tasks[task_id]["done"] = True
+                        return
+                    async for line in resp.aiter_lines():
+                        if not line:
+                            continue
+                        try:
+                            chunk = json.loads(line)
+                            status_text = chunk.get("status", "")
+                            completed = chunk.get("completed", 0)
+                            total = chunk.get("total", 0)
+                            percent = int((completed / total) * 100) if total > 0 else 0
+                            _ollama_pull_tasks[task_id]["status"] = status_text
+                            _ollama_pull_tasks[task_id]["percent"] = percent
+                            if chunk.get("error"):
+                                _ollama_pull_tasks[task_id]["error"] = chunk["error"]
+                        except Exception:
+                            pass
+            _ollama_pull_tasks[task_id]["done"] = True
+            _ollama_pull_tasks[task_id]["status"] = "Complete"
+            _ollama_pull_tasks[task_id]["percent"] = 100
+        except Exception as e:
+            _ollama_pull_tasks[task_id]["error"] = str(e)
+            _ollama_pull_tasks[task_id]["done"] = True
+
+    asyncio.create_task(_do_pull())
+    return {"task_id": task_id}
+
+@app.get("/api/ollama/pull/status/{task_id}")
+async def ollama_pull_status(task_id: str):
+    info = _ollama_pull_tasks.get(task_id)
+    if not info:
+        return {"done": True, "percent": 0, "status": "Not found", "error": "Task not found"}
+    return info
+
+@app.post("/api/ollama/delete")
+async def ollama_delete(req: OllamaDeleteRequest):
+    host = _ai_settings.get("ollama", {}).get("host", "http://localhost:11434")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.request("DELETE", f"{host.rstrip('/')}/api/delete", json={"model": req.model})
+            if resp.status_code in (200, 204):
+                return {"status": "ok"}
+            return {"status": "error", "error": f"HTTP {resp.status_code}"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.get("/api/settings/ai")
+async def get_ai_settings():
+    return _ai_settings
+
+@app.post("/api/settings/ai")
+async def update_ai_settings(req: AISettingsRequest):
+    if req.openrouter is not None:
+        _ai_settings["openrouter"].update(req.openrouter)
+    if req.ollama is not None:
+        _ai_settings["ollama"].update(req.ollama)
+    _save_ai_settings()
+    return _ai_settings
 
 @app.get("/api/models")
 async def get_models():
@@ -255,7 +433,7 @@ async def chat_start(req: ChatRequest):
     byok_key = req.byok_key or _byok_keys.get(byok_provider or "", "")
     byok_model = req.byok_model
 
-    if inference_mode == "byok" or (byok_provider and (byok_key or byok_provider == "openrouter")):
+    if inference_mode == "byok" or (byok_provider and (byok_key or byok_provider in ("openrouter", "ollama"))):
         endpoint = "byok"
     elif inference_mode == "cloud" or (req.license_key or _cached_license_key):
         endpoint = "cloud"
@@ -273,14 +451,21 @@ async def chat_start(req: ChatRequest):
                 model = byok_model or default_model
                 key = byok_key
 
-                if not key and provider != "openrouter":
+                if not key and provider not in ("openrouter", "ollama"):
                     _chat_tasks[task_id]["events"].append(
                         {"type": "error", "data": {"message": f"Please configure your API key for {provider} in the Model Manager."}}
                     )
                     return
 
+                effective_settings = dict(_ai_settings)
+                if req.ai_settings and isinstance(req.ai_settings, dict):
+                    if "openrouter" in req.ai_settings:
+                        effective_settings.setdefault("openrouter", {}).update(req.ai_settings["openrouter"])
+                    if "ollama" in req.ai_settings:
+                        effective_settings.setdefault("ollama", {}).update(req.ai_settings["ollama"])
+
                 async def backend_fn(messages):
-                    async for event in stream_byok(messages, provider, model, key, TOOLS_SCHEMA):
+                    async for event in stream_byok(messages, provider, model, key, TOOLS_SCHEMA, ai_settings=effective_settings):
                         yield event
 
             else:  # cloud (Vercel)
@@ -513,8 +698,10 @@ async def byok_complete(req: CompletionRequest):
     # Prefer the key riding in the request (survives server restarts, matching
     # the chat path); fall back to whatever was saved in-memory.
     key = (req.api_key or "").strip() or _byok_keys.get(req.provider, "")
-    if not key:
+    if not key and req.provider != "ollama":
         raise HTTPException(status_code=400, detail=f"No API key saved for {req.provider}")
+    if req.provider == "ollama" and not key:
+        key = "ollama"
     try:
         text = await complete_byok(
             req.provider,

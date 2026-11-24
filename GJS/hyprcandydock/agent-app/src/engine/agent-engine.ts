@@ -509,6 +509,7 @@ export class AgentEngine {
       }
       if (liveStore.specMode) payload.spec_enabled = true;
       if (liveStore.projectPath) payload.project_path = liveStore.projectPath;
+      if (liveStore.aiSettings) payload.ai_settings = liveStore.aiSettings;
       payload.turn_id = turnId;
 
       // Fire-and-forget: get task_id immediately, then poll for events.

@@ -347,6 +347,28 @@ export interface AppState {
    *  Rides the same completions provider/key, so it stays inert until both this
    *  and inlineCompletionsEnabled are on. Default false. */
   jumpSuggestionsEnabled: boolean;
+
+  // ── AI Engine Settings & Categorization ───────────────────────────────────
+  activeBackendCategory: 'local' | 'cloud';
+  ollamaModel: string;
+  ollamaCompletionsModel: string;
+  ollamaAutoStart: boolean;
+  aiSettings: {
+    openrouter: {
+      temperature: number;
+      reasoningEffort: 'low' | 'medium' | 'high';
+      reasoningTokens: number; // -1 for uncapped / max
+      maxOutputTokens: number; // -1 for uncapped / max
+      topP: number;
+    };
+    ollama: {
+      host: string;
+      temperature: number;
+      numCtx: number;
+      maxOutputTokens: number;
+      topP: number;
+    };
+  };
 }
 
 const STORAGE_KEY = 'hyprcandy_agent_state_v2';
@@ -474,6 +496,28 @@ function loadInitialState(): AppState {
     completionsModel: '',
     inlineCompletionsEnabled: false,
     jumpSuggestionsEnabled: false,
+
+    // Local / Cloud categorization and AI parameters
+    activeBackendCategory: 'cloud',
+    ollamaModel: 'qwen2.5-coder:7b',
+    ollamaCompletionsModel: 'qwen2.5-coder:7b',
+    ollamaAutoStart: false,
+    aiSettings: {
+      openrouter: {
+        temperature: 0.2,
+        reasoningEffort: 'high',
+        reasoningTokens: 16384,
+        maxOutputTokens: 16384,
+        topP: 1.0,
+      },
+      ollama: {
+        host: 'http://localhost:11434',
+        temperature: 0.2,
+        numCtx: 32768,
+        maxOutputTokens: 8192,
+        topP: 0.9,
+      },
+    },
   };
 
   const persisted = readPersistedBlob();
@@ -528,6 +572,11 @@ function persistedSnapshot() {
     githubToken: next.githubToken,
     githubUser: next.githubUser,
     selectedRepo: next.selectedRepo,
+    activeBackendCategory: next.activeBackendCategory,
+    ollamaModel: next.ollamaModel,
+    ollamaCompletionsModel: next.ollamaCompletionsModel,
+    ollamaAutoStart: next.ollamaAutoStart,
+    aiSettings: next.aiSettings,
   };
 }
 
@@ -614,6 +663,26 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     completionsModel: typeof parsed.completionsModel === 'string' ? parsed.completionsModel : '',
     inlineCompletionsEnabled: typeof parsed.inlineCompletionsEnabled === 'boolean' ? parsed.inlineCompletionsEnabled : false,
     jumpSuggestionsEnabled: typeof parsed.jumpSuggestionsEnabled === 'boolean' ? parsed.jumpSuggestionsEnabled : false,
+    activeBackendCategory: parsed.activeBackendCategory === 'local' ? 'local' : 'cloud',
+    ollamaModel: typeof parsed.ollamaModel === 'string' && parsed.ollamaModel ? parsed.ollamaModel : 'qwen2.5-coder:7b',
+    ollamaCompletionsModel: typeof parsed.ollamaCompletionsModel === 'string' && parsed.ollamaCompletionsModel ? parsed.ollamaCompletionsModel : 'qwen2.5-coder:7b',
+    ollamaAutoStart: typeof parsed.ollamaAutoStart === 'boolean' ? parsed.ollamaAutoStart : false,
+    aiSettings: {
+      openrouter: {
+        temperature: typeof parsed.aiSettings?.openrouter?.temperature === 'number' ? parsed.aiSettings.openrouter.temperature : 0.2,
+        reasoningEffort: ['low', 'medium', 'high'].includes(parsed.aiSettings?.openrouter?.reasoningEffort) ? parsed.aiSettings.openrouter.reasoningEffort : 'high',
+        reasoningTokens: typeof parsed.aiSettings?.openrouter?.reasoningTokens === 'number' ? parsed.aiSettings.openrouter.reasoningTokens : 16384,
+        maxOutputTokens: typeof parsed.aiSettings?.openrouter?.maxOutputTokens === 'number' ? parsed.aiSettings.openrouter.maxOutputTokens : 16384,
+        topP: typeof parsed.aiSettings?.openrouter?.topP === 'number' ? parsed.aiSettings.openrouter.topP : 1.0,
+      },
+      ollama: {
+        host: typeof parsed.aiSettings?.ollama?.host === 'string' ? parsed.aiSettings.ollama.host : 'http://localhost:11434',
+        temperature: typeof parsed.aiSettings?.ollama?.temperature === 'number' ? parsed.aiSettings.ollama.temperature : 0.2,
+        numCtx: typeof parsed.aiSettings?.ollama?.numCtx === 'number' ? parsed.aiSettings.ollama.numCtx : 32768,
+        maxOutputTokens: typeof parsed.aiSettings?.ollama?.maxOutputTokens === 'number' ? parsed.aiSettings.ollama.maxOutputTokens : 8192,
+        topP: typeof parsed.aiSettings?.ollama?.topP === 'number' ? parsed.aiSettings.ollama.topP : 0.9,
+      },
+    },
     byokLicenseKey: typeof parsed.byokLicenseKey === 'string' ? parsed.byokLicenseKey : '',
     byokLicenseInstanceId: typeof parsed.byokLicenseInstanceId === 'string' ? parsed.byokLicenseInstanceId : '',
     licenseLastActiveAt: typeof parsed.licenseLastActiveAt === 'number' ? parsed.licenseLastActiveAt : 0,

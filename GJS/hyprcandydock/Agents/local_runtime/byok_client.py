@@ -53,6 +53,18 @@ PROVIDERS = {
             {"id": "meta-llama/llama-3.3-70b-instruct",     "name": "Llama 3.3 70B",            "desc": "Meta open-weights flagship. High-speed versatile model.",                                      "context": "128k tokens"},
         ],
     },
+    "ollama": {
+        "name": "Ollama (Local)",
+        "key_hint": "No key required (Local server)",
+        "api_key_url": "https://ollama.com",
+        "models": [
+            {"id": "qwen2.5-coder:7b", "name": "Qwen 2.5 Coder 7B", "desc": "Leading local open coder model. Fast, reliable code generation & tool use.", "context": "32k tokens"},
+            {"id": "llama3.2:3b", "name": "Llama 3.2 3B", "desc": "Lightweight, high-speed local instruction model by Meta.", "context": "128k tokens"},
+            {"id": "deepseek-r1:8b", "name": "DeepSeek R1 8B", "desc": "Distilled open reasoning model for code, math & analysis.", "context": "128k tokens"},
+            {"id": "codellama:7b", "name": "CodeLlama 7B", "desc": "Specialized coding LLM by Meta.", "context": "16k tokens"},
+            {"id": "mistral:7b", "name": "Mistral 7B", "desc": "Fast, high-quality general instruction model.", "context": "32k tokens"},
+        ],
+    },
     "groq": {
         "name": "Groq",
         "key_hint": "gsk_...",
@@ -622,6 +634,12 @@ async def _stream_openai_compat(
     base_url: str,
     tools_schema: list[dict],
     extra_headers: dict | None = None,
+    temperature: float = 0.2,
+    max_tokens: int | None = 16384,
+    reasoning_tokens: int | None = None,
+    reasoning_effort: str = "high",
+    top_p: float = 1.0,
+    ollama_options: dict | None = None,
 ) -> AsyncIterator[dict]:
     """Stream from OpenAI-compatible API."""
     # Sanitize messages to strictly comply with the OpenAI Chat Completion schema.
@@ -650,13 +668,24 @@ async def _stream_openai_compat(
         "model": model,
         "messages": clean_messages,
         "stream": True,
-        "temperature": 0.2,
-        "max_tokens": 16384,
+        "temperature": temperature,
+        "top_p": top_p,
     }
+    if max_tokens is not None and max_tokens > 0:
+        payload["max_tokens"] = max_tokens
+
     # OpenRouter native deep reasoning / extended thinking
     if "openrouter" in base_url.lower():
         payload["include_reasoning"] = True
-        payload["reasoning"] = {"effort": "high", "exclude": False}
+        reas_dict: dict[str, Any] = {"effort": reasoning_effort or "high", "exclude": False}
+        if reasoning_tokens is not None and reasoning_tokens > 0:
+            reas_dict["max_tokens"] = reasoning_tokens
+        payload["reasoning"] = reas_dict
+
+    # Local Ollama runtime options
+    if "11434" in base_url or "ollama" in base_url.lower():
+        if ollama_options:
+            payload["options"] = ollama_options
 
     if tools_schema:
         payload["tools"] = tools_schema
@@ -899,6 +928,7 @@ async def stream_byok(
     model: str,
     api_key: str,
     tools_schema: list[dict] | None = None,
+    ai_settings: dict | None = None,
 ) -> AsyncIterator[dict]:
     """Route to the correct BYOK provider backend."""
     ts = tools_schema or []
@@ -917,8 +947,48 @@ async def stream_byok(
             "HTTP-Referer": "https://hyprcandy.app",
             "X-Title": "HyprCandy Workspace",
         }
+        or_cfg = (ai_settings or {}).get("openrouter", {})
+        temp = or_cfg.get("temperature", 0.2)
+        max_tok = or_cfg.get("max_tokens", 16384)
+        reas_tok = or_cfg.get("reasoning_tokens", None)
+        effort = or_cfg.get("reasoning_effort", "high")
+        top_p = or_cfg.get("top_p", 1.0)
         async for event in _stream_openai_compat(
-            messages, target_model, api_key, "https://openrouter.ai/api/v1", ts, extra_headers=extra
+            messages,
+            target_model,
+            api_key,
+            "https://openrouter.ai/api/v1",
+            ts,
+            extra_headers=extra,
+            temperature=temp,
+            max_tokens=max_tok if max_tok and max_tok > 0 else None,
+            reasoning_tokens=reas_tok if reas_tok and reas_tok > 0 else None,
+            reasoning_effort=effort,
+            top_p=top_p,
+        ):
+            yield event
+
+    elif provider == "ollama":
+        target_model = model.strip() if model and model.strip() else "qwen2.5-coder:7b"
+        ol_cfg = (ai_settings or {}).get("ollama", {})
+        host = ol_cfg.get("host", "http://localhost:11434")
+        base_url = f"{host.rstrip('/')}/v1" if not host.endswith("/v1") else host
+        ol_opts = {
+            "num_ctx": ol_cfg.get("num_ctx", 32768),
+            "temperature": ol_cfg.get("temperature", 0.2),
+            "top_p": ol_cfg.get("top_p", 0.9),
+        }
+        max_tok = ol_cfg.get("max_tokens", 8192)
+        async for event in _stream_openai_compat(
+            messages,
+            target_model,
+            "ollama",
+            base_url,
+            ts,
+            temperature=ol_cfg.get("temperature", 0.2),
+            max_tokens=max_tok if max_tok and max_tok > 0 else None,
+            top_p=ol_cfg.get("top_p", 0.9),
+            ollama_options=ol_opts,
         ):
             yield event
 
@@ -966,6 +1036,7 @@ _COMPLETION_BASE_URLS = {
     "cerebras": "https://api.cerebras.ai/v1",
     "groq": "https://api.groq.com/openai/v1",
     "openrouter": "https://openrouter.ai/api/v1",
+    "ollama": "http://localhost:11434/v1",
 }
 
 _COMPLETION_DEFAULT_MODELS = {
@@ -974,6 +1045,7 @@ _COMPLETION_DEFAULT_MODELS = {
     # openrouter/free is a random router that returns empty for FIM prompts; pin a
     # verified coder model so inline ghost text actually produces a continuation.
     "openrouter": "deepseek/deepseek-v3.2",
+    "ollama": "qwen2.5-coder:7b",
 }
 
 
@@ -996,8 +1068,18 @@ async def complete_byok(
     if not base_url:
         raise ValueError(f"Provider '{provider}' does not support inline completions")
     clean_key = (api_key or "").strip()
-    if not clean_key:
+    if not clean_key and provider != "ollama":
         raise ValueError("Missing API key for inline completions")
+    if provider == "ollama":
+        clean_key = clean_key or "ollama"
+        host = "http://localhost:11434"
+        try:
+            from runtime_server import _ai_settings
+            host = _ai_settings.get("ollama", {}).get("host") or host
+        except Exception:
+            pass
+        base_url = f"{host.rstrip('/')}/v1"
+
     target_model = (model or "").strip() or _COMPLETION_DEFAULT_MODELS.get(provider, "")
 
     payload: dict = {
@@ -1024,6 +1106,22 @@ async def complete_byok(
 
     async with httpx.AsyncClient(timeout=12.0) as client:
         resp = await client.post(f"{base_url}/chat/completions", json=payload, headers=headers)
+        if resp.status_code != 200 and provider == "ollama":
+            # Fallback to Ollama native /api/generate endpoint
+            try:
+                native_url = base_url.replace("/v1", "/api/generate")
+                native_resp = await client.post(native_url, json={
+                    "model": target_model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "raw": True,
+                    "options": {"num_predict": max_tokens, "temperature": 0.0}
+                })
+                if native_resp.status_code == 200:
+                    text = native_resp.json().get("response", "")
+                    return _clean_completion(text)
+            except Exception:
+                pass
         if resp.status_code != 200:
             body = resp.text[:200]
             raise RuntimeError(f"{provider} completion {resp.status_code}: {body}")

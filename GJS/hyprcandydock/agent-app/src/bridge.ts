@@ -445,6 +445,47 @@ class AgentBridge {
     return res.json();
   }
 
+  // ── Ollama Local Engine APIs ──────────────────────────────────────────────
+  public async getOllamaStatus(): Promise<{ online: boolean; version?: string; host?: string; error?: string }> {
+    try {
+      return await this.runtimeRequest('/api/ollama/status', {}, 'GET');
+    } catch (e: any) {
+      return { online: false, error: e?.message || 'Failed to connect to runtime' };
+    }
+  }
+
+  public async setOllamaService(action: 'start' | 'stop' | 'toggle'): Promise<{ status: string }> {
+    return this.runtimeRequest(`/api/ollama/service/${action}`, {}, 'POST');
+  }
+
+  public async getOllamaModels(): Promise<{ models: Array<any>; error?: string }> {
+    try {
+      return await this.runtimeRequest('/api/ollama/models', {}, 'GET');
+    } catch (e: any) {
+      return { models: [], error: e?.message || 'Failed to list Ollama models' };
+    }
+  }
+
+  public async pullOllamaModel(model: string): Promise<{ task_id: string }> {
+    return this.runtimeRequest('/api/ollama/pull', { model }, 'POST');
+  }
+
+  public async getOllamaPullStatus(taskId: string): Promise<{ done: boolean; percent: number; status: string; error?: string }> {
+    return this.runtimeRequest(`/api/ollama/pull/status/${taskId}`, {}, 'GET');
+  }
+
+  public async deleteOllamaModel(model: string): Promise<{ status: string; error?: string }> {
+    return this.runtimeRequest('/api/ollama/delete', { model }, 'POST');
+  }
+
+  public async getAISettings(): Promise<any> {
+    return this.runtimeRequest('/api/settings/ai', {}, 'GET');
+  }
+
+  public async updateAISettings(settings: any): Promise<any> {
+    return this.runtimeRequest('/api/settings/ai', settings, 'POST');
+  }
+
   /**
    * Open a URL in the system browser via GJS (xdg-open).
    * Used for the Pro checkout link in the Cloud tab.

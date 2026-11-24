@@ -127,6 +127,15 @@ export const App: React.FC = () => {
       window.dispatchEvent(new CustomEvent('matugen_theme_changed', { detail: cssVars }));
     });
 
+    // Auto-start Ollama on session launch if enabled by user
+    if (store.ollamaAutoStart) {
+      bridge.getOllamaStatus().then((st) => {
+        if (!st.online) {
+          bridge.setOllamaService('start').catch(() => {});
+        }
+      }).catch(() => {});
+    }
+
     const onToggleSidebar = () => storeActions.toggleSidebar();
     const onToggleChat = () => storeActions.toggleChat();
     const onToggleTerminal = () => storeActions.toggleTerminal();

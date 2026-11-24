@@ -2937,6 +2937,237 @@ body,
   line-height: 1.6;
 }
 
+/* ── Mermaid Diagrams — matugen themed ──────────────────────────────── */
+.mermaid-card {
+  margin: 12px 0;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid color-mix(in srgb, var(--matugen-outline, #546e7a) 28%, transparent);
+  background: color-mix(in srgb, var(--matugen-surface-container, #16252c) 70%, transparent);
+  overflow: hidden;
+}
+
+.mermaid-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: color-mix(in srgb, var(--matugen-on-secondary, #1d343c) 80%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--matugen-outline, #546e7a) 20%, transparent);
+  font-size: 11px;
+}
+
+.mermaid-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--matugen-primary, #a0c9dc);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.mermaid-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 60%, transparent);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mermaid-copy-btn:hover {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 15%, transparent);
+  color: var(--matugen-primary, #a0c9dc);
+  border-color: var(--matugen-primary, #a0c9dc);
+}
+
+.mermaid-svg-container {
+  padding: 16px;
+  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.mermaid-svg-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-error-wrap {
+  padding: 10px 12px;
+}
+
+.mermaid-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--matugen-error, #ef4444);
+  font-size: 11px;
+  margin-bottom: 8px;
+}
+
+.mermaid-fallback-pre {
+  margin: 0;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  overflow-x: auto;
+}
+
+.mermaid-rendering-msg {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+/* ── Dotted Interval Sliders (ModelManager Settings) ────────────────── */
+.dotted-slider-card {
+  margin: 10px 0;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--matugen-surface-container, #16252c) 55%, transparent);
+  border: 1px solid color-mix(in srgb, var(--matugen-outline, #546e7a) 25%, transparent);
+  border-radius: var(--radius-sm, 8px);
+}
+
+.dotted-slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.dotted-slider-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.dotted-slider-desc {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.dotted-slider-badge {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 16%, transparent);
+  color: var(--matugen-primary, #a0c9dc);
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 32%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.dotted-slider-track-wrap {
+  position: relative;
+  margin-top: 14px;
+  margin-bottom: 22px;
+  height: 32px;
+}
+
+.dotted-slider-track-bg {
+  position: absolute;
+  top: 7px;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  pointer-events: none;
+}
+
+.dotted-slider-track-fill {
+  height: 100%;
+  background: var(--matugen-primary, #a0c9dc);
+  border-radius: 9999px;
+}
+
+.dotted-slider-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--matugen-outline, #546e7a) 60%, transparent);
+  border: 2px solid var(--matugen-on-secondary, #1d343c);
+  pointer-events: auto;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dotted-slider-dot.active {
+  background: var(--matugen-primary, #a0c9dc);
+}
+
+.dotted-slider-dot.current {
+  width: 12px;
+  height: 12px;
+  box-shadow: 0 0 8px var(--matugen-primary, #a0c9dc);
+}
+
+.dotted-slider-dot.recommended {
+  border-color: var(--matugen-primary, #a0c9dc);
+}
+
+.dotted-slider-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 20px;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 5;
+  margin: 0;
+}
+
+.dotted-slider-labels {
+  position: relative;
+  top: 18px;
+  height: 16px;
+}
+
+.dotted-slider-tick-btn {
+  position: absolute;
+  transform: translateX(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.dotted-slider-tick-btn:hover {
+  color: var(--text-primary);
+}
+
+.dotted-slider-tick-btn.selected {
+  color: var(--matugen-primary, #a0c9dc);
+  font-weight: 700;
+}
+
+.dotted-slider-tick-btn.recommended {
+  color: var(--matugen-primary, #a0c9dc);
+}
+
+.tick-rec-star {
+  font-size: 8px;
+  margin-left: 2px;
+  color: var(--matugen-primary, #a0c9dc);
+}
+
 /* ── Markdown tables (GFM) — matugen themed ──────────────────────────── */
 .markdown-body table {
   border-collapse: collapse;

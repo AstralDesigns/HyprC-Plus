@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FC } from 'reac
 import {
   AlertTriangle, Check, Cpu,
   Eye, EyeOff, ExternalLink, Key, Loader,
-  RefreshCw, X, Search,
+  RefreshCw, X, Search, Sliders, Settings,
 } from 'lucide-react';
 import { useStore, setStore } from '../store';
 import { bridge } from '../bridge';
+import { AISettingsPanel } from './AISettingsPanel';
+import { OllamaModelView } from './OllamaModelView';
 
 // ── LICENSE GATE ──────────────────────────────────────────────────────────────
 // The Agents tab (and the agentic chat panel) is gated behind a Gumroad
@@ -1550,50 +1552,65 @@ const CompletionsTab: FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-      {/* Enable inline completions master switch */}
+      {/* Inline completions & Next-edit jump hints (Mirrored unified card pattern) */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
-        padding: '10px 12px', borderRadius: 'var(--radius-sm)',
-        background: `color-mix(in srgb, ${PRIMARY} 10%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${PRIMARY} 28%, transparent)`,
+        padding: '12px 14px', borderRadius: 'var(--radius-sm, 8px)',
+        border: '1px solid var(--border-subtle)',
+        background: 'color-mix(in srgb, var(--matugen-surface-container, #16252c) 60%, transparent)',
+        display: 'flex', flexDirection: 'column', gap: '10px',
       }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Inline completions</div>
-          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-            {canEnableInline
-              ? 'Ghost-text suggestions in the code/markdown editor from your chosen free provider.'
-              : 'Save a provider key below to enable.'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>Inline Completions (Ghost text)</div>
+            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+              {canEnableInline
+                ? 'Ghost-text suggestions in the code/markdown editor from OpenRouter.'
+                : 'Save an OpenRouter API key below to enable.'}
+            </div>
           </div>
+          <button
+            type="button"
+            disabled={!canEnableInline}
+            onClick={() => setStore({
+              inlineCompletionsEnabled: !store.inlineCompletionsEnabled,
+              completionsProvider: !store.inlineCompletionsEnabled ? provider.id : store.completionsProvider,
+            })}
+            style={{
+              background: store.inlineCompletionsEnabled && store.completionsProvider === provider.id ? PRIMARY : 'rgba(255,255,255,0.08)',
+              color: store.inlineCompletionsEnabled && store.completionsProvider === provider.id ? ON_PRIMARY : 'var(--text-muted)',
+              border: 'none', borderRadius: '9999px', padding: '4px 14px', fontSize: '11px', fontWeight: 700,
+              cursor: canEnableInline ? 'pointer' : 'not-allowed', transition: 'all 0.15s ease',
+              opacity: canEnableInline ? 1 : 0.5,
+            }}
+          >
+            {store.inlineCompletionsEnabled && store.completionsProvider === provider.id ? 'Active' : 'Off'}
+          </button>
         </div>
-        <IosToggle
-          checked={store.inlineCompletionsEnabled}
-          disabled={!canEnableInline}
-          onChange={v => setStore({ inlineCompletionsEnabled: v })}
-          label={store.inlineCompletionsEnabled ? 'On' : 'Off'}
-        />
-      </div>
 
-      {/* Next-edit jump hints — rides the inline-completions provider/key. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px',
-        padding: '10px 12px', borderRadius: 'var(--radius-sm)',
-        background: `color-mix(in srgb, ${PRIMARY} 10%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${PRIMARY} 28%, transparent)`,
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-primary)' }}>Next-edit jump hints</div>
-          <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
-            {canEnableInline && store.inlineCompletionsEnabled
-              ? 'After a pause, the model suggests a line to jump to (Tab), then shows the edit there.'
-              : 'Enable inline completions with a saved key first.'}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-primary)' }}>Next-edit jump hints</div>
+            <div style={{ fontSize: '10.5px', color: 'var(--text-muted)' }}>
+              {canEnableInline && store.inlineCompletionsEnabled
+                ? 'After a pause, the model suggests a line to jump to (Tab), then shows the edit there.'
+                : 'Enable inline completions with a saved key first.'}
+            </div>
           </div>
+          <button
+            type="button"
+            disabled={!(canEnableInline && store.inlineCompletionsEnabled)}
+            onClick={() => setStore({ jumpSuggestionsEnabled: !store.jumpSuggestionsEnabled })}
+            style={{
+              background: store.jumpSuggestionsEnabled ? PRIMARY : 'rgba(255,255,255,0.08)',
+              color: store.jumpSuggestionsEnabled ? ON_PRIMARY : 'var(--text-muted)',
+              border: 'none', borderRadius: '9999px', padding: '4px 14px', fontSize: '11px', fontWeight: 700,
+              cursor: (canEnableInline && store.inlineCompletionsEnabled) ? 'pointer' : 'not-allowed', transition: 'all 0.15s ease',
+              opacity: (canEnableInline && store.inlineCompletionsEnabled) ? 1 : 0.5,
+            }}
+          >
+            {store.jumpSuggestionsEnabled ? 'Active' : 'Off'}
+          </button>
         </div>
-        <IosToggle
-          checked={store.jumpSuggestionsEnabled}
-          disabled={!(canEnableInline && store.inlineCompletionsEnabled)}
-          onChange={v => setStore({ jumpSuggestionsEnabled: v })}
-          label={store.jumpSuggestionsEnabled ? 'On' : 'Off'}
-        />
       </div>
 
       {/* Provider pills — hidden when only one completion provider is visible. */}
@@ -1807,6 +1824,9 @@ const CompletionsTab: FC = () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 export const ModelManager: FC = () => {
   const [store] = useStore();
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<'ollama' | 'openrouter'>('openrouter');
+
   // Sub-tab is store-controlled so other surfaces (the chat gate) can open the
   // popup directly on the Agents tab. Defaults to Completions; transient (not
   // persisted), so a fresh launch always starts on the ungated Completions pane.
@@ -1823,11 +1843,13 @@ export const ModelManager: FC = () => {
   if (!store.modelManagerOpen) return null;
 
   const statusSubtitle =
-    store.inferenceMode === 'byok' && store.byokProvider
-      ? `BYOK · ${BYOK_PROVIDERS.find(p => p.id === store.byokProvider)?.name ?? store.byokProvider} active`
-      : store.inferenceMode === 'cloud'
-        ? `Cloud Gateway · ${store.activeModel || 'active'}`
-        : 'Configure your inference backend';
+    store.activeBackendCategory === 'local'
+      ? `Local · Ollama (${store.byokProvider === 'ollama' && store.byokModel ? store.byokModel : 'active'})`
+      : store.inferenceMode === 'byok' && store.byokProvider
+        ? `BYOK · ${BYOK_PROVIDERS.find(p => p.id === store.byokProvider)?.name ?? store.byokProvider} active`
+        : store.inferenceMode === 'cloud'
+          ? `Cloud Gateway · ${store.activeModel || 'active'}`
+          : 'Configure your inference backend';
 
   return (
     <div
@@ -1841,14 +1863,14 @@ export const ModelManager: FC = () => {
         className="animate-fade-in"
         onClick={e => e.stopPropagation()}
         style={{
-          width: '560px', maxHeight: '88vh', background: 'var(--matugen-on-secondary, #1d343c)',
+          width: '580px', maxHeight: '88vh', background: 'var(--matugen-on-secondary, #1d343c)',
           border: '1px solid var(--border-glass)', borderRadius: 'var(--radius-lg)',
           boxShadow: '0 20px 60px rgba(0,0,0,.7)', display: 'flex', flexDirection: 'column',
           overflow: 'hidden', backdropFilter: 'blur(20px)',
         }}
       >
         {/* Header */}
-        <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: '14px 20px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-sm)', background: PRIMARY, color: ON_PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Cpu size={17} color={ON_PRIMARY} />
@@ -1857,40 +1879,140 @@ export const ModelManager: FC = () => {
               <div style={{ fontWeight: 700, fontSize: '14px', color: 'var(--text-primary)' }}>Candy Agent</div>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{statusSubtitle}</div>
             </div>
+
+            {/* The 'Completions/Agents' pill buttons moved right after 'Candy Agent' header text */}
+            <div style={{
+              display: 'inline-flex', gap: '2px', padding: '3px', borderRadius: '9999px',
+              background: 'rgba(0,0,0,0.22)', border: '1px solid var(--border-subtle)',
+              marginLeft: '8px',
+            }}>
+              {([['completions', 'Completions'], ['agents', 'Agents']] as const).map(([id, label]) => {
+                const active = subTab === id && !showSettings;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => { setShowSettings(false); setSubTab(id); }}
+                    style={{
+                      padding: '4px 12px', borderRadius: '9999px', border: 'none', cursor: 'pointer',
+                      background: active ? PRIMARY : 'transparent',
+                      color: active ? ON_PRIMARY : PRIMARY,
+                      fontSize: '11px', fontWeight: 700, letterSpacing: '.01em',
+                      transition: 'all .18s cubic-bezier(0.16, 1, 0.3, 1)',
+                    }}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Right header controls: Settings glyph toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              type="button"
+              onClick={() => setShowSettings(!showSettings)}
+              style={{
+                background: showSettings ? PRIMARY : 'rgba(255,255,255,0.06)',
+                color: showSettings ? ON_PRIMARY : 'var(--text-secondary)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '6px',
+                width: '30px',
+                height: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title={showSettings ? 'Back to Model Selection' : 'Configure AI Parameters (Reasoning, Temperature, Sliders)'}
+            >
+              <Sliders size={15} />
+            </button>
           </div>
         </div>
 
-        {/* Sub-tab segmented pill control (replaces the old BYOK Open Access card) */}
+        {/* Sub-header navigation row */}
         <div style={{ padding: '12px 20px 0' }}>
-          <div style={{
-            display: 'flex', gap: '4px', padding: '4px', borderRadius: '9999px',
-            background: 'var(--matugen-on-secondary, #1d343c)',
-            border: '1px solid var(--border-subtle)',
-          }}>
-            {([['completions', 'Completions'], ['agents', 'Agents']] as const).map(([id, label]) => {
-              const active = subTab === id;
-              return (
-                <button key={id} onClick={() => setSubTab(id)} style={{
+          {showSettings ? (
+            /* Settings Subtabs (Local / Cloud) */
+            <div style={{
+              display: 'flex', gap: '4px', padding: '4px', borderRadius: '9999px',
+              background: 'rgba(0,0,0,0.22)', border: '1px solid var(--border-subtle)',
+            }}>
+              <button
+                type="button"
+                onClick={() => setSettingsTab('ollama')}
+                style={{
                   flex: 1, padding: '7px 0', borderRadius: '9999px', border: 'none', cursor: 'pointer',
-                  background: active ? PRIMARY : 'transparent',
-                  color: active ? ON_PRIMARY : PRIMARY,
+                  background: settingsTab === 'ollama' ? PRIMARY : 'transparent',
+                  color: settingsTab === 'ollama' ? ON_PRIMARY : PRIMARY,
+                  fontSize: '12px', fontWeight: 700,
+                  transition: 'all .18s ease',
+                }}
+              >
+                Local Settings (Ollama)
+              </button>
+              <button
+                type="button"
+                onClick={() => setSettingsTab('openrouter')}
+                style={{
+                  flex: 1, padding: '7px 0', borderRadius: '9999px', border: 'none', cursor: 'pointer',
+                  background: settingsTab === 'openrouter' ? PRIMARY : 'transparent',
+                  color: settingsTab === 'openrouter' ? ON_PRIMARY : PRIMARY,
+                  fontSize: '12px', fontWeight: 700,
+                  transition: 'all .18s ease',
+                }}
+              >
+                Cloud Settings (OpenRouter)
+              </button>
+            </div>
+          ) : (
+            /* Main Local / Cloud Toggle */
+            <div style={{
+              display: 'flex', gap: '4px', padding: '4px', borderRadius: '9999px',
+              background: 'rgba(0,0,0,0.22)', border: '1px solid var(--border-subtle)',
+            }}>
+              <button
+                type="button"
+                onClick={() => setStore({ activeBackendCategory: 'local' })}
+                style={{
+                  flex: 1, padding: '7px 0', borderRadius: '9999px', border: 'none', cursor: 'pointer',
+                  background: store.activeBackendCategory === 'local' ? PRIMARY : 'transparent',
+                  color: store.activeBackendCategory === 'local' ? ON_PRIMARY : PRIMARY,
                   fontSize: '12px', fontWeight: 700, letterSpacing: '.01em',
                   transition: 'all .18s cubic-bezier(0.16, 1, 0.3, 1)',
-                }}>
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+                }}
+              >
+                Local (Ollama)
+              </button>
+              <button
+                type="button"
+                onClick={() => setStore({ activeBackendCategory: 'cloud' })}
+                style={{
+                  flex: 1, padding: '7px 0', borderRadius: '9999px', border: 'none', cursor: 'pointer',
+                  background: store.activeBackendCategory === 'cloud' ? PRIMARY : 'transparent',
+                  color: store.activeBackendCategory === 'cloud' ? ON_PRIMARY : PRIMARY,
+                  fontSize: '12px', fontWeight: 700, letterSpacing: '.01em',
+                  transition: 'all .18s cubic-bezier(0.16, 1, 0.3, 1)',
+                }}
+              >
+                Cloud (OpenRouter)
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Content — no inline scrollbarWidth: setting the standard
-            scrollbar-width makes WebKit ignore the themed ::-webkit-scrollbar
-            rules in theme.css and repaint a default (white) bar. Leaving it
-            unset lets the global 5px themed scrollbar apply, whose transparent
-            track shows this popup's --matugen-on-secondary background. */}
+        {/* Content body */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
-          {subTab === 'completions' ? <CompletionsTab /> : <CloudTab />}
+          {showSettings ? (
+            <AISettingsPanel tab={settingsTab} />
+          ) : store.activeBackendCategory === 'local' ? (
+            <OllamaModelView mode={subTab} />
+          ) : (
+            subTab === 'completions' ? <CompletionsTab /> : <CloudTab />
+          )}
         </div>
       </div>
     </div>

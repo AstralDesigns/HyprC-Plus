@@ -1456,6 +1456,11 @@ Item {
                 win.switchTab("agent")
             }
 
+            Process {
+                id: ollamaStopProc
+                command: [Config.home + "/.config/quickshell/bar/scripts/ollama-service.sh", "stop"]
+            }
+
             // The circular workspace toggle handler: flip + persist the policy, then
             // reveal (ON) or hide-and-return-to-launcher (OFF).
             function agentToggleWorkspace() {
@@ -1468,6 +1473,8 @@ Item {
                     win.agentReady = false
                     win.agentStarting = false
                     win._webClearCache()
+                    ollamaStopProc.running = false
+                    ollamaStopProc.running = true
                     win.switchTab("launcher")
                 }
             }

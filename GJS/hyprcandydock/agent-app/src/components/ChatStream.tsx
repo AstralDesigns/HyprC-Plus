@@ -18,6 +18,7 @@ import { selectionRangeLabel, type SelectionRef } from '../utils/editorClipboard
 import { agentEngine } from '../engine/agent-engine';
 import { ImageLightboxModal } from './ImageLightboxModal';
 import { PromptContextMenu } from './PromptContextMenu';
+import { MermaidDiagram } from './MermaidDiagram';
 
 /* ── Empty chat screen ──────────────────────────────────────────────── */
 const EmptyChatScreen: React.FC = () => (
@@ -449,6 +450,13 @@ const renderMarkdown = (content: string, summaryMode?: boolean | string, selecti
             );
           },
           code({ node, className, children, ...props }: any) {
+            const match = /language-(\w+)/.exec(className || '');
+            const lang = match ? match[1] : '';
+
+            if (lang === 'mermaid') {
+              return <MermaidDiagram code={String(children).replace(/\n$/, '')} />;
+            }
+
             const isInline = !className;
             if (isInline) {
               const text = String(children || '').trim();
