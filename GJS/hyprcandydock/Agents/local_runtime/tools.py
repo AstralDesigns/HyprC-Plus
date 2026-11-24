@@ -26,6 +26,21 @@ from urllib.parse import urlencode
 
 import httpx
 
+try:
+    from ddgs import DDGS
+except ImportError:
+    DDGS = None  # type: ignore
+
+try:
+    from curl_cffi.requests import AsyncSession
+except ImportError:
+    AsyncSession = None  # type: ignore
+
+try:
+    import trafilatura
+except ImportError:
+    trafilatura = None  # type: ignore
+
 # ── Pending file edits (write_file stages here for accept/reject review) ────
 # Files are written to disk immediately (so subsequent tool calls in the same
 # turn see consistent state — a read_file right after a write_file must see
@@ -781,24 +796,24 @@ async def web_search(query: str, max_results: int = 8) -> list[dict]:
         return []
 
     # Tier 1: ddgs
-    try:
-        from ddgs import DDGS
-        def _sync_ddgs():
-            d = DDGS()
-            return list(d.text(cleaned_query, max_results=max_results))
-        results = await asyncio.to_thread(_sync_ddgs)
-        if results:
-            formatted = []
-            for r in results:
-                title = r.get("title") or ""
-                url = r.get("href") or r.get("url") or ""
-                snippet = r.get("body") or r.get("snippet") or ""
-                if title or url:
-                    formatted.append({"title": title, "url": url, "content": snippet})
-            if formatted:
-                return formatted
-    except Exception as exc:
-        pass
+    if DDGS is not None:
+        try:
+            def _sync_ddgs():
+                d = DDGS()
+                return list(d.text(cleaned_query, max_results=max_results))
+            results = await asyncio.to_thread(_sync_ddgs)
+            if results:
+                formatted = []
+                for r in results:
+                    title = r.get("title") or ""
+                    url = r.get("href") or r.get("url") or ""
+                    snippet = r.get("body") or r.get("snippet") or ""
+                    if title or url:
+                        formatted.append({"title": title, "url": url, "content": snippet})
+                if formatted:
+                    return formatted
+        except Exception:
+            pass
 
     # Tier 2: SearXNG fallback
     try:
@@ -835,42 +850,40 @@ async def fetch_url(url: str, max_chars: int = 24000) -> dict:
         return {"url": "", "text": "Error: empty URL provided."}
 
     # Tier 1: curl_cffi + trafilatura
-    try:
-        from curl_cffi.requests import AsyncSession
-        import trafilatura
-
-        headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
-        async with AsyncSession(impersonate="chrome", timeout=12) as session:
-            resp = await session.get(target_url, headers=headers)
-            if resp.status_code == 200:
-                extracted = trafilatura.extract(
-                    resp.text,
-                    output_format="markdown",
-                    include_links=True,
-                    include_formatting=True,
-                )
-                if extracted and len(extracted.strip()) > 100:
-                    clean_md = extracted.strip()[:max_chars]
-                    return {"url": target_url, "text": clean_md}
-    except Exception:
-        pass
+    if AsyncSession is not None and trafilatura is not None:
+        try:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+            async with AsyncSession(impersonate="chrome", timeout=12) as session:
+                resp = await session.get(target_url, headers=headers)
+                if resp.status_code == 200:
+                    extracted = trafilatura.extract(
+                        resp.text,
+                        output_format="markdown",
+                        include_links=True,
+                        include_formatting=True,
+                    )
+                    if extracted and len(extracted.strip()) > 100:
+                        clean_md = extracted.strip()[:max_chars]
+                        return {"url": target_url, "text": clean_md}
+        except Exception:
+            pass
 
     # Tier 2: Jina Reader fallback (r.jina.ai)
-    try:
-        from curl_cffi.requests import AsyncSession
-        jina_url = f"https://r.jina.ai/{target_url}"
-        async with AsyncSession(timeout=15) as session:
-            jina_resp = await session.get(jina_url)
-            if jina_resp.status_code == 200 and jina_resp.text:
-                clean_md = jina_resp.text.strip()[:max_chars]
-                if len(clean_md) > 100:
-                    return {"url": target_url, "text": clean_md}
-    except Exception:
-        pass
+    if AsyncSession is not None:
+        try:
+            jina_url = f"https://r.jina.ai/{target_url}"
+            async with AsyncSession(timeout=15) as session:
+                jina_resp = await session.get(jina_url)
+                if jina_resp.status_code == 200 and jina_resp.text:
+                    clean_md = jina_resp.text.strip()[:max_chars]
+                    if len(clean_md) > 100:
+                        return {"url": target_url, "text": clean_md}
+        except Exception:
+            pass
 
     # Tier 3: Standard httpx fallback with HTML stripping
     try:

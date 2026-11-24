@@ -10,6 +10,13 @@ import {
   GitCompare,
   RotateCcw,
   Lock,
+  ChevronUp,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  FileCode,
+  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import { useStoreSelector, storeActions, getStore } from '../store';
 import { MediaGallery } from './MediaGallery';
@@ -412,11 +419,12 @@ function registerFindWidgetCrossFileNav(editor: any, monaco: any, paneId: string
 
 /** Toolbar shown above the editor when the open file has a pending write_file
  * edit awaiting review — lets the user flip to a diff view and keep/undo
- * either this file or every pending file at once, without leaving Canvas. */
+ * either this file or every pending file at once, with change-jumping arrows. */
 const PendingEditToolbar: React.FC<{
   path: string; additions: number; deletions: number; pendingCount: number;
   diffView: boolean; onToggleDiff: () => void;
-}> = ({ path, additions, deletions, pendingCount, diffView, onToggleDiff }) => (
+  onPrevChange?: () => void; onNextChange?: () => void;
+}> = ({ path, additions, deletions, pendingCount, diffView, onToggleDiff, onPrevChange, onNextChange }) => (
   <div className="canvas-pending-toolbar">
     <div className="canvas-pending-toolbar-info">
       <span className="canvas-pending-badge">Pending change</span>
@@ -424,6 +432,28 @@ const PendingEditToolbar: React.FC<{
       <span className="diff-card-stat-del">-{deletions}</span>
     </div>
     <div className="canvas-pending-toolbar-actions">
+      {diffView && (
+        <div className="canvas-diff-nav-btns" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', marginRight: '4px' }}>
+          <button
+            type="button"
+            className="canvas-pending-btn"
+            style={{ padding: '3px 6px' }}
+            onClick={onPrevChange}
+            title="Previous change (Up)"
+          >
+            <ChevronUp size={12} />
+          </button>
+          <button
+            type="button"
+            className="canvas-pending-btn"
+            style={{ padding: '3px 6px' }}
+            onClick={onNextChange}
+            title="Next change (Down)"
+          >
+            <ChevronDown size={12} />
+          </button>
+        </div>
+      )}
       <button type="button" className={`canvas-pending-btn ${diffView ? 'canvas-pending-btn-active' : ''}`} onClick={onToggleDiff} title="Toggle diff view">
         <GitCompare size={12} /> Diff
       </button>
@@ -448,6 +478,83 @@ const PendingEditToolbar: React.FC<{
   </div>
 );
 
+/** Banner shown at the top of Canvas when files were modified by the agent
+ * but the user is currently viewing a different, unmodified file. Lets them
+ * navigate directly between the changed files like in standard IDEs. */
+const ExternalChangedNavigatorBanner: React.FC<{
+  pendingPaths: string[];
+}> = ({ pendingPaths }) => {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  if (!pendingPaths || pendingPaths.length === 0) return null;
+
+  const validIndex = currentIndex >= pendingPaths.length ? 0 : currentIndex;
+  const targetPath = pendingPaths[validIndex];
+  const filename = targetPath.split('/').pop() || targetPath;
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(i => (i - 1 + pendingPaths.length) % pendingPaths.length);
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex(i => (i + 1) % pendingPaths.length);
+  };
+
+  return (
+    <div className="canvas-changed-nav-banner animate-fade-in">
+      <div className="canvas-changed-nav-left">
+        <FileCode size={13} color="var(--matugen-primary, #a0c9dc)" />
+        <span className="canvas-changed-nav-label">
+          Agent edited <strong>{pendingPaths.length} file{pendingPaths.length === 1 ? '' : 's'}</strong>:
+        </span>
+        <button
+          type="button"
+          className="canvas-changed-nav-target-btn"
+          onClick={() => storeActions.openFileByPath(targetPath)}
+          title={`Open ${targetPath} in canvas`}
+        >
+          {filename}
+        </button>
+      </div>
+
+      <div className="canvas-changed-nav-actions">
+        {pendingPaths.length > 1 && (
+          <div className="canvas-changed-nav-arrows">
+            <button
+              type="button"
+              className="canvas-changed-nav-btn"
+              onClick={handlePrev}
+              title="Previous edited file"
+            >
+              <ChevronLeft size={12} />
+            </button>
+            <span className="canvas-changed-nav-counter">
+              {validIndex + 1}/{pendingPaths.length}
+            </span>
+            <button
+              type="button"
+              className="canvas-changed-nav-btn"
+              onClick={handleNext}
+              title="Next edited file"
+            >
+              <ChevronRight size={12} />
+            </button>
+          </div>
+        )}
+        <button
+          type="button"
+          className="canvas-changed-nav-btn canvas-changed-nav-open-btn"
+          onClick={() => storeActions.openFileByPath(targetPath)}
+          title="Jump to this file"
+        >
+          <ExternalLink size={11} /> Review
+        </button>
+      </div>
+    </div>
+  );
+};
+
 export const Canvas: React.FC = () => {
   // Selective subscription: Canvas/Monaco must not re-render on every chat
   // token (sessions update ~every 80ms while streaming) — only when the
@@ -470,6 +577,7 @@ export const Canvas: React.FC = () => {
   const monacoRef = useRef<any>(null);
   const markerDispRef = useRef<any>(null);
   const editorRef = useRef<any>(null);
+  const diffNavRef = useRef<any>(null);
   const lastEmittedRef = useRef<string>('');
   const [diffView, setDiffView] = useState(false);
 
@@ -485,6 +593,7 @@ export const Canvas: React.FC = () => {
 
   const pendingEdit = activePane?.path ? store.pendingFiles[activePane.path] : undefined;
   const pendingCount = Object.keys(store.pendingFiles).length;
+  const otherPendingPaths = Object.keys(store.pendingFiles).filter(p => !activePane?.path || p !== activePane.path);
 
   // Diff view only makes sense while the file actually has a pending edit;
   // drop back to the normal editor the moment it's kept/undone.
@@ -712,7 +821,7 @@ export const Canvas: React.FC = () => {
           const showDiff = !!pendingEdit && diffView;
           return (
             <div key={pane.id} className="canvas-editor-pane-wrap">
-              {pendingEdit && (
+              {pendingEdit ? (
                 <PendingEditToolbar
                   path={pane.path!}
                   additions={pendingEdit.additions}
@@ -720,7 +829,35 @@ export const Canvas: React.FC = () => {
                   pendingCount={pendingCount}
                   diffView={diffView}
                   onToggleDiff={() => setDiffView(v => !v)}
+                  onPrevChange={() => diffNavRef.current?.previous()}
+                  onNextChange={() => diffNavRef.current?.next()}
                 />
+              ) : otherPendingPaths.length > 0 ? (
+                <ExternalChangedNavigatorBanner pendingPaths={otherPendingPaths} />
+              ) : null}
+              {pane.externalChanged && (
+                <div className="canvas-external-conflict-banner animate-fade-in">
+                  <AlertTriangle size={12} className="canvas-conflict-icon" />
+                  <span className="canvas-conflict-text">This file was changed externally on disk.</span>
+                  <div className="canvas-conflict-actions">
+                    <button
+                      type="button"
+                      className="canvas-conflict-btn canvas-conflict-btn-overwrite"
+                      onClick={() => storeActions.saveFile(pane.id)}
+                      title="Overwrite disk with your current editor changes"
+                    >
+                      Overwrite Disk
+                    </button>
+                    <button
+                      type="button"
+                      className="canvas-conflict-btn canvas-conflict-btn-revert"
+                      onClick={() => storeActions.reloadPaneFromDisk(pane.id)}
+                      title="Discard editor changes and reload disk content"
+                    >
+                      Reload from Disk
+                    </button>
+                  </div>
+                </div>
               )}
               {pane.isReadOnly && (
                 <div className="canvas-readonly-banner animate-fade-in">
@@ -751,6 +888,14 @@ export const Canvas: React.FC = () => {
                     keepCurrentOriginalModel={true}
                     keepCurrentModifiedModel={true}
                     beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); monacoRef.current = monaco; }}
+                    onMount={(diffEditor, monaco) => {
+                      try {
+                        diffNavRef.current = monaco.editor.createDiffNavigator(diffEditor, {
+                          followsCaret: true,
+                          ignoreCharChanges: true,
+                        });
+                      } catch { /* noop */ }
+                    }}
                     language={pane.language || 'plaintext'}
                     original={pendingEdit!.oldContent}
                     modified={pane.content}

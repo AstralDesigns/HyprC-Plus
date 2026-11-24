@@ -19,6 +19,7 @@ import { agentEngine } from '../engine/agent-engine';
 import { ImageLightboxModal } from './ImageLightboxModal';
 import { PromptContextMenu } from './PromptContextMenu';
 import { MermaidDiagram } from './MermaidDiagram';
+import { DiffPreviewModal } from './DiffPreviewModal';
 
 /* ── Empty chat screen ──────────────────────────────────────────────── */
 const EmptyChatScreen: React.FC = () => (
@@ -577,55 +578,75 @@ const FilesChangedWidget: React.FC<{
   diffs: DiffData[];
 }> = ({ diffs }) => {
   const [expanded, setExpanded] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
   if (!diffs || diffs.length === 0) return null;
 
   const totalAdd = diffs.reduce((n, d) => n + (d.additions || 0), 0);
   const totalDel = diffs.reduce((n, d) => n + (d.deletions || 0), 0);
 
   return (
-    <div className="files-changed-widget">
-      <div
-        className="files-changed-header"
-        onClick={() => setExpanded(e => !e)}
-        title="Click to toggle changed files list"
-      >
-        <div className="files-changed-title">
-          {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <FileCode size={12} color="var(--matugen-primary, #a0c9dc)" />
-          <strong>{diffs.length} file{diffs.length === 1 ? '' : 's'} changed</strong>
-          {totalAdd > 0 && <span className="stat-add">+{totalAdd}</span>}
-          {totalDel > 0 && <span className="stat-del">-{totalDel}</span>}
+    <>
+      <div className="files-changed-widget">
+        <div
+          className="files-changed-header"
+          onClick={() => setExpanded(e => !e)}
+          title="Click to toggle changed files list"
+        >
+          <div className="files-changed-title">
+            {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+            <FileCode size={12} color="var(--matugen-primary, #a0c9dc)" />
+            <strong>{diffs.length} file{diffs.length === 1 ? '' : 's'} changed</strong>
+            {totalAdd > 0 && <span className="stat-add">+{totalAdd}</span>}
+            {totalDel > 0 && <span className="stat-del">-{totalDel}</span>}
+          </div>
+          <div className="files-changed-actions" onClick={e => e.stopPropagation()}>
+            <button
+              type="button"
+              className="files-changed-preview-btn"
+              onClick={() => setShowPreviewModal(true)}
+              title="Preview all changes in diff modal"
+            >
+              <Eye size={11} /> Preview
+            </button>
+          </div>
         </div>
+        {expanded && (
+          <div className="files-changed-list">
+            {diffs.map(d => {
+              const parts = d.filePath.split('/');
+              const fileName = parts.pop() || d.filePath;
+              const dirPath = parts.slice(-2).join('/');
+              return (
+                <div
+                  key={d.filePath}
+                  className="files-changed-row"
+                  onClick={() => storeActions.openFileByPath(d.filePath)}
+                  title={`Open ${d.filePath} in canvas`}
+                >
+                  <FileIcon name={fileName} isDir={false} size={13} />
+                  <span className="files-changed-name">{fileName}</span>
+                  {dirPath && <span className="files-changed-dir">…/{dirPath}</span>}
+                  <span className="files-changed-spacer" />
+                  {d.additions != null && d.additions > 0 && (
+                    <span className="stat-add">+{d.additions}</span>
+                  )}
+                  {d.deletions != null && d.deletions > 0 && (
+                    <span className="stat-del">-{d.deletions}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-      {expanded && (
-        <div className="files-changed-list">
-          {diffs.map(d => {
-            const parts = d.filePath.split('/');
-            const fileName = parts.pop() || d.filePath;
-            const dirPath = parts.slice(-2).join('/');
-            return (
-              <div
-                key={d.filePath}
-                className="files-changed-row"
-                onClick={() => storeActions.openFileByPath(d.filePath)}
-                title={`Open ${d.filePath} in canvas`}
-              >
-                <FileIcon name={fileName} isDir={false} size={13} />
-                <span className="files-changed-name">{fileName}</span>
-                {dirPath && <span className="files-changed-dir">…/{dirPath}</span>}
-                <span className="files-changed-spacer" />
-                {d.additions != null && d.additions > 0 && (
-                  <span className="stat-add">+{d.additions}</span>
-                )}
-                {d.deletions != null && d.deletions > 0 && (
-                  <span className="stat-del">-{d.deletions}</span>
-                )}
-              </div>
-            );
-          })}
-        </div>
+
+      {showPreviewModal && (
+        <DiffPreviewModal
+          diffs={diffs}
+          onClose={() => setShowPreviewModal(false)}
+        />
       )}
-    </div>
+    </>
   );
 };
 

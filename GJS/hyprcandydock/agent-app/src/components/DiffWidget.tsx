@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { DiffEditor } from '@monaco-editor/react';
-import { Check, X, ChevronDown, ChevronRight, FileCode, FilePlus2, CheckCircle2, XCircle, ExternalLink, Eye } from 'lucide-react';
+import { Check, X, ChevronDown, ChevronRight, ChevronUp, FileCode, FilePlus2, CheckCircle2, XCircle, ExternalLink, Eye } from 'lucide-react';
 import { DiffData, storeActions, useStore } from '../store';
 import { registerMonacoThemes } from '../utils/monacoThemes';
 import { languageForPath, registerCustomLanguages } from '../utils/monacoLanguages';
@@ -15,6 +15,7 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
   const [store] = useStore();
   const [collapsed, setCollapsed] = useState(true);
   const [busy, setBusy] = useState(false);
+  const diffNavRef = useRef<any>(null);
   const targetTheme = store.monacoTheme === 'matugen' || !store.monacoTheme ? 'matugen' : store.monacoTheme;
 
   const handleAccept = async () => {
@@ -53,6 +54,26 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
         </div>
 
         <div className="diff-card-actions" onClick={e => e.stopPropagation()}>
+          {!collapsed && (
+            <div className="diff-card-nav-btns" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', marginRight: '4px' }}>
+              <button
+                type="button"
+                className="diff-nav-arrow-btn"
+                title="Previous change (Up)"
+                onClick={() => diffNavRef.current?.previous()}
+              >
+                <ChevronUp size={12} />
+              </button>
+              <button
+                type="button"
+                className="diff-nav-arrow-btn"
+                title="Next change (Down)"
+                onClick={() => diffNavRef.current?.next()}
+              >
+                <ChevronDown size={12} />
+              </button>
+            </div>
+          )}
           {diff.status === 'accepted' ? (
             <div className="diff-card-status diff-card-status-accepted" title="Kept">
               <CheckCircle2 size={14} />
@@ -95,6 +116,14 @@ export const DiffWidget: React.FC<DiffWidgetProps> = ({ sessionId, messageId, di
             height="260px"
             theme={targetTheme}
             beforeMount={(monaco) => { registerMonacoThemes(monaco); registerCustomLanguages(monaco); }}
+            onMount={(diffEditor, monaco) => {
+              try {
+                diffNavRef.current = monaco.editor.createDiffNavigator(diffEditor, {
+                  followsCaret: true,
+                  ignoreCharChanges: true,
+                });
+              } catch { /* noop */ }
+            }}
             language={getLanguageFromPath(diff.filePath)}
             original={diff.originalCode}
             modified={diff.modifiedCode}
