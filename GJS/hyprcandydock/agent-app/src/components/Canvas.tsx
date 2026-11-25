@@ -629,6 +629,10 @@ export const Canvas: React.FC = () => {
       // Untitled panes have no disk path; their models live under the same
       // synthetic inmemory URI the Editor path prop uses, so keep them alive
       // while the tab is open (disposing them blanks the canvas mid-edit).
+      // The URI MUST be `inmemory:///untitled/<id>` (empty authority): with
+      // two slashes `untitled` parses as the AUTHORITY and uri.path becomes
+      // `/<id>`, which never matches this retention set — every panes update
+      // (paste, keystroke, view-state save) then disposed the live model.
       const openPaths = new Set(store.panes.map(p => p.path || `/untitled/${p.id}`).filter(Boolean));
       const models = monacoRef.current.editor.getModels();
       for (const m of models) {
@@ -923,7 +927,7 @@ export const Canvas: React.FC = () => {
                 ) : (
                   <Editor
                     height="100%"
-                    path={pane.path || `inmemory://untitled/${pane.id}`}
+                    path={pane.path || `inmemory:///untitled/${pane.id}`}
                     theme={targetTheme}
                     keepCurrentModel={true}
                     saveViewState={true}

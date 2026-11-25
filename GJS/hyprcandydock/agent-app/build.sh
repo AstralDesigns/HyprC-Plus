@@ -67,6 +67,11 @@ VENV="$RUNTIME_DIR/.venv"
 if [[ ! -f "$VENV/bin/uvicorn" ]]; then
   echo "Creating Python virtual environment and installing dependencies..."
   python3 -m venv "$VENV"
+  # venv ships Python's bundled ensurepip pip, which lags PyPI and nags about
+  # upgrades. Bootstrap to the latest release right away — deliberately
+  # unpinned so every fresh venv auto-resolves to current pip. Existing venvs
+  # are kept current by Candy_Update.sh's runtime maintenance pass.
+  "$VENV/bin/python" -m pip install --quiet --upgrade pip
   # Keep this package list identical to start.sh's own bootstrap — that
   # script re-checks/re-installs the same way on every launch, so the two
   # must never drift.

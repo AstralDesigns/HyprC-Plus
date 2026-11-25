@@ -13,6 +13,8 @@ LOG="$SCRIPT_DIR/.runtime.log"
 if [ ! -f "$VENV/bin/uvicorn" ]; then
     echo "[runtime] Setting up Python virtual environment..."
     python3 -m venv "$VENV"
+    # Latest pip from PyPI (ensurepip's bundled copy lags) — unpinned on purpose.
+    "$VENV/bin/python" -m pip install --quiet --upgrade pip
     "$VENV/bin/pip" install --quiet \
         fastapi \
         uvicorn[standard] \
