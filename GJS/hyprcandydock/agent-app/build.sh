@@ -105,8 +105,24 @@ else
 fi
 
 echo "== 2/2: agent-app frontend (React UI) =="
-if [[ ! -d node_modules || ! -d node_modules/@xterm/addon-image ]]; then
+# An interrupted install (OOM on a low-RAM box, cancelled run) can leave a
+# PARTIAL node_modules that still passes the old @xterm-only probe — tsc then
+# dies with "Cannot find module 'remark-gfm' / 'mermaid'" on every re-run.
+# Validate the whole declared tree (npm ls exits non-zero on anything
+# missing/invalid) and repair instead of trusting directory presence.
+if [[ ! -d node_modules || ! -d node_modules/@xterm/addon-image ]] \
+  || ! npm ls --depth=0 >/dev/null 2>&1; then
   npm ci --include=dev --no-audit --no-fund --loglevel=error || npm install --include=dev --no-audit --no-fund
+  # npm ci wipes the tree before extracting; if it died mid-extract the
+  # fallback install must have repaired it. Refuse to enter tsc with a broken
+  # tree — one last repair pass, then fail loudly.
+  if ! npm ls --depth=0 >/dev/null 2>&1; then
+    npm install --include=dev --no-audit --no-fund
+    npm ls --depth=0 >/dev/null 2>&1 || {
+      echo "[build.sh] node_modules still incomplete after repair — check disk space / network, then re-run." >&2
+      exit 1
+    }
+  fi
 fi
 
 # Ensure @xterm/addon-image supports IIP inline images without explicit size= (fastfetch compatibility)
