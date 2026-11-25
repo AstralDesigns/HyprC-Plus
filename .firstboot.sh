@@ -16,7 +16,7 @@ rm -f "$HOME/.config/systemd/user/hyprcandy-firstboot.service"
 #    iso-seeds is packaging-only. (No --ignore='wallpaper' — it would also
 #    exclude quickshell/wallpaper, since stow matches basenames.)
 cd "$HC"
-STOW_ARGS=(-v -t "$HOME" --ignore='Gifs' --ignore='GJS' --ignore='Greeter' --ignore='Wallhaven' --ignore='iso-seeds')
+STOW_ARGS=(-v -t "$HOME" --ignore='Gifs' --ignore='GJS' --ignore='Greeter' --ignore='Wallhaven' --ignore='iso-seeds' --ignore='ISO')
 stow "${STOW_ARGS[@]}" . || stow -R "${STOW_ARGS[@]}" .
 
 # 3. Executable bits for scripts/hooks.

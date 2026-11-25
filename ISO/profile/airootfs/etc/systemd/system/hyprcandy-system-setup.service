@@ -1,0 +1,13 @@
+[Unit]
+Description=HyprCandy system setup (sudoers, greeter, cursors, services)
+After=local-fs.target systemd-user-sessions.service
+Before=display-manager.service
+ConditionPathExists=!/run/hyprcandy-system-setup.done
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/hyprcandy/system-setup.sh
+
+[Install]
+WantedBy=multi-user.target

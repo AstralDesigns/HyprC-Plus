@@ -1,0 +1,36 @@
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/cp -r @HOME@/.icons/* /usr/share/icons/
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/magick * /usr/share/sddm/themes/sugar-candy/Backgrounds/*
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/sed -i s|^Background=*|* /usr/share/sddm/themes/sugar-candy/theme.conf
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/sed -i s|^BackgroundColor=*|* /usr/share/sddm/themes/sugar-candy/theme.conf
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/sed -i s|^AccentColor=*|* /usr/share/sddm/themes/sugar-candy/theme.conf
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/sed -i s|^CursorTheme=*|* /etc/sddm.conf.d/hyprcandy.conf
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/sed -i s|^CursorSize=*|* /etc/sddm.conf.d/hyprcandy.conf
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/sed -i s|^Inherits=*|* /usr/share/icons/default/index.theme
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/mkdir -p /usr/local/share/gtk3-reload
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/tee /usr/local/share/gtk3-reload/gtk3-reload.c
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/tee /usr/local/share/gtk3-reload/.gtk3-version
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/gcc * /usr/local/lib/gtk3-reload.so
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/gcc -shared -fPIC -o /usr/local/lib/gtk3-reload.so /usr/local/share/gtk3-reload/gtk3-reload.c *
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/dconf update
+@USER@ ALL=(ALL) NOPASSWD: /bin/cat /sys/class/drm/card*/device/gpu_busy_percent
+@USER@ ALL=(ALL) NOPASSWD: /bin/cat /sys/class/drm/card*/device/hwmon/hwmon*/temp*_input
+@USER@ ALL=(ALL) NOPASSWD: /bin/cat /sys/class/drm/card*/device/mem_info_vram_total
+@USER@ ALL=(ALL) NOPASSWD: /bin/cat /sys/class/drm/card*/device/mem_info_vram_used
+@USER@ ALL=(ALL) NOPASSWD: /bin/cat /sys/class/drm/card*/device/mem_info_gtt_total
+@USER@ ALL=(ALL) NOPASSWD: /bin/cat /sys/class/drm/card*/device/mem_info_gtt_used
+@USER@ ALL=(ALL) NOPASSWD: /bin/cat /sys/class/drm/card*/device/product_name
+@USER@ ALL=(ALL) NOPASSWD: /bin/cat /sys/class/drm/card*/device/address
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/readlink -f /sys/class/drm/card*/device/driver
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/chmod 644 /usr/share/sddm/themes/sugar-candy/Backgrounds/*
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/chvt
+@USER@ ALL=(ALL) NOPASSWD: @HOME@/.config/quickshell/bar/scripts/hyprcandy-docker.sh
+@USER@ ALL=(ALL) NOPASSWD: @HOME@/.config/quickshell/bar/scripts/hyprcandy-docker.sh *
+@USER@ ALL=(ALL) NOPASSWD: @HOME@/.config/quickshell/bar/scripts/hotspot-toggle.sh
+@USER@ ALL=(ALL) NOPASSWD: @HOME@/.config/quickshell/bar/scripts/hotspot-toggle.sh *
+@USER@ ALL=(ALL) NOPASSWD: @HOME@/.config/quickshell/bar/scripts/user-manager.py
+@USER@ ALL=(ALL) NOPASSWD: @HOME@/.config/quickshell/bar/scripts/user-manager.py *
+@USER@ ALL=(ALL) NOPASSWD: @HOME@/.config/quickshell/bar/scripts/greeter-set.sh *
+@USER@ ALL=(ALL) NOPASSWD: @HOME@/.config/quickshell/bar/scripts/greeter-sync.sh
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/ln -sfn @HOME@/.hyprcandy/Greeter/themes/* /usr/share/sddm/themes/*
+@USER@ ALL=(ALL) NOPASSWD: /usr/bin/install -m 644 @HOME@/.config/hyprcandy/user-icon.png /usr/share/sddm/faces/@USER@.face.icon
+Defaults env_keep += "HC_PASS"

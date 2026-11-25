@@ -2915,7 +2915,7 @@ PanelWindow {
                                     }
 
                                     CCSection { text: "Shape" }
-                                    CCSlider { label:"Icon Size"; from:18;to:60;stepSize:1; value:Config.dockIconSize; onMoved:function(v){Config.dockIconSize=v} }
+                                    CCSlider { label:"Icon Size"; from:18;to:60;stepSize:2; value:Config.dockIconSize; onMoved:function(v){Config.dockIconSize=v} }
                                     CCSlider { label:"Start Icon ×"; from:0.5;to:1.5;stepSize:0.05;decimals:2; value:Config.dockStartIconScale; onMoved:function(v){Config.dockStartIconScale=v} }
                                     CCSlider { label:"Trash Icon ×"; from:0.5;to:1.5;stepSize:0.05;decimals:2; value:Config.dockTrashIconScale; onMoved:function(v){Config.dockTrashIconScale=v} }
                                     CCSlider { label:"Spacing"; from:0;to:30;stepSize:1; value:Config.dockButtonSpacing; onMoved:function(v){Config.dockButtonSpacing=v} }
