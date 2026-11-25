@@ -37,12 +37,32 @@ if [ "$_HC_MEM_TOTAL" -lt 6144 ]; then
     _HC_SWAP=/var/tmp/hyprcandy-build.swap
     if ! swapon --show=NAME --noheadings 2>/dev/null | grep -qx "$_HC_SWAP"; then
       if [ ! -f "$_HC_SWAP" ]; then
+        # On btrfs (CachyOS default, compress=zstd) a plain dd file is CoW and
+        # the kernel REFUSES swapon on it. Use the btrfs-aware maker when the
+        # target fs is btrfs — it preallocates a NOCOW, uncompressed file.
         # shellcheck disable=SC2086
-        $_HC_MODE dd if=/dev/zero of="$_HC_SWAP" bs=1M count=4096 status=none 2>/dev/null \
-          && $_HC_MODE chmod 600 "$_HC_SWAP" 2>/dev/null \
-          && $_HC_MODE mkswap "$_HC_SWAP" >/dev/null 2>&1 || { _HC_SWAP=""; }
+        if [ "$(stat -f -c %T /var/tmp 2>/dev/null)" = "btrfs" ] \
+          && $_HC_MODE btrfs filesystem mkswapfile --size 4g "$_HC_SWAP" >/dev/null 2>&1; then
+          :
+        else
+          # shellcheck disable=SC2086
+          $_HC_MODE dd if=/dev/zero of="$_HC_SWAP" bs=1M count=4096 status=none 2>/dev/null \
+            && $_HC_MODE chmod 600 "$_HC_SWAP" 2>/dev/null \
+            && $_HC_MODE mkswap "$_HC_SWAP" >/dev/null 2>&1 || { _HC_SWAP=""; }
+        fi
       fi
-      if [ -n "$_HC_SWAP" ]; then $_HC_MODE swapon "$_HC_SWAP" 2>/dev/null || true; fi
+      # Activate AND verify: a file that won't swapon is not spill. Counting
+      # it anyway used to raise Node's heap to 4 GB on 4 GB btrfs laptops
+      # with no usable swap -> OOM abort mid-build (the laptop-only failure).
+      if [ -n "$_HC_SWAP" ]; then
+        # shellcheck disable=SC2086
+        if ! $_HC_MODE swapon "$_HC_SWAP" 2>/dev/null \
+          || ! swapon --show=NAME --noheadings 2>/dev/null | grep -qx "$_HC_SWAP"; then
+          # shellcheck disable=SC2086
+          $_HC_MODE rm -f "$_HC_SWAP" 2>/dev/null || true
+          _HC_SWAP=""
+        fi
+      fi
     fi
     trap _hc_del_swap EXIT
   fi
