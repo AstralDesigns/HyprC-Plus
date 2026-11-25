@@ -47,4 +47,13 @@ if ! grep -q 'archisobasedir=' /proc/cmdline && [ -f "$HOME/.config/pinned" ]; t
   fi
 fi
 
+# 7. Installed systems only: the live SDDM autologin drop-in survives unpackfs
+#    but references the removed liveuser. Drop it so the greeter owns login
+#    (wheel carries NOPASSWD sudo from the baked g_wheel rule).
+if ! grep -q 'archisobasedir=' /proc/cmdline; then
+  if grep -qs 'liveuser' /etc/sddm.conf.d/autologin.conf; then
+    sudo rm -f /etc/sddm.conf.d/autologin.conf || true
+  fi
+fi
+
 touch "$STATE/firstboot-done"

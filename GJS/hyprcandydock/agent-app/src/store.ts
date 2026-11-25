@@ -903,6 +903,10 @@ let lastToggleTerminalTime = 0;
 /* Store Actions */
 // Suppression window for local saves so inotify / statPoll echo does not flag externalChanged
 const localWriteSuppressions = new Map<string, number>();
+/** Paths with a writeFile in flight. saveFile clears isUnsaved optimistically
+ * before the write lands; without this guard a queued external fs event (or
+ * stat poll) could reload the PRE-write disk bytes over the user's buffer. */
+const localSaveInFlight = new Set<string>();
 
 export const storeActions = {
   focusEditor: () => {
@@ -1677,6 +1681,7 @@ export const storeActions = {
     if (!pane || !pane.path) return;
     // Suppress inotify / statPoll echo for 3.5s so our own write doesn't trigger externalChanged
     localWriteSuppressions.set(pane.path, Date.now() + 3500);
+    localSaveInFlight.add(pane.path);
     // Optimistically clear isUnsaved & externalChanged immediately so UI reflects saved state instantly
     setStore(prev => ({
       panes: prev.panes.map(p => p.id === paneId ? { ...p, isUnsaved: false, externalChanged: false } : p),
@@ -1702,6 +1707,8 @@ export const storeActions = {
         storeActions.openPasswordPrompt(pane.path, undefined, 'file', 'canvas');
       }
       console.error('Failed to save file:', e);
+    } finally {
+      localSaveInFlight.delete(pane.path);
     }
   },
 
@@ -1809,6 +1816,7 @@ export const storeActions = {
             setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, diskMtime: m } : x) }));
             continue;
           }
+          if (localSaveInFlight.has(p.path!)) continue;
           if (p.diskMtime === undefined) {
             setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, diskMtime: m } : x) }));
             continue;
@@ -1848,6 +1856,7 @@ export const storeActions = {
       if (localWriteSuppressions.has(p.path) && localWriteSuppressions.get(p.path)! > now) {
         continue;
       }
+      if (localSaveInFlight.has(p.path)) continue;
       if (p.type !== 'code' && p.type !== 'markdown') continue;
       if (p.isUnsaved) {
         setStore(prev => ({ panes: prev.panes.map(x => x.id === p.id ? { ...x, externalChanged: true } : x) }));

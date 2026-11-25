@@ -337,7 +337,7 @@ export const Composer: React.FC = () => {
     const newLabel = getPastedChipLabel(trimmed);
     pastedStore.current.set(id, { id, label: newLabel, text: newText });
 
-    const chipEl = editorRef.current?.querySelector(`[data-pasted-id="${id}"]`);
+    const chipEl = editorRef.current?.querySelector(`[data-pasted-id="${id}"]`) as HTMLElement | null;
     if (chipEl) {
       const labelSpan = chipEl.querySelector('.pasted-chip-label');
       if (labelSpan) labelSpan.textContent = newLabel;

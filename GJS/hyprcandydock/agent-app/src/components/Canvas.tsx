@@ -578,16 +578,18 @@ export const Canvas: React.FC = () => {
   const markerDispRef = useRef<any>(null);
   const editorRef = useRef<any>(null);
   const diffNavRef = useRef<any>(null);
-  const lastEmittedRef = useRef<string>('');
+  const externalApplyRef = useRef(false);
+  const prevSyncPathRef = useRef<string | undefined>(undefined);
   const [diffView, setDiffView] = useState(false);
 
   // Stable change handler: a fresh closure every render makes the library
   // tear down/re-add its onDidChangeModelContent subscription on each commit,
-  // which can drop a keystroke under rapid typing. Track what we emitted so the
-  // external-sync effect can tell our own edits apart from a background reload.
+  // which can drop a keystroke under rapid typing. Programmatic pushes from
+  // the external-sync effect are flagged so they don't echo back into the
+  // store as user edits (which would mark reloaded tabs dirty).
   const activePaneId = store.activePaneId;
   const handleEditChange = useCallback((val: string | undefined) => {
-    lastEmittedRef.current = val || '';
+    if (externalApplyRef.current) return;
     if (activePaneId) storeActions.updatePaneContent(activePaneId, val || '');
   }, [activePaneId]);
 
@@ -624,7 +626,10 @@ export const Canvas: React.FC = () => {
   useEffect(() => {
     if (!monacoRef.current) return;
     try {
-      const openPaths = new Set(store.panes.map(p => p.path).filter(Boolean));
+      // Untitled panes have no disk path; their models live under the same
+      // synthetic inmemory URI the Editor path prop uses, so keep them alive
+      // while the tab is open (disposing them blanks the canvas mid-edit).
+      const openPaths = new Set(store.panes.map(p => p.path || `/untitled/${p.id}`).filter(Boolean));
       const models = monacoRef.current.editor.getModels();
       for (const m of models) {
         if (!m || m.isDisposed?.()) continue;
@@ -646,7 +651,9 @@ export const Canvas: React.FC = () => {
   // the selection to the end of the file. External reloads always set
   // isUnsaved=false while the user's edits set it true, so gating on
   // !isUnsaved applies only the former — and restoring the position keeps a
-  // background refresh seamless instead of yanking the caret.
+  // background refresh seamless instead of yanking the caret. Exception: when
+  // the pane's path just changed (save-as / rename / tab switch) a cached
+  // model can hold stale bytes; the store buffer must win even if dirty.
   useEffect(() => {
     const ap = activePane;
     if (!ap?.path) return;
@@ -655,15 +662,17 @@ export const Canvas: React.FC = () => {
     let model: any;
     try { model = ed.getModel(); } catch { return; }
     if (!model || model.isDisposed?.()) return;
-    if (ap.isUnsaved) return;
+    const pathChanged = prevSyncPathRef.current !== ap.path;
+    prevSyncPathRef.current = ap.path;
+    if (ap.isUnsaved && !pathChanged) return;
     if (model.getValue() === ap.content) return;
-    // A store update that just echoes our own keystroke isn't an external edit.
-    if (lastEmittedRef.current === ap.content) return;
     const pos = ed.getPosition();
     try {
+      externalApplyRef.current = true;
       ed.setValue(ap.content);
+      externalApplyRef.current = false;
       if (pos) { ed.setPosition(pos); ed.revealPositionInCenterIfOutsideViewport(pos); }
-    } catch { /* editor torn down mid-switch */ }
+    } catch { externalApplyRef.current = false; /* editor torn down mid-switch */ }
   }, [activePane?.id, activePane?.path, activePane?.content, activePane?.isUnsaved]);
 
   // When the app window regains focus with nothing else focused (e.g. coming
@@ -914,7 +923,7 @@ export const Canvas: React.FC = () => {
                 ) : (
                   <Editor
                     height="100%"
-                    path={pane.path}
+                    path={pane.path || `inmemory://untitled/${pane.id}`}
                     theme={targetTheme}
                     keepCurrentModel={true}
                     saveViewState={true}

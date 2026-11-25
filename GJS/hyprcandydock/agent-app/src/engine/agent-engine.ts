@@ -528,6 +528,7 @@ export class AgentEngine {
       let lastActivity = Date.now();
       let lastActionTime = Date.now();
       let lastWatchdogNudgeTime = 0;
+      let hadToolUse = false;
       const WATCHDOG_ACTIONLESS_MS = 30 * 1000;
       let waitingForApproval = false;
       let waitingForSuggestions = false;
