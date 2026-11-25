@@ -3,7 +3,11 @@ import json
 import os
 import subprocess
 import time
+import html
+import re
+import urllib.parse
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -215,7 +219,70 @@ def _save_ai_settings():
         logger.error("Failed to save ai_settings.json: %s", e)
 
 _ollama_pull_tasks: dict[str, dict] = {}
+_ollama_library_cache: list[dict] = []
+_ollama_library_cache_time: float = 0
 OLLAMA_SERVICE_SCRIPT = os.path.expanduser("~/.config/quickshell/bar/scripts/ollama-service.sh")
+
+def _get_offline_ollama_models() -> list[dict]:
+    """Scan local ~/.ollama/models/manifests directly from disk if daemon is offline."""
+    results = []
+    manifests_dir = os.path.expanduser("~/.ollama/models/manifests")
+    if not os.path.isdir(manifests_dir):
+        return results
+    try:
+        for reg in os.listdir(manifests_dir):
+            reg_dir = os.path.join(manifests_dir, reg)
+            if not os.path.isdir(reg_dir):
+                continue
+            for ns in os.listdir(reg_dir):
+                ns_dir = os.path.join(reg_dir, ns)
+                if not os.path.isdir(ns_dir):
+                    continue
+                for mname in os.listdir(ns_dir):
+                    m_dir = os.path.join(ns_dir, mname)
+                    if not os.path.isdir(m_dir):
+                        continue
+                    for tag in os.listdir(m_dir):
+                        tag_path = os.path.join(m_dir, tag)
+                        if not os.path.isfile(tag_path):
+                            continue
+                        full_name = f"{mname}:{tag}" if ns == "library" else f"{ns}/{mname}:{tag}"
+                        stat = os.stat(tag_path)
+                        size = 0
+                        try:
+                            with open(tag_path, "r", encoding="utf-8") as mf:
+                                mdata = json.load(mf)
+                                layers = mdata.get("layers", [])
+                                size = sum(l.get("size", 0) for l in layers)
+                        except Exception:
+                            pass
+                        results.append({
+                            "name": full_name,
+                            "model": full_name,
+                            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            "size": size,
+                            "details": {"family": mname},
+                        })
+    except Exception as e:
+        logger.warning("Error reading offline ollama manifests: %s", e)
+    return results
+
+def _parse_ollama_html(html_text: str) -> list[dict]:
+    items = []
+    seen = set()
+    for full_match in re.finditer(r'<a href=\"/library/([^\"]+)\"(.*?)</a>', html_text, re.DOTALL):
+        mid = full_match.group(1).strip()
+        if mid in seen:
+            continue
+        seen.add(mid)
+        body = full_match.group(2)
+        t_m = re.search(r'<span[^>]*>([^<]+)</span>', body)
+        name = t_m.group(1).strip() if t_m else mid
+        p_m = re.search(r'<p[^>]*>([^<]+)</p>', body)
+        desc = html.unescape(p_m.group(1).strip()) if p_m else ""
+        tags = re.findall(r'<span[^>]*text-indigo-600[^>]*>([^<]+)</span>', body)
+        items.append({"id": mid, "name": name, "desc": desc, "tags": tags})
+    return items
 
 # ── Ollama REST APIs ──────────────────────────────────────────────────────────
 
@@ -237,29 +304,86 @@ async def ollama_service_action(action: str):
 
 @app.get("/api/ollama/status")
 async def ollama_status():
-    host = _ai_settings.get("ollama", {}).get("host", "http://localhost:11434")
+    host = _ai_settings.get("ollama", {}).get("host", "http://127.0.0.1:11434")
+    if "localhost" in host:
+        host = host.replace("localhost", "127.0.0.1")
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=2.0) as client:
             resp = await client.get(f"{host.rstrip('/')}/api/version")
             if resp.status_code == 200:
                 data = resp.json()
                 return {"online": True, "version": data.get("version", "unknown"), "host": host}
-    except Exception as e:
+    except Exception:
         pass
     return {"online": False, "version": None, "host": host, "error": "Ollama service is not running"}
 
 @app.get("/api/ollama/models")
 async def ollama_models():
-    host = _ai_settings.get("ollama", {}).get("host", "http://localhost:11434")
+    host = _ai_settings.get("ollama", {}).get("host", "http://127.0.0.1:11434")
+    if "localhost" in host:
+        host = host.replace("localhost", "127.0.0.1")
+    live_models: list[dict] = []
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=4.0) as client:
             resp = await client.get(f"{host.rstrip('/')}/api/tags")
             if resp.status_code == 200:
                 data = resp.json()
-                return {"models": data.get("models", [])}
+                live_models = data.get("models", [])
+    except Exception:
+        pass
+
+    if live_models:
+        return {"models": live_models}
+
+    # Fallback to local on-disk manifest scan
+    offline = _get_offline_ollama_models()
+    return {"models": offline}
+
+@app.get("/api/ollama/library")
+async def ollama_library(q: str = ""):
+    global _ollama_library_cache, _ollama_library_cache_time
+    cleaned_q = (q or "").strip()
+    now = time.time()
+
+    if cleaned_q:
+        try:
+            url = f"https://ollama.com/search?q={urllib.parse.quote(cleaned_q)}"
+            async with httpx.AsyncClient(timeout=8.0, headers={"User-Agent": "Mozilla/5.0"}) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    models = _parse_ollama_html(resp.text)
+                    if models:
+                        return {"models": models}
+        except Exception as e:
+            logger.warning("Failed to search ollama.com: %s", e)
+        if _ollama_library_cache:
+            filtered = [
+                m for m in _ollama_library_cache
+                if cleaned_q.lower() in m["id"].lower()
+                or cleaned_q.lower() in m["name"].lower()
+                or cleaned_q.lower() in m.get("desc", "").lower()
+                or any(cleaned_q.lower() in t.lower() for t in m.get("tags", []))
+            ]
+            return {"models": filtered}
+        return {"models": []}
+
+    if _ollama_library_cache and (now - _ollama_library_cache_time < 3600):
+        return {"models": _ollama_library_cache}
+
+    try:
+        url = "https://ollama.com/library"
+        async with httpx.AsyncClient(timeout=10.0, headers={"User-Agent": "Mozilla/5.0"}) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                models = _parse_ollama_html(resp.text)
+                if models:
+                    _ollama_library_cache = models
+                    _ollama_library_cache_time = now
+                    return {"models": _ollama_library_cache}
     except Exception as e:
-        return {"models": [], "error": str(e)}
-    return {"models": []}
+        logger.warning("Failed to fetch ollama.com/library: %s", e)
+
+    return {"models": _ollama_library_cache}
 
 @app.post("/api/ollama/pull")
 async def ollama_pull(req: OllamaPullRequest):

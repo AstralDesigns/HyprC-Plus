@@ -5,7 +5,7 @@ ACTION="${1:-status}"
 PORT=11434
 
 is_running() {
-    curl -s --connect-timeout 1 "http://localhost:${PORT}/api/version" >/dev/null 2>&1
+    curl -s --connect-timeout 1 "http://127.0.0.1:${PORT}/api/version" >/dev/null 2>&1
 }
 
 case "$ACTION" in
@@ -21,10 +21,14 @@ case "$ACTION" in
             echo "active"
             exit 0
         fi
+        systemctl --user start ollama 2>/dev/null || true
+        if is_running; then
+            echo "active"
+            exit 0
+        fi
         mkdir -p "$HOME/.local/share/hyprcandy"
-        nohup /usr/bin/ollama serve </dev/null > "$HOME/.local/share/hyprcandy/ollama.log" 2>&1 &
-        disown
-        for i in {1..20}; do
+        setsid /usr/bin/ollama serve </dev/null > "$HOME/.local/share/hyprcandy/ollama.log" 2>&1 &
+        for i in {1..25}; do
             if is_running; then
                 echo "active"
                 exit 0
@@ -35,7 +39,8 @@ case "$ACTION" in
         exit 1
         ;;
     stop)
-        systemctl stop ollama 2>/dev/null || true
+        systemctl --user stop ollama 2>/dev/null || true
+        sudo -n systemctl stop ollama 2>/dev/null || true
         pkill -x ollama 2>/dev/null || true
         pkill -f "ollama serve" 2>/dev/null || true
         echo "inactive"

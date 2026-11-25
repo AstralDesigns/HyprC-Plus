@@ -1,0 +1,4 @@
+# HyprCandy Bash Profile
+if [ -f ~/.bashrc ]; then
+    . ~/.bashrc
+fi

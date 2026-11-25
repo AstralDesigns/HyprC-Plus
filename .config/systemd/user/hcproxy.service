@@ -1,0 +1,16 @@
+[Unit]
+Description=HyprCandy launcher MITM ad-block / UA proxy (opt-in)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/mitmdump -s "%h/.config/quickshell/bar/scripts/webproxy/hcproxy_addon.py" --set confdir="%h/.mitmproxy" \
+    --listen-host 127.0.0.1 --listen-port 8888 \
+    --set connection_strategy=lazy --set stream_large_bodies=1m \
+    --set "ignore_hosts=(googlevideo|accounts\.google\.|oauth2\.googleapis\.com|iam\.googleapis\.com)" \
+    --set termlog_verbosity=warn
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

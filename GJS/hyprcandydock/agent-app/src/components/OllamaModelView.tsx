@@ -32,6 +32,7 @@ interface LibraryModel {
   param: string;
   category: 'coder' | 'reasoning' | 'general';
   isRecommended?: boolean;
+  tags?: string[];
 }
 
 const OLLAMA_LIBRARY_MODELS: LibraryModel[] = [
@@ -141,7 +142,8 @@ const OLLAMA_LIBRARY_MODELS: LibraryModel[] = [
 
 export const OllamaModelView: React.FC<{ mode: 'completions' | 'agents' }> = ({ mode }) => {
   const [store] = useStore();
-  const [status, setStatus] = useState<{ online: boolean; version?: string; host?: string; error?: string } | null>(null);
+  const status = store.ollamaStatus;
+  const isOnline = !!status?.online;
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [serviceActionLoading, setServiceActionLoading] = useState(false);
   const [downloadedModels, setDownloadedModels] = useState<OllamaDownloadedItem[]>([]);
@@ -150,14 +152,16 @@ export const OllamaModelView: React.FC<{ mode: 'completions' | 'agents' }> = ({ 
   const [customPullInput, setCustomPullInput] = useState('');
   const [pullingTags, setPullingTags] = useState<Record<string, { percent: number; status: string; error?: string }>>({});
   const [deletingModel, setDeletingModel] = useState<string | null>(null);
+  const [libraryModels, setLibraryModels] = useState<LibraryModel[]>(OLLAMA_LIBRARY_MODELS);
+  const [loadingLibrary, setLoadingLibrary] = useState(false);
 
   const fetchStatus = useCallback(async () => {
     setCheckingStatus(true);
     try {
       const res = await bridge.getOllamaStatus();
-      setStatus(res);
+      setStore({ ollamaStatus: res });
     } catch (e: any) {
-      setStatus({ online: false, error: e?.message || 'Failed to connect to local runtime' });
+      setStore({ ollamaStatus: { online: false, error: e?.message || 'Failed to connect to local runtime' } });
     } finally {
       setCheckingStatus(false);
     }
@@ -176,22 +180,75 @@ export const OllamaModelView: React.FC<{ mode: 'completions' | 'agents' }> = ({ 
     }
   }, []);
 
+  const fetchLibrary = useCallback(async (query: string = '') => {
+    setLoadingLibrary(true);
+    try {
+      const res = await bridge.getOllamaLibrary(query);
+      if (res?.models && res.models.length > 0) {
+        const mapped: LibraryModel[] = res.models.map(m => ({
+          id: m.id,
+          name: m.name,
+          desc: m.desc || '',
+          context: '',
+          size: '',
+          param: '',
+          category: (m.tags?.includes('tools') || m.id.includes('coder')) ? 'coder' : m.tags?.includes('thinking') ? 'reasoning' : 'general',
+          isRecommended: ['qwen2.5-coder', 'deepseek-r1', 'llama3.2', 'gemma4'].includes(m.id),
+          tags: m.tags,
+        }));
+        setLibraryModels(mapped);
+      }
+    } catch (e) {
+      console.warn('Failed to fetch Ollama library models:', e);
+    } finally {
+      setLoadingLibrary(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchStatus();
     fetchModels();
-  }, [fetchStatus, fetchModels]);
+    fetchLibrary('');
+  }, [fetchStatus, fetchModels, fetchLibrary]);
+
+  // Debounced search against live Ollama library
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchLibrary(search.trim());
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search, fetchLibrary]);
 
   const handleToggleService = async () => {
     setServiceActionLoading(true);
-    const action = status?.online ? 'stop' : 'start';
+    const currentlyOnline = !!store.ollamaStatus?.online;
+    const targetOnline = !currentlyOnline;
+    const action = currentlyOnline ? 'stop' : 'start';
+
     try {
       await bridge.setOllamaService(action);
-      // Brief delay for systemd/process to settle
-      setTimeout(async () => {
-        await fetchStatus();
-        await fetchModels();
-        setServiceActionLoading(false);
-      }, 900);
+      // Fast reactive polling every 250ms until daemon state transitions
+      let attempts = 0;
+      const maxAttempts = 24; // 6 seconds max
+      const interval = setInterval(async () => {
+        attempts++;
+        try {
+          const res = await bridge.getOllamaStatus();
+          setStore({ ollamaStatus: res });
+          if (res.online === targetOnline || attempts >= maxAttempts) {
+            clearInterval(interval);
+            setServiceActionLoading(false);
+            if (res.online) {
+              fetchModels();
+            }
+          }
+        } catch {
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            setServiceActionLoading(false);
+          }
+        }
+      }, 250);
     } catch (e) {
       setServiceActionLoading(false);
       fetchStatus();
@@ -285,6 +342,7 @@ export const OllamaModelView: React.FC<{ mode: 'completions' | 'agents' }> = ({ 
         byokProvider: 'ollama',
         byokModel: name,
         ollamaModel: name,
+        ollamaAutoStart: true,
       });
     } else {
       setStore({
@@ -292,7 +350,14 @@ export const OllamaModelView: React.FC<{ mode: 'completions' | 'agents' }> = ({ 
         completionsModel: name,
         ollamaCompletionsModel: name,
         inlineCompletionsEnabled: true,
+        ollamaAutoStart: true,
       });
+    }
+    // If Ollama daemon is offline when the user selects a local model, auto-launch it
+    if (!isOnline) {
+      bridge.setOllamaService('start').then(() => {
+        fetchStatus();
+      }).catch(() => {});
     }
   };
 
@@ -342,18 +407,17 @@ export const OllamaModelView: React.FC<{ mode: 'completions' | 'agents' }> = ({ 
 
   // Catalog Section: Library models that are not yet downloaded or pulling
   const catalogModels = useMemo(() => {
-    const list = OLLAMA_LIBRARY_MODELS.filter(m => !downloadedTagMap.has(m.id) && !pullingTags[m.id]);
+    const list = libraryModels.filter(m => !downloadedTagMap.has(m.id) && !pullingTags[m.id]);
     if (!q) return list;
     return list.filter(m =>
       m.id.toLowerCase().includes(q) ||
       m.name.toLowerCase().includes(q) ||
       m.desc.toLowerCase().includes(q) ||
-      m.param.toLowerCase().includes(q) ||
-      m.category.toLowerCase().includes(q)
+      (m.param && m.param.toLowerCase().includes(q)) ||
+      m.category.toLowerCase().includes(q) ||
+      (m.tags && m.tags.some(t => t.toLowerCase().includes(q)))
     );
-  }, [downloadedTagMap, pullingTags, q]);
-
-  const isOnline = !!status?.online;
+  }, [libraryModels, downloadedTagMap, pullingTags, q]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -739,14 +803,27 @@ export const OllamaModelView: React.FC<{ mode: 'completions' | 'agents' }> = ({ 
                   <div style={{ fontSize: '10.5px', color: 'var(--text-muted)', marginBottom: '4px' }}>
                     {m.desc}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-secondary)' }}>
-                    <span style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px' }}>
-                      {m.param}
-                    </span>
-                    <span style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px' }}>
-                      {m.context} ctx
-                    </span>
-                    <span>Est. {m.size}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '10px', color: 'var(--text-secondary)', flexWrap: 'wrap' }}>
+                    {m.param ? (
+                      <span style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px' }}>
+                        {m.param}
+                      </span>
+                    ) : null}
+                    {m.context ? (
+                      <span style={{ background: 'rgba(255,255,255,0.06)', padding: '1px 5px', borderRadius: '3px' }}>
+                        {m.context} ctx
+                      </span>
+                    ) : null}
+                    {m.size ? <span>Est. {m.size}</span> : null}
+                    {m.tags && m.tags.map(t => (
+                      <span key={t} style={{
+                        background: 'color-mix(in srgb, var(--matugen-primary, #a0c9dc) 15%, transparent)',
+                        color: 'var(--matugen-primary, #a0c9dc)',
+                        padding: '1px 5px', borderRadius: '3px', fontWeight: 600,
+                      }}>
+                        {t}
+                      </span>
+                    ))}
                   </div>
                 </div>
 

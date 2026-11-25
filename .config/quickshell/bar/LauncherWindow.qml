@@ -1445,6 +1445,16 @@ Item {
                 runtimeHealthProc.running = true
             }
 
+            Process {
+                id: ollamaStartProc
+                command: [Config.home + "/.config/quickshell/bar/scripts/ollama-service.sh", "start"]
+            }
+
+            Process {
+                id: ollamaStopProc
+                command: [Config.home + "/.config/quickshell/bar/scripts/ollama-service.sh", "stop"]
+            }
+
             // ON branch of the toggle: reveal the workspace, warm the runtime and
             // surface the agent tab (GJS _agentRevealWorkspace + _agentToggleWorkspace).
             function agentRevealWorkspace() {
@@ -1453,12 +1463,9 @@ Item {
                 win.agentMissing = false
                 win.agentEnsureUp()
                 win.ensureRuntimeBackend()
+                ollamaStartProc.running = false
+                ollamaStartProc.running = true
                 win.switchTab("agent")
-            }
-
-            Process {
-                id: ollamaStopProc
-                command: [Config.home + "/.config/quickshell/bar/scripts/ollama-service.sh", "stop"]
             }
 
             // The circular workspace toggle handler: flip + persist the policy, then

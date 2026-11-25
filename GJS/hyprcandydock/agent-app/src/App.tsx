@@ -127,14 +127,42 @@ export const App: React.FC = () => {
       window.dispatchEvent(new CustomEvent('matugen_theme_changed', { detail: cssVars }));
     });
 
-    // Auto-start Ollama on session launch if enabled by user
-    if (store.ollamaAutoStart) {
+    // Global Ollama status & auto-start policy
+    const shouldStartOllama = store.ollamaAutoStart ||
+      store.activeBackendCategory === 'local' ||
+      store.byokProvider === 'ollama' ||
+      store.completionsProvider === 'ollama';
+
+    bridge.getOllamaStatus().then((st) => {
+      setStore({ ollamaStatus: st });
+      if (!st.online && shouldStartOllama) {
+        bridge.setOllamaService('start').then(() => {
+          let count = 0;
+          const poll = setInterval(async () => {
+            count++;
+            try {
+              const res = await bridge.getOllamaStatus();
+              setStore({ ollamaStatus: res });
+              if (res.online || count >= 16) clearInterval(poll);
+            } catch {
+              if (count >= 16) clearInterval(poll);
+            }
+          }, 300);
+        }).catch(() => {});
+      }
+    }).catch(() => {});
+
+    // Periodic heartbeat for Ollama status across the entire app
+    const ollamaHeartbeat = setInterval(() => {
       bridge.getOllamaStatus().then((st) => {
-        if (!st.online) {
-          bridge.setOllamaService('start').catch(() => {});
-        }
+        setStore(prev => {
+          if (prev.ollamaStatus?.online !== st.online || prev.ollamaStatus?.version !== st.version) {
+            return { ollamaStatus: st };
+          }
+          return {};
+        });
       }).catch(() => {});
-    }
+    }, 6000);
 
     const onToggleSidebar = () => storeActions.toggleSidebar();
     const onToggleChat = () => storeActions.toggleChat();
@@ -322,6 +350,7 @@ export const App: React.FC = () => {
       window.removeEventListener('error', onUncaughtError);
       window.removeEventListener('beforeunload', onBeforeUnload);
       window.removeEventListener('keydown', onKeyDown, { capture: true });
+      clearInterval(ollamaHeartbeat);
       try { persistStoreNow(); } catch (_) { /* noop */ }
     };
   }, []);

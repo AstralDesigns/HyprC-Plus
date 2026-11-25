@@ -13,3 +13,6 @@
 # paths), never part of a clean store — ignore so they never get committed.
 *.log
 **/*.log
+
+# fish universal variables (machine-specific, runtime-generated)
+.config/fish/fish_variables

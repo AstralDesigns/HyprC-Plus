@@ -74,9 +74,6 @@ export const DiffPreviewModal: React.FC<DiffPreviewModalProps> = ({ diffs, onClo
           <div className="diff-preview-modal-actions">
             <button type="button" className="diff-preview-btn-subtle" onClick={expandAll}>Expand all</button>
             <button type="button" className="diff-preview-btn-subtle" onClick={collapseAll}>Collapse all</button>
-            <button type="button" className="diff-preview-btn-close" onClick={onClose} aria-label="Close preview">
-              <X size={15} />
-            </button>
           </div>
         </div>
 

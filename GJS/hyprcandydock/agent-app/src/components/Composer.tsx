@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Send, Square, Paperclip, ListChecks } from 'lucide-react';
+import { Send, Square, Paperclip, ListChecks, Plus, CheckCircle, Cpu } from 'lucide-react';
 import { useStore, setStore, storeActions, type AttachmentData } from '../store';
+import { getActiveModelLabel } from '../utils/modelLabels';
 import { agentEngine } from '../engine/agent-engine';
 import { bridge } from '../bridge';
 import { PendingFilesBar } from './PendingFilesBar';
 import { PromptContextMenu } from './PromptContextMenu';
+import { EditLongTextModal } from './EditLongTextModal';
 import {
   matchEditorCopy,
   serializeSelections,
@@ -15,17 +17,54 @@ import {
 // Inline SVGs so imperatively-built chips (outside React) match the styled pill
 // without pulling the lucide components into DOM-managed nodes.
 const CODE_SVG = '<svg class="selection-chip-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>';
+const TEXT_SVG = '<svg class="selection-chip-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="3" y2="18"></line></svg>';
 const X_SVG = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+interface PastedTextRef {
+  id: string;
+  label: string;
+  text: string;
+}
+
+const isLongText = (text: string): boolean => {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  const lines = trimmed.split('\n');
+  return lines.length >= 4 || trimmed.length > 250;
+};
+
+function getPastedChipLabel(text: string): string {
+  const firstNonEmpty = text.split('\n').map(l => l.trim()).find(l => l.length > 0) || 'Pasted text';
+  const words = firstNonEmpty.split(/\s+/);
+  let label = words[0];
+  if (label.endsWith(':')) {
+    return `${label}...`;
+  }
+  let candidate = words[0];
+  for (let i = 1; i < Math.min(words.length, 3); i++) {
+    if ((candidate + ' ' + words[i]).length <= 22) {
+      candidate += ' ' + words[i];
+    } else {
+      break;
+    }
+  }
+  return candidate.length > 22 ? `${candidate.slice(0, 22).trim()}...` : `${candidate}...`;
+}
 
 export const Composer: React.FC = () => {
   const [store] = useStore();
   const [attachments, setAttachments] = useState<AttachmentData[]>([]);
   const [hasContent, setHasContent] = useState(false);
   const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [actionMenuOpen, setActionMenuOpen] = useState(false);
+  const actionMenuRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   // SelectionRefs live here (keyed by chip id); the contenteditable holds only
   // the chip DOM nodes, so large snippets never round-trip through React state.
   const selStore = useRef<Map<string, SelectionRef>>(new Map());
+  // External non-file long pasted texts live here (keyed by chip id)
+  const pastedStore = useRef<Map<string, PastedTextRef>>(new Map());
+  const [editingPastedItem, setEditingPastedItem] = useState<{ id: string; text: string } | null>(null);
 
   // Prompt history navigation state (Up/Down arrow traversal)
   const historyIndexRef = useRef<number>(-1);
@@ -45,11 +84,30 @@ export const Composer: React.FC = () => {
     draftRef.current = '';
   }, [store.activeSessionId]);
 
+  // Click outside & Escape dismiss for the (+) actions menu
+  useEffect(() => {
+    if (!actionMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
+        setActionMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActionMenuOpen(false);
+    };
+    window.addEventListener('click', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('click', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [actionMenuOpen]);
+
   const updateHasContent = useCallback(() => {
     const ed = editorRef.current;
     if (!ed) return;
     const text = (ed.textContent || '').replace(/\u200B/g, '').trim();
-    const hasChip = !!ed.querySelector('[data-sel-id]');
+    const hasChip = !!ed.querySelector('[data-sel-id]') || !!ed.querySelector('[data-pasted-id]');
     setHasContent(!!text || hasChip);
   }, []);
 
@@ -57,6 +115,7 @@ export const Composer: React.FC = () => {
     const ed = editorRef.current;
     if (ed) ed.innerHTML = '';
     selStore.current.clear();
+    pastedStore.current.clear();
     setHasContent(false);
   }, []);
 
@@ -94,8 +153,8 @@ export const Composer: React.FC = () => {
   }, []);
 
   // Walk the editor in document order, rebuilding the prompt with each chip
-  // replaced inline by its <selection> block, plus a compact display form
-  // (⟦file Lx-Ly⟧) for the stored user bubble.
+  // replaced inline by its <selection> block or full pasted text, plus a compact display form
+  // for the stored user bubble.
   const collectPrompt = useCallback((): { prompt: string; display: string; refs: SelectionRef[] } => {
     const ed = editorRef.current;
     const refs: SelectionRef[] = [];
@@ -108,12 +167,19 @@ export const Composer: React.FC = () => {
           prompt += t; display += t;
         } else if (n instanceof HTMLElement) {
           const selId = n.dataset.selId;
+          const pastedId = n.dataset.pastedId;
           if (selId) {
             const r = selStore.current.get(selId);
             if (r) {
               refs.push(r);
               prompt += `\n${serializeSelections([r])}\n`;
               display += `⟦${r.name} ${selectionRangeLabel(r)}⟧`;
+            }
+          } else if (pastedId) {
+            const p = pastedStore.current.get(pastedId);
+            if (p) {
+              prompt += `\n${p.text}\n`;
+              display += `\n${p.text}\n`;
             }
           } else if (n.tagName === 'BR') {
             prompt += '\n'; display += '\n';
@@ -193,6 +259,93 @@ export const Composer: React.FC = () => {
     }
     updateHasContent();
   }, [updateHasContent]);
+
+  // Build a minimal atomic chip for long pasted text that can be clicked to edit in a floating modal
+  const insertPastedChip = useCallback((rawText: string) => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    const id = 'pasted_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 7);
+    const label = getPastedChipLabel(rawText);
+    pastedStore.current.set(id, { id, label, text: rawText });
+
+    const chip = document.createElement('span');
+    chip.className = 'selection-chip selection-chip-inline pasted-text-chip';
+    chip.setAttribute('contenteditable', 'false');
+    chip.dataset.pastedId = id;
+    chip.title = `Click to view/edit pasted text (${rawText.length} chars) · ${label}`;
+    chip.innerHTML = `${TEXT_SVG}<span class="selection-chip-name pasted-chip-label"></span><button type="button" class="selection-chip-x" aria-label="Remove pasted text">${X_SVG}</button>`;
+    chip.querySelector('.pasted-chip-label')!.textContent = label;
+
+    // Clicking the chip body opens the floating "Edit Long Text" container
+    chip.addEventListener('click', (e) => {
+      if ((e.target as HTMLElement).closest('.selection-chip-x')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const entry = pastedStore.current.get(id);
+      if (entry) {
+        setEditingPastedItem({ id: entry.id, text: entry.text });
+      }
+    });
+
+    // Remove button removes chip and entry
+    chip.querySelector('.selection-chip-x')!.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      pastedStore.current.delete(id);
+      chip.remove();
+      updateHasContent();
+    });
+
+    ed.focus();
+    const sel = window.getSelection();
+    let placed = false;
+    if (sel && sel.rangeCount) {
+      const range = sel.getRangeAt(0);
+      if (ed.contains(range.commonAncestorContainer)) {
+        range.deleteContents();
+        range.insertNode(chip);
+        const sp = document.createTextNode(' ');
+        chip.after(sp);
+        const r2 = document.createRange();
+        r2.setStartAfter(sp);
+        r2.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(r2);
+        placed = true;
+      }
+    }
+    if (!placed) {
+      ed.appendChild(chip);
+      ed.appendChild(document.createTextNode(' '));
+    }
+    updateHasContent();
+  }, [updateHasContent]);
+
+  const handleSavePastedText = useCallback((newText: string) => {
+    if (!editingPastedItem) return;
+    const { id } = editingPastedItem;
+    const trimmed = newText.trim();
+    if (!trimmed) {
+      pastedStore.current.delete(id);
+      const chipEl = editorRef.current?.querySelector(`[data-pasted-id="${id}"]`);
+      chipEl?.remove();
+      updateHasContent();
+      setEditingPastedItem(null);
+      return;
+    }
+
+    const newLabel = getPastedChipLabel(trimmed);
+    pastedStore.current.set(id, { id, label: newLabel, text: newText });
+
+    const chipEl = editorRef.current?.querySelector(`[data-pasted-id="${id}"]`);
+    if (chipEl) {
+      const labelSpan = chipEl.querySelector('.pasted-chip-label');
+      if (labelSpan) labelSpan.textContent = newLabel;
+      chipEl.title = `Click to view/edit pasted text (${newText.length} chars) · ${newLabel}`;
+    }
+    setEditingPastedItem(null);
+    updateHasContent();
+  }, [editingPastedItem, updateHasContent]);
 
   const handleSend = async () => {
     const { prompt, display, refs } = collectPrompt();
@@ -514,6 +667,10 @@ export const Composer: React.FC = () => {
       // this" chip at the caret; anything else is inserted as plain text.
       const ref = matchEditorCopy(pasted);
       if (ref) { insertChip(ref); return; }
+      if (isLongText(pasted)) {
+        insertPastedChip(pasted);
+        return;
+      }
       insertTextAtCaret(pasted);
       return;
     }
@@ -661,25 +818,74 @@ export const Composer: React.FC = () => {
           {!hasContent && <div className="composer-placeholder">{placeholder}</div>}
         </div>
         <div className="composer-toolbar">
-          {/* Left tools */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <button
-              className="chat-attach-btn"
-              onClick={handleAttachFile}
-              data-tip="Attach File Context"
-            >
-              <Paperclip size={12} />
-              <span>Attach</span>
-            </button>
+          {/* Left tools: (+) Action Menu & Minimal Active Model Chip */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', position: 'relative' }}>
             <button
               type="button"
-              className={`chat-attach-btn composer-spec-toggle ${store.specMode ? 'active' : ''}`}
-              onClick={() => setStore({ specMode: !store.specMode })}
-              disabled={store.agentRunning}
-              data-tip="Spec-driven: draft a plan for your approval before executing"
+              className={`composer-plus-btn ${actionMenuOpen ? 'active' : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setActionMenuOpen(prev => !prev);
+              }}
+              data-tip="Actions & Options"
+              aria-label="Add options"
             >
-              <ListChecks size={12} />
-              <span>Spec</span>
+              <Plus size={14} />
+            </button>
+
+            {actionMenuOpen && (
+              <div
+                ref={actionMenuRef}
+                className="composer-plus-menu animate-fade-in"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  className="composer-plus-item"
+                  onClick={() => {
+                    setActionMenuOpen(false);
+                    handleAttachFile();
+                  }}
+                >
+                  <div className="composer-plus-item-left">
+                    <Paperclip size={13} />
+                    <span>Attach</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className={`composer-plus-item ${store.specMode ? 'enabled' : ''}`}
+                  onClick={() => {
+                    setStore({ specMode: !store.specMode });
+                  }}
+                  disabled={store.agentRunning}
+                >
+                  <div className="composer-plus-item-left">
+                    <ListChecks
+                      size={13}
+                      style={store.specMode ? { color: '#22c55e' } : undefined}
+                    />
+                    <span style={store.specMode ? { color: '#22c55e', fontWeight: 600 } : undefined}>
+                      Create Plan
+                    </span>
+                  </div>
+                  {store.specMode && (
+                    <CheckCircle size={13} color="#22c55e" className="composer-plus-check" />
+                  )}
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="composer-model-chip"
+              onClick={() => setStore({ modelManagerOpen: true })}
+              data-tip="Configure inference backend"
+              aria-label="Active Model"
+            >
+              <Cpu size={11} className="composer-model-chip-icon" />
+              <span className="composer-model-chip-name">{getActiveModelLabel(store)}</span>
             </button>
           </div>
 
@@ -713,6 +919,14 @@ export const Composer: React.FC = () => {
           y={contextMenuPos.y}
           targetEl={editorRef.current}
           onClose={() => setContextMenuPos(null)}
+        />
+      )}
+
+      {editingPastedItem && (
+        <EditLongTextModal
+          initialText={editingPastedItem.text}
+          onSave={handleSavePastedText}
+          onClose={() => setEditingPastedItem(null)}
         />
       )}
     </div>

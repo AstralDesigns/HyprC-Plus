@@ -1,0 +1,18 @@
+[Unit]
+Description=Watch ~/.config/background, clear awww cache and update background images
+After=hyprland-session.target
+PartOf=hyprland-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.config/hyprcandy/hooks/watch_background.sh
+Restart=on-failure
+RestartSec=5
+
+# Import environment variables from the user session
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+# These will be set by the ExecStartPre command
+ExecStartPre=/bin/bash -c 'systemctl --user import-environment HYPRLAND_INSTANCE_SIGNATURE XDG_CURRENT_DESKTOP WAYLAND_DISPLAY DISPLAY'
+
+[Install]
+WantedBy=hyprland-session.target

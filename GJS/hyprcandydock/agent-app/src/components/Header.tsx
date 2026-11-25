@@ -28,6 +28,7 @@ import {
   TerminalSquare,
 } from 'lucide-react';
 import { useStore, setStore, storeActions, PRESET_MODELS, FilePane } from '../store';
+import { hasActiveAgentConfig } from '../utils/modelLabels';
 import { fileStatusClass, fileStatusLetter } from '../utils/gitStatus';
 import { FileIcon } from '../utils/fileIcons';
 import { RenameDialog } from './RenameDialog';
@@ -454,122 +455,49 @@ export const Header: React.FC = () => {
         })}
       </div>
 
-      {/* Right controls: Processing, Model Chip, Chat Toggle */}
+      {/* Right controls: Agent State Chip, Chat Toggle */}
       <div className="header-right">
-        {store.agentRunning && (
-          <div className="processing-indicator">
-            <span className="processing-dot" />
-            <span>Agent Busy…</span>
-          </div>
-        )}
-
-
-        {/* Active model chip — doubles as active model display and ModelManager toggle */}
-        <button
-          type="button"
-          className="model-chip"
-          onClick={() => setStore({ modelManagerOpen: true })}
-          data-tip="Configure inference backend"
-        >
-          <div
-            className={`status-dot ${modelStatusClass}`}
-            style={store.modelStatus === 'ready' ? {
-              background: 'var(--matugen-primary, #a0c9dc)',
-              boxShadow: '0 0 6px var(--matugen-primary, #a0c9dc)',
-            } : undefined}
-          />
-          <Cpu
-            size={12}
-            style={{
-              color: store.modelStatus === 'ready' ? 'var(--matugen-primary, #a0c9dc)' : 'inherit',
-              transition: 'color var(--transition-fast)',
-            }}
-          />
-          <span className="model-chip-name">
-            {(() => {
-              const KNOWN_LABELS: Record<string, string> = {
-                'openrouter/free': 'OpenRouter Free',
-                'anthropic/claude-3.7-sonnet': 'Claude 3.7 Sonnet',
-                'claude-3-7-sonnet-20250219': 'Claude 3.7 Sonnet',
-                'claude-opus-4': 'Claude Opus 4',
-                'claude-sonnet-4-5': 'Claude Sonnet 4.5',
-                'claude-haiku-4-5': 'Claude Haiku 4.5',
-                'gpt-4.5-preview': 'GPT-4.5 Orion',
-                'openai/gpt-4.5-preview': 'GPT-4.5 Orion',
-                'gpt-4o': 'GPT-4o',
-                'openai/gpt-4o': 'GPT-4o',
-                'gpt-4o-mini': 'GPT-4o mini',
-                'openai/gpt-4o-mini': 'GPT-4o mini',
-                'o3-mini': 'o3-mini',
-                'openai/o3-mini': 'o3-mini',
-                'o3': 'o3',
-                'deepseek/deepseek-r1': 'DeepSeek R1',
-                'deepseek/deepseek-chat': 'DeepSeek V3',
-                'meta-llama/llama-3.3-70b-instruct': 'Llama 3.3 70B',
-                'llama-3.3-70b-versatile': 'Llama 3.3 70B',
-                'llama-3.1-8b-instant': 'Llama 3.1 8B',
-                'qwen-2.5-coder-32b': 'Qwen 2.5 Coder 32B',
-                'qwen/qwen-2.5-coder-32b-instruct': 'Qwen 2.5 Coder 32B',
-                'deepseek-r1-distill-llama-70b': 'DeepSeek R1 70B',
-                'mixtral-8x7b-32768': 'Mixtral 8x7B',
-                'gemma2-9b-it': 'Gemma 2 9B',
-                'gemini-3.8-flash': 'Gemini 3.8 Flash',
-                'gemini-3.6-flash': 'Gemini 3.6 Flash',
-                'gemini-3.1-pro-preview': 'Gemini 3.1 Pro',
-                'gemini-3.1-flash-lite': 'Gemini 3.1 Flash-Lite',
-                'google/gemini-2.5-pro': 'Gemini 2.5 Pro',
-                'google/gemini-2.5-flash': 'Gemini 2.5 Flash',
-                'grok-3': 'Grok 3',
-                'grok-3-mini': 'Grok 3 Mini',
-                'grok-2-1212': 'Grok 2',
-                'x-ai/grok-3': 'Grok 3',
-              };
-
-              if (store.inferenceMode === 'byok') {
-                const raw = store.byokModel;
-                if (store.byokProvider === 'openrouter') {
-                  if (!raw || raw === 'openrouter/free') return 'OpenRouter Free';
+        {/* Agent state chip — launches ModelManager popup */}
+        {(() => {
+          const hasAgent = hasActiveAgentConfig(store);
+          const agentStateLabel = store.agentRunning ? 'Agent busy' : hasAgent ? 'Agent idle' : 'Select an agent';
+          return (
+            <button
+              type="button"
+              className={`model-chip agent-state-chip ${store.agentRunning ? 'busy' : hasAgent ? 'idle' : 'none'}`}
+              onClick={() => setStore({ modelManagerOpen: true })}
+              data-tip="Configure inference backend"
+            >
+              <div
+                className={`status-dot ${store.agentRunning ? 'busy' : hasAgent ? 'ready' : 'idle'}`}
+                style={
+                  store.agentRunning
+                    ? {
+                        background: 'var(--matugen-surface-tint, #a0c9dc)',
+                        boxShadow: '0 0 8px var(--matugen-primary, #a0c9dc)',
+                        animation: 'pulse 1.2s ease-in-out infinite',
+                      }
+                    : hasAgent
+                      ? {
+                          background: 'var(--matugen-primary, #a0c9dc)',
+                          boxShadow: '0 0 6px var(--matugen-primary, #a0c9dc)',
+                        }
+                      : { background: 'var(--text-muted)' }
                 }
-                if (store.byokProvider === 'groq') {
-                  if (!raw || raw === 'llama-3.3-70b-versatile') return 'Llama 3.3 70B';
-                }
-                if (raw && KNOWN_LABELS[raw]) return KNOWN_LABELS[raw];
-                if (raw) {
-                  const seg = raw.split('/').pop() || raw;
-                  return seg.replace(/-20\d{6}$/, '').replace(/-preview$/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).slice(0, 24);
-                }
-                const prov = store.byokProvider;
-                return prov ? prov.charAt(0).toUpperCase() + prov.slice(1) : 'Candy Agent';
-              }
-              if (store.inferenceMode === 'cloud') {
-                return KNOWN_LABELS[store.cloudModel || ''] || store.cloudModel || 'Candy Agent';
-              }
-              return 'Candy Agent';
-            })()}&nbsp;
-            <span style={{
-              fontSize: '10px',
-              padding: '1px 7px',
-              borderRadius: 'var(--radius-full)',
-              background: store.modelStatus === 'ready'
-                ? 'color-mix(in srgb, var(--matugen-primary, #a0c9dc) 18%, transparent)'
-                : store.modelStatus === 'loading' || store.modelStatus === 'downloading'
-                  ? 'color-mix(in srgb, var(--wallust-color5, #BA8C40) 20%, transparent)'
-                  : 'rgba(255,255,255,.08)',
-              border: `1px solid ${store.modelStatus === 'ready'
-                ? 'color-mix(in srgb, var(--matugen-primary, #a0c9dc) 35%, transparent)'
-                : 'transparent'}`,
-              color: store.modelStatus === 'ready'
-                ? 'var(--matugen-primary, #a0c9dc)'
-                : store.modelStatus === 'loading' || store.modelStatus === 'downloading'
-                  ? 'var(--wallust-color5, #BA8C40)'
-                  : 'var(--text-muted)',
-              fontWeight: 700,
-              transition: 'all var(--transition-fast)',
-            }}>
-              {store.modelStatus === 'ready' ? 'Active' : store.modelStatus === 'loading' || store.modelStatus === 'downloading' ? 'Loading' : 'Idle'}
-            </span>
-          </span>
-        </button>
+              />
+              <Cpu
+                size={12}
+                style={{
+                  color: store.agentRunning || hasAgent ? 'var(--matugen-primary, #a0c9dc)' : 'var(--text-muted)',
+                  transition: 'color var(--transition-fast)',
+                }}
+              />
+              <span className={store.agentRunning ? 'agent-state-busy-text' : hasAgent ? 'agent-state-text-idle' : 'agent-state-text-none'}>
+                {agentStateLabel}
+              </span>
+            </button>
+          );
+        })()}
 
         <button
           type="button"

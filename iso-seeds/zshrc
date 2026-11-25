@@ -1,0 +1,114 @@
+# HyprCandy Zsh Configuration with Oh My Zsh and Starship
+
+# Oh My Zsh configuration
+export ZSH="$HOME/.oh-my-zsh"
+
+# Set environment variables
+export HYPRLAND_LOG_WS=1
+export EDITOR=micro
+export BROWSER=firefox
+export TERMINAL=kitty
+
+# Add local bin to PATH
+if [ -d "$HOME/.local/bin" ]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Initialize Starship prompt
+if command -v starship > /dev/null 2>&1; then
+    eval "$(starship init zsh)"
+fi
+
+# Source Oh My Zsh
+source $ZSH/oh-my-zsh.sh
+
+# Aliases
+
+#alias hyprcandy="cd .hyprcandy && git pull && stow --ignore='Candy' --ignore='Candy-Images' --ignore='Dock-SVGs' --ignore='Gifs' --ignore='Logo' --ignore='transparent.png' --ignore='GJS' --ignore='Candy.desktop' --ignore='HyprCandy.png' --ignore='candy-daemon.js' --ignore='candy-launcher.sh' --ignore='toggle-control-center.sh' --ignore='toggle-media-player.sh' --ignore='toggle-system-monitor.sh' --ignore='toggle-weather-widget.sh' --ignore='toggle-hyprland-settings.sh' --ignore='candy-system-monitor.js' --ignore='resources' --ignore='src' --ignore='meson.build' --ignore='README.md' --ignore='run.log' --ignore='test_layout.js' --ignore='test_media_menu.js' --ignore='toggle.js' --ignore='toggle-main.js' --ignore='~' --ignore='candy-main.js' --ignore='gjs-media-player.desktop' --ignore='gjs-toggle-controls.desktop' --ignore='main.js' --ignore='media-main.js' --ignore='SEEK_FEATURE.md' --ignore='setup-custom-icon.sh' --ignore='weather-main.js' */"
+alias ll="ls -alF"
+alias la="ls -A"
+alias l="ls -CF"
+alias ..="cd .."
+alias ...="cd ../.."
+alias grep="grep --color=auto"
+alias fgrep="fgrep --color=auto"
+alias egrep="egrep --color=auto"
+alias update="sudo pacman -Syu"
+alias install="sudo pacman -S"
+alias search="pacman -Ss"
+alias remove="sudo pacman -R"
+alias autoremove='sudo pacman -Rs $(pacman -Qtdq)'
+alias c="clear"
+alias h="history"
+alias j="jobs -l"
+alias df="df -h"
+alias du="du -h"
+alias mkdir="mkdir -pv"
+alias wget="wget -c"
+
+# Git aliases
+alias g="git clone --depth 1"
+alias ga="git add ."
+alias gc="git commit -m"
+gp() {
+    # Ensure .config/hypr are gitignored before every push
+    if ! grep -qF ".config/hypr" .gitignore 2>/dev/null; then
+        echo ".config/hypr/hyprviz.conf" >> .gitignore
+	    echo ".config/hypr/monitors.conf" >> .gitignore
+        git add .gitignore
+        git commit -m "chore: ignore personal config dirs"
+    fi
+    git push
+}
+alias gl="git pull"
+alias gs="git status"
+alias gd="git diff"
+alias gco="git checkout"
+alias gb="git branch"
+alias glog="git log --oneline --graph --decorate"
+
+# System information
+alias sysinfo="fastfetch"
+alias weather="curl wttr.in"
+
+# Fun stuff
+alias matrix="cmatrix -a -b -r"
+alias pipes="pipes.sh"
+alias clock="tty-clock -s -c"
+alias sea="asciiquarium"
+
+# Start HyprCandy fastfetch
+fastfetch
+
+# Source HyprCandy Zsh setup if it exists
+if [ -f ~/.hyprcandy-zsh.zsh ]; then
+    source ~/.hyprcandy-zsh.zsh
+fi
+
+# =============================================================================
+# CandyCode Configuration
+# =============================================================================
+
+# Set CandyCode as default editor
+export EDITOR="/home/king/.local/bin/CandyCode"
+export VISUAL="/home/king/.local/bin/CandyCode"
+
+# Add CandyCode to PATH if not already present
+if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Optional: Alias for quick access
+alias candycode="/home/king/.local/bin/CandyCode"
+alias cc="/home/king/.local/bin/CandyCode"
+
+# HyprCandy: cargo bin on PATH
+case ":$PATH:" in
+  *":$HOME/.cargo/bin:"*) ;;
+  *) [ -d "$HOME/.cargo/bin" ] && export PATH="$HOME/.cargo/bin:$PATH" ;;
+esac
+
+# QODER_DISPATCHER_PATH v1
+path=("$HOME/.qoder/entry" ${path:#"$HOME/.qoder/entry"})
+export PATH
+# END QODER_DISPATCHER_PATH v1

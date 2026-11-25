@@ -1,0 +1,13 @@
+[Unit]
+Description=HyprCandy first-login setup (stow dotfiles, enable watchers)
+Before=graphical-session.target
+ConditionPathExists=!%h/.local/state/hyprcandy/firstboot-done
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=%h/.hyprcandy/.firstboot.sh
+TimeoutStartSec=900
+
+[Install]
+WantedBy=default.target

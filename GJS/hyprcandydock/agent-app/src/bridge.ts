@@ -466,6 +466,15 @@ class AgentBridge {
     }
   }
 
+  public async getOllamaLibrary(query: string = ''): Promise<{ models: Array<{ id: string; name: string; desc: string; tags?: string[] }> }> {
+    try {
+      const q = query.trim() ? `?q=${encodeURIComponent(query.trim())}` : '';
+      return await this.runtimeRequest(`/api/ollama/library${q}`, {}, 'GET');
+    } catch (e: any) {
+      return { models: [] };
+    }
+  }
+
   public async pullOllamaModel(model: string): Promise<{ task_id: string }> {
     return this.runtimeRequest('/api/ollama/pull', { model }, 'POST');
   }

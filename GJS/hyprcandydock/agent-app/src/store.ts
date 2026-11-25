@@ -353,6 +353,12 @@ export interface AppState {
   ollamaModel: string;
   ollamaCompletionsModel: string;
   ollamaAutoStart: boolean;
+  ollamaStatus: {
+    online: boolean;
+    version?: string;
+    host?: string;
+    error?: string;
+  } | null;
   aiSettings: {
     openrouter: {
       temperature: number;
@@ -501,7 +507,8 @@ function loadInitialState(): AppState {
     activeBackendCategory: 'cloud',
     ollamaModel: 'qwen2.5-coder:7b',
     ollamaCompletionsModel: 'qwen2.5-coder:7b',
-    ollamaAutoStart: false,
+    ollamaAutoStart: true,
+    ollamaStatus: null,
     aiSettings: {
       openrouter: {
         temperature: 0.2,
@@ -511,7 +518,7 @@ function loadInitialState(): AppState {
         topP: 1.0,
       },
       ollama: {
-        host: 'http://localhost:11434',
+        host: 'http://127.0.0.1:11434',
         temperature: 0.2,
         numCtx: 32768,
         maxOutputTokens: 8192,
@@ -666,7 +673,8 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
     activeBackendCategory: parsed.activeBackendCategory === 'local' ? 'local' : 'cloud',
     ollamaModel: typeof parsed.ollamaModel === 'string' && parsed.ollamaModel ? parsed.ollamaModel : 'qwen2.5-coder:7b',
     ollamaCompletionsModel: typeof parsed.ollamaCompletionsModel === 'string' && parsed.ollamaCompletionsModel ? parsed.ollamaCompletionsModel : 'qwen2.5-coder:7b',
-    ollamaAutoStart: typeof parsed.ollamaAutoStart === 'boolean' ? parsed.ollamaAutoStart : false,
+    ollamaAutoStart: typeof parsed.ollamaAutoStart === 'boolean' ? parsed.ollamaAutoStart : true,
+    ollamaStatus: null,
     aiSettings: {
       openrouter: {
         temperature: typeof parsed.aiSettings?.openrouter?.temperature === 'number' ? parsed.aiSettings.openrouter.temperature : 0.2,
@@ -676,7 +684,9 @@ function sanitizePersisted(defaultState: AppState, defSession: Session, parsed: 
         topP: typeof parsed.aiSettings?.openrouter?.topP === 'number' ? parsed.aiSettings.openrouter.topP : 1.0,
       },
       ollama: {
-        host: typeof parsed.aiSettings?.ollama?.host === 'string' ? parsed.aiSettings.ollama.host : 'http://localhost:11434',
+        host: typeof parsed.aiSettings?.ollama?.host === 'string' && !parsed.aiSettings.ollama.host.includes('localhost')
+          ? parsed.aiSettings.ollama.host
+          : 'http://127.0.0.1:11434',
         temperature: typeof parsed.aiSettings?.ollama?.temperature === 'number' ? parsed.aiSettings.ollama.temperature : 0.2,
         numCtx: typeof parsed.aiSettings?.ollama?.numCtx === 'number' ? parsed.aiSettings.ollama.numCtx : 32768,
         maxOutputTokens: typeof parsed.aiSettings?.ollama?.maxOutputTokens === 'number' ? parsed.aiSettings.ollama.maxOutputTokens : 8192,
@@ -2146,5 +2156,21 @@ export const storeActions = {
       customModels: prev.customModels.filter(m => m.id !== id),
       activeModel: prev.activeModel === id ? PRESET_MODELS[0].id : prev.activeModel,
     }));
+  },
+
+  setOllamaStatus: (status: AppState['ollamaStatus']) => {
+    setStore({ ollamaStatus: status });
+  },
+
+  refreshOllamaStatus: async () => {
+    try {
+      const res = await bridge.getOllamaStatus();
+      setStore({ ollamaStatus: res });
+      return res;
+    } catch (e: any) {
+      const fallback = { online: false, error: e?.message || 'Local runtime unreachable' };
+      setStore({ ollamaStatus: fallback });
+      return fallback;
+    }
   },
 };
