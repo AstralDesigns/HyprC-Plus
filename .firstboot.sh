@@ -28,8 +28,17 @@ for d in "$HOME/.config/hypr/scripts" "$HOME/.config/hyprcandy/scripts" \
 done
 
 # 4. User services (watchers; hcproxy stays opt-in via the launcher).
+#    theme/cursor watchers are WantedBy=default.target, which has already
+#    been reached by the time firstboot runs -> `enable` alone would not
+#    start them this session, so use --now. background/lock watchers are
+#    WantedBy=hyprland-session.target / graphical-session.target, which are
+#    reached LATER (firstboot is Before=graphical-session.target): plain
+#    `enable` installs the wants symlinks so the session pulls them in once
+#    Hyprland is up (starting them now, before the Hyprland IPC exists, would
+#    just fail their import-environment ExecStartPre).
 systemctl --user daemon-reload
-systemctl --user enable theme-watcher.service cursor-theme-watcher.service 2>/dev/null || true
+systemctl --user enable --now theme-watcher.service cursor-theme-watcher.service 2>/dev/null || true
+systemctl --user enable background-watcher.service lock-watcher.service 2>/dev/null || true
 
 # 5. Repair path only: rebuild the agent workspace if the baked dist is missing.
 if [ ! -f "$HC/GJS/hyprcandydock/agent-app/dist/index.html" ]; then
