@@ -49,8 +49,8 @@ fi
 # (cat > keeps the inode/ownership; sed -i would replace the file as root-owned
 # when run from system contexts, and firstboot runs as the user anyway.)
 if ! grep -q 'archisobasedir=' /proc/cmdline && [ -f "$HOME/.config/pinned" ]; then
-  if grep -qx 'calamares' "$HOME/.config/pinned"; then
-    grep -vx 'calamares' "$HOME/.config/pinned" > "$HOME/.config/pinned.tmp"
+  if grep -qx 'io.calamares.calamares' "$HOME/.config/pinned"; then
+    grep -vx 'io.calamares.calamares' "$HOME/.config/pinned" > "$HOME/.config/pinned.tmp"
     cat "$HOME/.config/pinned.tmp" > "$HOME/.config/pinned"
     rm -f "$HOME/.config/pinned.tmp"
   fi

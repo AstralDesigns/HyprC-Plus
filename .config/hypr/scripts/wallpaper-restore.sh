@@ -27,6 +27,13 @@ if ! awww query 2>/dev/null | grep -q 'displaying: image:'; then
   # so the seed is persisted to wallpaper.ini and matugen colors regenerate.
   # `awww restore` only helps on subsequent logins where the daemon already
   # remembers an image, which never happens on a fresh live session.
-  [ -n "$seed" ] && [ -f "$seed" ] && \
-    bash "$HOME/.config/quickshell/wallpaper/wallpaper-apply.sh" "$seed"
+  # Retry: hyprland.start fires this before the wayland socket accepts
+  # one-shot clients on slow boots; awww img dies on the first refusal, so
+  # keep trying until it lands (host logins succeed on the first attempt).
+  if [ -n "$seed" ] && [ -f "$seed" ]; then
+    for _ in $(seq 1 20); do
+      bash "$HOME/.config/quickshell/wallpaper/wallpaper-apply.sh" "$seed" && break
+      sleep 1
+    done
+  fi
 fi
