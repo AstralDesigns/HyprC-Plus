@@ -6,6 +6,7 @@ hl.config({
     general = {
         gaps_in = 4,
         gaps_out = 20,
+        border_size = 3,
         col = {
             active_border = color6,
             inactive_border = background,
@@ -20,9 +21,6 @@ hl.config({
             passes = 5,
             xray = true,
         },
-    },
-    input = {
-        kb_layout = "us",
     },
 })
 
