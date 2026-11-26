@@ -156,7 +156,9 @@ ShellRoot {
     readonly property int rFull: 9999
 
     // ── App state ─────────────────────────────────────────────────────────────
-    property string wallpaperDir:    appSettings.wallpaperDir
+    property string wallpaperDir:    appSettings.wallpaperDir !== ""
+                                         ? appSettings.wallpaperDir
+                                         : (Quickshell.env("HOME") + "/Pictures/Wallhaven")
     property string currentWallpaper:""
     property string searchText:      ""
     property int    focusedIdx:      0
@@ -169,7 +171,7 @@ ShellRoot {
     // ── Sidebar directory browsing state ─────────────────────────────────────
     property string sidebarPath:     appSettings.wallpaperDir !== ""
                                          ? _parentOf(appSettings.wallpaperDir)
-                                         : (Quickshell.env("HOME") + "/Pictures")
+                                         : (Quickshell.env("HOME") + "/Pictures/Wallhaven")
     property var    sidebarDirs:     []
 
     function _parentOf(p) {

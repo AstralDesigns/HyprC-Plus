@@ -1,13 +1,10 @@
 #!/bin/bash
-
-CONFIG_FILE="$HOME/.config/hypr/hyprviz.conf"
-
-CURRENT_BORDER=$(grep -E "^\s*border_size\s*=" "$CONFIG_FILE" | sed 's/.*border_size\s*=\s*\([0-9]*\).*/\1/')
-NEW_BORDER=$((CURRENT_BORDER > 0 ? CURRENT_BORDER - 1 : 0))
-sed -i "s/^\(\s*border_size\s*=\s*\)[0-9]*/\1$NEW_BORDER/" "$CONFIG_FILE"
-
-hyprctl keyword general:border_size $NEW_BORDER
+# Lua-aware visual adjust: persist through the CC state helper (hyprcandy-bar.conf
+# + hyprviz-state.lua), then reload. The legacy hyprviz.conf + `hyprctl keyword`
+# path never persisted on Hyprland 0.55+ Lua configs (file absent, keyword invalid).
+HELPER="$HOME/.config/quickshell/bar/scripts/hyprland-lua-state.sh"
+NEW_VALUE=$("$HELPER" adjust border_size -1)
 hyprctl reload
 
-echo "🔽 Border decreased: border_size=$NEW_BORDER"
-notify-send "Border Decreased" "border_size: $NEW_BORDER" -t 2000
+echo "🔽 Border decreased: border_size=$NEW_VALUE"
+notify-send "Border Decreased" "border_size: $NEW_VALUE" -t 2000

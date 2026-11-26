@@ -1,0 +1,10 @@
+[Unit]
+Description=Auto-update theme changes via nwg-look
+After=graphical-session.target
+
+[Service]
+ExecStart=%h/.config/hyprcandy/hooks/watch_gtk_font.sh
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

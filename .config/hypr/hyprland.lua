@@ -23,6 +23,8 @@ local function optional_dofile(path, label)
     return result
 end
 
+-- hl.config({ quirks = { skip_non_kms_dmabuf_formats = false } })
+
 -- Generated color bridges. Matugen keeps the existing ~/.config/hypr/colors.conf
 -- output for Quickshell reads and also writes ~/.config/hypr/colors.lua.
 -- Pywal keeps legacy cache outputs and additionally writes ~/.cache/wal/hyprland-colors.lua.
@@ -38,7 +40,7 @@ optional_dofile(home .. "/.config/hypr/hyprviz-state.lua", "HyprCandyPlus mutabl
 -- Custom settings file for user-preferences.
 optional_dofile(home .. "/.config/custom/custom.lua", "HyprCandyPlus custom user-preferences file")
 
--- Animation preset selected by ~/.config/hypr/scripts/animations.sh.
+-- Animation preset selected by the CC Animations tab (quickshell/bar/scripts/hyprcandy-animations.sh).
 optional_dofile(home .. "/.config/hypr/animations.lua", "HyprCandyPlus animation preset")
 
 -- Default workspace rules settings.

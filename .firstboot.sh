@@ -37,7 +37,7 @@ done
 #    Hyprland is up (starting them now, before the Hyprland IPC exists, would
 #    just fail their import-environment ExecStartPre).
 systemctl --user daemon-reload
-systemctl --user enable --now theme-watcher.service cursor-theme-watcher.service 2>/dev/null || true
+systemctl --user enable --now theme-watcher.service cursor-theme-watcher.service font-watcher.service 2>/dev/null || true
 systemctl --user enable background-watcher.service lock-watcher.service 2>/dev/null || true
 
 # 5. Repair path only: rebuild the agent workspace if the baked dist is missing.

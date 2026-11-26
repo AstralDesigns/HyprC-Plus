@@ -131,7 +131,7 @@ hl.window_rule({
         class = "(nwg-displays)",
     },
     float = true,
-    size = "990 600",
+    size = "1000 590",
     center = true,
 })
 hl.window_rule({
@@ -302,7 +302,7 @@ hl.window_rule({
 hl.window_rule({
     name = "windowrule-38",
     match = {
-        class = "^(Nm-connection-editor)$",
+        title = "^(Network Connections)$",
     },
     float = true,
 })
@@ -546,4 +546,13 @@ hl.window_rule({
     float = true,
     center = true,
     size = "400 200",
+})
+hl.window_rule({
+    name = "windowrule-72",
+    match = {
+        class = "^(io.calamares.calamares)$",
+    },
+    float = true,
+    center = true,
+    size = "1100 590",
 })

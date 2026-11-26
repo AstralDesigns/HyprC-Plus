@@ -1,6 +1,7 @@
 #!/bin/bash
-
-CONFIG_FILE="$HOME/.config/hypr/hyprviz.lua"
+# Lua-aware presets: persist through the CC state helper so the hyprviz-state.lua
+# overrides (loaded after hyprviz.lua) don't revert the preset on the next reload.
+HELPER="$HOME/.config/quickshell/bar/scripts/hyprland-lua-state.sh"
 
 case "$1" in
     "minimal")
@@ -33,15 +34,11 @@ case "$1" in
         ;;
 esac
 
-# Apply all settings to hyprviz.lua
-# Note: In Lua, these are inside hl.config({ general = { ... }, decoration = { ... } })
-sed -i "s/\(gaps_out\s*=\s*\)[0-9]*/\1$GAPS_OUT/" "$CONFIG_FILE"
-sed -i "s/\(gaps_in\s*=\s*\)[0-9]*/\1$GAPS_IN/" "$CONFIG_FILE"
-sed -i "s/\(border_size\s*=\s*\)[0-9]*/\1$BORDER/" "$CONFIG_FILE"
-sed -i "s/\(rounding\s*=\s*\)[0-9]*/\1$ROUNDING/" "$CONFIG_FILE"
-
-# Apply immediately using new Lua dispatch syntax via hyprctl
-hyprctl eval "hl.config({ general = { gaps_out = $GAPS_OUT, gaps_in = $GAPS_IN, border_size = $BORDER }, decoration = { rounding = $ROUNDING } })"
+"$HELPER" set gaps_out "$GAPS_OUT" >/dev/null
+"$HELPER" set gaps_in "$GAPS_IN" >/dev/null
+"$HELPER" set border_size "$BORDER" >/dev/null
+"$HELPER" set rounding "$ROUNDING" >/dev/null
+hyprctl reload
 
 echo "🎨 Applied $1 preset: gaps_out=$GAPS_OUT, gaps_in=$GAPS_IN, border=$BORDER, rounding=$ROUNDING"
 notify-send "Visual Preset Applied" "$1: OUT=$GAPS_OUT IN=$GAPS_IN BORDER=$BORDER ROUND=$ROUNDING" -t 3000

@@ -11,124 +11,124 @@ matugen.background = background
 error = "rgba(f8afa6ff)"
 matugen.error = error
 
-error_container = "rgba(9d1b19ff)"
+error_container = "rgba(8b1112ff)"
 matugen.error_container = error_container
 
-inverse_on_surface = "rgba(1d1b18ff)"
+inverse_on_surface = "rgba(1b1c1fff)"
 matugen.inverse_on_surface = inverse_on_surface
 
-inverse_primary = "rgba(583c16ff)"
+inverse_primary = "rgba(354b76ff)"
 matugen.inverse_primary = inverse_primary
 
-inverse_surface = "rgba(e6ded6ff)"
+inverse_surface = "rgba(dfdfe6ff)"
 matugen.inverse_surface = inverse_surface
 
-on_background = "rgba(e6ded6ff)"
+on_background = "rgba(dfdfe6ff)"
 matugen.on_background = on_background
 
-on_error = "rgba(160000ff)"
+on_error = "rgba(1f0001ff)"
 matugen.on_error = on_error
 
 on_error_container = "rgba(ffffffff)"
 matugen.on_error_container = on_error_container
 
-on_primary = "rgba(100900ff)"
+on_primary = "rgba(041731ff)"
 matugen.on_primary = on_primary
 
-on_primary_container = "rgba(000000ff)"
+on_primary_container = "rgba(ffffffff)"
 matugen.on_primary_container = on_primary_container
 
-on_primary_fixed = "rgba(000000ff)"
+on_primary_fixed = "rgba(000610ff)"
 matugen.on_primary_fixed = on_primary_fixed
 
-on_primary_fixed_variant = "rgba(3e2907ff)"
+on_primary_fixed_variant = "rgba(21365cff)"
 matugen.on_primary_fixed_variant = on_primary_fixed_variant
 
-on_secondary = "rgba(130d06ff)"
+on_secondary = "rgba(131720ff)"
 matugen.on_secondary = on_secondary
 
 on_secondary_container = "rgba(ffffffff)"
 matugen.on_secondary_container = on_secondary_container
 
-on_secondary_fixed = "rgba(000000ff)"
+on_secondary_fixed = "rgba(05070bff)"
 matugen.on_secondary_fixed = on_secondary_fixed
 
-on_secondary_fixed_variant = "rgba(3b2f1fff)"
+on_secondary_fixed_variant = "rgba(2f3543ff)"
 matugen.on_secondary_fixed_variant = on_secondary_fixed_variant
 
-on_surface = "rgba(ece2dbff)"
+on_surface = "rgba(dfdfe6ff)"
 matugen.on_surface = on_surface
 
-on_surface_variant = "rgba(ccbeafff)"
+on_surface_variant = "rgba(bec0caff)"
 matugen.on_surface_variant = on_surface_variant
 
-on_tertiary = "rgba(050600ff)"
+on_tertiary = "rgba(231525ff)"
 matugen.on_tertiary = on_tertiary
 
-on_tertiary_container = "rgba(000000ff)"
+on_tertiary_container = "rgba(ffffffff)"
 matugen.on_tertiary_container = on_tertiary_container
 
-on_tertiary_fixed = "rgba(000000ff)"
+on_tertiary_fixed = "rgba(0f0710ff)"
 matugen.on_tertiary_fixed = on_tertiary_fixed
 
-on_tertiary_fixed_variant = "rgba(292d0dff)"
+on_tertiary_fixed_variant = "rgba(443047ff)"
 matugen.on_tertiary_fixed_variant = on_tertiary_fixed_variant
 
-outline = "rgba(95897cff)"
+outline = "rgba(83858dff)"
 matugen.outline = outline
 
-outline_variant = "rgba(5c5348ff)"
+outline_variant = "rgba(494b52ff)"
 matugen.outline_variant = outline_variant
 
-primary = "rgba(e5b67bff)"
+primary = "rgba(a9c1f9ff)"
 matugen.primary = primary
 
-primary_container = "rgba(a37c48ff)"
+primary_container = "rgba(364c77ff)"
 matugen.primary_container = primary_container
 
-primary_fixed = "rgba(fad9b2ff)"
+primary_fixed = "rgba(d5dffcff)"
 matugen.primary_fixed = primary_fixed
 
-primary_fixed_dim = "rgba(e5b67bff)"
+primary_fixed_dim = "rgba(a9c1f9ff)"
 matugen.primary_fixed_dim = primary_fixed_dim
 
 scrim = "rgba(000000ff)"
 matugen.scrim = scrim
 
-secondary = "rgba(d4bb9eff)"
+secondary = "rgba(bac0d6ff)"
 matugen.secondary = secondary
 
-secondary_container = "rgba(61503bff)"
+secondary_container = "rgba(454b5bff)"
 matugen.secondary_container = secondary_container
 
-secondary_fixed = "rgba(f5dabcff)"
+secondary_fixed = "rgba(d8dff6ff)"
 matugen.secondary_fixed = secondary_fixed
 
-secondary_fixed_dim = "rgba(d4bb9eff)"
+secondary_fixed_dim = "rgba(bac0d6ff)"
 matugen.secondary_fixed_dim = secondary_fixed_dim
 
 shadow = "rgba(000000ff)"
 matugen.shadow = shadow
 
-source_color = "rgba(a57c44ff)"
+source_color = "rgba(3d537fff)"
 matugen.source_color = source_color
 
 surface = "rgba(000000ff)"
 matugen.surface = surface
 
-surface_bright = "rgba(2d2926ff)"
+surface_bright = "rgba(28292dff)"
 matugen.surface_bright = surface_bright
 
-surface_container = "rgba(0d0b0aff)"
+surface_container = "rgba(0b0c0eff)"
 matugen.surface_container = surface_container
 
-surface_container_high = "rgba(191715ff)"
+surface_container_high = "rgba(17171bff)"
 matugen.surface_container_high = surface_container_high
 
-surface_container_highest = "rgba(26231fff)"
+surface_container_highest = "rgba(232327ff)"
 matugen.surface_container_highest = surface_container_highest
 
-surface_container_low = "rgba(050404ff)"
+surface_container_low = "rgba(050607ff)"
 matugen.surface_container_low = surface_container_low
 
 surface_container_lowest = "rgba(000000ff)"
@@ -137,22 +137,22 @@ matugen.surface_container_lowest = surface_container_lowest
 surface_dim = "rgba(000000ff)"
 matugen.surface_dim = surface_dim
 
-surface_tint = "rgba(e5b67bff)"
+surface_tint = "rgba(a9c1f9ff)"
 matugen.surface_tint = surface_tint
 
-surface_variant = "rgba(39322aff)"
+surface_variant = "rgba(32353bff)"
 matugen.surface_variant = surface_variant
 
-tertiary = "rgba(bac385ff)"
+tertiary = "rgba(d9b8daff)"
 matugen.tertiary = tertiary
 
-tertiary_container = "rgba(7e8650ff)"
+tertiary_container = "rgba(5d455fff)"
 matugen.tertiary_container = tertiary_container
 
-tertiary_fixed = "rgba(dae2a1ff)"
+tertiary_fixed = "rgba(f9d5faff)"
 matugen.tertiary_fixed = tertiary_fixed
 
-tertiary_fixed_dim = "rgba(bac385ff)"
+tertiary_fixed_dim = "rgba(d9b8daff)"
 matugen.tertiary_fixed_dim = tertiary_fixed_dim
 
 

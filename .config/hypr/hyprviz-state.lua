@@ -5,21 +5,24 @@
 hl.config({
     general = {
         gaps_in = 4,
-        gaps_out = 8,
-        border_size = 3,
+        gaps_out = 20,
         col = {
             active_border = color6,
+            inactive_border = background,
         },
     },
     decoration = {
         rounding = 10,
-        active_opacity = 1.00,
-        inactive_opacity = 1.00,
+        active_opacity = 0.90,
+        inactive_opacity = 0.90,
         blur = {
             size = 1,
             passes = 5,
             xray = true,
         },
+    },
+    input = {
+        kb_layout = "us",
     },
 })
 

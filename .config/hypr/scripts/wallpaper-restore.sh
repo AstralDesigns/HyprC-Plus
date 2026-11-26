@@ -23,5 +23,10 @@ awww-daemon 2>/dev/null
 sleep 0.5
 awww restore 2>/dev/null
 if ! awww query 2>/dev/null | grep -q 'displaying: image:'; then
-  [ -n "$seed" ] && [ -f "$seed" ] && awww img "$seed"
+  # First application (ISO / new desktop): go through the picker's apply path
+  # so the seed is persisted to wallpaper.ini and matugen colors regenerate.
+  # `awww restore` only helps on subsequent logins where the daemon already
+  # remembers an image, which never happens on a fresh live session.
+  [ -n "$seed" ] && [ -f "$seed" ] && \
+    bash "$HOME/.config/quickshell/wallpaper/wallpaper-apply.sh" "$seed"
 fi

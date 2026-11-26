@@ -35,6 +35,10 @@ matugen image "$bg_path" --type scheme-smart -m smart -r nearest --base16-backen
         magick "$bg_path" "$HOME/.config/background"
         sleep 1
         "$HOOKS_DIR/update_background.sh"
+        # matugen just rewrote colors.lua; Hyprland only picks it up on reload.
+        # Without this the fresh palette stays pending until a manual reload
+        # (e.g. a Control Center slider nudge) - first-boot colors never apply.
+        hyprctl reload 2>/dev/null || true
         #echo "✅ Updated ~/.config/background to point to: $bg_path"
         return 0
     else
