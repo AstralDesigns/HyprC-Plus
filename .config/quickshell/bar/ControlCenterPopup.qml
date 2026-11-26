@@ -832,7 +832,7 @@ PanelWindow {
         property int activeTab: 1  // Default to Hyprland tab (index 1)
         property int activeBarSubTab: 0  // Remembered Bar sub-tab (default: General)
         property int activeKbSubTab:  0  // Remembered Keybinds sub-tab (0 = View, 1 = Edit)
-        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH, 3 = Keyboard, 4 = Hypridle, 5 = GitHub)
+        property int activeSysSubTab: 0  // Remembered System sub-tab (0 = Info, 1 = Hotspot, 2 = SSH, 3 = Keyboard, 4 = Hypridle, 5 = GitHub, 6 = V.Machine)
         property int activeGreetSubTab: 0  // Remembered Greeter sub-tab (0 = Themes, 1 = Edit)
     }
     Settings {
@@ -4989,6 +4989,15 @@ PanelWindow {
                         // Sub-tab index (mirrored to/from ccTabSettings)
                         property int kbSubIdx: ccTabSettings.activeKbSubTab
 
+                        // Preload both bind sources as soon as the CC popup is created
+                        // (its Loader activates on open). The activeTabChanged hook below
+                        // only fires on switches, so a CC opened straight onto the
+                        // remembered Keybinds tab would otherwise show an empty list.
+                        Component.onCompleted: {
+                            if (!_kbHyprvizReader.running) _kbHyprvizReader.running = true
+                            if (!_kbCustomReader.running)  _kbCustomReader.running  = true
+                        }
+
                         // ── Lua line regex helper (pure JS) ─────────────────────────────
                         function parseBindLine(line) {
                             // Match: hl.bind("KEYS", ..., { description = "DESC" })
@@ -5036,10 +5045,6 @@ PanelWindow {
                                 '-- ██║     ██╔══██║██║╚██╗██║██║  ██║  ╚██╔╝  ',
                                 '-- ╚██████╗██║  ██║██║ ╚████║██████╔╝   ██║   ',
                                 '--  ╚═════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═════╝    ╚═╝   ',
-                                '-- ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓',
-                                '-- ┃                          User Settings                      ┃',
-                                '-- ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛',
-                                '-- [NOTE!!] Your personal settings added here are sourced in hyprland.lua.',
                                 '',
                             ]
                             for (let i = 0; i < src.length; i++)
@@ -6144,7 +6149,7 @@ PanelWindow {
                                 Layout.fillWidth: true
                                 spacing: 4
                                 Repeater {
-                                    model: ["Info", "Hotspot", "SSH", "Keyboard", "Hypridle", "GitHub"]
+                                    model: ["Info", "Hotspot", "SSH", "Keyboard", "Hypridle", "GitHub", "V.Machine"]
                                     delegate: Rectangle {
                                         required property string modelData
                                         required property int index
@@ -8141,6 +8146,212 @@ PanelWindow {
                                                 font.family: Config.labelFont
                                                 font.pixelSize: 11
                                                 elide: Text.ElideRight
+                                            }
+                                        }
+
+                                        Item { Layout.preferredHeight: 10 }
+                                    }
+                                }
+
+                                // ── V.Machine sub-tab ─────────────────────────
+                                // Probes the virt-manager stack (binary, libvirtd,
+                                // libvirt group, KVM) and offers the auto-setup
+                                // script in a floating kitty -- setsid --fork so
+                                // the terminal survives CC hide, same as the shell
+                                // switcher. setsid exits immediately after forking,
+                                // so completion is observed by re-probing every 5s
+                                // while this tab is open and setup is incomplete.
+                                CCScrollPane {
+                                    ColumnLayout {
+                                        id: vmTab
+                                        width: parent.width
+                                        spacing: 10
+                                        property bool loaded: false
+                                        property bool vmOk: false
+                                        property bool svcOk: false
+                                        property bool grpOk: false
+                                        property bool kvmOk: false
+                                        readonly property bool ready: vmOk && svcOk && grpOk
+
+                                        Process {
+                                            id: vmReadProc
+                                            running: false
+                                            command: ["bash", "-c",
+                                                "command -v virt-manager >/dev/null 2>&1 && echo VM=1 || echo VM=0; " +
+                                                "systemctl is-active --quiet libvirtd && echo SVC=1 || echo SVC=0; " +
+                                                "id -nG | grep -qw libvirt && echo GRP=1 || echo GRP=0; " +
+                                                "lsmod | grep -q kvm && echo KVM=1 || echo KVM=0"]
+                                            property string _buf: ""
+                                            stdout: SplitParser {
+                                                splitMarker: "\n"
+                                                onRead: function(l) { vmReadProc._buf += l + "\n" }
+                                            }
+                                            onExited: {
+                                                const raw = _buf; _buf = ""
+                                                vmTab.vmOk = raw.indexOf("VM=1") > -1
+                                                vmTab.svcOk = raw.indexOf("SVC=1") > -1
+                                                vmTab.grpOk = raw.indexOf("GRP=1") > -1
+                                                vmTab.kvmOk = raw.indexOf("KVM=1") > -1
+                                                vmTab.loaded = true
+                                            }
+                                        }
+                                        Process {
+                                            id: vmSetupProc
+                                            running: false
+                                            command: [
+                                                "setsid", "--fork", "kitty",
+                                                "--class", "floating-installer",
+                                                "--title", "   Virt-Manager Setup",
+                                                "-e", "bash", "-ic",
+                                                ccWin.scriptDir + "/virt-manager-auto-setup.sh"
+                                            ]
+                                            onExited: running = false
+                                        }
+                                        Process {
+                                            id: vmOpenProc
+                                            running: false
+                                            command: ["setsid", "--fork", "bash", "-c",
+                                                "if [ -x \"$HOME/.local/bin/vm-display-setup.sh\" ]; then \"$HOME/.local/bin/vm-display-setup.sh\"; else virt-manager; fi"]
+                                            onExited: running = false
+                                        }
+                                        Connections {
+                                            target: sysSubStack
+                                            function onCurrentIndexChanged() {
+                                                if (sysSubStack.currentIndex === 6 && !vmTab.loaded && !vmReadProc.running)
+                                                    vmReadProc.running = true
+                                            }
+                                        }
+                                        Timer {
+                                            interval: 5000
+                                            repeat: true
+                                            running: sysSubStack.currentIndex === 6 && vmTab.loaded && !vmTab.ready
+                                            onTriggered: if (!vmReadProc.running) vmReadProc.running = true
+                                        }
+
+                                        // ── Status banner ──
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 50
+                                            radius: 10
+                                            color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.45)
+                                            border.width: 1
+                                            border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.16)
+                                            RowLayout {
+                                                anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; leftMargin: 10; rightMargin: 10 }
+                                                spacing: 10
+                                                Text {
+                                                    Layout.alignment: Qt.AlignVCenter
+                                                    text: "\u{F108}"
+                                                    color: vmTab.ready ? Theme.cPrimary : Theme.cTertiary
+                                                    font.family: Config.fontFamily
+                                                    font.pixelSize: 22
+                                                }
+                                                ColumnLayout {
+                                                    Layout.fillWidth: true
+                                                    Layout.alignment: Qt.AlignVCenter
+                                                    spacing: 2
+                                                    Text {
+                                                        text: "Virtual Machines (virt-manager)"
+                                                        color: Theme.cPrimary
+                                                        font.family: Config.labelFont
+                                                        font.pixelSize: 12
+                                                        font.weight: Font.DemiBold
+                                                    }
+                                                    Text {
+                                                        text: !vmTab.loaded ? "Probing virtualization state…"
+                                                              : (vmTab.ready ? "Virtualization is set up and ready"
+                                                                             : "Virtualization is not set up yet")
+                                                        color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.65)
+                                                        font.family: Config.labelFont
+                                                        font.pixelSize: 11
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // ── Component chips ──
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            Repeater {
+                                                model: [
+                                                    { label: "virt-manager", ok: vmTab.vmOk },
+                                                    { label: "libvirtd", ok: vmTab.svcOk },
+                                                    { label: "libvirt group", ok: vmTab.grpOk },
+                                                    { label: "KVM", ok: vmTab.kvmOk }
+                                                ]
+                                                delegate: Rectangle {
+                                                    required property var modelData
+                                                    Layout.fillWidth: true
+                                                    Layout.preferredHeight: 26
+                                                    radius: 8
+                                                    color: Qt.rgba(Theme.cOnSecondary.r, Theme.cOnSecondary.g, Theme.cOnSecondary.b, 0.3)
+                                                    Row {
+                                                        anchors.centerIn: parent
+                                                        spacing: 5
+                                                        Text {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            text: modelData.ok ? "\u{F00C}" : "\u{F00D}"
+                                                            color: modelData.ok ? Theme.cPrimary : Theme.cTertiary
+                                                            font.family: Config.fontFamily
+                                                            font.pixelSize: 11
+                                                        }
+                                                        Text {
+                                                            anchors.verticalCenter: parent.verticalCenter
+                                                            text: modelData.label
+                                                            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.8)
+                                                            font.family: Config.labelFont
+                                                            font.pixelSize: 11
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Text {
+                                            visible: vmTab.loaded && !vmTab.ready
+                                            Layout.fillWidth: true
+                                            wrapMode: Text.WordWrap
+                                            text: "Setup installs qemu/libvirt/virt-manager, enables libvirtd and the default network, and adds your user to the libvirt/kvm groups. It runs in a floating terminal and asks for your sudo password there."
+                                            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.65)
+                                            font.family: Config.labelFont
+                                            font.pixelSize: 11
+                                        }
+                                        Text {
+                                            visible: vmTab.loaded && vmTab.vmOk && vmTab.svcOk && !vmTab.grpOk
+                                            Layout.fillWidth: true
+                                            wrapMode: Text.WordWrap
+                                            text: "Packages and service are ready -- log out and back in once to apply the libvirt group membership."
+                                            color: Theme.cTertiary
+                                            font.family: Config.labelFont
+                                            font.pixelSize: 11
+                                        }
+                                        Text {
+                                            visible: vmTab.loaded && vmTab.ready && !vmTab.kvmOk
+                                            Layout.fillWidth: true
+                                            wrapMode: Text.WordWrap
+                                            text: "KVM acceleration is unavailable on this host; VMs will run with software emulation (TCG)."
+                                            color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.65)
+                                            font.family: Config.labelFont
+                                            font.pixelSize: 11
+                                        }
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 6
+                                            CCPillBtn {
+                                                text: vmTab.ready ? "Re-run setup" : "Set up virtualization"
+                                                active: !vmTab.ready
+                                                onClicked: vmSetupProc.running = true
+                                            }
+                                            CCPillBtn {
+                                                text: "Open virt-manager"
+                                                active: vmTab.ready
+                                                onClicked: vmOpenProc.running = true
+                                            }
+                                            CCPillBtn {
+                                                text: "Re-check"
+                                                onClicked: if (!vmReadProc.running) vmReadProc.running = true
                                             }
                                         }
 

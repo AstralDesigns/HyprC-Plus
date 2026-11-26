@@ -385,6 +385,25 @@ export const App: React.FC = () => {
     return () => { clearInterval(id); window.removeEventListener('focus', onFocus); };
   }, []);
 
+  // Agent-driven web preview: the runtime holds the last web_preview_open
+  // request (same poll pattern as chat). When requestId advances, surface the
+  // pane so the user sees exactly what the agent is about to test live.
+  useEffect(() => {
+    let last = -1;
+    const id = setInterval(async () => {
+      try {
+        const s = await bridge.runtimeRequest('/api/web_preview/state', {}, 'GET', 4000);
+        const rid = s?.requestId || 0;
+        if (last === -1) { last = rid; return; }  // don't replay stale opens on boot
+        if (rid > last && s?.url) {
+          last = rid;
+          storeActions.openPreview(s.url, s.title || undefined);
+        }
+      } catch { /* runtime offline */ }
+    }, 2000);
+    return () => clearInterval(id);
+  }, []);
+
   // Drain buffered inotify events from the host watcher and apply them. Cheap
   // (the server returns a small list), so a short tick + focus gives near-
   // real-time updates without per-file polling.

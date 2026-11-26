@@ -900,6 +900,17 @@ async def files_reject(body: PathBody):
     return {"ok": ok}
 
 
+# ── Live web preview: agent opens, canvas polls ──────────────────────────────
+@app.post("/api/web_preview/open")
+async def web_preview_open(body: dict):
+    return await tools_module.web_preview_open(body.get("url", ""), body.get("title", ""))
+
+
+@app.get("/api/web_preview/state")
+async def web_preview_state():
+    return tools_module.WEB_PREVIEW_STATE
+
+
 @app.post("/api/files/accept-all")
 async def files_accept_all():
     count = tools_module.accept_all_edits()

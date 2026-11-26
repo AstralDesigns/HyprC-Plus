@@ -172,6 +172,8 @@ export interface FilePane {
   diskMtime?: number;
   /** On-disk file changed while this tab held unsaved edits — surfaced as a badge. */
   externalChanged?: boolean;
+  /** Markdown tabs: render a read-only preview instead of the Monaco editor. */
+  mdPreview?: boolean;
 }
 
 export interface FileSystemItem {
@@ -1497,6 +1499,15 @@ export const storeActions = {
     });
   },
 
+  /** Navigate a web-preview pane to a new URL (address bar / agent open). */
+  navigatePreview: (id: string, url: string) => {
+    setStore(prev => ({
+      panes: prev.panes.map(p => p.id === id
+        ? { ...p, path: url, name: url.replace(/^https?:\/\//, '') || p.name }
+        : p),
+    }));
+  },
+
   updateCommandStatus: (sessionId: string, messageId: string, updater: Partial<CommandData>) => {
     setStore(prev => {
       const updated = prev.sessions.map(s => {
@@ -1639,6 +1650,14 @@ export const storeActions = {
   setPaneViewState: (id: string, viewState: { cursorPosition?: { lineNumber: number; column: number }; scrollTop?: number }) => {
     setStore(prev => ({
       panes: prev.panes.map(p => p.id === id ? { ...p, ...viewState } : p),
+    }));
+  },
+
+  /** Per-tab code/preview toggle for markdown files (the floating canvas pill).
+   *  Stored on the pane so each tab remembers its own view across switches. */
+  setPaneMdPreview: (id: string, on: boolean) => {
+    setStore(prev => ({
+      panes: prev.panes.map(p => p.id === id ? { ...p, mdPreview: on } : p),
     }));
   },
 

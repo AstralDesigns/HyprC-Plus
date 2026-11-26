@@ -40,6 +40,9 @@ optional_dofile(home .. "/.config/hypr/hyprviz-state.lua", "HyprCandyPlus mutabl
 -- Custom settings file for user-preferences.
 optional_dofile(home .. "/.config/custom/custom.lua", "HyprCandyPlus custom user-preferences file")
 
+-- Personal user-settings (sourced last so personal overrides win).
+optional_dofile(home .. "/.config/custom/user-settings.lua", "HyprCandyPlus personal user-settings file")
+
 -- Animation preset selected by the CC Animations tab (quickshell/bar/scripts/hyprcandy-animations.sh).
 optional_dofile(home .. "/.config/hypr/animations.lua", "HyprCandyPlus animation preset")
 

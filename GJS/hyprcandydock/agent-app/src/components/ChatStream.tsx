@@ -19,6 +19,7 @@ import { agentEngine } from '../engine/agent-engine';
 import { ImageLightboxModal } from './ImageLightboxModal';
 import { PromptContextMenu } from './PromptContextMenu';
 import { MermaidDiagram } from './MermaidDiagram';
+import { diffLines, isDiffLang } from './DiffCode';
 import { DiffPreviewModal } from './DiffPreviewModal';
 
 /* ── Empty chat screen ──────────────────────────────────────────────── */
@@ -458,6 +459,14 @@ const renderMarkdown = (content: string, summaryMode?: boolean | string, selecti
               return <MermaidDiagram code={String(children).replace(/\n$/, '')} />;
             }
 
+            // Standard diff coloring, shared with the canvas markdown preview.
+            if (isDiffLang(lang)) {
+              const lines = diffLines(String(children));
+              return isSummary
+                ? <code className="md-diff">{lines}</code>
+                : <pre className="md-diff-pre"><code className="md-diff">{lines}</code></pre>;
+            }
+
             const isInline = !className;
             if (isInline) {
               const text = String(children || '').trim();
@@ -484,6 +493,11 @@ const renderMarkdown = (content: string, summaryMode?: boolean | string, selecti
                 return <code {...props}>{children}</code>;
               }
               return <code {...props}>{children}</code>;
+            }
+            // Summary mode supplies its own themed <pre> wrapper (data-lang
+            // label); emitting another here would nest pre-in-pre.
+            if (isSummary) {
+              return <code className={className} {...props}>{children}</code>;
             }
             return (
               <pre>

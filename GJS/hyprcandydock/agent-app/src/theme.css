@@ -2347,6 +2347,73 @@ body,
   min-height: 0;
 }
 
+/* ── Markdown code/preview pill ───────────────────────────────────────────
+   Floating top-center of the canvas on markdown tabs. Matugen on-secondary
+   pill; primary-colored icons; the active view gets a circular primary 10%
+   highlight. Sits above Monaco (z-index) without blocking editor clicks. */
+.md-preview-toggle {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: var(--matugen-on-secondary, #1d343c);
+  border: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 18%, transparent);
+  box-shadow: var(--shadow-md);
+}
+
+.md-preview-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--matugen-primary, #a0c9dc);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.md-preview-toggle-btn:hover {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 8%, transparent);
+}
+
+.md-preview-toggle-btn-active,
+.md-preview-toggle-btn-active:hover {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 10%, transparent);
+}
+
+/* Rendered markdown preview surface (reuses .markdown-body typography).
+   Flex row so the outline rail can sit sticky at the left of the scroll. */
+.md-preview-scroll {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 28px 36px 48px 14px;
+}
+
+.md-preview-body {
+  flex: 1;
+  min-width: 0;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.md-preview-body img {
+  max-width: 100%;
+  border-radius: var(--radius-sm);
+}
+
 .canvas-pending-toolbar {
   display: flex;
   align-items: center;
@@ -2926,6 +2993,7 @@ body,
   padding: 12px 14px;
   overflow-x: auto;
   margin: 0.55em 0;
+  white-space: pre;
 }
 
 .markdown-body pre code {
@@ -2935,6 +3003,13 @@ body,
   color: var(--text-code);
   font-size: 12px;
   line-height: 1.6;
+  /* Fenced blocks (ASCII file trees, diffs, logs) must keep their newlines
+     and indentation. The inline-chip wrap rules on .markdown-body code
+     otherwise collapse them into flowing prose — in the chat panel AND the
+     canvas markdown preview, which share this class. */
+  white-space: pre;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 /* ── Mermaid Diagrams — matugen themed ──────────────────────────────── */
@@ -3202,10 +3277,7 @@ body,
 .markdown-body tr:nth-child(even) td {
   background: color-mix(in srgb, var(--matugen-surface-variant, #2a3c46) 28%, transparent);
 }
-.markdown-body tr:hover td {
-  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 10%, transparent);
-  transition: background 0.1s ease;
-}
+/* Static zebra only — no hover highlight on the skipped rows. */
 
 /* ── Tool cards ──────────────────────────────────────────────────────── */
 .tool-card {
@@ -4610,6 +4682,14 @@ body,
 .monaco-editor .find-widget textarea::selection {
   background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 15%, transparent) !important;
   color: var(--matugen-on-surface, #dfe3e6) !important;
+}
+
+/* Rounded drag-selection like newer IDEs: Monaco paints each selection
+   segment as a .selected-text overlay div and only rounds its outer
+   corners at 3px via corner classes; a uniform 6px radius per segment
+   gives the modern pill look (multi-line selections stack rounded rows). */
+.monaco-editor .view-overlays .selected-text {
+  border-radius: 1px !important;
 }
 
 /* ── Monaco Find/Replace toggle buttons (match case, whole word, regex, preserve case) ── */
@@ -6319,4 +6399,204 @@ body,
 
 .edit-long-text-btn-continue:hover {
   opacity: 0.9;
+}
+
+/* ── Live web preview chrome (the page itself stays unthemed) ─────────── */
+.web-preview-pane {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+}
+
+.web-preview-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: color-mix(in srgb, var(--matugen-surface-container-high, #23343c) 82%, transparent);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.web-preview-globe {
+  color: var(--matugen-primary, #a0c9dc);
+  flex: 0 0 auto;
+}
+
+.web-preview-addr {
+  flex: 1;
+  min-width: 0;
+  background: color-mix(in srgb, var(--matugen-surface, #101c22) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--matugen-outline, #546e7a) 35%, transparent);
+  border-radius: var(--radius-full, 9999px);
+  color: var(--matugen-on-surface, #dde3e8);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 4px 12px;
+  outline: none;
+  transition: border-color var(--transition-fast, 0.15s ease);
+}
+
+.web-preview-addr:focus {
+  border-color: var(--matugen-primary, #a0c9dc);
+}
+
+.web-preview-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: color-mix(in srgb, var(--wallust-color3, #e5c07b) 75%, transparent);
+}
+
+.web-preview-dot-live {
+  background: var(--wallust-color2, #98c379);
+}
+
+.web-preview-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--matugen-primary, #a0c9dc);
+  cursor: pointer;
+  transition: background var(--transition-fast, 0.15s ease);
+}
+
+.web-preview-btn:hover {
+  background: color-mix(in srgb, var(--matugen-primary, #a0c9dc) 12%, transparent);
+}
+
+.web-preview-frame {
+  flex: 1;
+  width: 100%;
+  border: 0;
+  background: #fff;
+}
+
+/* ── Markdown outline rail: one dash per heading, hover = themed hint ─── */
+.md-outline-rail {
+  position: sticky;
+  top: 0;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 10px 10px 6px;
+  /* Full pane height so the dash column centres against the VISIBLE body,
+     not the document; sticky keeps it pinned while scrolling. */
+  height: 100%;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+/* Auto margins centre the dashes when they fit and collapse to 0 when the
+   outline overflows, so long outlines scroll from the top, never clip. */
+.md-outline-rail .md-outline-dash:first-child { margin-top: auto; }
+.md-outline-rail .md-outline-dash:last-child { margin-bottom: auto; }
+
+.md-outline-rail::-webkit-scrollbar {
+  display: none;
+}
+
+.md-outline-dash {
+  height: 3px;
+  border: none;
+  border-radius: 2px;
+  padding: 0;
+  background: color-mix(in srgb, var(--matugen-on-surface-variant, #bfc8ce) 38%, transparent);
+  cursor: pointer;
+  transition: background var(--transition-fast, 0.15s ease);
+}
+
+.md-outline-dash:hover {
+  background: var(--wallust-color4, #56b6c2);
+}
+
+.md-outline-active,
+.md-outline-active:hover {
+  background: var(--matugen-primary, #a0c9dc);
+}
+
+.md-outline-l1 { width: 20px; margin-left: 0; }
+.md-outline-l2 { width: 16px; margin-left: 4px; }
+.md-outline-l3 { width: 12px; margin-left: 8px; }
+.md-outline-l4 { width: 9px; margin-left: 12px; }
+.md-outline-l5 { width: 7px; margin-left: 16px; }
+.md-outline-l6 { width: 5px; margin-left: 20px; }
+
+/* ── Standard diff semantics (palette-independent, GitHub-dark hues) ──── */
+.markdown-body code.md-diff {
+  display: block;
+  white-space: pre;
+}
+
+.md-diff span {
+  display: block;
+  padding: 0 14px;
+  margin: 0 -14px;
+}
+
+.md-diff-add { color: #3fb950; background: rgba(46, 160, 67, 0.15); }
+.md-diff-del { color: #f85149; background: rgba(248, 81, 73, 0.15); }
+.md-diff-hunk { color: #a371f7; background: rgba(163, 113, 247, 0.12); }
+.md-diff-ctx { color: var(--text-code); }
+
+/* ── Markdown palette variety: matugen structure + wallust accents ────── */
+.markdown-body h1 {
+  color: var(--wallust-color5, #e5c07b);
+}
+.markdown-body h2 {
+  color: var(--wallust-color2, #e5c07b);
+}
+.markdown-body h3,
+.markdown-body h4 {
+  color: var(--wallust-color3, #e5c07b);
+}
+
+/* Section separators: ONE wallust rule ABOVE each section title; the next
+   title's top rule closes the previous section, so no bottom rule. */
+.markdown-body h1,
+.markdown-body h2 {
+  border-top: 1px solid color-mix(in srgb, var(--wallust-color4, #56b6c2) 45%, transparent);
+  padding: 0.3em 0 0;
+}
+
+/* Source documents often put a `---` rule immediately before a section
+   title; the title's own top rule is the single separator, so drop the
+   duplicate hr (Chromium :has() is available in the embedded WebEngine). */
+.markdown-body hr:has(+ h1),
+.markdown-body hr:has(+ h2),
+.markdown-body hr:has(+ h3) {
+  display: none;
+}
+
+.markdown-body blockquote {
+  border-left: 3px solid var(--wallust-color2, #98c379);
+  background: color-mix(in srgb, var(--wallust-color2, #98c379) 7%, transparent);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  padding: 6px 12px;
+}
+
+.markdown-body a {
+  color: var(--matugen-primary, #a0c9dc);
+}
+
+.markdown-body a:hover {
+  color: var(--wallust-color3, #e5c07b);
+}
+
+.markdown-body hr {
+  border: none;
+  height: 1px;
+  background: color-mix(in srgb, var(--wallust-color4, #56b6c2) 45%, transparent);
+}
+
+/* Tables stay matugen-only; the static zebra lives in the base rules. */
+.markdown-body table th {
+  background: color-mix(in srgb, var(--matugen-surface-container-high, #23343c) 80%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--matugen-primary, #a0c9dc) 35%, transparent);
 }

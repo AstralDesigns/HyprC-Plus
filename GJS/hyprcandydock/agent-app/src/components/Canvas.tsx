@@ -17,9 +17,14 @@ import {
   FileCode,
   ExternalLink,
   AlertTriangle,
+  Code2,
+  Eye,
+  Globe,
 } from 'lucide-react';
 import { useStoreSelector, storeActions, getStore } from '../store';
 import { MediaGallery } from './MediaGallery';
+import { MarkdownPreview } from './MarkdownPreview';
+import { WebPreview } from './WebPreview';
 import { bridge } from '../bridge';
 import { registerMonacoThemes, applyMatugenThemeNow } from '../utils/monacoThemes';
 import { registerCustomLanguages, attachDiagnostics } from '../utils/monacoLanguages';
@@ -810,6 +815,14 @@ export const Canvas: React.FC = () => {
           <button
             type="button"
             className="empty-action-btn"
+            onClick={() => storeActions.openPreview('', 'Web Preview')}
+          >
+            <Globe size={14} />
+            <span>Web Preview</span>
+          </button>
+          <button
+            type="button"
+            className="empty-action-btn"
             onClick={async () => {
               const picked = await bridge.openFileDialog({ directory: false, currentFolder: store.projectPath });
               if (picked) storeActions.openFileByPath(picked);
@@ -832,6 +845,10 @@ export const Canvas: React.FC = () => {
         if (pane.type === 'code' || pane.type === 'markdown') {
           const targetTheme = store.monacoTheme === 'matugen' || !store.monacoTheme ? 'matugen' : store.monacoTheme;
           const showDiff = !!pendingEdit && diffView;
+          // Markdown tabs get a floating code/preview pill; the preview is a
+          // read-only rendered view (Monaco unmounts, its model is retained).
+          const isMarkdown = pane.type === 'markdown' || /\.(md|markdown)$/i.test(pane.path || pane.name || '');
+          const showMdPreview = isMarkdown && !!pane.mdPreview && !showDiff;
           return (
             <div key={pane.id} className="canvas-editor-pane-wrap">
               {pendingEdit ? (
@@ -888,7 +905,29 @@ export const Canvas: React.FC = () => {
                 </div>
               )}
               <div className="canvas-editor-pane">
-                {showDiff ? (
+                {isMarkdown && !showDiff && (
+                  <div className="md-preview-toggle" aria-label="Markdown view mode">
+                    <button
+                      type="button"
+                      className={`md-preview-toggle-btn ${!pane.mdPreview ? 'md-preview-toggle-btn-active' : ''}`}
+                      onClick={() => storeActions.setPaneMdPreview(pane.id, false)}
+                      title="Code view"
+                    >
+                      <Code2 size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className={`md-preview-toggle-btn ${pane.mdPreview ? 'md-preview-toggle-btn-active' : ''}`}
+                      onClick={() => storeActions.setPaneMdPreview(pane.id, true)}
+                      title="Markdown preview"
+                    >
+                      <Eye size={14} />
+                    </button>
+                  </div>
+                )}
+                {showMdPreview ? (
+                  <MarkdownPreview content={pane.content} filePath={pane.path} />
+                ) : showDiff ? (
                   <DiffEditor
                     // Same dispose-race concern as DiffWidget: a repeated
                     // write_file to this same path while the diff view is
@@ -1257,22 +1296,8 @@ export const Canvas: React.FC = () => {
           );
         }
 
-        if (pane.type === 'preview' && pane.path) {
-          const src = /^https?:\/\//.test(pane.path) ? pane.path : `file://${pane.path}`;
-          return (
-            <div key={pane.id} className="canvas-preview-pane">
-              <div className="canvas-preview-bar">
-                <span className="canvas-preview-url">{src}</span>
-                <button type="button" className="canvas-pending-btn" onClick={() => {
-                  const frame = document.getElementById(`preview-frame-${pane.id}`) as HTMLIFrameElement | null;
-                  if (frame) frame.src = frame.src;
-                }}>
-                  Reload
-                </button>
-              </div>
-              <iframe id={`preview-frame-${pane.id}`} src={src} className="canvas-preview-frame" title={pane.name} />
-            </div>
-          );
+        if (pane.type === 'preview') {
+          return <WebPreview key={pane.id} pane={pane} />;
         }
 
         if (pane.type === 'image-gallery') {

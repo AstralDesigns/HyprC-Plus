@@ -52,10 +52,11 @@
 // (its lifecycle is tied to the websearch toggle in LauncherWindow.qml
 // -- see proxyOptIn; run `hcproxy disable` to strip the flag and stop the
 // launcher managing it).
-//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS= --renderer-process-limit=1 --enable-gpu-rasterization --ignore-gpu-blocklist --disk-cache-size=1 --media-cache-size=1 --disable-gpu-shader-disk-cache --disable-background-newtworking --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --proxy-server=http://127.0.0.1:8888 
+//@ pragma Env QTWEBENGINE_CHROMIUM_FLAGS= --renderer-process-limit=1 --enable-gpu-rasterization --ignore-gpu-blocklist --disk-cache-size=1 --media-cache-size=1 --disable-gpu-shader-disk-cache --disable-background-newtworking --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --no-pings --remote-debugging-port=9222 --proxy-server=http://127.0.0.1:8888 
 // --use-gl=angle --use-angle=gl --num-raster-threads=1
-// (If CDP forensics are ever needed again: re-add
-//  //@ pragma Env QTWEBENGINE_REMOTE_DEBUGGING=9223 and use bar/scripts/webtest/.)
+// (CDP is now permanent on loopback port 9222: the agent's live web-preview
+//  tools (local_runtime/cdp_client.py) drive the canvas preview iframe through
+//  it. bar/scripts/webtest/ still works for manual forensics against that port.)
 
 // ── Qt logging filter (keep errors, drop benign chatter) ────────────────────
 // qt.svg: Humanity icon theme probing a printer.svg that isn't installed.

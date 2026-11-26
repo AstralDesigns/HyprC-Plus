@@ -16,6 +16,7 @@ import difflib
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -235,12 +236,13 @@ TOOLS_SCHEMA = [
         "type": "function",
         "function": {
             "name": "exec_command",
-            "description": "Execute a bash shell command. Use cautiously for builds, git, tests.",
+            "description": "Execute a bash shell command. Use cautiously for builds, git, tests. Set sandbox=true to run inside a bubblewrap jail (whole filesystem read-only except the working directory, /tmp and ~/.cache; network kept) for risky or untrusted commands; leave it off when the command needs system-wide write access (package installs, sudo, system services).",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "Bash command to run."},
                     "cwd": {"type": "string", "description": "Working directory (optional)."},
+                    "sandbox": {"type": "boolean", "description": "Run in a bubblewrap sandbox: read-only root, only cwd / /tmp / ~/.cache writable. Optional, default false."},
                 },
                 "required": ["command"],
             },
@@ -525,6 +527,77 @@ TOOLS_SCHEMA = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_preview_open",
+            "description": "Open (or refresh) a live web-app/website preview pane in the user's canvas. Use whenever you start or change a web project's dev server or static site so the user sees it. The pane is also your live test surface: web_preview_eval/snapshot/console/screenshot drive the very same page.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "http(s) URL of the dev server or site, e.g. http://127.0.0.1:5173/"},
+                    "title": {"type": "string", "description": "Optional tab title for the preview pane."},
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_preview_eval",
+            "description": "Evaluate JavaScript inside the live web preview page (the same iframe the user sees) and return the result. Use for live testing: click elements, fill inputs, read DOM state, assert rendered output. Requires the preview pane to be open.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "js": {"type": "string", "description": "JavaScript expression or IIFE; its value is returned (promises awaited)."},
+                    "url": {"type": "string", "description": "Optional preview URL override; defaults to the last web_preview_open URL."},
+                },
+                "required": ["js"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_preview_snapshot",
+            "description": "See the live web preview without pixels: page title, URL, visible text and up to 80 interactive elements (links/buttons/inputs with ids, text, hrefs). Use to verify what rendered and to pick selectors for web_preview_eval.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {"type": "string", "description": "Optional preview URL override."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_preview_console",
+            "description": "Read buffered console output and uncaught errors from the live web preview page (log/warn/error entries since attach). Use to check for runtime errors after interacting.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "clear": {"type": "boolean", "description": "Empty the buffer after reading (default false)."},
+                    "url": {"type": "string", "description": "Optional preview URL override."},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "web_preview_screenshot",
+            "description": "Capture a PNG screenshot of the live web preview page (exactly what the user sees) and return the saved file path.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Optional output PNG path; defaults to /tmp/hyprcandy_web_<ts>.png."},
+                    "url": {"type": "string", "description": "Optional preview URL override."},
+                },
+            },
+        },
+    },
 ]
 
 
@@ -622,7 +695,7 @@ async def write_file(path: str, content: str) -> dict:
     }
 
 
-async def exec_command(command: str, cwd: Optional[str] = None) -> dict:
+async def exec_command(command: str, cwd: Optional[str] = None, sandbox: bool = False) -> dict:
     work_dir = Path(cwd).expanduser() if cwd else Path.home()
 
     # Pre-scan files that might be targeted by the command to capture pre-edit content
@@ -673,13 +746,56 @@ async def exec_command(command: str, cwd: Optional[str] = None) -> dict:
             pre_snapshots[p] = (None, None)
 
     try:
+        # Optional bubblewrap sandbox (agent opts in per command): read-only
+        # root with only the working directory, /tmp and the user cache dir
+        # writable; network is kept so builds/downloads still work. Falls back
+        # to a direct run (with a note) when bwrap is missing or cannot start.
+        sandboxed = False
+        sandbox_note = ""
+        argv = ["/bin/bash", "-c", command]
+        if sandbox:
+            bwrap = shutil.which("bwrap")
+            if bwrap:
+                home = Path.home()
+                argv = [
+                    bwrap,
+                    "--ro-bind", "/", "/",
+                    "--bind", str(work_dir), str(work_dir),
+                    "--bind", "/tmp", "/tmp",
+                ]
+                if (home / ".cache").is_dir():
+                    argv += ["--bind", str(home / ".cache"), str(home / ".cache")]
+                argv += [
+                    "--dev", "/dev",
+                    "--proc", "/proc",
+                    "--tmpfs", "/run",
+                    "--die-with-parent",
+                    "--", "/bin/bash", "-c", command,
+                ]
+                sandboxed = True
+            else:
+                sandbox_note = "[sandbox unavailable: bwrap (bubblewrap) not installed; ran unsandboxed]\n"
+
         result = subprocess.run(
-            ["/bin/bash", "-c", command],
+            argv,
             capture_output=True,
             text=True,
             cwd=str(work_dir),
             timeout=60,
         )
+
+        # bwrap itself failed to start (e.g. unprivileged user namespaces
+        # disabled) — retry once unsandboxed so the task still progresses.
+        if sandboxed and result.returncode != 0 and "bwrap:" in (result.stderr or ""):
+            result = subprocess.run(
+                ["/bin/bash", "-c", command],
+                capture_output=True,
+                text=True,
+                cwd=str(work_dir),
+                timeout=60,
+            )
+            sandboxed = False
+            sandbox_note = "[sandbox failed to start; ran unsandboxed]\n"
 
         # Post-run discovery: scan stdout/stderr AND the command string itself for
         # file paths not captured in the pre-scan (e.g. python -c writing files via
@@ -776,7 +892,8 @@ async def exec_command(command: str, cwd: Optional[str] = None) -> dict:
         res_payload = {
             "exitCode": result.returncode,
             "stdout": result.stdout[:8_000],
-            "stderr": result.stderr[:2_000],
+            "stderr": (sandbox_note + (result.stderr or ""))[:2_000],
+            "sandboxed": sandboxed,
         }
         if capped_modified:
             res_payload["modified_files"] = capped_modified
@@ -1023,6 +1140,73 @@ async def delete_memory(topic: str) -> dict:
     return {"ok": True, "path": str(p), "topic": topic}
 
 
+# ── Live web preview (canvas pane + CDP) ─────────────────────────────────────
+# The React app polls /api/web_preview/state and opens/refreshes the pane when
+# requestId advances; the agent then drives that same page over CDP.
+WEB_PREVIEW_STATE = {"url": "", "title": "", "requestId": 0, "ts": 0.0}
+
+
+def _preview_url(url: str = "") -> str:
+    target = (url or WEB_PREVIEW_STATE["url"] or "").strip()
+    if not target:
+        raise ValueError("no web preview open — call web_preview_open first")
+    return target
+
+
+async def web_preview_open(url: str, title: str = "") -> dict:
+    url = (url or "").strip()
+    if not re.match(r"^https?://", url):
+        raise ValueError("web_preview_open needs an http(s) URL")
+    WEB_PREVIEW_STATE.update(url=url, title=title or url, ts=time.time())
+    WEB_PREVIEW_STATE["requestId"] += 1
+    return {
+        "ok": True,
+        "url": url,
+        "requestId": WEB_PREVIEW_STATE["requestId"],
+        "note": "The user's canvas opens/refreshes the preview pane within ~2s; "
+                "web_preview_eval/snapshot/console/screenshot now drive that page.",
+    }
+
+
+async def web_preview_eval(js: str, url: str = "") -> dict:
+    import cdp_client
+    target = _preview_url(url)
+    try:
+        return await asyncio.to_thread(cdp_client.evaluate, target, js)
+    except cdp_client.CDPUnavailable as e:
+        return {"ok": False, "error": str(e)}
+
+
+async def web_preview_snapshot(url: str = "") -> dict:
+    import cdp_client
+    target = _preview_url(url)
+    try:
+        return await asyncio.to_thread(cdp_client.snapshot, target)
+    except cdp_client.CDPUnavailable as e:
+        return {"ok": False, "error": str(e)}
+
+
+async def web_preview_console(clear: bool = False, url: str = "") -> dict:
+    import cdp_client
+    target = _preview_url(url)
+    try:
+        entries = await asyncio.to_thread(cdp_client.console_entries, target, bool(clear))
+        return {"ok": True, "entries": entries}
+    except cdp_client.CDPUnavailable as e:
+        return {"ok": False, "error": str(e)}
+
+
+async def web_preview_screenshot(path: str = "", url: str = "") -> dict:
+    import cdp_client
+    target = _preview_url(url)
+    out = path or f"/tmp/hyprcandy_web_{int(time.time())}.png"
+    try:
+        saved = await asyncio.to_thread(cdp_client.screenshot, target, out)
+        return {"ok": True, "path": saved}
+    except cdp_client.CDPUnavailable as e:
+        return {"ok": False, "error": str(e)}
+
+
 # ── Dispatcher ─────────────────────────────────────────────────────────────────
 TOOL_FUNCTIONS = {
     "list_directory": list_directory,
@@ -1039,6 +1223,11 @@ TOOL_FUNCTIONS = {
     "write_memory": save_memory,
     "update_memory": save_memory,
     "delete_memory": delete_memory,
+    "web_preview_open": web_preview_open,
+    "web_preview_eval": web_preview_eval,
+    "web_preview_snapshot": web_preview_snapshot,
+    "web_preview_console": web_preview_console,
+    "web_preview_screenshot": web_preview_screenshot,
 }
 
 TOOL_ALIASES = {
@@ -1081,12 +1270,28 @@ async def dispatch(name: str, arguments: dict) -> any:
     elif canonical_name == "exec_command":
         if "command" not in args:
             args["command"] = args.get("cmd") or args.get("script") or args.get("shell_command") or ""
+        if "sandbox" not in args and "sandboxed" in args:
+            args["sandbox"] = args.pop("sandboxed")
+        if isinstance(args.get("sandbox"), str):
+            args["sandbox"] = args["sandbox"].strip().lower() in ("true", "1", "yes", "on")
     elif canonical_name == "web_search":
         if "query" not in args:
             args["query"] = args.get("q") or args.get("search_query") or args.get("text") or ""
     elif canonical_name == "fetch_url":
         if "url" not in args:
             args["url"] = args.get("uri") or args.get("link") or ""
+    elif canonical_name in ("web_preview_open", "web_preview_eval", "web_preview_snapshot",
+                            "web_preview_console", "web_preview_screenshot"):
+        if "url" not in args:
+            args["url"] = args.get("uri") or args.get("link") or ""
+        for k in ("uri", "link"):
+            args.pop(k, None)
+        if canonical_name == "web_preview_eval" and "js" not in args:
+            args["js"] = args.get("expression") or args.get("code") or args.get("script") or ""
+        for k in ("expression", "code", "script"):
+            args.pop(k, None)
+        if isinstance(args.get("clear"), str):
+            args["clear"] = args["clear"].strip().lower() in ("true", "1", "yes", "on")
     elif canonical_name in ("read_memory", "save_memory", "delete_memory"):
         if "topic" not in args:
             args["topic"] = args.get("name") or args.get("title") or args.get("subject") or ""

@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 import QtCore
 import Quickshell
@@ -27,6 +28,38 @@ import QtQuick.Effects
 
 Item {
     id: launcherScope
+
+    // Themed item for the web-tab context menu. Menu uses its DECLARED
+    // MenuItem children as-is (the delegate property only styles
+    // action-derived items), so the palette lives in this shared inline
+    // component: cPrimary text and a 10% cPrimary hover tint; the
+    // cOnSecondary surface comes from the Menu background.
+    component WebMenuItem: MenuItem {
+        id: wmi
+        // Zero-height when hidden: ListView keeps invisible delegates in
+        // its layout, so collapsing them here makes the popup height track
+        // only the options the current page actually offers.
+        implicitHeight: visible ? 30 : 0
+        // The Text below carries the only insets; the style's default
+        // padding 6 would double them.
+        padding: 0
+        hoverEnabled: true
+        opacity: enabled ? 1 : 0.4
+        contentItem: Text {
+            text: wmi.text
+            color: Theme.cPrimary
+            font.pixelSize: 12
+            verticalAlignment: Text.AlignVCenter
+            leftPadding: 10
+            rightPadding: 14
+        }
+        background: Rectangle {
+            radius: 6
+            color: wmi.hovered || wmi.highlighted
+                   ? Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.1)
+                   : "transparent"
+        }
+    }
 
     Variants {
         id: launcherVariants
@@ -308,6 +341,14 @@ Item {
                 httpCacheMaximumSize: 128 * 1024 * 1024
             }
             property WebEngineProfile webProfile: null
+            // The prototype is creation-time config only and exposes no
+            // signals; hook downloads on the LIVE instance instead. Accept
+            // with Qt's default destination (XDG Downloads + suggested name);
+            // without a handler QML drops the request and Save link no-ops.
+            Connections {
+                target: win.webProfile
+                function onDownloadRequested(download) { download.accept() }
+            }
 
             // Build the single shared WebEngine profile on FIRST use, never
             // destroy it. instance() must run after component init (calling it
@@ -1033,11 +1074,13 @@ Item {
                 if (!t) return
                 win._webTouch()
             }
-            function webNewTab(url) {
+            function webNewTab(url, activate) {
                 const tab = { url: (url && url.length) ? String(url) : win.searxBase,
                               title: "", _id: win._nextTabId++ }
                 win.webTabs.push(tab)
-                win.activeWebTab = win.webTabs.length - 1
+                // activate===false keeps the current tab focused (context-menu
+                // "Open link in new tab" backgrounds the new tab like a browser).
+                if (activate !== false) win.activeWebTab = win.webTabs.length - 1
                 win._webTouch()
                 win._ensureView(tab)
                 win._syncViewVisibility()
@@ -4148,6 +4191,87 @@ Item {
                                             id: webViewContainer
                                             anchors.fill: parent
                                         }
+                                        // Themed right-click menu for web tabs: accepting the
+                                        // context-menu request suppresses Qt's unthemed default
+                                        // popup; this one matches the agent workspace palette
+                                        // (cOnSecondary surface, cPrimary text, 10% cPrimary
+                                        // hover). Only actions that work inside the embedded
+                                        // view are offered -- no new-window/loop/save-media/
+                                        // save-page dead ends -- and "Open link in new tab"
+                                        // joins the launcher tab pool in the background.
+                                        // Menu width: the style's ListView contentItem contributes
+                                        // no implicit width and a plain background Rectangle has
+                                        // none either (the stock background supplies 200), so size
+                                        // the popup from the longest label: text insets 10+14 plus
+                                        // menu padding 4+4.
+                                        FontMetrics { id: cmFontMetrics; font.pixelSize: 12 }
+                                        Menu {
+                                            id: webContextMenu
+                                            property var targetView: null
+                                            property string linkUrl: ""
+                                            property string mediaUrl: ""
+                                            property bool mediaIsImage: false
+                                            property string selectedText: ""
+                                            padding: 4
+                                            implicitWidth: Math.ceil(cmFontMetrics.advanceWidth("Open link in new tab")) + 32
+                                            background: Rectangle {
+                                                radius: 10
+                                                color: Theme.cOnSecondary
+                                                border.width: 1
+                                                border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.25)
+                                            }
+                                            WebMenuItem {
+                                                text: "Back"
+                                                enabled: webContextMenu.targetView && webContextMenu.targetView.canGoBack
+                                                onTriggered: webContextMenu.targetView.goBack()
+                                            }
+                                            WebMenuItem {
+                                                text: "Forward"
+                                                enabled: webContextMenu.targetView && webContextMenu.targetView.canGoForward
+                                                onTriggered: webContextMenu.targetView.goForward()
+                                            }
+                                            WebMenuItem {
+                                                text: "Reload"
+                                                onTriggered: webContextMenu.targetView.reload()
+                                            }
+                                            MenuSeparator {
+                                                visible: webContextMenu.linkUrl !== "" || webContextMenu.mediaUrl !== "" || webContextMenu.selectedText !== ""
+                                                // Same collapse as the items: no slot when hidden.
+                                                implicitHeight: visible ? 13 : 0
+                                                verticalPadding: visible ? 6 : 0
+                                                contentItem: Rectangle {
+                                                    implicitHeight: 1
+                                                    color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g, Theme.cPrimary.b, 0.15)
+                                                }
+                                            }
+                                            WebMenuItem {
+                                                text: "Open link in new tab"
+                                                visible: webContextMenu.linkUrl !== ""
+                                                onTriggered: win.webNewTab(webContextMenu.linkUrl, false)
+                                            }
+                                            WebMenuItem {
+                                                text: "Save link"
+                                                visible: webContextMenu.linkUrl !== ""
+                                                onTriggered: webContextMenu.targetView.triggerWebAction(WebEngineView.DownloadLinkToDisk)
+                                            }
+                                            WebMenuItem {
+                                                text: "Copy link address"
+                                                visible: webContextMenu.linkUrl !== ""
+                                                onTriggered: webContextMenu.targetView.triggerWebAction(WebEngineView.CopyLinkToClipboard)
+                                            }
+                                            WebMenuItem {
+                                                text: "Copy media address"
+                                                visible: webContextMenu.mediaUrl !== ""
+                                                onTriggered: webContextMenu.targetView.triggerWebAction(
+                                                    webContextMenu.mediaIsImage ? WebEngineView.CopyImageUrlToClipboard
+                                                                                : WebEngineView.CopyMediaUrlToClipboard)
+                                            }
+                                            WebMenuItem {
+                                                text: "Copy"
+                                                visible: webContextMenu.selectedText !== ""
+                                                onTriggered: webContextMenu.targetView.triggerWebAction(WebEngineView.Copy)
+                                            }
+                                        }
                                         Component {
                                             id: tabViewProto
                                             WebEngineView {
@@ -4198,6 +4322,17 @@ Item {
                                                 // window. Users reach those flows via the
                                                 // header's "Open in default browser" button.
                                                 onNewWindowRequested: function (request) { }
+                                                // Hand the right-click popup to the themed menu
+                                                // above; accepted=true drops Qt's default one.
+                                                onContextMenuRequested: function (request) {
+                                                    request.accepted = true
+                                                    webContextMenu.targetView = tabView
+                                                    webContextMenu.linkUrl = request.linkUrl.toString()
+                                                    webContextMenu.mediaUrl = request.mediaUrl.toString()
+                                                    webContextMenu.mediaIsImage = request.mediaType === ContextMenuRequest.MediaTypeImage
+                                                    webContextMenu.selectedText = request.selectedText
+                                                    webContextMenu.popup(tabView, request.position.x, request.position.y)
+                                                }
                                                 onFullScreenRequested: function (request) { win._onViewFullScreen(tabId, request) }
                                                 // Installing this handler stops QtWebEngine forwarding every page
                                                 // console message to the log. Chromium + third-party pages emit a lot
@@ -4266,6 +4401,20 @@ Item {
                                                 onUrlChanged: if (win.agentReady) agentView._onApp = true
                                                 backgroundColor: "transparent"
                                                 settings.javascriptEnabled: true
+                                                // New-tab launches from the workspace's web
+                                                // preview (target=_blank / window.open inside
+                                                // the credentialless iframe) become real
+                                                // launcher websearch tabs: the browser pool
+                                                // has the UA spoof, shield and per-tab
+                                                // persistence the preview pane lacks.
+                                                // Non-http schemes are dropped.
+                                                onNewWindowRequested: function (request) {
+                                                    const u = String(request.requestedUrl || "")
+                                                    if (/^https?:\/\//.test(u)) {
+                                                        win.webNewTab(u)
+                                                        win.tab = "websearch"
+                                                    }
+                                                }
                                                 onVisibleChanged: if (visible) forceActiveFocus()
                                                 // Publish ourselves for the window-level focus
                                                 // calls and grab keyboard focus on first creation
