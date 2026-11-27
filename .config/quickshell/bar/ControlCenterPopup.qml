@@ -4985,7 +4985,7 @@ PanelWindow {
                         // { description = "..." })`, whose description lives on a
                         // different line than the `hl.bind("KEYS"` header. Keyed by the
                         // exact bind string; only applied when the parsed desc is empty.
-                        property var kbDescOverrides: ({ "ALT + G": "Toggle game-mode" })
+                        property var kbDescOverrides: ({ "ALT + G": "Toggle game-mode", "SUPER + M": "Minimize/hide window" })
                         // Sub-tab index (mirrored to/from ccTabSettings)
                         property int kbSubIdx: ccTabSettings.activeKbSubTab
 
@@ -5019,8 +5019,12 @@ PanelWindow {
                             if (execM) {
                                 cmd = execM[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\')
                             } else {
-                                // Non-exec dispatch — extract the dispatch call text
-                                const dispM = line.match(/hl\.bind\s*\(\s*"[^"]+"\s*,\s*(hl\.[^,\)]+)/)
+                                // Non-exec dispatch — capture table-arg dispatches
+                                // (hl.dsp.window.move({ ... })) whole: the generic
+                                // fallback stops at the first comma INSIDE the table
+                                // and would truncate the argument list.
+                                const tblM = line.match(/(hl\.dsp\.[\w.]+\(\{[^}]*\}\))/)
+                                const dispM = tblM || line.match(/hl\.bind\s*\(\s*"[^"]+"\s*,\s*(hl\.[^,\)]+)/)
                                 if (dispM) cmd = dispM[1].trim()
                             }
                             return { keys: keys, cmd: cmd, desc: desc, raw: line }
@@ -5028,8 +5032,13 @@ PanelWindow {
 
                         // Build hl.bind line for custom.lua
                         function makeBindLine(keys, cmd, desc) {
-                            const escapedCmd = cmd.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
                             const escapedDesc = desc.replace(/"/g, '\\"')
+                            // Non-exec dispatches (e.g. hl.dsp.window.move({ ... }))
+                            // round-trip verbatim: wrapping them in exec_cmd would
+                            // turn the dispatcher text into a broken shell command.
+                            if (/^hl\.dsp\.(?!exec_cmd)/.test(cmd))
+                                return 'hl.bind("' + keys + '", ' + cmd + ', { description = "' + escapedDesc + '" })'
+                            const escapedCmd = cmd.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
                             return 'hl.bind("' + keys + '", hl.dsp.exec_cmd("' + escapedCmd + '"), { description = "' + escapedDesc + '" })'
                         }
 
