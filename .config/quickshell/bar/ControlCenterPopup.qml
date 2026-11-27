@@ -7355,6 +7355,56 @@ PanelWindow {
                                                 idleReadProc.running = true
                                         }
 
+                                        CCSection { text: "Idle Inhibitor" }
+                                        ColumnLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 4
+                                            RowLayout {
+                                                Layout.fillWidth: true; spacing: 8
+                                                Text {
+                                                    text: "Idle inhibitor always on"
+                                                    color: Theme.cOnSurf
+                                                    font.family: Config.labelFont; font.pixelSize: 13
+                                                    Layout.fillWidth: true
+                                                }
+                                                // iOS-style pill (same design as CCToggle) bound to the
+                                                // shared InhibitorState singleton: the bar module click and
+                                                // this pill fire the identical toggle() + conf write, and
+                                                // both reflect the persisted cross-session state.
+                                                Rectangle {
+                                                    id: inhPill
+                                                    property bool _animate: false
+                                                    width: 46; height: 26; radius: 13
+                                                    color: InhibitorState.active
+                                                        ? Qt.rgba(Theme.cInversePrimary.r, Theme.cInversePrimary.g,
+                                                              Theme.cInversePrimary.b, 0.82)
+                                                        : Qt.rgba(Theme.cScrim.r, Theme.cScrim.g, Theme.cScrim.b, 0.3)
+                                                    border.width: 1
+                                                    border.color: Qt.rgba(Theme.cPrimary.r, Theme.cPrimary.g,
+                                                                          Theme.cPrimary.b, 0.6)
+                                                    Rectangle {
+                                                        width: 20; height: 20; radius: 10
+                                                        color: Theme.cPrimary
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        x: InhibitorState.active ? parent.width - width - 3 : 3
+                                                        Behavior on x { enabled: inhPill._animate; NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
+                                                    }
+                                                    MouseArea {
+                                                        anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                                                        onClicked: { inhPill._animate = true; InhibitorState.toggle() }
+                                                    }
+                                                    Behavior on color { enabled: inhPill._animate; ColorAnimation { duration: 150 } }
+                                                }
+                                            }
+                                            Text {
+                                                Layout.fillWidth: true
+                                                text: "Keeps the session awake while hypridle timers would otherwise dim, lock or suspend. The applied setting persists across desktop sessions."
+                                                color: Qt.rgba(Theme.cOnSurf.r, Theme.cOnSurf.g, Theme.cOnSurf.b, 0.6)
+                                                font.family: Config.labelFont; font.pixelSize: 11
+                                                wrapMode: Text.WordWrap
+                                            }
+                                        }
+
                                         CCSection { text: "Hypridle Sleep & Lock Timers" }
                                         Text {
                                             Layout.fillWidth: true
