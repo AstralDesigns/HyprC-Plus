@@ -19,7 +19,12 @@
 seed="$(grep '^wallpaper' "$HOME/.config/wallpaper/wallpaper.ini" 2>/dev/null \
   | cut -d= -f2 | sed "s|^ *||;s|^~|$HOME|")"
 
-awww-daemon 2>/dev/null
+# Daemon start must be backgrounded AND pgrep-guarded (install.sh idiom): a
+# foreground `awww-daemon` BLOCKS forever on a fresh boot where no daemon exists
+# yet, so restore/apply never ran (live ISO black backdrop + everything queued
+# behind hyprland.start held back). With a daemon already up the guarded start
+# is skipped, which is why host logins and relogins never showed the hang.
+pgrep -x awww-daemon > /dev/null 2>&1 || awww-daemon > /dev/null 2>&1 &
 sleep 0.5
 awww restore 2>/dev/null
 if ! awww query 2>/dev/null | grep -q 'displaying: image:'; then
