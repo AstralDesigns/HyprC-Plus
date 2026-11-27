@@ -50,18 +50,29 @@ QtObject {
     }
 
     // DesktopEntries may not be populated yet right after qs start.
+    // values (QObjectList) is the typed property; raw-model .count carries no
+    // guaranteed notify and lint flags it missing on UntypedObjectModel.
     property var _entriesPoller: Timer {
         interval: 250
         repeat: true
-        running: root.idList.length > 0 && DesktopEntries.applications.count === 0
+        running: root.idList.length > 0 && DesktopEntries.applications.values.length === 0
         property int _attempts: 0
         onTriggered: {
             _attempts++
-            if (DesktopEntries.applications.count > 0 || _attempts >= 40)
+            if (DesktopEntries.applications.values.length > 0 || _attempts >= 40)
                 stop()
-            if (DesktopEntries.applications.count > 0)
+            if (DesktopEntries.applications.values.length > 0)
                 root._resolveApps()
         }
+    }
+
+    // Boot race on slow live sessions: entries can populate AFTER the poller's
+    // 10s budget, leaving pins cached with fallback icon/exec until a manual
+    // repin. Re-resolve on the model's real notify signal (valuesChanged per
+    // quickshell-core.qmltypes; raw-model .count has no guaranteed notify).
+    property var _entriesConn: Connections {
+        target: DesktopEntries.applications
+        function onValuesChanged() { root._resolveApps() }
     }
 
     function _findEntry(id) {

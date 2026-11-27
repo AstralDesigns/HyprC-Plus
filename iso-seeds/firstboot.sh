@@ -38,6 +38,17 @@ systemctl --user daemon-reload
 systemctl --user enable --now theme-watcher.service cursor-theme-watcher.service 2>/dev/null || true
 systemctl --user enable background-watcher.service lock-watcher.service 2>/dev/null || true
 
+# 4b. Seed the GTK icon theme into dconf ONCE (this script runs once per user,
+#     live and installed). GTK3's gsettings backend overrides gtk-3.0/settings.ini
+#     on dbus sessions, and a fresh dconf defaults icon-theme to Adwaita. Seeding
+#     here - not in per-session autostart - keeps later nwg-look/CC choices intact.
+#     Wait briefly for the user bus socket (firstboot precedes the session).
+for _ in $(seq 1 10); do
+  [ -S "${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/bus" ] && break
+  sleep 0.5
+done
+gsettings set org.gnome.desktop.interface icon-theme 'Tela-circle-black' 2>/dev/null || true
+
 # 5. Repair path only: rebuild the agent workspace if the baked dist is missing.
 if [ ! -f "$HC/GJS/hyprcandydock/agent-app/dist/index.html" ]; then
   bash "$HC/GJS/hyprcandydock/agent-app/build.sh" || true

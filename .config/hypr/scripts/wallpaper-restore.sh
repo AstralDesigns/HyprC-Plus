@@ -32,8 +32,12 @@ if ! awww query 2>/dev/null | grep -q 'displaying: image:'; then
   # keep trying until it lands (host logins succeed on the first attempt).
   if [ -n "$seed" ] && [ -f "$seed" ]; then
     for _ in $(seq 1 20); do
-      bash "$HOME/.config/quickshell/wallpaper/wallpaper-apply.sh" "$seed" && break
+      bash "$HOME/.config/quickshell/wallpaper/wallpaper-apply.sh" "$seed"
+      # wallpaper-apply.sh ends in a backgrounded nohup, so it ALWAYS exits 0
+      # even when awww img died on an early wayland refusal - verify via query
+      # instead of the exit code, else the loop breaks on the first failure.
       sleep 1
+      awww query 2>/dev/null | grep -q 'displaying: image:' && break
     done
   fi
 fi
