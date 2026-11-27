@@ -16,7 +16,10 @@ rm -f "$HOME/.config/systemd/user/hyprcandy-firstboot.service"
 #    iso-seeds is packaging-only. (No --ignore='wallpaper' — it would also
 #    exclude quickshell/wallpaper, since stow matches basenames.)
 cd "$HC"
-STOW_ARGS=(-v -t "$HOME" --ignore='Gifs' --ignore='GJS' --ignore='Greeter' --ignore='Wallhaven' --ignore='iso-seeds' --ignore='ISO')
+STOW_ARGS=(-v -t "$HOME" --ignore='Gifs' --ignore='GJS' --ignore='Greeter' --ignore='Wallhaven' --ignore='iso-seeds' --ignore='ISO' --ignore='transparent.png')
+# Older firstboot stows linked transparent.png into $HOME; it ships only as the
+# real Pictures/ copy (prepare-payload). Drop the stray symlink, never a real file.
+if [ -L "$HOME/transparent.png" ]; then rm -f "$HOME/transparent.png"; fi
 stow "${STOW_ARGS[@]}" . || stow -R "${STOW_ARGS[@]}" .
 
 # 3. Executable bits for scripts/hooks.
@@ -74,6 +77,9 @@ if ! grep -q 'archisobasedir=' /proc/cmdline; then
   if grep -qs 'liveuser' /etc/sddm.conf.d/autologin.conf; then
     sudo rm -f /etc/sddm.conf.d/autologin.conf || true
   fi
+  # Older ISOs logged the installer into the home dir; drop any legacy copy
+  # (the launcher now logs to /tmp, live tmpfs that is never shipped).
+  rm -f "$HOME/cachy-install.log"
 fi
 
 touch "$STATE/firstboot-done"

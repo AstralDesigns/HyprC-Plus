@@ -16,7 +16,10 @@ rm -f "$HOME/.config/systemd/user/hyprcandy-firstboot.service"
 #    iso-seeds is packaging-only. (No --ignore='wallpaper' — it would also
 #    exclude quickshell/wallpaper, since stow matches basenames.)
 cd "$HC"
-STOW_ARGS=(-v -t "$HOME" --ignore='Gifs' --ignore='GJS' --ignore='Greeter' --ignore='Wallhaven' --ignore='iso-seeds' --ignore='ISO')
+STOW_ARGS=(-v -t "$HOME" --ignore='Gifs' --ignore='GJS' --ignore='Greeter' --ignore='Wallhaven' --ignore='iso-seeds' --ignore='ISO' --ignore='transparent.png')
+# Older firstboot stows linked transparent.png into $HOME; it ships only as the
+# real Pictures/ copy (prepare-payload). Drop the stray symlink, never a real file.
+if [ -L "$HOME/transparent.png" ]; then rm -f "$HOME/transparent.png"; fi
 stow "${STOW_ARGS[@]}" . || stow -R "${STOW_ARGS[@]}" .
 
 # 3. Executable bits for scripts/hooks.
